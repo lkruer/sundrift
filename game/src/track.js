@@ -116,7 +116,7 @@ export class Track {
     if (r() < 0.10) this._mountTarget = 0;
     // set pieces every 400 m or so, never inside a hairpin, in a fixed rotation so a tunnel always comes early
     if (this._sinceSet >= 4 && type !== 'hairpin' && r() < 0.65) {
-      const kinds = ['shrine', 'vista', 'tunnel', 'hut', 'tunnel', 'shrine', 'vista', 'hut'];
+      const kinds = ['shrine', 'busstop', 'tunnel', 'conbini', 'hut', 'tunnel', 'shrine', 'vista', 'busstop', 'conbini'];
       const kind = kinds[this.markers.length % kinds.length];
       this.markers.push({ s: s0 + 30, kind, side: this._mountTarget >= 0 ? 1 : -1 });
       this._sinceSet = 0;

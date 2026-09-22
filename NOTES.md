@@ -115,6 +115,38 @@ Measured after the turn, on the live URL under the jam gate: ready 9.1 s, 1.1 MB
 triangles, 0 errors, 0 404s, RESULT PASS. Desktop gate: 321 draws, 0.89 M triangles, five drifts banked over
 600 m.
 
+## Critic rounds, and the turn to a drift anime (22 Sep)
+
+Two blind rounds against nine night photographs, a fresh critic each time (work/critic1, work/critic2). Both
+lost 0 of 8, and each named one property.
+
+| round | the property the critic named | pairs | margins |
+|---|---|---|---|
+| 1 | the night ambient: verges and canopies lit to daylight luma, so no lamp pool owns the frame | 0 of 8 | 6 decisive, 2 clear |
+| 2 | one colour temperature: unlit ground warm brown, pools beige, only the sky cool | 0 of 8 | 6 decisive, 2 clear ("clearly better, right bones, wrong palette") |
+
+Round 1's fix: the rig's fill cut to a fifth at night, a faint moon, lamps as the light with real fall-off,
+headlights narrowed to the road. Round 2's fix: a blue moon, a night tint on the ground and foliage materials
+(skylight drowns warm albedo), sodium-orange lamps and pools, cool-white headlights, beams that fade along
+their length, tail lights over the bloom line. Round 1 also caught a grid of squares in the lamp glare, which
+was the per-texel noise in the road's roughness map showing in the highlight: replaced with smooth variation.
+
+Then the owner's second direction: a much more detailed car, easier and cleaner drifting, more retro, and an
+environment that is not low-poly trees and rocks; "decide on a unique art direction and go into it fully".
+The direction chosen: **a playable 90s drift anime**. The night pass in the mood of the late-90s arcade racers
+(sodium lamps, deep-blue gradient sky, a town of lights in the valley) and the drift-anime touge (guardrails,
+chevrons, power lines, a lit convenience store at the pass), rendered as cel bands with ink outlines and
+halftone shade. The cel look is one full-screen pass (`game/src/post.js`) over the normally lit frame: ink
+from relative depth discontinuities plus a luma sobel for creases, six luminance bands applied as a ratio so
+hue survives, halftone dots in the shade, grain and a faint scanline veneer. Giving the composer's ping-pong
+buffers a shared depth texture rendered one black frame a second; the scene now renders into its own target
+that owns the depth. Measured after: median 60 fps headless on the RTX 3060, 336 draws, 0.88 M triangles.
+
+Drift assists added for the same request: counter-steer assist 0.48 to 0.62 (0.78 on touch) rising to 0.97
+past 45 degrees of slip, an anti-spin throttle ease past 40 degrees, extra yaw damping while a slide is
+coming back, more lock at speed, a gentler grip curve and a slightly lighter handbrake. The sim scenarios all
+still hold (work/sim.mjs).
+
 ## Still wrong, or not attempted
 
 (kept up to date at the end)

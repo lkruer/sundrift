@@ -5,6 +5,10 @@ and boost, clip the guardrail without touching it, and every banked drift pushes
 moonlight, the lamps, the sunrise and the golden hour that follows are driven by how well you drive, and the
 whole cycle comes round again.
 
+**The look:** a playable 90s drift anime. Sodium street lamps on a Japanese touge at night, a town of lights in
+the valley, and the whole frame rendered as cel bands with ink outlines and halftone shade by one post pass
+over the recipe's lighting rig.
+
 **Play:** https://lkruer.github.io/sundrift/game/ (phone or laptop; one finger on a phone, WASD and Space on a keyboard)
 
 Built for the [404 game jam 001](https://github.com/404-Repo/404-game-jam) with the
