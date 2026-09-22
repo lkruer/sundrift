@@ -434,8 +434,8 @@ function applySun(dt) {
   if (beams) beams.userData.mat.opacity = 0.09 * nightAmt;
   if (night.moon) night.moon.intensity = 0.85 * nightAmt;
   if (night.glow) night.glow.material.opacity = 0.42 * smoothstep(-0.5, -5, el);
-  if (night.spill) night.spill.intensity = 34 * nightAmt;
-  if (night.tailGlow) night.tailGlow.intensity = 9 * nightAmt;
+  if (night.spill) night.spill.intensity = 22 * nightAmt;
+  if (night.tailGlow) night.tailGlow.intensity = 6 * nightAmt;
   if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.66 * nightAmt);
   if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el);
   if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el); }
