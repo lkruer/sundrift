@@ -182,7 +182,7 @@ export class Track {
     const ridge = 1 - Math.min(1, Math.abs(mount) * 1.6);
     h = lerp(h, -0.28 * fall, ridge);
     // noise, growing with distance from the road so the shoulder stays clean
-    const n = this.noise(u * 0.11 + s * 0.013, s * 0.06) * 2.2 + this.noise(u * 0.35, s * 0.21) * 0.5;
+    const n = this.noise(u * 0.11 + s * 0.013, s * 0.06) * 1.3 + this.noise(u * 0.35, s * 0.21) * 0.2;
     h += n * smoothstep(rail + 0.8, rail + 6, au);
     // terraces: a flat cut for a shrine or a lay-by, with soft edges
     for (const t of this.terraces) {

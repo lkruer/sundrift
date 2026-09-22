@@ -24,7 +24,7 @@ const canvas = $('c');
 const loadEl = $('load'), barf = $('barf'), loadmsg = $('loadmsg');
 
 const G = {
-  playing: false, over: false, hour: 17.6, hourShown: 0, lastSunApply: 0,
+  playing: false, over: false, hour: 20.6, hourShown: 0, lastSunApply: 0,
   fps: 60, frameAvg: 1 / 60, s: 0, u: 0, idx: 0, dist: 0, lastS: 0, boostMax: SCORE.boostMax, night: 0,
 };
 window.__GAME__ = { pos: [0, 0], fps: 0, speed: 0, score: 0, over: false, draws: 0, tris: 0 };
@@ -42,8 +42,40 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.4, 45
 scene.add(camera);
 const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 55, fogDensity: 0.0013, exposure: 1.05 });
 
-let track, world, car, carRoot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights;
+let track, world, car, carRoot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, beams;
 const lampLights = [];
+const night = { moon: null, stars: null, disc: null, dir: new THREE.Vector3(0.35, 0.6, -0.72).normalize(), amt: 0 };
+
+/** The night's own light: a cool moon with a shadow box around the car, stars, and a moon disc. */
+function buildNight() {
+  const moon = new THREE.DirectionalLight(0x9fb4e0, 0);
+  moon.castShadow = Q.shadow;
+  const sm = tier === 'phone' ? 1024 : 2048;
+  moon.shadow.mapSize.set(sm, sm);
+  moon.shadow.camera.near = 1; moon.shadow.camera.far = 120;
+  moon.shadow.bias = -0.0008; moon.shadow.normalBias = 0.04;
+  const r = 34; const c = moon.shadow.camera; c.left = -r; c.right = r; c.top = r; c.bottom = -r; c.updateProjectionMatrix();
+  scene.add(moon); scene.add(moon.target);
+  night.moon = moon;
+  // stars: a point cloud on a far sphere that follows the camera
+  const N = tier === 'phone' ? 900 : 1600;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const a = Math.random() * Math.PI * 2, e = Math.asin(Math.random() * 0.95 + 0.04);
+    pos[i * 3] = Math.cos(e) * Math.sin(a) * 2600; pos[i * 3 + 1] = Math.sin(e) * 2600; pos[i * 3 + 2] = Math.cos(e) * Math.cos(a) * 2600;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xdfe8ff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  stars.frustumCulled = false; stars.renderOrder = -1;
+  scene.add(stars); night.stars = stars;
+  // the moon disc with a soft halo
+  const disc = new THREE.Group();
+  const dm = new THREE.Mesh(new THREE.CircleGeometry(38, 24), new THREE.MeshBasicMaterial({ color: 0xfff4dc, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+  const halo = new THREE.Mesh(new THREE.CircleGeometry(120, 24), new THREE.MeshBasicMaterial({ color: 0x9fb4e0, transparent: true, opacity: 0, fog: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+  halo.position.z = -1;
+  disc.add(halo, dm); disc.userData = { dm, halo };
+  scene.add(disc); night.disc = disc;
+}
 
 // ---------------------------------------------------------------- boot
 async function boot() {
@@ -55,6 +87,7 @@ async function boot() {
   await world.load((f, k) => prog(0.05 + f * 0.6, k.replace('_', ' ')));
   prog(0.68, 'the car');
   await buildCar();
+  buildNight();
   prog(0.8, 'the mountain');
   car = new Car();
   const start = track.sample(8);
@@ -153,10 +186,21 @@ async function buildCar() {
     carRoot.add(sp); carRoot.add(sp.target);
     headlights.push(sp);
   }
-  for (let i = 0; i < (tier === 'phone' ? 2 : 3); i++) {
-    const pl = new THREE.PointLight(0xffcf7a, 0, 26, 1.6);
+  for (let i = 0; i < (tier === 'phone' ? 3 : 5); i++) {
+    const pl = new THREE.PointLight(0xffcf7a, 0, 36, 1.5);
     scene.add(pl); lampLights.push(pl);
   }
+  // fake volumetric beams: two additive cones ahead of the lamps, the way arcade racers draw headlights
+  beams = new THREE.Group();
+  const beamGeo = new THREE.ConeGeometry(2.6, 16, 14, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 8);
+  const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff0c8, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  for (const x of [-0.6, 0.6]) {
+    const b = new THREE.Mesh(beamGeo, beamMat);
+    b.position.set(x, 0.62, 2.1); b.rotation.x = 0.04;
+    beams.add(b);
+  }
+  beams.userData.mat = beamMat;
+  carRoot.add(beams);
 }
 
 function startGame() {
@@ -167,14 +211,14 @@ function startGame() {
   hud.show(true);
   audio.unlock();
   G.playing = true;
-  hud.toast('DRIFT THE SUN DOWN', 'good', true);
+  hud.toast('DRIFT THE NIGHT AWAY', 'good', true);
 }
 
 function restartRun() {
   scoring.reset();
   const start = track.sample(8);
   car.reset(start.x, start.z, start.h);
-  G.idx = 0; G.dist = 0; G.lastS = 8; G.hour = 17.6;
+  G.idx = 0; G.dist = 0; G.lastS = 8; G.hour = 20.6;
   chase.snap(car, start.y);
   hud.toast('NEW RUN', '', false);
 }
@@ -222,6 +266,8 @@ function idle(dt) {
   if (Math.abs(camera.fov - 48) > 0.1) { camera.fov = 48; camera.updateProjectionMatrix(); }
   placeCar(y, 0);
   world.updateFar(car.x, y, car.z);
+  nightFollow();
+  if (!G.sunOnce) { G.sunOnce = true; applySun(10); }
 }
 
 function step(dt) {
@@ -277,8 +323,8 @@ function step(dt) {
   // the clock runs slowly with distance too, fast through the night and the flat middle of the day, slow
   // through the golden hour that the game is about
   const h = G.hour;
-  const rate = (h > 18.3 || h < 5.6) ? 10 : h < 15 ? 5 : h < 17.2 ? 2.5 : 1;
-  G.hour += ds / 3800 * rate;
+  const rate = (h >= 7.2 && h < 16.6) ? 7 : 1;
+  G.hour += ds / 3000 * rate;
   if (G.hour >= 24) { G.hour -= 24; }
   // the day's two moments, called out once each
   const crossed = (edge) => h < edge && G.hour >= edge;
@@ -298,9 +344,26 @@ function step(dt) {
 
   // ---- camera, world
   chase.update(dt, car, road.y, (x, z) => track.groundAt(x, z, G.idx), boost01);
+  nightFollow();
   world.update(G.s);
   world.updateFar(car.x, road.y, car.z);
   hud.update(dt, scoring, car, G.hour, G.dist, car.boost, SCORE.boostMax, perfLine);
+}
+
+function nightFollow() {
+  if (!night.moon) return;
+  if (night.stars) night.stars.position.copy(camera.position);
+  if (night.disc) {
+    night.disc.position.copy(camera.position).addScaledVector(night.dir, 2400);
+    night.disc.lookAt(camera.position);
+  }
+  // the moon key sits over the car; snapped to texels so the shadow edges do not crawl
+  const texel = 68 / (tier === 'phone' ? 1024 : 2048);
+  const sx = Math.round(car.x / texel) * texel, sz = Math.round(car.z / texel) * texel;
+  const m = night.moon;
+  m.position.set(sx + night.dir.x * 60, carRoot.position.y + night.dir.y * 60, sz + night.dir.z * 60);
+  m.target.position.set(sx, carRoot.position.y, sz);
+  m.target.updateMatrixWorld();
 }
 
 let sunTimer = 0;
@@ -315,9 +378,14 @@ function applySun(dt) {
   const el = t.elevation;
   // headlights and lamps come on as the sun goes
   const nightAmt = smoothstep(4, -3, el);
-  G.night = nightAmt;
-  for (const h of headlights) h.intensity = 180 * nightAmt;
-  sunColor.copy(rig.sun.color).lerp(new THREE.Color(0.6, 0.7, 1.0), nightAmt);
+  G.night = nightAmt; night.amt = nightAmt;
+  for (const h of headlights) h.intensity = 220 * nightAmt;
+  if (beams) beams.userData.mat.opacity = 0.075 * nightAmt;
+  if (night.moon) night.moon.intensity = 1.35 * nightAmt;
+  if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el);
+  if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el); }
+  world.setNight(nightAmt);
+  sunColor.copy(rig.sun.color).lerp(new THREE.Color(0.55, 0.65, 0.95), nightAmt);
 }
 
 function placeCar(y, grade) {
@@ -369,7 +437,7 @@ function effects(dt, y, boost01) {
       const e = near[i];
       if (!e || e.d > 70 * 70) { pl.intensity = 0; return; }
       pl.position.set(e.l.x, e.l.y, e.l.z);
-      pl.intensity = e.l.tunnel ? 60 : 90 * Math.max(G.night, 0.15);
+      pl.intensity = e.l.tunnel ? 70 : 130 * Math.max(G.night, 0.12);
     });
   } else lampLights.forEach((pl) => { pl.intensity = 0; });
 }

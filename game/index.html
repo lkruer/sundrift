@@ -103,6 +103,9 @@
 
   #vign { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:0;
           background:radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%); }
+  #crt { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:.55;
+         background: repeating-linear-gradient(0deg, rgba(0,0,0,.10) 0px, rgba(0,0,0,.10) 1px, transparent 1px, transparent 3px),
+                     radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(4,6,14,.55) 100%); }
   #hit { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:0; background:radial-gradient(ellipse at center, rgba(224,74,46,0) 50%, rgba(224,74,46,.5) 100%); }
   #perf { position:absolute; right:calc(var(--safe-r) + 16px); top:calc(var(--safe-t) + 56px); font-size:10px; color:var(--dim); letter-spacing:.06em;
           text-align:right; line-height:1.6; display:none; }
@@ -150,12 +153,13 @@
 
 <div id="load">
   <h1>SUNDRIFT</h1>
-  <div class="sub">AUTUMN TOUGE</div>
+  <div class="sub">NIGHT TOUGE</div>
   <div id="bar"><div id="barf"></div></div>
   <div id="loadmsg">warming up</div>
 </div>
 
 <div id="vign"></div>
+<div id="crt"></div>
 <div id="hit"></div>
 
 <div id="hud">
@@ -196,7 +200,7 @@
 
 <div class="screen" id="start">
   <h1>SUNDRIFT</h1>
-  <div class="sub">AUTUMN TOUGE · ENDLESS</div>
+  <div class="sub">NIGHT TOUGE · ENDLESS</div>
   <div class="ctl keys">
     <div><span><kbd>W</kbd><kbd>S</kbd></span><b>GAS · BRAKE</b></div>
     <div><span><kbd>A</kbd><kbd>D</kbd></span><b>STEER</b></div>
@@ -206,7 +210,7 @@
     <div><b>LEFT THUMB</b><span>hold to drive, slide to steer</span></div>
     <div><b>RIGHT THUMB</b><span>hold for handbrake</span></div>
   </div>
-  <div class="tiny">Chain drifts to bank score and earn boost. Every banked drift pushes the sun across the sky. Clip the guardrail without touching it for a bonus. Crashing drops the drift you are holding.</div>
+  <div class="tiny">Chain drifts to bank score and earn boost. Every banked drift pushes the night toward dawn. Clip the guardrail without touching it for a bonus. Crashing drops the drift you are holding.</div>
   <button class="btn" id="startb">DRIVE</button>
   <div class="best" id="best"></div>
 </div>

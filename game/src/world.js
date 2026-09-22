@@ -45,7 +45,7 @@ function roadTextures() {
     else {
       const wear = 1 - 0.07 * Math.exp(-Math.pow((au - 1.55) / 0.5, 2));       // darker tyre tracks
       c = asphalt.map((v) => (v + grain) * wear);
-      rough = 0.84 + (rnd() - 0.5) * 0.12 - 0.05 * (1 - wear) * 6;
+      rough = 0.66 + (rnd() - 0.5) * 0.10 - 0.05 * (1 - wear) * 6;
       const onEdge = Math.abs(au - 3.35) < 0.075;
       const onCentre = au < 0.06 && (vm % 12) < 4.2;
       if (onEdge || onCentre) { const k = onCentre ? 0.92 : 1; c = line.map((v) => v * k + grain * 0.5); rough = 0.62; }
@@ -95,11 +95,20 @@ export class World {
         }
       });
     }
+    // reflectors and lenses glow at night: anything tail-red or lamp-warm on the roadside props is emissive
+    for (const name of ['pole', 'post', 'chevron', 'mirror']) {
+      const tpl = this.templates[name]; if (!tpl) continue;
+      tpl.traverse((o) => {
+        if (!o.isMesh || !o.material || !o.material.color) return;
+        const hex = o.material.color.getHex();
+        if (hex === PAL.tailRed || hex === PAL.laneWhite) { o.material = o.material.clone(); o.material.emissive.set(hex); o.material.emissiveIntensity = hex === PAL.tailRed ? 0.9 : 0.35; }
+      });
+    }
     const rt = roadTextures();
     this.roadMat = new THREE.MeshStandardMaterial({ map: rt.map, roughnessMap: rt.roughnessMap, roughness: 1, metalness: 0.0, color: 0xffffff });
     const g = surface(THREE, 'ground', 256);
     this.groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: g.map, roughnessMap: g.roughnessMap, normalMap: g.normalMap,
-      normalScale: new THREE.Vector2(0.55, 0.55), roughness: 1, metalness: 0, color: 0xffffff });
+      normalScale: new THREE.Vector2(0.28, 0.28), roughness: 1, metalness: 0, color: 0xffffff });
     this.railMat = new THREE.MeshStandardMaterial({ color: PAL.galvanised, roughness: 0.42, metalness: 0.65, side: THREE.DoubleSide });
     this.tunnelMat = new THREE.MeshStandardMaterial({ color: 0x4a4a50, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
     this.tunnelLampMat = new THREE.MeshStandardMaterial({ color: 0xffe9c0, emissive: 0xffd28a, emissiveIntensity: 2.2, roughness: 0.5 });
@@ -172,6 +181,7 @@ export class World {
 
     // static props, baked per chunk
     const statics = new THREE.Group();
+    this._pools = [];
     const place = (name, x, y, z, ry, scale = 1, sx = 1, colour = 0) => {
       const tpl = this.templates[name]; if (!tpl) return null;
       const o = tpl.clone(true);
@@ -188,6 +198,12 @@ export class World {
     const baked = bakeStatic(statics);
     baked.traverse((o) => { if (o.isMesh) { own.add(o.geometry); o.castShadow = true; o.receiveShadow = true; } });
     group.add(baked);
+    if (this._pools.length) {
+      const pg = new THREE.Group(); this._pools.forEach((m) => pg.add(m)); pg.updateMatrixWorld(true);
+      const pb = bakeStatic(pg);
+      pb.traverse((o) => { if (o.isMesh) { own.add(o.geometry); o.castShadow = false; o.receiveShadow = false; o.renderOrder = 2; } });
+      group.add(pb);
+    }
 
     this.placeTrees(i0, i1, s0, s1, group, rng);
 
@@ -472,19 +488,40 @@ export class World {
         place('mirror', x, y, z, p.h + Math.PI + f.dir * 0.5);
       }
     }
-    // a lamp every so often on a straight, lighting the road at night
-    for (const f of t.features) {
-      if (f.type !== 'straight' || f.s0 < s0 || f.s0 >= s1) continue;
-      if (rng() > 0.5) continue;
-      const p = t.sample(f.s0 + 20);
-      if (this.nearTunnel(p.s, 10) || t.terraceAt(p.s)) continue;
-      const side = p.mount >= 0 ? -1 : 1;                  // on the valley side, arm over the road
+    // street lamps every 36 m, alternating sides, the arm reaching over the road: at night they are the light
+    for (let sl = Math.ceil(s0 / 36) * 36; sl < s1; sl += 36) {
+      const p = t.sample(sl);
+      if (p.tunnel || this.nearTunnel(p.s, 8)) continue;
+      const side = (Math.round(sl / 36) % 2 === 0) ? 1 : -1;
+      const lay = t.terraceAt(p.s);
+      if (lay && lay.layby && lay.side === side) continue;
       const w = side > 0 ? p.wl : p.wr;
-      const [x, y, z] = this.at(p, (w + 0.5) * side);
-      place('lamp', x, y, z, p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2) + Math.PI);
-      const arm = 1.3;
-      this.lamps.push({ x: x - Math.cos(p.h) * side * arm, y: y + 5.8, z: z + Math.sin(p.h) * side * arm, ci });
+      const [x, y, z] = this.at(p, (w - 0.15) * side);
+      // the asset's arm reaches local +X; point it at the road centre
+      const ry = side > 0 ? p.h + Math.PI : p.h;
+      place('lamp', x, y, z, ry);
+      const hx = x + Math.cos(ry) * 0.5, hz = z - Math.sin(ry) * 0.5;      // the head, half a metre along the arm
+      this.lamps.push({ x: hx, y: y + 5.75, z: hz, ci });
+      this.pool(hx, y, hz, 9, 1.0);
     }
+  }
+
+  /** A warm additive pool of light on the ground under a lamp, so the string of lamps reads at any distance. */
+  pool(x, y, z, size, strength) {
+    if (!this._poolTex) {
+      const sz = 128, cv = document.createElement('canvas'); cv.width = cv.height = sz;
+      const ctx = cv.getContext('2d');
+      const g = ctx.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
+      g.addColorStop(0, 'rgba(255,205,130,0.55)'); g.addColorStop(0.35, 'rgba(255,190,110,0.28)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, sz, sz);
+      this._poolTex = new THREE.CanvasTexture(cv); this._poolTex.colorSpace = THREE.SRGBColorSpace;
+      this._poolMat = new THREE.MeshBasicMaterial({ map: this._poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
+      this._poolGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+    }
+    const m = new THREE.Mesh(this._poolGeo, this._poolMat);
+    m.position.set(x, y + 0.035, z); m.scale.set(size, 1, size * 0.8);
+    m.renderOrder = 2;
+    this._pools.push(m);
   }
 
   /** Shrines, rest huts, tunnel portals. */
@@ -678,6 +715,9 @@ export class World {
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     this.far = g; this.scene.add(g);
   }
+
+  /** How bright the lamp pools are: 0 by day, 1 at night. */
+  setNight(n) { if (this._poolMat) this._poolMat.opacity = 0.85 * n; }
 
   updateFar(x, y, z) {
     if (!this.far) return;
