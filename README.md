@@ -1,10 +1,11 @@
 # SUNDRIFT
 
-An endless autumn mountain pass, driven sideways. Chain drifts to bank score and boost, clip the guardrail
-without touching it, and every banked drift pushes the sun across the sky: the light, the shadows and the
-colour of the whole pass move with how well you drive.
+An endless autumn mountain pass at night, driven sideways under the street lamps. Chain drifts to bank score
+and boost, clip the guardrail without touching it, and every banked drift pushes the night toward dawn: the
+moonlight, the lamps, the sunrise and the golden hour that follows are driven by how well you drive, and the
+whole cycle comes round again.
 
-**Play:** _(GitHub Pages link goes here once deployed)_
+**Play:** https://lkruer.github.io/sundrift/game/ (phone or laptop; one finger on a phone, WASD and Space on a keyboard)
 
 Built for the [404 game jam 001](https://github.com/404-Repo/404-game-jam) with the
 [404 game recipe](https://github.com/404-Repo/404-game-recipe): every 3D object in the game is Three.js code
