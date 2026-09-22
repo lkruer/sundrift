@@ -1,0 +1,16 @@
+{
+  "title": "SUNDRIFT",
+  "slug": "sundrift",
+  "team": ["lkruer"],
+  "play_url": "https://lkruer.github.io/sundrift/game/",
+  "source_url": "https://github.com/lkruer/sundrift",
+  "commit": "FILL_FROM_VERDICT",
+  "genre": "racing",
+  "agent": "Claude Code",
+  "models": ["Claude Fable 5.1 wrote the code, the assets and judged the candidates and the critic rounds", "no image or audio model: there are no image or audio files, every texture and sound is generated in code at load"],
+  "own_art": false,
+  "own_art_list": [],
+  "what_i_found": "The sun is a score. Every banked drift pushes the time of day forward, so the light, the shadow direction and the colour of the whole pass are driven by how well you drive, and a long chain visibly swings the shadows across the road. Also: one-finger phone drifting, with counter-steer that scales with slip so a thumb can hold a 50-degree angle without spinning.",
+  "wallet": "later",
+  "contact": "FILL_BEFORE_SUBMITTING"
+}

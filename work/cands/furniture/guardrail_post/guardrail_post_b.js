@@ -26,12 +26,12 @@ export default function (THREE) {
 
   const H = 0.73;
   // Shapes drawn in (x, y) and extruded along local +z; rotation.x = -PI/2 turns that into world +Y
-  // and maps shape y onto world -Z, so the web (world z 0..0.03) is drawn at shape y -0.03..0 and the
-  // flanges (world z -0.03..0) at shape y 0..0.03.
-  const cShape = poly([[-0.05, -0.03], [0.05, -0.03], [0.05, 0.03], [0.03, 0.03], [0.03, 0], [-0.03, 0], [-0.03, 0.03], [-0.05, 0.03]]);
+  // and maps shape y onto world -Z, so the web (world z 0.01..0.03) is drawn at shape y -0.03..-0.01 and
+  // the flanges (world z -0.03..0.01) at shape y -0.01..0.03: a 0.07 x 0.04 recess open to the back.
+  const cShape = poly([[-0.05, -0.03], [0.05, -0.03], [0.05, 0.03], [0.035, 0.03], [0.035, -0.01], [-0.035, -0.01], [-0.035, 0.03], [-0.05, 0.03]]);
   put(extrude(cShape, H), galv, [0, 0, 0], [-Math.PI / 2, 0, 0]);
   // dark cap closing the channel top
-  put(new THREE.BoxGeometry(0.104, 0.02, 0.064), dark, [0, H + 0.01, 0]);
+  put(new THREE.BoxGeometry(0.104, 0.02, 0.06), dark, [0, H + 0.01, 0]);
   // base plate: chamfered 0.16 x 0.12 rectangle, centred under the post + spacer footprint (world z 0.03)
   const plate = poly([[-0.06, -0.09], [0.06, -0.09], [0.08, -0.07], [0.08, 0.01], [0.06, 0.03], [-0.06, 0.03], [-0.08, 0.01], [-0.08, -0.07]]);
   put(extrude(plate, 0.02), galv, [0, 0, 0], [-Math.PI / 2, 0, 0]);

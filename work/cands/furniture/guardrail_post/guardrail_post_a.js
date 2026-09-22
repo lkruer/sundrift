@@ -27,7 +27,7 @@ export default function (THREE) {
   put(new THREE.BoxGeometry(0.02, H, 0.03), galv, [-0.04, H / 2, -0.015]);
   put(new THREE.BoxGeometry(0.02, H, 0.03), galv, [0.04, H / 2, -0.015]);
   // dark cap closing the open channel top
-  put(new THREE.BoxGeometry(0.104, 0.02, 0.064), dark, [0, H + 0.01, 0]);
+  put(new THREE.BoxGeometry(0.104, 0.02, 0.06), dark, [0, H + 0.01, 0]);
   // base plate 0.16 x 0.12 x 0.02 under the post + spacer footprint
   put(new THREE.BoxGeometry(0.16, 0.02, 0.12), galv, [0, 0.01, 0.03]);
   // four anchor bolts, hex heads

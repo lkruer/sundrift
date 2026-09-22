@@ -169,10 +169,12 @@ export class World {
 
     // static props, baked per chunk
     const statics = new THREE.Group();
-    const place = (name, x, y, z, ry, scale = 1, sx = 1) => {
+    const place = (name, x, y, z, ry, scale = 1, sx = 1, colour = 0) => {
       const tpl = this.templates[name]; if (!tpl) return null;
       const o = tpl.clone(true);
       o.position.set(x, y, z); o.rotation.y = ry; o.scale.set(scale * sx, scale, scale);
+      // a placed (not instanced) maple gets a real coloured material, since a bake has no instance colour
+      if (colour) o.traverse((m) => { if (m.isMesh && m.material.name === 'foliage_tinted') m.material = this.mapleMat(colour); });
       statics.add(o);
       return o;
     };
@@ -189,6 +191,20 @@ export class World {
     this.root.add(group);
     this.chunks.set(ci, c);
     return c;
+  }
+
+  /** One material per maple colour, for baked clones. */
+  mapleMat(colour) {
+    this._mapleMats = this._mapleMats || new Map();
+    let m = this._mapleMats.get(colour);
+    if (!m) {
+      let base = null;
+      this.templates.maple.traverse((o) => { if (!base && o.isMesh && o.material.name === 'foliage_tinted') base = o.material; });
+      m = base ? base.clone() : new THREE.MeshStandardMaterial({ flatShading: true });
+      m.color.set(colour); m.name = 'foliage_' + colour.toString(16);
+      this._mapleMats.set(colour, m);
+    }
+    return m;
   }
 
   /** A slice's left unit vector and position, for placing things at lateral offset u. */
@@ -460,7 +476,7 @@ export class World {
         for (const [p, u] of [[p1, RAIL + 2.6], [p3, RAIL + 2.6]]) { const [x, , z] = this.at(p, u * side); place('lantern', x, h, z, face(p)); }
         { const [x, , z] = this.at(p2, (RAIL + 5.2) * side); place('torii', x, h, z, face(p2)); }
         { const [x, , z] = this.at(p2, (RAIL + 11.5) * side); place('hut', x, h, z, face(p2)); }
-        for (let k = 0; k < 3; k++) { const p = t.sample(m.s - 2 + k * 13); const [x, , z] = this.at(p, (RAIL + 8 + rng() * 5) * side); place('maple', x, h + t.profile((RAIL + 9) * side, p.mount, p.s) * 0 , z, rng() * 6, 0.9 + rng() * 0.3); }
+        for (let k = 0; k < 3; k++) { const p = t.sample(m.s - 2 + k * 13); const [x, , z] = this.at(p, (RAIL + 8 + rng() * 5) * side); place('maple', x, h, z, rng() * 6, 0.9 + rng() * 0.3, 1, k === 1 ? PAL.mapleGold : PAL.mapleRed); }
       } else if (m.kind === 'hut' || m.kind === 'vista') {
         const side = -m.side;                             // the lay-by is on the valley side
         const face = (p) => p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
@@ -560,45 +576,40 @@ export class World {
     }
   }
 
-  /** Far mountains and the valley floor: big, cheap, and moved with the car at a fraction of its motion. */
+  /** Far ranges: two rings of skyline, each one strip with a jagged crest, plus the valley floor and a lake. */
   buildFar() {
     const g = new THREE.Group();
     const rng = mulberry32(ROAD.seed ^ 0x5eed);
-    const mat = new THREE.MeshStandardMaterial({ color: 0x33473a, roughness: 1, metalness: 0, flatShading: true });
-    const matFar = new THREE.MeshStandardMaterial({ color: 0x2f4238, roughness: 1, metalness: 0, flatShading: true });
-    // a ridge: a cone whose rim is pulled into a long uneven crest, so it reads as a range and not a pyramid
-    const ridge = (r, h, seg) => {
-      const geo = new THREE.ConeGeometry(r, h, seg, 4, false);
-      const p = geo.attributes.position;
-      for (let i = 0; i < p.count; i++) {
-        const y = p.getY(i), x = p.getX(i), z = p.getZ(i);
-        const t = (y + h / 2) / h;                       // 0 at the base, 1 at the tip
-        const ang = Math.atan2(z, x);
-        const crest = 1 + 0.35 * Math.sin(ang * 3 + rng() * 0.5) + 0.2 * Math.sin(ang * 7);
-        p.setX(i, x * (1.7 + 0.6 * Math.cos(ang)) * (t > 0.95 ? 1 : 1 + (rng() - 0.5) * 0.25));
-        p.setZ(i, z * (0.9 + (rng() - 0.5) * 0.25));
-        if (t > 0.05) p.setY(i, y * (0.75 + 0.25 * crest) - h * 0.15 * t * (1 - t));
+    const ring = (radius, base, hMin, hMax, segs, colour, seedOff) => {
+      const pos = new Float32Array((segs + 1) * 2 * 3), idx = [];
+      const n1 = mulberry32(seedOff);
+      const bumps = []; for (let i = 0; i < 6; i++) bumps.push({ a: n1() * Math.PI * 2, w: 0.25 + n1() * 0.6, h: n1() });
+      for (let i = 0; i <= segs; i++) {
+        const a = (i / segs) * Math.PI * 2;
+        // a crest from a few broad peaks plus a jagged fine term
+        let h = 0;
+        for (const b of bumps) { let d = Math.abs(a - b.a); d = Math.min(d, Math.PI * 2 - d); h = Math.max(h, b.h * Math.max(0, 1 - (d / b.w) * (d / b.w))); }
+        const fine = 0.5 + 0.5 * Math.sin(a * 23 + seedOff) * Math.sin(a * 41 + 1.7) ;
+        const y = base + hMin + (hMax - hMin) * (0.55 * h + 0.45 * fine * (0.4 + 0.6 * h));
+        const x = Math.sin(a) * radius, z = Math.cos(a) * radius;
+        pos.set([x, base, z, x, y, z], i * 6);
+        if (i < segs) { const b0 = i * 2; idx.push(b0, b0 + 2, b0 + 1, b0 + 1, b0 + 2, b0 + 3); }
       }
-      geo.computeVertexNormals();
-      return geo;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setIndex(idx); geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: colour, roughness: 1, metalness: 0, side: THREE.DoubleSide, flatShading: true }));
+      m.frustumCulled = false;
+      return m;
     };
-    for (let i = 0; i < 34; i++) {
-      const a = (i / 34) * Math.PI * 2 + (rng() - 0.5) * 0.25;
-      const near = i % 2 === 0;
-      const d = near ? 950 + rng() * 350 : 1800 + rng() * 700;
-      const r = near ? 380 + rng() * 300 : 700 + rng() * 500;
-      const h = near ? 260 + rng() * 220 : 520 + rng() * 380;
-      const m = new THREE.Mesh(ridge(r, h, 9 + Math.floor(rng() * 6)), near ? mat : matFar);
-      m.position.set(Math.sin(a) * d, h / 2 - 150, Math.cos(a) * d);
-      m.rotation.y = a + Math.PI / 2 + (rng() - 0.5) * 0.6;
-      g.add(m);
-    }
+    g.add(ring(820, -170, 140, 330, 96, 0x3d5243, 11));
+    g.add(ring(1500, -190, 260, 640, 120, 0x394c46, 29));
+    g.add(ring(2600, -200, 500, 1100, 140, 0x35474a, 47));
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(7000, 7000), new THREE.MeshStandardMaterial({ color: 0x2c3d2a, roughness: 1 }));
-    floor.rotation.x = -Math.PI / 2; floor.position.y = -150;
+    floor.rotation.x = -Math.PI / 2; floor.position.y = -160;
     g.add(floor);
-    // a lake in one quarter of the valley: flat, a little reflective
-    const lake = new THREE.Mesh(new THREE.CircleGeometry(520, 24), new THREE.MeshStandardMaterial({ color: 0x8fb0c4, roughness: 0.15, metalness: 0.2 }));
-    lake.rotation.x = -Math.PI / 2; lake.position.set(700, -148, -600);
+    const lake = new THREE.Mesh(new THREE.CircleGeometry(420, 24), new THREE.MeshStandardMaterial({ color: 0x8fb0c4, roughness: 0.15, metalness: 0.2 }));
+    lake.rotation.x = -Math.PI / 2; lake.position.set(520, -158, -420);
     g.add(lake);
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     this.far = g; this.scene.add(g);

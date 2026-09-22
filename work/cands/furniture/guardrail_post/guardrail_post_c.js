@@ -27,7 +27,7 @@ export default function (THREE) {
     put(new THREE.BoxGeometry(0.02, H, 0.03), galv, [sx * 0.04, H / 2, -0.015]);
     put(new THREE.BoxGeometry(0.015, H, 0.012), galv, [sx * 0.0225, H / 2, -0.024]);
   }
-  put(new THREE.BoxGeometry(0.104, 0.02, 0.064), dark, [0, H + 0.01, 0]);
+  put(new THREE.BoxGeometry(0.104, 0.02, 0.06), dark, [0, H + 0.01, 0]);
   // base plate with two gusset ribs against the web sides
   put(new THREE.BoxGeometry(0.16, 0.02, 0.12), galv, [0, 0.01, 0.03]);
   for (const sx of [-1, 1]) put(new THREE.BoxGeometry(0.012, 0.06, 0.05), galv, [sx * 0.055, 0.05, 0.025]);

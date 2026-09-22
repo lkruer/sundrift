@@ -24,7 +24,7 @@ const canvas = $('c');
 const loadEl = $('load'), barf = $('barf'), loadmsg = $('loadmsg');
 
 const G = {
-  playing: false, over: false, hour: 15.85, hourShown: 0, lastSunApply: 0,
+  playing: false, over: false, hour: 17.35, hourShown: 0, lastSunApply: 0,
   fps: 60, frameAvg: 1 / 60, s: 0, u: 0, idx: 0, dist: 0, lastS: 0, boostMax: SCORE.boostMax, night: 0,
 };
 window.__GAME__ = { pos: [0, 0], fps: 0, speed: 0, score: 0, over: false, draws: 0, tris: 0 };
@@ -70,6 +70,9 @@ async function boot() {
   particles = new Particles(scene, Q.smoke);
   particles.setScale(innerHeight);
   rig.refresh(scene);
+  // compile every shader variant now, not on the first frame that needs it
+  try { renderer.compile(scene, camera); } catch (e) { console.warn('compile', e.message); }
+  window.__DEBUG__ = { world, track, car, rig, scene, renderer, get scoring() { return scoring; } };
   input.onAny = () => audio.unlock();
   hud.setBest(scoring.best);
   prog(1, 'ready');
@@ -141,7 +144,7 @@ function restartRun() {
   scoring.reset();
   const start = track.sample(8);
   car.reset(start.x, start.z, start.h);
-  G.idx = 0; G.dist = 0; G.lastS = 8; G.hour = 15.85;
+  G.idx = 0; G.dist = 0; G.lastS = 8; G.hour = 17.35;
   chase.snap(car, start.y);
   hud.toast('NEW RUN', '', false);
 }
@@ -223,8 +226,8 @@ function step(dt) {
   for (const e of scoring.drain()) {
     hud.onEvent(e); audio.onEvent(e);
     if (e.type === 'bank') {
-      // the sun moves with the score: a banked drift pushes the day on
-      G.hour += e.value / 22000;
+      // the sun moves with the score: a banked drift pushes the day on, and a big one swings the shadows
+      G.hour += e.value / 6000;
     }
     if (e.type === 'crash') chase.kick(0.9);
   }
@@ -233,8 +236,11 @@ function step(dt) {
   // ---- distance, time of day
   const ds = Math.max(0, G.s - G.lastS); G.lastS = G.s;
   if (ds < 50) { G.dist += ds; scoring.stats.distance = G.dist; }
-  const night = G.hour > 18.4 || G.hour < 5.6;
-  G.hour += ds / 3800 * (night ? 3.2 : 1);
+  // the clock runs slowly with distance too, fast through the night and the flat middle of the day, slow
+  // through the golden hour that the game is about
+  const h = G.hour;
+  const rate = (h > 18.3 || h < 5.6) ? 10 : h < 15 ? 5 : h < 17.2 ? 2.5 : 1;
+  G.hour += ds / 3800 * rate;
   if (G.hour >= 24) { G.hour -= 24; }
   applySun(dt);
 
@@ -258,9 +264,10 @@ function step(dt) {
 let sunTimer = 0;
 function applySun(dt) {
   sunTimer += dt;
-  // setTime rebuilds the sky, so it is throttled: every 1.2 s, or sooner when the sun has moved a lot
+  // setTime rebuilds the sky (about 25 ms), so it is throttled: every 2.5 s, or sooner after a big bank
   const moved = Math.abs(G.hour - G.hourShown);
-  if (sunTimer < 1.2 && moved < 0.08) return;
+  if (sunTimer < 2.5 && moved < 0.12) return;
+  if (moved < 0.004) return;
   sunTimer = 0; G.hourShown = G.hour;
   const t = rig.setTime({ hour: G.hour });
   const el = t.elevation;
