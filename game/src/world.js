@@ -306,6 +306,8 @@ export class World {
         if (u > RAIL + 60) tmp.lerp(cDark, smoothstep(RAIL + 60, RAIL + 140, u));
         tmp.lerp(cStone, smoothstep(0.55, 1.0, slope));
         if (u < RAIL + 1.6) tmp.lerp(cStone, 0.35);                 // the ditch and the berm are gravelly
+        const lay = t.terraceAt(p.s);
+        if (lay && lay.layby && lay.side === side && u >= lay.u0 - 0.5 && u <= lay.u1 + 1) tmp.set(0x8a8478).lerp(cGrass, 0.25 * nz);   // a gravel pull-off
         col[o * 3] = tmp.r; col[o * 3 + 1] = tmp.g; col[o * 3 + 2] = tmp.b;
       }
       if (k < n - 1) for (let j = 0; j < cols - 1; j++) {
@@ -651,7 +653,7 @@ export class World {
         // a crest from a few broad peaks plus a jagged fine term
         let h = 0;
         for (const b of bumps) { let d = Math.abs(a - b.a); d = Math.min(d, Math.PI * 2 - d); h = Math.max(h, b.h * Math.max(0, 1 - (d / b.w) * (d / b.w))); }
-        const fine = 0.5 + 0.5 * Math.sin(a * 23 + seedOff) * Math.sin(a * 41 + 1.7) ;
+        const fine = 0.5 + 0.5 * this.track.noise(a * 5.5 + seedOff, seedOff * 0.37) + 0.25 * this.track.noise(a * 17 + seedOff, 3.1);
         const y = base + hMin + (hMax - hMin) * (0.55 * h + 0.45 * fine * (0.4 + 0.6 * h));
         const x = Math.sin(a) * radius, z = Math.cos(a) * radius;
         pos.set([x, base, z, x, y, z], i * 6);
