@@ -6,19 +6,19 @@
  * renderer.info. The start button is #startb and it is the only way the game starts.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js';
-import { createRig, detectTier } from '../rig.js';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, clamp, damp, smoothstep } from './config.js';
-import { Car, gearbox } from './car.js';
-import { Track } from './track.js';
-import { World } from './world.js';
-import { ChaseCam } from './camera.js';
-import { Input } from './input.js';
-import { Scoring } from './scoring.js';
-import { Hud } from './hud.js';
-import { Audio } from './audio.js';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js';
-import { makePost } from './post.js';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609220343';
+import { createRig, detectTier } from '../rig.js?v=202609220343';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, clamp, damp, smoothstep } from './config.js?v=202609220343';
+import { Car, gearbox } from './car.js?v=202609220343';
+import { Track } from './track.js?v=202609220343';
+import { World } from './world.js?v=202609220343';
+import { ChaseCam } from './camera.js?v=202609220343';
+import { Input } from './input.js?v=202609220343';
+import { Scoring } from './scoring.js?v=202609220343';
+import { Hud } from './hud.js?v=202609220343';
+import { Audio } from './audio.js?v=202609220343';
+import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609220343';
+import { makePost } from './post.js?v=202609220343';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');

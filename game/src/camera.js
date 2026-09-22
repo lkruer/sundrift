@@ -7,7 +7,7 @@
  * the terrain so a hairpin cut into the mountain cannot put it inside the rock.
  */
 import * as THREE from 'three';
-import { CAM, clamp, damp, smoothstep } from './config.js';
+import { CAM, clamp, damp, smoothstep } from './config.js?v=202609220343';
 
 const TAU = Math.PI * 2;
 function lerpAngle(a, b, t) { let d = b - a; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; return a + d * t; }
