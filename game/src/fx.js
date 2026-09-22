@@ -8,7 +8,7 @@
  * points; it is tinted by the sun so it reads warm at golden hour and cool in shade.
  */
 import * as THREE from 'three';
-import { clamp } from './config.js?v=202609222216';
+import { clamp } from './config.js?v=202609222231';
 
 function spriteTexture() {
   const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;

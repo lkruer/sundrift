@@ -7,7 +7,7 @@
  * Everything is DOM and SVG, written only when a value changes (the needle, which moves every frame, is one
  * attribute), so a phone is not re-laying out text sixty times a second.
  */
-import { SCORE, clamp, damp } from './config.js?v=202609222216';
+import { SCORE, clamp, damp } from './config.js?v=202609222231';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -90,7 +90,7 @@ export class Hud {
   constructor() {
     this.el = {
       hud: $('hud'), drift: $('drift'), driftpts: $('driftpts'), mult: $('mult'), tier: $('tier'), combon: $('combon'), chainf: $('chainf'),
-      toasts: $('toasts'), vign: $('vign'), hit: $('hit'), perf: $('perf'), btns: $('hbtns'),
+      toasts: $('toasts'), perf: $('perf'), btns: $('hbtns'),
       lampdrift: $('lampdrift'), lampclip: $('lampclip'), lampboost: $('lampboost'), angle: $('angle'), anglef: $('anglef'), angledeg: $('angledeg'),
     };
     this.score = new Seg7($('score7'), 8);
@@ -110,6 +110,26 @@ export class Hud {
   }
 
   show(on) { this.el.hud.classList.toggle('on', on); this.el.btns.classList.toggle('on', on); }
+
+  /**
+   * Draw every effect the HUD will ever use, once, nearly invisibly, while the title is up: the browser compiles
+   * a raster shader the first time it draws a blurred text shadow or a glow, and doing that mid-drift was a
+   * 100 ms stall at the first slide of the first run.
+   */
+  warm(on) {
+    const el = this.el;
+    el.hud.classList.toggle('warm', on);
+    for (const e of [el.drift, el.angle, el.lampdrift, el.lampclip, el.lampboost]) e.classList.toggle('on', on);
+    if (on) {
+      el.driftpts.textContent = '+1,234'; el.mult.textContent = '×2.0'; el.tier.textContent = 'GREAT'; el.tier.className = 't3';
+      this.toast('WARM', 'good', true); this.toast('WARM', 'bad'); this.toast('WARM');
+      this.leds.forEach((l) => l.classList.add('on'));
+    } else {
+      el.driftpts.textContent = ''; el.tier.textContent = '';
+      this.leds.forEach((l) => l.classList.remove('on'));
+      this._drifting = this._clip = this._boosting = this._slide = false; this.lastLeds = 0; this.lastTier = -1;
+    }
+  }
 
   reset() { this.shown = 0; this.score.set(''); this.lastCombo = -1; }
 
@@ -208,10 +228,9 @@ export class Hud {
     this.clock.set(String(hh).padStart(2, '0') + String(mm).padStart(2, '0'));
     this.dist.set(String(Math.floor(dist / 100)).padStart(2, '0'));
 
+    // the vignette and the hit flash are drawn by the post pass (main reads these two)
     this.hitFlash = Math.max(0, this.hitFlash - dt * 2.2);
-    el.hit.style.opacity = this.hitFlash.toFixed(2);
-    this.vignette = damp(this.vignette, active ? 0.55 : 0, 3, dt);
-    el.vign.style.opacity = this.vignette.toFixed(2);
+    this.vignette = damp(this.vignette, active ? 1 : 0, 3, dt);
     if (this.perfOn && perf) el.perf.textContent = perf;
   }
 }

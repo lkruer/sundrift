@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609222216';
-import { surface } from '../surfaces.js?v=202609222216';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222216';
-import { Ground } from './ground.js?v=202609222216';
-import { Terrain, LODS } from './terrain.js?v=202609222216';
-import { partsOf, Pool } from './instancing.js?v=202609222216';
+import { ASSET } from '../assetlib.js?v=202609222231';
+import { surface } from '../surfaces.js?v=202609222231';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222231';
+import { Ground } from './ground.js?v=202609222231';
+import { Terrain, LODS } from './terrain.js?v=202609222231';
+import { partsOf, Pool } from './instancing.js?v=202609222231';
 
 const ASSETS = {
   cedar: './assets/cedar_tree.js', maple: './assets/maple_tree.js', boulder: './assets/boulder.js',
@@ -837,7 +837,7 @@ export class World {
    * Compile every shader program the world can ask for, now, so the first convenience store or bamboo clump to
    * enter the frame does not stall the game while its materials compile.
    */
-  async precompile(renderer, camera, refresh = null, target = null) {
+  async precompile(renderer, camera, refresh = null, target = null, warm = null) {
     const stage = new THREE.Group();
     const m4 = new THREE.Matrix4().makeTranslation(0, -500, 0);
     // every prop draws instanced (pools and forest), so only the instanced programs are needed
@@ -866,6 +866,15 @@ export class World {
       else renderer.compile(this.scene, camera);
     } catch (e) { console.warn('precompile', e.message); }
     renderer.setRenderTarget(prev);
+    // and one frame with every kind of prop standing in front of the camera, inside the shadow frustum: the
+    // shadow pass compiles its depth programs only when a new kind of caster first falls in it, which was a
+    // 100 ms stall a few seconds into the first run
+    if (warm) {
+      stage.position.set(warm.x, warm.y + 500, warm.z);
+      stage.updateMatrixWorld(true);
+      warm.render();
+      stage.position.set(0, 0, 0);
+    }
     for (const im of hidden) im.visible = false;
     this.scene.remove(stage);
   }

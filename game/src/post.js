@@ -23,10 +23,11 @@ const Cel = {
     tDiffuse: { value: null }, tDepth: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uNear: { value: 0.4 }, uFar: { value: 4500 }, uTime: { value: 0 },
     uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.06 }, uSpeed: { value: 0 },
+    uVig: { value: 0 }, uHit: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed;
+    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed, uVig, uHit;
     varying vec2 vUv;
     float lin(vec2 uv){ float z = texture2D(tDepth, uv).x * 2.0 - 1.0; return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear)); }
     float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -72,6 +73,12 @@ const Cel = {
       float gr = (hash(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5) * uGrain;
       col += gr * (0.25 + l);
       col *= 1.0 - uScan * (0.5 + 0.5 * sin(gl_FragCoord.y * 1.5708));
+      // the tube's vignette, deeper while a drift is held, and the red flash of a hit: drawn here rather than as
+      // full-screen page layers, which cost the browser a 100 ms stall the first time a drift lit them
+      vec2 vq = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
+      float r2 = dot(vq, vq);
+      col *= 1.0 - (0.34 + 0.32 * uVig) * smoothstep(0.16, 0.62, r2);
+      col = mix(col, vec3(1.0, 0.23, 0.19) * (0.25 + l), uHit * 0.55 * smoothstep(0.1, 0.55, r2));
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }`,
 };

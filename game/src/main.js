@@ -6,19 +6,19 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609222216';
-import { createRig, detectTier } from '../rig.js?v=202609222216';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222216';
-import { Car, gearbox } from './car.js?v=202609222216';
-import { Track, DIFFS } from './track.js?v=202609222216';
-import { World } from './world.js?v=202609222216';
-import { ChaseCam } from './camera.js?v=202609222216';
-import { Input } from './input.js?v=202609222216';
-import { Scoring } from './scoring.js?v=202609222216';
-import { Hud } from './hud.js?v=202609222216';
-import { Audio } from './audio.js?v=202609222216';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222216';
-import { makePost } from './post.js?v=202609222216';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609222231';
+import { createRig, detectTier } from '../rig.js?v=202609222231';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222231';
+import { Car, gearbox } from './car.js?v=202609222231';
+import { Track, DIFFS } from './track.js?v=202609222231';
+import { World } from './world.js?v=202609222231';
+import { ChaseCam } from './camera.js?v=202609222231';
+import { Input } from './input.js?v=202609222231';
+import { Scoring } from './scoring.js?v=202609222231';
+import { Hud } from './hud.js?v=202609222231';
+import { Audio } from './audio.js?v=202609222231';
+import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222231';
+import { makePost } from './post.js?v=202609222231';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -157,9 +157,22 @@ async function boot() {
   applySun(0, true);
   rig.refresh(scene);
   prog(0.93, 'the shaders');
-  await world.precompile(renderer, camera, (root) => rig.refresh(root), post.sceneRT);
-  // one real frame while hidden: shadow and post programs compile here, not in the first second of play
-  idle(0.016); rig.update(camera, 0.016); post.render(0.016);
+  // one real frame while hidden, with every prop in view and every shadow map drawn: shadow and post programs
+  // compile here, not in the first seconds of play
+  // things that are only drawn later (skid marks, the boost flame) are drawn once here too: the first draw of
+  // a mesh is when the GPU driver finishes its shader, and that was a 100 ms stall at the first drift
+  const warmRender = () => {
+    idle(0.016); rig.update(camera, 0.016);
+    if (rig.csm) for (const l of rig.csm.lights) l.shadow.needsUpdate = true;
+    for (const t of skids.tracks) t.geo.setDrawRange(0, 6);
+    flame.cones.visible = true;
+    post.render(0.016);
+    for (const t of skids.tracks) t.geo.setDrawRange(0, 0);
+    flame.cones.visible = false;
+  };
+  const [fx0, fz0] = car.forward();
+  await world.precompile(renderer, camera, (root) => rig.refresh(root), post.sceneRT, { x: car.x + fx0 * 6, y: start.y, z: car.z + fz0 * 6, render: warmRender });
+  warmRender();
   window.__DEBUG__ = { world, get track() { return track; }, car, rig, scene, renderer, G, chase, audio, post, get scoring() { return scoring; }, prof,
     teleport(s, kmh = 0) {
       const p = track.sample(s);
@@ -337,6 +350,7 @@ function showTitle() {
   G.mode = 'title';
   $('title').classList.add('on');
   hud.show(false);
+  if (!G.hudWarmed) { G.hudWarmed = true; hud.warm(true); setTimeout(() => { if (G.mode === 'title') hud.warm(false); }, 700); }
   document.body.classList.remove('playing');
 }
 
@@ -345,6 +359,7 @@ function startGame() {
   $('title').classList.remove('on');
   document.body.classList.add('playing');
   if (night.hero) night.hero.intensity = 0;
+  hud.warm(false);
   scoring.reset(); hud.reset();
   G.hour = 20.6; G.dist = 0; G.newBest = false; G.runBest = G.best[G.diff] || 0;
   const p = track.sample(G.s || START_S);
@@ -425,6 +440,8 @@ function frame(now) {
   renderer.info.reset();
   rig.update(camera, dt);
   post.cel.uniforms.uSpeed.value = car && G.mode === 'playing' ? clamp((car.speed - 8) / 32, 0, 1) * (1 + 0.6 * clamp(car.boost / 1.2, 0, 1)) : 0;
+  post.cel.uniforms.uVig.value = hud && G.mode === 'playing' ? hud.vignette : 0;
+  post.cel.uniforms.uHit.value = hud && G.mode === 'playing' ? hud.hitFlash : 0;
   post.render(dt);
   const t2 = performance.now();
   G.renderMs = damp(G.renderMs || 4, t2 - t1, 6, dt);
@@ -445,6 +462,7 @@ function frame(now) {
     if (ms > 28 && G.mode === 'playing') { prof.long++; prof.log.push({ at: Math.round(G.s), ms: Math.round(ms), sim: +(G.simMs || 0).toFixed(1), world: +(G.worldMs || 0).toFixed(1), render: +(t2 - t1).toFixed(1) }); if (prof.log.length > 40) prof.log.shift(); }
     prof.worst = Math.max(prof.worst * 0.999, ms);
   }
+  if (window.__ONFRAME__) window.__ONFRAME__(dt, real);
   if (hud && (hud.perfOn || prof.on)) {
     perfLine = `${G.fps} fps  ${g.draws} draws  ${(g.tris / 1000).toFixed(0)}k tris  ${tier}\n` +
       `sim ${prof.parts.sim.toFixed(1)}  world ${prof.parts.world.toFixed(1)}  render ${prof.parts.render.toFixed(1)} ms\n` +
