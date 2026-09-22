@@ -93,6 +93,28 @@ weight 1.1 MB (budget 10), started from a real tap, moved 60 m in the hold, 150 
 triangles, 0 console errors. Desktop gate with the full forest and verge in view: 338 draws, 1.21 M triangles
 after thinning the cedar grid from 12/14 m to 13/15.5 m spacing (it had reached 1.53 M).
 
+## The turn to night (22 Sep)
+
+The owner's direction after the first playable: less rough, more retro, at night with headlights and street
+lights. The mechanic survived the turn inverted: the run now starts at 20:36 and every banked drift pushes the
+night toward dawn; the flat middle of the day runs seven times faster on the clock so the golden hour comes
+round again. What was added, all code, no files:
+
+- a moon key (cool, with a 68 m shadow box snapped to texels around the car) because the recipe's rig is a
+  sky, a haze and one cool fill below the horizon, and a night lit by that alone has one colour temperature;
+- street lamps every 36 m on alternating sides (the recipe-loop lamp asset), each with an additive pool of
+  warm light on the asphalt so the string reads at any distance, and a pool of five real point lights that
+  follows the car; reflectors on the snow poles and guardrail posts made emissive;
+- two spotlights for headlights plus two additive cones for the beams, the way arcade racers draw them;
+- stars, a moon disc with a halo, and a horizon-glow band around the camera; the rig's hemisphere fill dimmed
+  by 55 percent at night so the pools and the headlights own the frame;
+- terrain noise halved and the ground normal map weakened, the road's roughness lowered so the lamps show as
+  sheen, and a subtle scanline-and-vignette overlay for the retro cabinet feel.
+
+Measured after the turn, on the live URL under the jam gate: ready 9.1 s, 1.1 MB, 211 draws, 545 k
+triangles, 0 errors, 0 404s, RESULT PASS. Desktop gate: 321 draws, 0.89 M triangles, five drifts banked over
+600 m.
+
 ## Still wrong, or not attempted
 
 (kept up to date at the end)
