@@ -1,0 +1,7 @@
+# tunnel_portal — receipts
+
+Winner: **tunnel_portal_c** (piers + spandrel, hood ring, lofted lining). 1,040 triangles, measured 11.8 x 7.2 x 3.56 m against 10.0 x 6.8 x 3.0 (tol 0.2).
+Why: it is the only one whose face has relief. The 0.35 m projecting hood ring makes the arch read as a portal from the front and the three-quarter view; the lofted lining (flat-shaded, two recessed joint bands) reads as a dark bore, and the opening runs clean to the road at y = 0 because the arch is on the spandrel's outline rather than a Path hole, so there is no threshold sill across the carriageway.
+A (extrude with Path hole + half-cylinder + half-torus rings) and B (all-extrusion, solid arch band lining) both pass and both read as a portal, but their faces are flat sheets with 0.15 m pilasters, and their concrete rings inside the mouth read as ribs rather than lining; both carry a 0.04 m sill across the opening because a Path hole cannot touch the outline of its Shape.
+Departures from the brief, deliberate: the wing walls flare 22 degrees off the tunnel axis, not 30, because 3.0 m walls at 30 degrees from a 10 m face measure 13 to 15 m wide and fail the 10 m expect at 0.2 tolerance (22 degrees gives 11.8 m). Coping sits on top of the 6.8 m wall, so height is 7.2 m (6% over).
+The back is the same portal from inside: the arch spandrel is an extrusion (both caps carry the arch), the lining exterior and the stepped wings are all visible from -Z. Nothing changed after the render; all three passed first run.

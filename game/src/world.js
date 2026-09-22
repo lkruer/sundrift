@@ -264,9 +264,28 @@ export class World {
       const p = pts[rows[k]];
       const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side;
       const tun = this.nearTunnel(p.s, 10);
+      let folded = false, fx = 0, fy = 0, fz = 0;
       for (let j = 0; j < cols; j++) {
         let u = US[j];
         let h;
+        if (folded) {
+          // past the fold (the inside of a hairpin, say) another stretch of road is nearer: collapse the rest of
+          // the row onto the last good vertex so the strip never climbs over the far half of the road
+          const o = k * cols + j;
+          pos[o * 3] = fx; pos[o * 3 + 1] = fy; pos[o * 3 + 2] = fz;
+          uv[o * 2] = fx / 7; uv[o * 2 + 1] = fz / 7;
+          col[o * 3] = col[(o - 1) * 3]; col[o * 3 + 1] = col[(o - 1) * 3 + 1]; col[o * 3 + 2] = col[(o - 1) * 3 + 2];
+          continue;
+        }
+        if (j > 0 && u > 6) {
+          const wx = p.x + lx * u, wz = p.z + lz * u;
+          const n = t.nearestScan(wx, wz, rows[k], 80);
+          if (Math.abs(n.i - rows[k]) > 10 && n.d < u - 2) {
+            folded = true; const o = k * cols + j - 1;
+            fx = pos[o * 3]; fy = pos[o * 3 + 1]; fz = pos[o * 3 + 2];
+            j--; continue;
+          }
+        }
         if (tun) {
           // over the tunnel the whole hill rises; the roof arches over the road itself
           const cap = tun && p.s >= tun.s0 - 2 && p.s <= tun.s1 + 2 ? 9 - (u * u) / 11 : -99;
@@ -421,6 +440,7 @@ export class World {
         if (mountainHere > 0.5 && rng() < 0.28) {
           const u = RAIL + 2.2 + rng() * 3.5;
           const [x, , z] = this.at(p, u * side);
+          if (t.onRoad(x, z, i, 1.0)) continue;
           const y = t.groundAt(x, z, i) - 0.15;
           place('boulder', x, y, z, rng() * Math.PI * 2, 0.55 + rng() * 0.9);
         }
@@ -524,6 +544,7 @@ export class World {
           if (rng() < 0.22) continue;
           const uu = u + (rng() - 0.5) * 5;
           const [x, , z] = this.at(p, uu * side + (rng() - 0.5) * 2);
+          if (t.onRoad(x, z, i, 2.5)) continue;
           const y = t.groundAt(x, z, i) - 0.4;
           put(cedars, x, y, z, rng() * Math.PI * 2, 0.7 + rng() * 0.6, { near: uu < 45 });
         }
@@ -531,6 +552,7 @@ export class World {
         if (!tun && !(lay && lay.side === side) && rng() < 0.55) {
           const u = mountainHere > 0.5 ? RAIL + 2.2 + rng() * 5 : RAIL + 1.4 + rng() * 3;
           const [x, , z] = this.at(p, u * side);
+          if (t.onRoad(x, z, i, 1.2)) continue;
           const y = t.groundAt(x, z, i) - 0.25;
           const pick = rng();
           if (rng() < 0.45) {
@@ -545,6 +567,7 @@ export class World {
         if (!tun && mountainHere > 0.5 && !(lay && lay.side === side) && rng() < 0.4) {
           const u = RAIL + 7 + rng() * 6;
           const [x, , z] = this.at(p, u * side);
+          if (t.onRoad(x, z, i, 2.5)) continue;
           const y = t.groundAt(x, z, i) - 0.3;
           const pick = rng();
           const colour = pick < 0.4 ? PAL.mapleGold : pick < 0.7 ? PAL.mapleOrange : pick < 0.85 ? PAL.dryGrass : PAL.mapleRed;
@@ -560,6 +583,7 @@ export class World {
       for (let k = 0; k < 5; k++) {
         const p = t.sample(apex - 14 + k * 7);
         const [x, , z] = this.at(p, (RAIL + 2.5 + rng() * 4) * f.dir);
+        if (t.onRoad(x, z, t.index(p.s), 1.2)) continue;
         const y = t.groundAt(x, z, t.index(p.s)) - 0.25;
         put(maplesA, x, y, z, rng() * 6, 0.85 + rng() * 0.35, { colour: k % 2 ? PAL.mapleRed : PAL.mapleGold });
       }
@@ -576,6 +600,7 @@ export class World {
         const w = side > 0 ? p.wl : p.wr;
         const u = w + 0.6 + rng() * (mountainHere > 0.5 ? 2.4 : 1.7);
         const [x, , z] = this.at(p, u * side + (rng() - 0.5) * 1.2);
+        if (t.onRoad(x, z, i, 0.6)) continue;
         const y = t.groundAt(x, z, i) - 0.12;
         const pick = rng();
         const colour = pick < 0.4 ? PAL.dryGrass : pick < 0.68 ? PAL.moss : pick < 0.9 ? PAL.mapleGold : PAL.mapleOrange;

@@ -114,10 +114,10 @@ export class Track {
     // which side the mountain is on changes slowly, through a ridge
     if (r() < 0.22) this._mountTarget = this._mountTarget > 0 ? -1 : 1;
     if (r() < 0.10) this._mountTarget = 0;
-    // set pieces every 450 m or so, never inside a hairpin
-    if (this._sinceSet >= 5 && type !== 'hairpin' && r() < 0.55) {
-      const kinds = ['shrine', 'tunnel', 'vista', 'hut', 'mirrors'];
-      const kind = kinds[Math.floor(r() * kinds.length)];
+    // set pieces every 400 m or so, never inside a hairpin, in a fixed rotation so a tunnel always comes early
+    if (this._sinceSet >= 4 && type !== 'hairpin' && r() < 0.65) {
+      const kinds = ['shrine', 'vista', 'tunnel', 'hut', 'tunnel', 'shrine', 'vista', 'hut'];
+      const kind = kinds[this.markers.length % kinds.length];
       this.markers.push({ s: s0 + 30, kind, side: this._mountTarget >= 0 ? 1 : -1 });
       this._sinceSet = 0;
     }
@@ -210,10 +210,35 @@ export class Track {
     return lerp(lerp(hsh(xi, yi), hsh(xi + 1, yi), sx), lerp(hsh(xi, yi + 1), hsh(xi + 1, yi + 1), sx), sy);
   }
 
+  /**
+   * The globally nearest sample within a span of samples around a hint, by scanning. nearest() walks to a
+   * local minimum, which is the wrong half of a hairpin for a point on its inside; this is what terrain and
+   * tree placement use so nothing lands on the far half of the road.
+   */
+  nearestScan(x, z, hint = 0, span = 90) {
+    const pts = this.pts;
+    const i0 = Math.max(0, hint - span), i1 = Math.min(pts.length - 1, hint + span);
+    let best = Infinity, bi = clamp(hint, 0, pts.length - 1);
+    for (let j = i0; j <= i1; j++) {
+      const p = pts[j]; const dx = x - p.x, dz = z - p.z; const d = dx * dx + dz * dz;
+      if (d < best) { best = d; bi = j; }
+    }
+    const p = pts[bi];
+    const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+    const u = (x - p.x) * lx + (z - p.z) * lz;
+    return { i: bi, u, d: Math.sqrt(best), p };
+  }
+
   /** World height of the ground at a point, given a nearby sample index as a hint. */
   groundAt(x, z, hint = 0) {
-    const n = this.nearest(x, z, hint);
-    return n.p.y + this.profile(n.u, n.p.mount, n.s);
+    const n = this.nearestScan(x, z, hint);
+    return n.p.y + this.profile(n.u, n.p.mount, n.p.s);
+  }
+
+  /** True when a point lies on or within `margin` metres of any nearby stretch of road. */
+  onRoad(x, z, hint = 0, margin = 1.5) {
+    const n = this.nearestScan(x, z, hint);
+    return n.d < ROAD.railOffset + margin;
   }
 
   /** The wall on each side at distance s: the rail on the valley side, the cutting face on the mountain side. */
