@@ -18,7 +18,7 @@ const ASSETS = {
   post: './assets/guardrail_post.js', pole: './assets/snow_pole.js', lamp: './assets/lamp_post.js',
   mirror: './assets/traffic_mirror.js', chevron: './assets/chevron_sign.js', torii: './assets/torii_gate.js',
   lantern: './assets/stone_lantern.js', portal: './assets/tunnel_portal.js', hut: './assets/mountain_hut.js',
-  vending: './assets/vending_machine.js',
+  vending: './assets/vending_machine.js', shrub: './assets/roadside_shrub.js', broadleaf: './assets/broadleaf_tree.js',
 };
 const SURFACED = new Set(['boulder', 'post', 'pole', 'lamp', 'mirror', 'chevron', 'torii', 'lantern', 'portal', 'hut', 'vending']);
 const TUNNEL_LEN = 96;
@@ -85,13 +85,16 @@ export class World {
       this.templates[k] = t;
       n++; if (progress) progress(n / names.length, k);
     }));
-    // the maple's foliage material turns white so the instance colour is the leaf colour
-    const maple = this.templates.maple;
-    maple.traverse((o) => {
-      if (o.isMesh && o.material && (o.material.name === 'foliage' || o.material.color.getHex() === PAL.mapleOrange)) {
-        o.material = o.material.clone(); o.material.color.set(0xffffff); o.material.name = 'foliage_tinted';
-      }
-    });
+    // foliage materials turn white so the instance colour is the leaf colour
+    for (const name of ['maple', 'shrub', 'broadleaf']) {
+      const tpl = this.templates[name]; if (!tpl) continue;
+      tpl.traverse((o) => {
+        const hex = o.isMesh && o.material ? o.material.color.getHex() : -1;
+        if (o.isMesh && o.material && (o.material.name === 'foliage' || hex === PAL.mapleOrange || hex === PAL.dryGrass || hex === PAL.mapleGold)) {
+          o.material = o.material.clone(); o.material.color.set(0xffffff); o.material.name = 'foliage_tinted';
+        }
+      });
+    }
     const rt = roadTextures();
     this.roadMat = new THREE.MeshStandardMaterial({ map: rt.map, roughnessMap: rt.roughnessMap, roughness: 1, metalness: 0.0, color: 0xffffff });
     const g = surface(THREE, 'ground', 256);
@@ -501,7 +504,7 @@ export class World {
   /** Cedars on the slopes, maples along the road, as per-chunk InstancedMesh. */
   placeTrees(i0, i1, s0, s1, group, rng) {
     const t = this.track, pts = t.pts;
-    const cedars = [], maplesA = [];
+    const cedars = [], maplesA = [], broad = [], shrubs = [];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
     const density = this.q.trees;
     const put = (list, x, y, z, ry, s, extra) => {
@@ -516,7 +519,7 @@ export class World {
         const mountainHere = side > 0 ? (p.mount + 1) * 0.5 : (1 - p.mount) * 0.5;
         const lay = t.terraceAt(p.s);
         const start = tun ? RAIL + 12 : (lay && lay.side === side ? lay.u1 + 3 : (mountainHere > 0.5 ? RAIL + 8.5 : RAIL + 5));
-        const spacing = mountainHere > 0.5 ? 10.5 : 12.5;
+        const spacing = mountainHere > 0.5 ? 12 : 14;
         for (let u = start + rng() * spacing; u < RAIL + 150; u += spacing / density) {
           if (rng() < 0.22) continue;
           const uu = u + (rng() - 0.5) * 5;
@@ -524,14 +527,28 @@ export class World {
           const y = t.groundAt(x, z, i) - 0.4;
           put(cedars, x, y, z, rng() * Math.PI * 2, 0.7 + rng() * 0.6, { near: uu < 45 });
         }
-        // maples: the accent trees at the road's edge
-        if (!tun && !(lay && lay.side === side) && rng() < 0.42) {
+        // the accent trees at the road's edge: maples and a looser broadleaf, red a minority
+        if (!tun && !(lay && lay.side === side) && rng() < 0.55) {
           const u = mountainHere > 0.5 ? RAIL + 2.2 + rng() * 5 : RAIL + 1.4 + rng() * 3;
           const [x, , z] = this.at(p, u * side);
           const y = t.groundAt(x, z, i) - 0.25;
           const pick = rng();
-          const colour = pick < 0.45 ? PAL.mapleRed : pick < 0.8 ? PAL.mapleOrange : PAL.mapleGold;
-          put(maplesA, x, y, z, rng() * Math.PI * 2, 0.75 + rng() * 0.45, { colour });
+          if (rng() < 0.45) {
+            const colour = pick < 0.5 ? PAL.mapleGold : pick < 0.85 ? PAL.dryGrass : PAL.mapleOrange;
+            put(broad, x, y, z, rng() * Math.PI * 2, 0.8 + rng() * 0.45, { colour });
+          } else {
+            const colour = pick < 0.3 ? PAL.mapleRed : pick < 0.7 ? PAL.mapleOrange : PAL.mapleGold;
+            put(maplesA, x, y, z, rng() * Math.PI * 2, 0.75 + rng() * 0.45, { colour });
+          }
+        }
+        // a second rank on the mountain slope, so the hillside above the road is not bare grass
+        if (!tun && mountainHere > 0.5 && !(lay && lay.side === side) && rng() < 0.4) {
+          const u = RAIL + 7 + rng() * 6;
+          const [x, , z] = this.at(p, u * side);
+          const y = t.groundAt(x, z, i) - 0.3;
+          const pick = rng();
+          const colour = pick < 0.4 ? PAL.mapleGold : pick < 0.7 ? PAL.mapleOrange : pick < 0.85 ? PAL.dryGrass : PAL.mapleRed;
+          put(pick < 0.5 ? broad : maplesA, x, y, z, rng() * 6, 0.7 + rng() * 0.4, { colour });
         }
       }
     }
@@ -547,9 +564,29 @@ export class World {
         put(maplesA, x, y, z, rng() * 6, 0.85 + rng() * 0.35, { colour: k % 2 ? PAL.mapleRed : PAL.mapleGold });
       }
     }
+    // shrubs crowd the verge on both sides, every few metres, in the dry autumn hues
+    for (let i = i0; i < i1; i += 2) {
+      const p = pts[i];
+      if (this.nearTunnel(p.s, 6)) continue;
+      for (const side of [1, -1]) {
+        const lay = t.terraceAt(p.s);
+        if (lay && lay.side === side && lay.layby) continue;
+        if (rng() < 0.3) continue;
+        const mountainHere = side > 0 ? (p.mount + 1) * 0.5 : (1 - p.mount) * 0.5;
+        const w = side > 0 ? p.wl : p.wr;
+        const u = w + 0.6 + rng() * (mountainHere > 0.5 ? 2.4 : 1.7);
+        const [x, , z] = this.at(p, u * side + (rng() - 0.5) * 1.2);
+        const y = t.groundAt(x, z, i) - 0.12;
+        const pick = rng();
+        const colour = pick < 0.4 ? PAL.dryGrass : pick < 0.68 ? PAL.moss : pick < 0.9 ? PAL.mapleGold : PAL.mapleOrange;
+        put(shrubs, x, y, z, rng() * 6.28, 0.7 + rng() * 0.7, { colour });
+      }
+    }
     this.instance(group, 'cedar', cedars.filter((c) => c.near), true);
     this.instance(group, 'cedar', cedars.filter((c) => !c.near), false);
     this.instance(group, 'maple', maplesA, true, true);
+    this.instance(group, 'broadleaf', broad, true, true);
+    this.instance(group, 'shrub', shrubs, false, true);
   }
 
   /** Turn a template's merged meshes into InstancedMeshes with the given placements. */

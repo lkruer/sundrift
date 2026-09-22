@@ -7,3 +7,4 @@ _gate*/
 work/cands/**/_verify/
 .claude/
 *.log
+work/refs/

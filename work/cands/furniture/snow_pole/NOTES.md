@@ -1,0 +1,7 @@
+# snow_pole — notes
+
+- Winner: **A** (five stacked 8-sided cylinder bands, a 3-sided prism scaled into the arrow plate, cylinder reflector, dark clamp band and bracket block). 256 triangles, measured 0.14 x 1.4 x 0.092 m (the 0.034 clamp band and the reflector proud of the plate push depth 0.012 over the brief's 0.08, inside tolerance).
+- Why A: all three candidates read identically as a red/white delineator with a down-pointing red arrow and a white dot from every view, so the cheapest and cleanest one wins for an object instanced hundreds of times. A has flush bands and the crispest silhouette.
+- B (red lathe pole with white lathe sleeves, extruded triangle, lathe lens; 276 tris) adds a foot flare and a domed cap that are nice but invisible at chase-camera distance, and its white sleeves stand proud of the pole. C (white core with three red sleeves, hand-built prism plate, sphere-cap reflector; 214 tris) has the red bands proud instead, which reads as a stepped pole from the side.
+- Nothing changed after the render: all three passed the verifier first time and the sheet showed no proportion problem. Band order checked: red at the ground, red at the top, five bands of 0.26 m.
+- The dark clamp band and bracket block are the only parts not named in the brief (the style lock's dark line, and a plausible fixing for a plate hanging off the front of a pole). No emissive: the style lock says pole bands only emit on cars, and the white reflector is plain lane white.
