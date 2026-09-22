@@ -177,9 +177,11 @@ export default function (THREE) {
   // both ends capped: the inner end faces the wheel well and would read as a hole
   // The inner sections reach into the arch openings so the bumper meets the flare's
   // sloped face; ending them at the arch edge left a dark wedge of wheel tub showing.
-  add(body, loft([bumper(1.56, 0.81, 0.585), bumper(1.95, 0.80, 0.585), bumper(2.145, 0.72, 0.585)],
+  // Their tops overlap the hull's floor edge by a centimetre: a coplanar seam there read
+  // as a dark tick at each flare's top corner.
+  add(body, loft([bumper(1.56, 0.81, 0.605), bumper(1.95, 0.80, 0.605), bumper(2.145, 0.72, 0.60)],
                  { creaseRows: [1, 11, 4, 8], capFront: 0, capBack: 0 }), PAINT);
-  add(body, loft([bumper(-1.56, 0.81, 0.70), bumper(-2.0, 0.80, 0.77), bumper(-2.21, 0.72, 0.78)],
+  add(body, loft([bumper(-1.56, 0.81, 0.715), bumper(-2.0, 0.80, 0.77), bumper(-2.21, 0.72, 0.78)],
                  { creaseRows: [1, 11, 4, 8], capFront: 0, capBack: 0 }), PAINT);
   const band = (z, hw, y0, y1) => [[hw, y0, z], [hw, y1, z], [-hw, y1, z], [-hw, y0, z]];
   const HARD = [0, 1, 2, 3];

@@ -142,6 +142,7 @@ async function buildCar() {
 function startGame() {
   if (G.playing) return;
   $('start').classList.remove('on');
+  document.body.classList.add('playing');
   hud.show(true);
   audio.unlock();
   G.playing = true;
