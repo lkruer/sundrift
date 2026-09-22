@@ -8,7 +8,7 @@
  * points; it is tinted by the sun so it reads warm at golden hour and cool in shade.
  */
 import * as THREE from 'three';
-import { clamp } from './config.js?v=202609220418';
+import { clamp } from './config.js?v=202609222216';
 
 function spriteTexture() {
   const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
@@ -45,6 +45,11 @@ export class SkidMarks {
       scene.add(mesh);
       this.tracks.push({ mesh, geo, pos, al, head: 0, count: 0, lastX: 0, lastZ: 0, on: false, gap: true });
     }
+  }
+
+  /** Wipe every mark (a new course or a new run). */
+  clear() {
+    for (const t of this.tracks) { t.al.fill(0); t.head = 0; t.count = 0; t.gap = true; t.geo.attributes.alpha.needsUpdate = true; t.geo.setDrawRange(0, 0); }
   }
 
   /**
@@ -118,9 +123,12 @@ export class Particles {
     });
   }
 
-  dust(x, y, z, vx, vz, strength) {
-    this.spawn({ x, y: y + 0.05, z, vx: vx * 0.4 + (Math.random() - 0.5) * 2, vy: 0.6 + Math.random(), vz: vz * 0.4 + (Math.random() - 0.5) * 2,
-      life: 0.9 + Math.random() * 0.6, s0: 0.4, s1: 2.2, r: 0.62, g: 0.52, b: 0.36, a0: 0.12 + 0.2 * strength, drag: 1.6 });
+  dust(x, y, z, vx, vz, strength, tint = null) {
+    // dry dirt thrown up off the verge: brown, low, spreading and thin, lit by the scene's light colour
+    const k = tint ? 0.55 : 1;
+    this.spawn({ x, y: y + 0.08, z, vx: vx * 0.3 + (Math.random() - 0.5) * 1.6, vy: 0.35 + Math.random() * 0.5, vz: vz * 0.3 + (Math.random() - 0.5) * 1.6,
+      life: 0.8 + Math.random() * 0.6, s0: 0.7, s1: 2.6, r: 0.42 * k * (tint ? tint.r * 1.6 : 1), g: 0.34 * k * (tint ? tint.g * 1.6 : 1), b: 0.24 * k * (tint ? tint.b * 1.6 : 1),
+      a0: 0.05 + 0.1 * strength, drag: 2.2 });
   }
 
   sparks(x, y, z, nx, nz, n = 10) {
@@ -158,7 +166,13 @@ export class Particles {
   }
 }
 
-/** A flickering cone of fire at the exhaust while boosting, plus a light on the road behind it. */
+/**
+ * A flickering cone of fire at the exhaust while boosting, plus a light on the road behind it.
+ *
+ * The light is never hidden or removed, only dimmed to zero: the number of lights in the scene is part of
+ * every lit material's shader, so a light that comes and goes recompiles every material in the scene (a
+ * second-long freeze the first time a boost fires).
+ */
 export class ExhaustFlame {
   constructor(parent) {
     const geo = new THREE.ConeGeometry(0.075, 0.9, 8, 1, true);
@@ -169,8 +183,10 @@ export class ExhaustFlame {
     this.inner = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.55, 8, 1, true).rotateX(Math.PI / 2).translate(0, 0, -0.27),
       new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.group = new THREE.Group();
-    this.group.add(this.core, this.inner);
-    this.group.visible = false;
+    this.cones = new THREE.Group();
+    this.cones.add(this.core, this.inner);
+    this.cones.visible = false;
+    this.group.add(this.cones);
     this.light = new THREE.PointLight(0xff9a3a, 0, 6, 2);
     this.light.position.set(0, 0.2, -0.9);
     this.group.add(this.light);
@@ -181,10 +197,10 @@ export class ExhaustFlame {
   update(dt, strength) {
     this.t += dt;
     const on = strength > 0.02;
-    this.group.visible = on;
+    this.cones.visible = on;
     if (!on) { this.light.intensity = 0; return; }
     const f = 0.7 + 0.3 * Math.sin(this.t * 61) * Math.sin(this.t * 37 + 1);
-    this.group.scale.set(1, 1, (0.6 + 1.2 * strength) * f);
+    this.cones.scale.set(1, 1, (0.6 + 1.2 * strength) * f);
     this.mat.opacity = 0.6 * f * strength + 0.2;
     this.light.intensity = 25 * strength * f;
   }

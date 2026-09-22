@@ -23,42 +23,24 @@
     [-0.87, 0.24, 0.80, 0.815, 0.80,  0.78,  0.910, 0.593, 1.230, 1.262],   // door rear edge
     [-0.89, 0.70, 0.80, 0.815, 0.80,  0.78,  0.911, 0.592, 1.229, 1.260],   // quarter: the skin ends above the arch
     [-0.95, 0.70, 0.80, 0.815, 0.80,  0.78,  0.912, 0.59, 1.225, 1.255],    // rear glass top
-    [-1.48, 0.70, 0.80, 0.815, 0.80,  0.80,  0.915, 0.70, 0.935, 0.946],   // rear glass base
+    [-1.48, 0.70, 0.80, 0.815, 0.80,  0.80,  0.915, 0.70, 0.94,  0.952],    // rear glass base
+    [-2.12, 0.78, 0.78, 0.79,  0.85,  0.78,  0.905, 0.71, 0.915, 0.93],     // tail, deck lowered
   ];
   const rings = stations.map((s) => ring(...s));
-  // ---- the tail: short, pinched in plan, rounded at the corners, its face undercut ----------
-  // Behind the rear arch the skin drops to y TLO (the bottom of the rear face), the flank pinches
-  // from 0.815 to TW, the corners round in plan with radius TR, the deck kicks up into a ducktail
-  // lip at z TZ, and every ring leans so the face (the loft's back cap) is undercut 20 degrees:
-  // a ring point at height y sits at z = zTop + g (TY - y) RAKE, lower points further forward.
-  const RAKE = Math.tan(20 * PI / 180), TY = 0.95, TZ = -2.03, TR = 0.17, TW = 0.775, TLO = 0.44;
-  const tailRing = (zTop, W, g, sx, duck, yBelt, yRoof, yTop) =>
-    ring(0, TLO, W - 0.015, W, TLO + (yBelt - TLO) * 0.55, W - 0.015, yBelt, W - 0.115, yRoof + duck * 0.8, yTop + duck)
-      .map(([x, y]) => [x * sx, y, zTop + g * (TY - y) * RAKE]);
-  rings.push(ring(-1.555, 0.70, 0.80, 0.815, 0.80, 0.80, 0.912, 0.70, 0.930, 0.942));           // the last ring over the rear arch
-  rings.push(tailRing(-1.56, 0.815, 0, 1, 0, 0.910, 0.925, 0.937));                                 // the skin drops to the face's bottom edge
-  rings.push(tailRing(-1.70, 0.800, 0.45, 1, 0, 0.905, 0.914, 0.926));                              // pinching in, starting to lean
-  const TAIL0 = rings.length;                                                                         // the first ring of the rounded corner
-  for (let k = 0; k <= 4; k++) {
-    const ph = k * PI / 8, d = TR * (1 - Math.sin(ph)), duck = 0.035 * Math.pow(1 - d / TR, 1.5);
-    rings.push(tailRing(TZ + d, TW, 1, (TW - TR + TR * Math.cos(ph)) / TW, duck, 0.90, 0.905, 0.917));
-  }
-  const TAILN = rings.length - 1;                                                                     // the face ring: the cap inside it is the rear face
   add(body, loft(rings, {
     creaseRows: [1, 3, 4, 12, 13, 15], creaseSecs: [5, 6, 10, 11], capFront: 0, capBack: 0,
     matOf: (seg, row) => {
       const top = row >= 4 && row <= 11, side = row === 3 || row === 12;
       if (top && (seg === 5 || seg === 10)) return 1;
       if (side && seg >= 5 && seg <= 10) return 1;
-      if (seg >= 12 && (row === 0 || row === 15)) return 2;     // the wall behind the rear wheel and the tail's underside
       return 0;
     },
-  }), [PAINT, GLASS, DARK]);
+  }), [PAINT, GLASS]);
 
   // ---- reading the hull's own surface, so fittings sit ON it ---------------------------
   const ringAt = (z) => {
-    let i = 0; while (i < rings.length - 2 && z < rings[i + 1][8][2]) i++;
-    const a = rings[i], b = rings[i + 1], t = c01((a[8][2] - z) / ((a[8][2] - b[8][2]) || 1e-9));
+    let i = 0; while (i < rings.length - 2 && z < rings[i + 1][0][2]) i++;
+    const a = rings[i], b = rings[i + 1], t = c01((a[0][2] - z) / (a[0][2] - b[0][2]));
     return a.map((p, k) => [lerp(p[0], b[k][0], t), lerp(p[1], b[k][1], t), z]);
   };
   // height of the top skin at (x, z): belt(+x), roof edge, crown points, roof edge, belt(-x)
@@ -118,13 +100,13 @@
     topPanel(s * 0.30, s * 0.62, 1.79, 2.05, 0.003, PAINT, 3);                                 // pop-up lamp lid, closed
     const lid = [[s * 0.30, 1.79], [s * 0.62, 1.79], [s * 0.62, 2.05], [s * 0.30, 2.05], [s * 0.30, 1.79]];
     for (let k = 0; k < 4; k++) topStrip(linePts(lid[k], lid[k + 1], 4), 0.010);
-    topStrip([[s * 0.688, -1.52]].concat([12, TAIL0 - 1, TAIL0, TAIL0 + 1, TAIL0 + 2, TAIL0 + 3].map((k) => [s * (rings[k][4][0] - 0.012), rings[k][8][2]])), 0.010);   // boot lid edges, round the deck's corners
+    topStrip(linePts([s * 0.60, -1.52], [s * 0.60, -2.13], 7), 0.010);                        // boot edges, run out through the ducktail
     flankStrip(s, linePts([0.25, 0.42], [0.80, 0.42], 6), 0.010);                             // door front edge
     flankStrip(s, linePts([0.25, -0.93], [0.80, -0.93], 6), 0.010);                           // door rear edge
   }
   topStrip(linePts([-0.60, 1.74], [0.60, 1.74], 12), 0.010);                                  // bonnet front edge
   topStrip(linePts([-0.60, 0.34], [0.60, 0.34], 12), 0.010);                                  // bonnet rear edge (scuttle)
-  topStrip(linePts([-0.688, -1.52], [0.688, -1.52], 12), 0.010);                              // boot front edge
+  topStrip(linePts([-0.60, -1.52], [0.60, -1.52], 12), 0.010);                                // boot front edge
   {                                                                                            // bonnet bulge, riding the crown
     const secs = [];
     for (let k = 0; k <= 8; k++) {
@@ -133,6 +115,15 @@
       secs.push([[0.25, y(0.25) - 0.012, z], [0.25, y(0.25) + 0.002, z], [0.13, y(0.13) + h, z], [-0.13, y(-0.13) + h, z], [-0.25, y(-0.25) + 0.002, z], [-0.25, y(-0.25) - 0.012, z]]);
     }
     add(body, loft(secs, { creaseRows: [0, 1, 4, 5] }), PAINT);
+  }
+  {                                                                                            // ducktail: the boot lid trailing edge kicks up
+    const secs = [];
+    for (let k = 0; k <= 7; k++) {
+      const z = lerp(-1.90, -2.19, k / 7), h = 0.04 * Math.pow(c01((-1.90 - z) / 0.29), 1.6), lo = [], hi = [];
+      for (let j = 0; j <= 6; j++) { const x = lerp(-0.58, 0.58, j / 6), y = topY(x, z); lo.push([x, y - 0.012, z]); hi.push([x, y + h + 0.002, z]); }
+      secs.push(lo.concat(hi.reverse()));
+    }
+    add(body, loft(secs, { creaseRows: [0, 6, 7, 13], capBack: 0 }), PAINT);
   }
 
 
@@ -143,8 +134,24 @@
   add(body, sweep(clipX(nose, -0.815, -0.58), plainProf(0.19, 0.40, 0.10)), PAINT);
   add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.135, 0.168, 0.10, 0.055)), DARK);          // splitter lip, proud of the face
   add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.585, 0.665, 0.10, 0.012)), DARK);           // lamp band
-  for (const s of [-1, 1]) for (const [az, top] of [[1.275, 0.74], [-1.225, 0.79]]) {
-    const th0 = Math.atan2(-0.08, 0.50), th1 = az > 0 ? PI - th0 : PI - Math.asin(0.08 / 0.35), secs = [];
+  const topR = (x, z) => lerp(0.725, 0.80, c01((-1.60 - z) / 0.59));
+  add(body, sweep(tail, [[-0.06, 0.30], [0, 0.46], [0.012, 0.52], [0.004, topR], [-0.10, topR], [-0.10, 0.30]]), PAINT);   // rear bumper: 0.34 face with a soft crease, chin tucked under
+  add(body, sweep(clipZ(tail, -1.92), [[0.0, 0.80], [0.014, 0.812], [0.014, 0.928], [0.0, 0.94], [-0.08, 0.94], [-0.08, 0.80]]), DARK);   // garnish, 0.14 tall, chamfered, wrapping into the quarters
+  add(body, sweep(tail, plainProf(0.17, 0.31, 0.10, -0.054)), DARK);                                  // lower valance, wraps the corners
+  // rear wing: aerofoil lofted across, swept uprights, end plates, high-mount brake lamp
+  const foil = (x) => {
+    const out = [];
+    for (let k = 0; k < 14; k++) {
+      const t = k / 14, u = 0.5 - 0.5 * Math.cos(2 * PI * t);
+      const th = 0.011 * (1.2 * Math.sqrt(u) - 0.3 * u - 0.9 * u * u) / 0.50;
+      out.push([x, t < 0.5 ? th + 0.006 : -th * 0.9 + 0.006, 0.11 - 0.22 * u]);
+    }
+    return out;
+  };
+  add(body, loft([foil(-0.71), foil(-0.30), foil(0.30), foil(0.71)], { capFront: 0, capBack: 0 }), DARK, 0, 1.235, -2.02, 0.10);
+  for (const s of [-1, 1]) add(body, loft([rect(1, [s * 0.45, 0.905, -1.83], [0.018, 0.09]), rect(1, [s * 0.45, 1.08, -1.92], [0.018, 0.075]), rect(1, [s * 0.45, 1.232, -2.01], [0.018, 0.06])], { capFront: 0, capBack: 0 }), DARK);   // taller swept uprights
+  for (const s of [-1, 1]) for (const [az, top] of [[1.275, 0.74], [-1.225, 0.78]]) {
+    const th0 = Math.atan2(-0.08, 0.50), secs = [];
     const outer = (th) => {
       const sn = Math.sin(th), cs = Math.abs(Math.cos(th)), sg = Math.sign(Math.cos(th)) || 1;
       let t = sn > 1e-6 ? (top - 0.32) / sn : 1e9;
@@ -152,8 +159,8 @@
       return [az + sg * t * cs, 0.32 + t * sn];
     };
     for (let k = 0; k <= 18; k++) {
-      const th = th0 + (th1 - th0) * k / 18, iz = az + 0.35 * Math.cos(th), iy = 0.32 + 0.35 * Math.sin(th), [oz, oy] = outer(th);
-      const ox = az > 0 ? 0.875 : 0.905;                                                        // the rear flares stand out as hips
+      const th = th0 + (PI - 2 * th0) * k / 18, iz = az + 0.35 * Math.cos(th), iy = 0.32 + 0.35 * Math.sin(th), [oz, oy] = outer(th);
+      const ox = az > 0 ? 0.875 : 0.89;
       secs.push([[s * 0.785, iy, iz], [s * ox, iy, iz], [s * ox, oy, oz], [s * 0.785, oy, oz]]);
     }
     add(body, loft(secs, { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), PAINT);

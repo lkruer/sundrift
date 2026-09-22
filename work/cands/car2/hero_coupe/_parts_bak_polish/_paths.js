@@ -11,3 +11,6 @@
     add(grp, box(w, h, d), m, 0, 0, (proud || 0) + d / 2 - d);
     return grp;
   };
+  const tail = endPath(-1, -2.19, -1.56, wrapR).reverse();
+  // the part of a tail path at or behind z = zl, with exact points inserted at the cuts
+  const clipZ = (path, zl) => { const out = []; for (let i = 0; i < path.length; i++) { const p = path[i], q = path[i + 1]; if (p[1] <= zl + 1e-9) out.push(p); if (q && (p[1] - zl) * (q[1] - zl) < 0) { const t = (zl - p[1]) / (q[1] - p[1]); out.push([lerp(p[0], q[0], t), zl]); } } return out; };                                        // reversed so the swept normal faces out

@@ -1,5 +1,5 @@
 /**
- * SUNDRIFT — every tunable in one place.
+ * MINIDRIFT — every tunable in one place.
  *
  * Colours here are the style lock (STYLE_LOCK.md at the repo root) and nothing else; the assets use the
  * same hex values, which is what makes a road, a tree and a car built by different agents read as one place.
@@ -26,7 +26,7 @@ export const ROAD = {
 
 /** Chase camera. */
 export const CAM = {
-  dist: 4.1, height: 1.5, lookAhead: 3.4, lookUp: 0.75,
+  dist: 3.55, height: 1.28, lookAhead: 3.0, lookUp: 0.6,
   fov: 58, fovBoost: 10, fovSpeed: 6,
   followRate: 5.5, yawBlend: 0.62,   // 0 = behind the car's heading, 1 = behind the velocity vector
   roll: 0.045,
@@ -35,10 +35,10 @@ export const CAM = {
 /** Scoring. */
 export const SCORE = {
   minSpeed: 6.0,         // m/s before a slide counts
-  minSlip: 0.17,         // rad, drift begins
+  minSlip: 0.15,         // rad, drift begins
   endSlip: 0.11,         // rad, drift ends below this for endGrace seconds
-  endGrace: 0.55,
-  chainGrace: 1.6,       // seconds between drifts that keep the chain alive
+  endGrace: 0.7,
+  chainGrace: 2.2,       // seconds between drifts that keep the chain alive
   rate: 2.2,             // points per second per (km/h * angle factor * multiplier)
   multStep: 0.5,         // multiplier gained per multEvery seconds of continuous drift
   multEvery: 1.4,
@@ -59,6 +59,9 @@ export const QUALITY = {
 };
 
 export const MAX_DT = 1 / 20;
+
+/** The car as drawn: a little smaller than the physics body, so the road reads roomy. */
+export const CAR_SCALE = 0.75;
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt));

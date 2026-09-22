@@ -10,7 +10,7 @@
  * is a scheduled 128 bpm loop in A minor pentatonic: kick, hat, snare, a filtered saw bass, a chord pad and
  * a delayed arpeggio that only joins while a drift is held.
  */
-import { clamp } from './config.js?v=202609220418';
+import { clamp } from './config.js?v=202609222216';
 
 const NOTES = { A2: 110, C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, G4: 392, A4: 440, C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880 };
 // four bars: Am, F, C, G, as bass roots and pad triads
@@ -25,7 +25,7 @@ export class Audio {
   constructor() {
     this.ctx = null; this.ready = false;
     this.muted = false;
-    try { this.muted = localStorage.getItem('sundrift.mute') === '1'; } catch {}
+    try { this.muted = localStorage.getItem('minidrift.mute') === '1'; } catch {}
     this.rpm = 900; this.throttle = 0; this.lastThrottle = 0; this.lastRpm = 900;
     this.music = { on: true, next: 0, step: 0, tempo: 128, intensity: 0 };
   }
@@ -117,9 +117,15 @@ export class Audio {
     this.music.next = c.currentTime + 0.1;
   }
 
+  /** Pause: the whole audio clock stops, so the engine, the tyres and the music all hold where they are. */
+  pause(on) {
+    if (!this.ctx) return;
+    try { if (on) this.ctx.suspend(); else this.ctx.resume(); } catch {}
+  }
+
   setMuted(m) {
     this.muted = m;
-    try { localStorage.setItem('sundrift.mute', m ? '1' : '0'); } catch {}
+    try { localStorage.setItem('minidrift.mute', m ? '1' : '0'); } catch {}
     if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.05);
   }
 

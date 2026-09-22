@@ -6,9 +6,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1b1a22">
-<title>SUNDRIFT</title>
-<!-- The only network dependencies: Three.js pinned to the version the recipe's verifier renders with, and one font. -->
+<meta name="theme-color" content="#140f1c">
+<title>MINIDRIFT</title>
+<!-- The only network dependencies: Three.js pinned to the version the recipe's verifier renders with, and fonts. -->
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
@@ -17,109 +17,180 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Racing+Sans+One&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap">
 <link rel="icon" href="data:,">
 <style>
   :root {
-    --ink:#f4efe6; --dim:#b9b0a2; --orange:#e8892a; --gold:#f0c24a; --red:#e04a2e; --teal:#7fd0c8;
+    --ink:#f6efe2; --dim:#a79f95; --amber:#ffb347; --amber2:#ff8a2a; --gold:#f0c24a; --red:#ff3b30; --teal:#6fe3d6;
+    --pink:#ff4f9a; --violet:#7a4dff; --panel:rgba(12,10,18,.72);
     --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
-  html,body { margin:0; padding:0; height:100%; overflow:hidden; background:#1b1a22; color:var(--ink);
+  html,body { margin:0; padding:0; height:100%; overflow:hidden; background:#140f1c; color:var(--ink);
               font-family:"Rajdhani","Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-weight:600; }
   canvas#c { display:block; width:100%; height:100%; touch-action:none; }
   .num { font-variant-numeric: tabular-nums; }
+  .mono { font-family:"Share Tech Mono",ui-monospace,Consolas,monospace; }
+
+  /* ---- the logo: italic racing type, chrome over a sunset, the way a 90s arcade cabinet shouts ---- */
+  .logo { position:relative; display:inline-block; width:max-content; padding:0 .12em 0 .02em; margin:0; font-family:"Racing Sans One","Rajdhani",sans-serif; font-weight:400; font-style:italic;
+          font-size:clamp(46px,10.5vw,118px); line-height:.92; letter-spacing:.02em; transform:skewX(-6deg);
+          background:linear-gradient(180deg,#fffaf0 0%,#ffe0a8 38%,#ff9a3d 52%,#ff4f9a 70%,#7a4dff 100%);
+          -webkit-background-clip:text; background-clip:text; color:transparent;
+          filter:drop-shadow(0 3px 0 #1a0f24) drop-shadow(0 0 22px rgba(255,90,140,.35)); }
+  .logo::after { content:attr(data-t); position:absolute; left:0; top:0; color:transparent;
+                 background:repeating-linear-gradient(0deg, rgba(20,10,30,.35) 0 2px, transparent 2px 5px);
+                 -webkit-background-clip:text; background-clip:text; pointer-events:none; }
+  .tag { font-family:"Share Tech Mono",monospace; font-size:clamp(11px,2.2vw,15px); letter-spacing:.5em; color:#ffd9a8; text-indent:.5em; opacity:.9; }
 
   /* ---- loading ---- */
-  #load { position:fixed; inset:0; z-index:40; background:linear-gradient(180deg,#2a2331 0%,#5a3a3a 55%,#c9743a 100%);
-          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
-  #load h1, .screen h1 { margin:0; font-size:clamp(44px,12vw,104px); letter-spacing:.18em; font-weight:700; line-height:.9;
-             color:#fff3df; text-indent:.18em; text-shadow:0 6px 30px rgba(0,0,0,.35); }
-  #load .sub, .screen .sub { font-size:clamp(12px,2.6vw,16px); letter-spacing:.42em; color:#ffe2b8; text-indent:.42em; opacity:.85; }
-  #bar { width:min(340px,64vw); height:3px; background:rgba(0,0,0,.28); overflow:hidden; border-radius:2px; }
-  #barf { height:100%; width:0%; background:#fff3df; transition:width .15s linear; }
-  #loadmsg { font-size:12px; color:#ffe2b8; letter-spacing:.16em; height:14px; opacity:.8; }
+  #load { position:fixed; inset:0; z-index:40; background:
+            repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 4px),
+            linear-gradient(180deg,#120c1d 0%,#2b1638 40%,#6a2a4a 70%,#d8743a 100%);
+          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; }
+  #bar { width:min(340px,64vw); height:6px; background:rgba(0,0,0,.35); border:1px solid rgba(255,217,168,.35); overflow:hidden; }
+  #barf { height:100%; width:0%; background:repeating-linear-gradient(90deg,#ffb347 0 10px,#ff8a2a 10px 12px); transition:width .15s linear; }
+  #loadmsg { font-family:"Share Tech Mono",monospace; font-size:12px; color:#ffd9a8; letter-spacing:.2em; height:14px; opacity:.85; text-transform:uppercase; }
 
-  /* ---- screens ---- */
-  .screen { position:fixed; inset:0; z-index:35; display:none; flex-direction:column; align-items:center; justify-content:center;
-            gap:18px; text-align:center; padding:24px;
-            background:radial-gradient(ellipse at 50% 60%, rgba(20,16,24,.35), rgba(12,10,16,.78)); }
-  .screen.on { display:flex; }
-  .screen .ctl { display:flex; gap:22px; flex-wrap:wrap; justify-content:center; font-size:14px; letter-spacing:.12em; color:var(--dim); }
-  .screen .ctl div { display:flex; flex-direction:column; align-items:center; gap:6px; }
-  .screen .ctl b { color:var(--ink); font-size:13px; letter-spacing:.2em; }
-  .screen.touchmode .ctl.keys { display:none; }
-  .screen:not(.touchmode) .ctl.fingers { display:none; }
-  kbd { display:inline-block; min-width:30px; padding:4px 8px; border:1.5px solid rgba(244,239,230,.45); border-radius:6px;
-        font:inherit; font-size:14px; color:var(--ink); background:rgba(0,0,0,.25); margin:0 2px; }
-  .btn { padding:16px 44px; border:2px solid var(--gold); border-radius:999px; background:rgba(240,194,74,.16); color:#fff3df;
-         font:inherit; font-size:22px; font-weight:700; letter-spacing:.32em; text-indent:.32em; cursor:pointer;
-         box-shadow:0 0 0 0 rgba(240,194,74,.55); animation:pulse 2.2s ease-out infinite; }
-  .btn:active { transform:scale(.97); }
-  @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(240,194,74,.55);} 100% { box-shadow:0 0 0 22px rgba(240,194,74,0);} }
-  .best { font-size:13px; letter-spacing:.3em; color:var(--gold); }
-  .tiny { font-size:11px; letter-spacing:.2em; color:var(--dim); max-width:min(520px,88vw); line-height:1.7; }
+  /* ---- title ---- */
+  #title { position:fixed; inset:0; z-index:35; display:none; pointer-events:none; }
+  #title.on { display:block; }
+  #title .shade { position:absolute; inset:0; background:
+      linear-gradient(90deg, rgba(10,6,18,.86) 0%, rgba(10,6,18,.55) 38%, rgba(10,6,18,0) 62%),
+      linear-gradient(0deg, rgba(10,6,18,.55) 0%, rgba(10,6,18,0) 30%); }
+  #title .logo { font-size:clamp(44px,7.2vw,96px); }
+  #title .menu { position:absolute; left:calc(var(--safe-l) + clamp(18px,5vw,72px)); top:50%; transform:translateY(-50%);
+      width:min(470px,86vw); display:flex; flex-direction:column; gap:clamp(10px,1.8vh,18px); pointer-events:auto; }
+  .sect { font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.34em; color:var(--dim); margin-bottom:-4px; }
+  .diffs { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .diff { position:relative; padding:10px 10px 9px; border:1.5px solid rgba(246,239,226,.22); background:rgba(12,8,20,.55); color:var(--ink);
+          font:inherit; text-align:left; cursor:pointer; transform:skewX(-8deg); transition:border-color .15s, background .15s; }
+  .diff > * { display:block; transform:skewX(8deg); }
+  .diff b { font-family:"Racing Sans One",sans-serif; font-weight:400; font-style:italic; font-size:22px; letter-spacing:.04em; }
+  .diff span { font-size:12px; color:var(--dim); line-height:1.25; margin-top:2px; min-height:30px; }
+  .diff i { font-style:normal; font-family:"Share Tech Mono",monospace; font-size:11px; color:var(--amber); margin-top:4px; letter-spacing:.08em; }
+  .diff:hover { border-color:rgba(255,179,71,.6); }
+  .diff.sel { border-color:var(--amber); background:linear-gradient(180deg,rgba(255,138,42,.28),rgba(255,79,154,.12)); box-shadow:0 0 18px rgba(255,138,42,.25); }
+  .diff[data-d="easy"].sel b { color:#9ff0b8; } .diff[data-d="medium"].sel b { color:var(--gold); } .diff[data-d="hard"].sel b { color:#ff7a6a; }
+  .swatches { display:flex; flex-wrap:wrap; gap:9px; align-items:center; }
+  .sw { width:34px; height:34px; border-radius:50%; border:2px solid rgba(246,239,226,.25); cursor:pointer; padding:0;
+        box-shadow:inset 0 -6px 10px rgba(0,0,0,.35), inset 0 4px 8px rgba(255,255,255,.35); transition:transform .12s, border-color .12s; }
+  .sw:hover { transform:scale(1.08); }
+  .sw.sel { border-color:var(--amber); transform:scale(1.14); box-shadow:0 0 0 3px rgba(255,179,71,.3), inset 0 -6px 10px rgba(0,0,0,.35), inset 0 4px 8px rgba(255,255,255,.35); }
+  #paintname { font-family:"Share Tech Mono",monospace; font-size:12px; letter-spacing:.2em; color:var(--ink); opacity:.8; margin-left:4px; }
+  .start { margin-top:6px; align-self:flex-start; padding:15px 46px 13px; border:none; cursor:pointer; color:#1a0f1f;
+           font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:26px; letter-spacing:.14em;
+           background:linear-gradient(180deg,#ffe3a6,#ffb347 45%,#ff8a2a); transform:skewX(-10deg);
+           box-shadow:0 0 0 2px #1a0f1f, 0 0 0 4px var(--amber), 0 8px 30px rgba(255,138,42,.45); animation:glow 1.6s ease-in-out infinite; }
+  .start > span { display:inline-block; transform:skewX(10deg); }
+  .start:active { transform:skewX(-10deg) scale(.97); }
+  @keyframes glow { 0%,100% { filter:brightness(1);} 50% { filter:brightness(1.18);} }
+  .keys { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; color:var(--dim); letter-spacing:.06em; }
+  .keys div { white-space:nowrap; }
+  kbd { display:inline-block; min-width:24px; padding:1px 6px; border:1px solid rgba(246,239,226,.4); border-bottom-width:2px; border-radius:4px;
+        font-family:"Share Tech Mono",monospace; font-size:12px; color:var(--ink); background:rgba(0,0,0,.3); margin-right:3px; text-align:center; }
+  body.touch .keys.k { display:none; } body:not(.touch) .keys.f { display:none; }
+  #title .credit { position:absolute; right:calc(var(--safe-r) + 18px); bottom:calc(var(--safe-b) + 14px); font-family:"Share Tech Mono",monospace;
+                   font-size:11px; letter-spacing:.3em; color:rgba(246,239,226,.45); }
+  #building { position:absolute; left:0; right:0; bottom:calc(var(--safe-b) + 18px); text-align:center; font-family:"Share Tech Mono",monospace;
+              font-size:12px; letter-spacing:.3em; color:var(--amber); opacity:0; transition:opacity .2s; }
+  #building.on { opacity:1; }
+
+  /* ---- pause ---- */
+  #pause { position:fixed; inset:0; z-index:36; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+           background:repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 4px), rgba(10,6,18,.62); backdrop-filter:blur(2px); }
+  #pause.on { display:flex; }
+  #pause h2 { margin:0 0 8px; font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:clamp(40px,8vw,72px);
+              letter-spacing:.08em; color:var(--amber); text-shadow:0 0 24px rgba(255,138,42,.45); animation:blink 1.1s steps(2,start) infinite; }
+  @keyframes blink { 50% { opacity:.55; } }
+  .pbtn { width:min(300px,78vw); padding:12px 0 10px; border:1.5px solid rgba(246,239,226,.3); background:rgba(12,8,20,.7); color:var(--ink);
+          font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:22px; letter-spacing:.12em; cursor:pointer; transform:skewX(-10deg); }
+  .pbtn:hover, .pbtn:focus-visible { border-color:var(--amber); color:var(--amber); outline:none; }
+  #pause .stats { font-family:"Share Tech Mono",monospace; font-size:12px; letter-spacing:.2em; color:var(--dim); margin-top:6px; text-align:center; line-height:1.8; }
 
   /* ---- hud ---- */
   #hud { position:fixed; inset:0; z-index:12; display:none; pointer-events:none; }
   #hud.on { display:block; }
-  #score { position:absolute; left:0; right:0; top:calc(var(--safe-t) + 10px); text-align:center; text-shadow:0 2px 10px rgba(0,0,0,.55); }
-  #score .lab { font-size:11px; letter-spacing:.42em; color:var(--dim); text-indent:.42em; }
-  #score .digits { position:relative; display:inline-block; }
-  #scoren { position:relative; font-size:clamp(34px,7vw,54px); font-weight:700; line-height:1; letter-spacing:.04em; }
-  #scoreghost { position:absolute; right:0; top:0; font-size:clamp(34px,7vw,54px); font-weight:700; line-height:1; letter-spacing:.04em; color:rgba(244,239,230,.07); }
-  #kmhghost { position:absolute; left:0; right:0; bottom:22px; text-align:center; font-size:44px; font-weight:700; line-height:1; color:rgba(244,239,230,.08); }
-  #drift { position:absolute; left:0; right:0; top:calc(var(--safe-t) + 78px); text-align:center; opacity:0; transition:opacity .18s;
-           text-shadow:0 2px 10px rgba(0,0,0,.6); }
+  .seg { display:inline-block; overflow:visible; }
+  .seg .s { fill:var(--amber); opacity:.07; }
+  .seg .s.on { opacity:1; }
+  .seg.glow { filter:drop-shadow(0 0 5px rgba(255,160,60,.65)); }
+  #scorebox { position:absolute; left:50%; top:calc(var(--safe-t) + 10px); transform:translateX(-50%); padding:6px 14px 7px;
+              background:var(--panel); border:1px solid rgba(255,179,71,.25); border-radius:3px; text-align:center; }
+  #scorebox .lab { font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.5em; color:var(--dim); text-indent:.5em; margin-bottom:3px; }
+  #score7 { height:clamp(30px,5.4vw,44px); }
+  #drift { position:absolute; left:0; right:0; top:calc(var(--safe-t) + clamp(84px,11vw,104px)); text-align:center; opacity:0; transition:opacity .18s;
+           text-shadow:0 2px 10px rgba(0,0,0,.7); }
   #drift.on { opacity:1; }
-  #driftpts { font-size:clamp(24px,5vw,38px); font-weight:700; color:var(--gold); letter-spacing:.04em; }
-  #mult { font-size:clamp(16px,3.2vw,22px); color:var(--orange); margin-left:8px; font-weight:700; }
-  #tier { font-size:clamp(13px,2.6vw,17px); letter-spacing:.38em; text-indent:.38em; color:var(--ink); margin-top:2px; height:20px; }
-  #tier.t1 { color:var(--ink);} #tier.t2 { color:var(--gold);} #tier.t3 { color:var(--orange);} #tier.t4 { color:var(--red);}
-  #combo { position:absolute; left:calc(var(--safe-l) + 18px); top:calc(var(--safe-t) + 14px); font-size:13px; letter-spacing:.3em;
-           color:var(--dim); text-shadow:0 2px 8px rgba(0,0,0,.6); }
-  #combo b { display:block; font-size:30px; color:var(--ink); letter-spacing:.02em; line-height:1; }
-  #combo .chain { height:3px; width:90px; background:rgba(255,255,255,.14); margin-top:6px; border-radius:2px; overflow:hidden; }
-  #combo .chain i { display:block; height:100%; width:100%; background:var(--gold); transform-origin:left; }
-  #daydial { position:absolute; right:calc(var(--safe-r) + 16px); top:calc(var(--safe-t) + 12px); width:64px; height:36px; opacity:.9; }
-  #dist { position:absolute; left:calc(var(--safe-l) + 18px); bottom:calc(var(--safe-b) + 16px); font-size:12px; letter-spacing:.28em;
-          color:var(--dim); text-shadow:0 2px 8px rgba(0,0,0,.6); }
-  #dist b { color:var(--ink); font-size:18px; letter-spacing:.04em; }
+  #driftpts { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(28px,5.4vw,44px); color:var(--gold); letter-spacing:.03em; }
+  #mult { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(18px,3.4vw,26px); color:var(--amber2); margin-left:10px; }
+  #tier { font-family:"Share Tech Mono",monospace; font-size:clamp(13px,2.4vw,17px); letter-spacing:.42em; text-indent:.42em; color:var(--ink); margin-top:2px; height:20px; }
+  #tier.t1 { color:var(--ink);} #tier.t2 { color:var(--gold);} #tier.t3 { color:var(--amber2);} #tier.t4 { color:var(--red);}
+  #combo { position:absolute; left:calc(var(--safe-l) + 16px); top:calc(var(--safe-t) + 12px); padding:7px 12px 8px; background:var(--panel);
+           border:1px solid rgba(255,179,71,.2); border-radius:3px; min-width:112px; }
+  #combo .lab, #clockbox .lab, #distbox .lab { font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.4em; color:var(--dim); }
+  #combon { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:34px; line-height:1; color:var(--ink); }
+  #combo .x { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:18px; color:var(--amber); margin-right:2px; }
+  #combo .chain { height:4px; width:100%; background:rgba(255,255,255,.12); margin-top:5px; overflow:hidden; }
+  #combo .chain i { display:block; height:100%; width:100%; background:linear-gradient(90deg,var(--amber2),var(--gold)); transform-origin:left; }
+  #distbox { margin-top:8px; }
+  #dist7 { height:18px; }
+  #clockbox { position:absolute; right:calc(var(--safe-r) + 16px); top:calc(var(--safe-t) + 12px); padding:6px 10px 7px; background:var(--panel);
+              border:1px solid rgba(255,179,71,.2); border-radius:3px; text-align:right; }
+  #clock7 { height:22px; }
+  #hbtns { position:fixed; right:calc(var(--safe-r) + 16px); top:calc(var(--safe-t) + 66px); z-index:16; display:none; gap:8px; }
+  #hbtns.on { display:flex; }
+  .tb { width:38px; height:38px; border-radius:3px; border:1px solid rgba(255,179,71,.35); background:var(--panel); color:var(--ink);
+        font-family:"Share Tech Mono",monospace; font-size:14px; cursor:pointer; pointer-events:auto; display:flex; align-items:center; justify-content:center; }
+  .tb.off { opacity:.45; text-decoration:line-through; }
 
-  #speedo { position:absolute; right:calc(var(--safe-r) + 12px); bottom:calc(var(--safe-b) + 8px); width:170px; height:120px; }
-  #speedo svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
-  #kmh { position:absolute; left:0; right:0; bottom:22px; text-align:center; font-size:44px; font-weight:700; line-height:1;
-         text-shadow:0 2px 10px rgba(0,0,0,.6); }
-  #speedo .unit { position:absolute; left:0; right:0; bottom:8px; text-align:center; font-size:11px; letter-spacing:.4em; color:var(--dim); text-indent:.4em; }
-  #boost { position:absolute; right:calc(var(--safe-r) + 16px); bottom:calc(var(--safe-b) + 132px); width:160px; height:8px;
-           background:rgba(255,255,255,.14); border-radius:4px; overflow:hidden; transform:skewX(-18deg); }
-  #boostf { height:100%; width:0%; background:linear-gradient(90deg,var(--orange),var(--gold)); }
-  #boost.hot #boostf { background:linear-gradient(90deg,#fff,var(--gold)); }
-  #boostlab { position:absolute; right:calc(var(--safe-r) + 16px); bottom:calc(var(--safe-b) + 144px); font-size:10px; letter-spacing:.4em; color:var(--dim); }
+  /* the cluster: a 90s tuner's dash, tach with redline, amber seven-segment speed, gear, boost LEDs, telltales */
+  #cluster { position:absolute; right:calc(var(--safe-r) + 12px); bottom:calc(var(--safe-b) + 10px); width:clamp(190px,24vw,262px); aspect-ratio:1/1.02; }
+  #cluster svg.tach { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+  #spd7 { position:absolute; left:50%; top:61%; width:37%; transform:translate(-50%,-50%); }
+  #cluster .kmh { position:absolute; left:0; right:0; top:71.5%; text-align:center; font-family:"Share Tech Mono",monospace; font-size:clamp(9px,1vw,11px);
+                  letter-spacing:.35em; color:var(--dim); text-indent:.35em; }
+  #gear { position:absolute; left:50%; top:20%; transform:translateX(-50%); width:9.5%; }
+  #lamps { position:absolute; left:14%; right:14%; bottom:5%; display:flex; justify-content:space-between; }
+  .lamp { font-family:"Share Tech Mono",monospace; font-size:clamp(8px,.9vw,10px); letter-spacing:.12em; padding:2px 4px; border:1px solid rgba(255,255,255,.12);
+          color:rgba(255,255,255,.22); background:rgba(0,0,0,.35); border-radius:2px; }
+  .lamp.on { color:#1a0f1f; }
+  #lampdrift.on { background:var(--amber); border-color:var(--amber); box-shadow:0 0 10px rgba(255,160,60,.8); }
+  #lampboost.on { background:#5ad1ff; border-color:#5ad1ff; box-shadow:0 0 10px rgba(90,209,255,.85); }
+  #lampclip.on { background:#9ff0b8; border-color:#9ff0b8; box-shadow:0 0 10px rgba(159,240,184,.85); }
+  #boostbar { position:absolute; right:calc(var(--safe-r) + 12px); bottom:calc(var(--safe-b) + 10px + clamp(190px,24vw,262px) * 1.02 + 8px);
+              width:clamp(190px,24vw,262px); display:flex; align-items:center; gap:8px; }
+  #boostbar .lab { font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.3em; color:var(--dim); }
+  #leds { flex:1; display:flex; gap:3px; }
+  #leds i { flex:1; height:9px; background:rgba(90,209,255,.1); border:1px solid rgba(90,209,255,.18); transform:skewX(-14deg); }
+  #leds i.on { background:#5ad1ff; box-shadow:0 0 6px rgba(90,209,255,.8); }
+  #leds i.on.hi { background:#c9f1ff; }
+  #angle { position:absolute; left:50%; bottom:calc(var(--safe-b) + 18px); transform:translateX(-50%); width:min(300px,50vw); opacity:0; transition:opacity .25s; }
+  #angle.on { opacity:1; }
+  #angle .rail { position:relative; height:10px; border:1px solid rgba(255,179,71,.3); background:rgba(0,0,0,.35); }
+  #angle .rail::before { content:""; position:absolute; left:50%; top:-3px; bottom:-3px; width:1px; background:rgba(255,255,255,.35); }
+  #anglef { position:absolute; top:0; bottom:0; left:50%; width:0; background:linear-gradient(90deg,var(--amber2),var(--gold)); }
+  #angle .lab { display:flex; justify-content:space-between; font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.2em; color:var(--dim); margin-top:3px; }
+  #angledeg { color:var(--amber); }
 
-  #toasts { position:absolute; left:0; right:0; top:38%; text-align:center; pointer-events:none; }
-  .toast { position:absolute; left:0; right:0; font-size:clamp(20px,4.6vw,34px); font-weight:700; letter-spacing:.3em; text-indent:.3em;
-           color:var(--gold); text-shadow:0 3px 14px rgba(0,0,0,.6); animation:toast 1.25s ease-out forwards; }
-  .toast.bad { color:var(--red); } .toast.good { color:var(--teal); } .toast.big { font-size:clamp(28px,7vw,52px); }
-  @keyframes toast { 0% { opacity:0; transform:translateY(14px) scale(.85);} 12% { opacity:1; transform:translateY(0) scale(1.06);} 30% { transform:scale(1);} 100% { opacity:0; transform:translateY(-36px);} }
+  #toasts { position:absolute; left:0; right:0; top:36%; text-align:center; pointer-events:none; }
+  .toast { position:absolute; left:0; right:0; font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(22px,4.6vw,38px);
+           letter-spacing:.12em; color:var(--gold); text-shadow:0 0 18px rgba(255,138,42,.5), 0 3px 0 rgba(20,10,30,.8); animation:toast 1.25s ease-out forwards; }
+  .toast.bad { color:var(--red); text-shadow:0 0 18px rgba(255,59,48,.5), 0 3px 0 rgba(20,10,30,.8); }
+  .toast.good { color:var(--teal); text-shadow:0 0 18px rgba(111,227,214,.45), 0 3px 0 rgba(20,10,30,.8); }
+  .toast.big { font-size:clamp(30px,7vw,60px); }
+  @keyframes toast { 0% { opacity:0; transform:translateY(14px) skewX(-8deg) scale(.85);} 12% { opacity:1; transform:translateY(0) skewX(-8deg) scale(1.06);} 30% { transform:skewX(-8deg) scale(1);} 100% { opacity:0; transform:translateY(-36px) skewX(-8deg);} }
 
   #vign { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:0;
           background:radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%); }
-  #crt { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:.4;
-         background: repeating-linear-gradient(0deg, rgba(0,0,0,.07) 0px, rgba(0,0,0,.07) 1px, transparent 1px, transparent 4px),
-                     radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(4,6,14,.6) 100%); }
-  #hit { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:0; background:radial-gradient(ellipse at center, rgba(224,74,46,0) 50%, rgba(224,74,46,.5) 100%); }
-  #perf { position:absolute; right:calc(var(--safe-r) + 16px); top:calc(var(--safe-t) + 56px); font-size:10px; color:var(--dim); letter-spacing:.06em;
-          text-align:right; line-height:1.6; display:none; }
+  #crt { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:.5;
+         background: repeating-linear-gradient(0deg, rgba(0,0,0,.08) 0px, rgba(0,0,0,.08) 1px, transparent 1px, transparent 3px),
+                     radial-gradient(ellipse at center, rgba(0,0,0,0) 62%, rgba(6,4,16,.62) 100%); }
+  #hit { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:0; background:radial-gradient(ellipse at center, rgba(255,59,48,0) 50%, rgba(255,59,48,.5) 100%); }
+  #perf { position:absolute; left:calc(var(--safe-l) + 16px); top:calc(var(--safe-t) + 150px); font-family:"Share Tech Mono",monospace; font-size:11px;
+          color:var(--dim); letter-spacing:.04em; line-height:1.6; display:none; white-space:pre; }
   #perf.on { display:block; }
-
-  /* ---- top-right buttons ---- */
-  #tools { position:fixed; right:calc(var(--safe-r) + 12px); top:calc(var(--safe-t) + 54px); z-index:16; display:none; gap:8px; }
-  #tools.on { display:flex; }
-  .tb { width:36px; height:36px; border-radius:50%; border:1.5px solid rgba(244,239,230,.35); background:rgba(0,0,0,.3); color:var(--ink);
-        font:inherit; font-size:12px; font-weight:700; cursor:pointer; pointer-events:auto; display:flex; align-items:center; justify-content:center; }
-  .tb.off { opacity:.45; text-decoration:line-through; }
 
   /* ---- touch ---- */
   #touch { position:fixed; inset:0; z-index:14; display:none; }
@@ -127,27 +198,38 @@
   #stick { position:absolute; left:0; top:22%; bottom:0; width:60%; }
   #brake { position:absolute; right:0; top:22%; bottom:0; width:40%; }
   #stick .hint, #brake .hint { position:absolute; left:calc(var(--safe-l) + 16px); bottom:calc(var(--safe-b) + 60px);
-        font-size:11px; letter-spacing:.3em; color:rgba(244,239,230,.6); white-space:nowrap; text-shadow:0 2px 8px rgba(0,0,0,.6);
+        font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.24em; color:rgba(246,239,226,.65); white-space:nowrap; text-shadow:0 2px 8px rgba(0,0,0,.6);
         transition:opacity .4s; }
-  #brake .hint { left:auto; right:calc(var(--safe-r) + 16px); bottom:calc(var(--safe-b) + 310px); }
+  #brake .hint { left:auto; right:calc(var(--safe-r) + 16px); bottom:calc(var(--safe-b) + 330px); }
   #touch.used .hint { opacity:0; }
   #wheel { position:absolute; width:180px; height:56px; margin:-28px 0 0 -90px; opacity:0; transition:opacity .15s; }
-  #wheel .track { position:absolute; left:0; right:0; top:26px; height:4px; border-radius:2px; background:rgba(244,239,230,.35); }
-  #wheel .tick { position:absolute; left:50%; top:18px; width:2px; height:20px; margin-left:-1px; background:rgba(244,239,230,.5); }
+  #wheel .track { position:absolute; left:0; right:0; top:26px; height:4px; background:rgba(246,239,226,.35); }
+  #wheel .tick { position:absolute; left:50%; top:18px; width:2px; height:20px; margin-left:-1px; background:rgba(246,239,226,.5); }
   #wheel .nub { position:absolute; left:50%; top:28px; width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%;
-                border:2px solid rgba(244,239,230,.85); background:rgba(240,194,74,.35); box-shadow:0 2px 12px rgba(0,0,0,.4); }
-  #brake .pad { position:absolute; right:calc(var(--safe-r) + 26px); bottom:calc(var(--safe-b) + 210px); width:88px; height:88px; border-radius:50%;
-        border:2px solid rgba(244,239,230,.45); background:rgba(0,0,0,.22); display:flex; align-items:center; justify-content:center;
-        font-size:11px; letter-spacing:.2em; color:rgba(244,239,230,.8); text-align:center; line-height:1.3; }
-  #brake.dn .pad { background:rgba(224,74,46,.5); border-color:var(--red); color:#fff; }
-  @media (max-width: 480px) {
-    #speedo { width:140px; height:100px; right:calc(var(--safe-r) + 8px); }
-    #kmh { font-size:36px; bottom:20px; }
-    #boost { width:124px; bottom:calc(var(--safe-b) + 112px); } #boostlab { bottom:calc(var(--safe-b) + 124px); }
-    #brake .pad { bottom:calc(var(--safe-b) + 175px); right:calc(var(--safe-r) + 18px); width:80px; height:80px; }
-    #brake .hint { bottom:calc(var(--safe-b) + 262px); }
-    #dist { bottom:calc(var(--safe-b) + 36px); }
-    #combo b { font-size:24px; }
+                border:2px solid rgba(246,239,226,.85); background:rgba(255,179,71,.35); box-shadow:0 2px 12px rgba(0,0,0,.4); }
+  #brake .pad { position:absolute; right:calc(var(--safe-r) + 26px); bottom:calc(var(--safe-b) + 240px); width:88px; height:88px; border-radius:50%;
+        border:2px solid rgba(246,239,226,.45); background:rgba(0,0,0,.25); display:flex; align-items:center; justify-content:center;
+        font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.14em; color:rgba(246,239,226,.85); text-align:center; line-height:1.3; }
+  #brake.dn .pad { background:rgba(255,59,48,.5); border-color:var(--red); color:#fff; }
+
+  @media (max-width: 720px) {
+    #title .shade { background:linear-gradient(0deg, rgba(10,6,18,.9) 0%, rgba(10,6,18,.75) 52%, rgba(10,6,18,.1) 80%); }
+    #title .menu { top:auto; bottom:calc(var(--safe-b) + 16px); transform:none; left:50%; margin-left:calc(min(470px,90vw) / -2); width:min(470px,90vw); gap:10px; }
+    .diff b { font-size:18px; } .diff span { font-size:11px; min-height:28px; }
+    .start { align-self:stretch; text-align:center; font-size:22px; padding:13px 0 11px; }
+    #cluster, #boostbar { width:170px; }
+    #boostbar { bottom:calc(var(--safe-b) + 10px + 174px + 6px); }
+    #brake .pad { bottom:calc(var(--safe-b) + 222px); right:calc(var(--safe-r) + 18px); width:78px; height:78px; }
+    #brake .hint { bottom:calc(var(--safe-b) + 306px); }
+    #combo { min-width:92px; } #combon { font-size:28px; }
+    #angle { width:62vw; top:calc(var(--safe-t) + 150px); bottom:auto; left:50%; }
+    #title .credit { display:none; }
+    #score7 { height:24px; }
+    #scorebox { padding:5px 10px 6px; }
+    #combo { min-width:78px; padding:6px 9px 7px; }
+    #clockbox { padding:5px 8px 6px; } #clock7 { height:18px; }
+    #hbtns { top:calc(var(--safe-t) + 58px); }
+    .tb { width:34px; height:34px; }
   }
 </style>
 </head>
@@ -155,8 +237,8 @@
 <canvas id="c"></canvas>
 
 <div id="load">
-  <h1>SUNDRIFT</h1>
-  <div class="sub">NIGHT TOUGE</div>
+  <h1 class="logo" data-t="MINIDRIFT">MINIDRIFT</h1>
+  <div class="tag">NIGHT TOUGE</div>
   <div id="bar"><div id="barf"></div></div>
   <div id="loadmsg">warming up</div>
 </div>
@@ -166,59 +248,60 @@
 <div id="hit"></div>
 
 <div id="hud">
-  <div id="combo">COMBO<b id="combon" class="num">0</b><div class="chain"><i id="chainf"></i></div></div>
-  <div id="score"><div class="lab">SCORE</div><div class="digits"><div id="scoreghost" class="num">0000000</div><div id="scoren" class="num">0</div></div></div>
-  <div id="drift"><span id="driftpts" class="num">0</span><span id="mult" class="num">x1.0</span><div id="tier"></div></div>
-  <svg id="daydial" viewBox="0 0 64 36" aria-hidden="true">
-    <path d="M4 32 A28 28 0 0 1 60 32" fill="none" stroke="rgba(244,239,230,.35)" stroke-width="1.5"/>
-    <circle id="sundot" cx="32" cy="4" r="4" fill="#f0c24a"/>
-    <line x1="2" y1="32" x2="62" y2="32" stroke="rgba(244,239,230,.35)" stroke-width="1.5"/>
-  </svg>
-  <div id="dist">DISTANCE <b id="distn" class="num">0.0</b> km</div>
-  <div id="boostlab">BOOST</div>
-  <div id="boost"><div id="boostf"></div></div>
-  <div id="speedo">
-    <svg viewBox="0 0 170 120" aria-hidden="true">
-      <path d="M20 100 A65 65 0 1 1 150 100" fill="none" stroke="rgba(244,239,230,.18)" stroke-width="9" stroke-linecap="round"/>
-      <path id="speedarc" d="M20 100 A65 65 0 1 1 150 100" fill="none" stroke="#f0c24a" stroke-width="9" stroke-linecap="round"
-            stroke-dasharray="306" stroke-dashoffset="306"/>
-      <g id="needle" style="transform-origin:85px 100px; transform:rotate(-135deg)">
-        <line x1="85" y1="100" x2="85" y2="44" stroke="#fff3df" stroke-width="3" stroke-linecap="round"/>
-        <circle cx="85" cy="100" r="6" fill="#fff3df"/>
-      </g>
-    </svg>
-    <div id="kmhghost" class="num">888</div>
-    <div id="kmh" class="num">0</div>
-    <div class="unit">KM/H</div>
+  <div id="combo"><div class="lab">COMBO</div><div><span class="x">×</span><span id="combon" class="num">0</span></div><div class="chain"><i id="chainf"></i></div>
+    <div id="distbox"><div class="lab">DIST KM</div><svg id="dist7" class="seg"></svg></div></div>
+  <div id="scorebox"><div class="lab">SCORE</div><svg id="score7" class="seg glow"></svg></div>
+  <div id="drift"><span id="driftpts" class="num">0</span><span id="mult" class="num">×1.0</span><div id="tier"></div></div>
+  <div id="clockbox"><div class="lab">TIME</div><svg id="clock7" class="seg glow"></svg></div>
+  <div id="boostbar"><span class="lab">BOOST</span><div id="leds"></div></div>
+  <div id="cluster">
+    <svg class="tach" id="tach" viewBox="0 0 200 204" aria-hidden="true"></svg>
+    <svg id="gear" class="seg glow"></svg>
+    <svg id="spd7" class="seg glow"></svg>
+    <div class="kmh">KM/H</div>
+    <div id="lamps"><span class="lamp" id="lampdrift">DRIFT</span><span class="lamp" id="lampclip">CLIP</span><span class="lamp" id="lampboost">BOOST</span></div>
   </div>
+  <div id="angle"><div class="rail"><div id="anglef"></div></div><div class="lab"><span>L</span><span id="angledeg">0°</span><span>R</span></div></div>
   <div id="toasts"></div>
   <div id="perf"></div>
 </div>
 
-<div id="tools"><button class="tb" id="mute" title="sound">♪</button><button class="tb" id="restart" title="restart run">↺</button></div>
+<div id="hbtns"><button class="tb" id="mute" title="sound (M)">♪</button><button class="tb" id="pauseb" title="pause (Esc)">II</button></div>
 
 <div id="touch">
   <div id="stick"><div class="hint">HOLD TO DRIVE · SLIDE TO STEER</div><div id="wheel"><div class="track"></div><div class="tick"></div><div class="nub"></div></div></div>
   <div id="brake"><div class="hint">HOLD FOR HANDBRAKE</div><div class="pad">E-BRAKE</div></div>
 </div>
 
-<div class="screen" id="start">
-  <h1>SUNDRIFT</h1>
-  <div class="sub">NIGHT TOUGE · ENDLESS</div>
-  <div class="ctl keys">
-    <div><span><kbd>W</kbd><kbd>S</kbd></span><b>GAS · BRAKE</b></div>
-    <div><span><kbd>A</kbd><kbd>D</kbd></span><b>STEER</b></div>
-    <div><span><kbd>SPACE</kbd></span><b>HANDBRAKE</b></div>
+<div id="title">
+  <div class="shade"></div>
+  <div class="menu">
+    <h1 class="logo" data-t="MINIDRIFT">MINIDRIFT</h1>
+    <div class="tag" style="text-indent:0;margin-top:-4px">NIGHT TOUGE · ENDLESS</div>
+    <div class="sect">COURSE</div>
+    <div class="diffs" id="diffs">
+      <button class="diff" data-d="easy"><b>EASY</b><span>Wide road, flowing sweepers</span><i id="best-easy">BEST —</i></button>
+      <button class="diff" data-d="medium"><b>MEDIUM</b><span>Hairpins and S-bends</span><i id="best-medium">BEST —</i></button>
+      <button class="diff" data-d="hard"><b>HARD</b><span>Narrow, tight, relentless</span><i id="best-hard">BEST —</i></button>
+    </div>
+    <div class="sect">PAINT <span id="paintname">PEARL WHITE</span></div>
+    <div class="swatches" id="swatches"></div>
+    <button class="start" id="startb"><span>START</span></button>
+    <div class="keys k"><div><kbd>W</kbd><kbd>S</kbd>gas · brake</div><div><kbd>A</kbd><kbd>D</kbd>steer</div><div><kbd>SPACE</kbd>handbrake</div><div><kbd>ESC</kbd>pause</div><div>wheel · zoom</div></div>
+    <div class="keys f"><div>left thumb: hold to drive, slide to steer</div><div>right thumb: handbrake</div></div>
   </div>
-  <div class="ctl fingers">
-    <div><b>LEFT THUMB</b><span>hold to drive, slide to steer</span></div>
-    <div><b>RIGHT THUMB</b><span>hold for handbrake</span></div>
-  </div>
-  <div class="tiny">Chain drifts to bank score and earn boost. Every banked drift pushes the night toward dawn. Clip the guardrail without touching it for a bonus. Crashing drops the drift you are holding.</div>
-  <button class="btn" id="startb">DRIVE</button>
-  <div class="best" id="best"></div>
+  <div id="building">BUILDING THE PASS</div>
+  <div class="credit">CHAIN DRIFTS · BANK SCORE · EARN BOOST</div>
 </div>
 
-<script type="module" src="./src/main.js?v=202609220418"></script>
+<div id="pause">
+  <h2>PAUSED</h2>
+  <button class="pbtn" id="resumeb">RESUME</button>
+  <button class="pbtn" id="restartb">RESTART</button>
+  <button class="pbtn" id="quitb">MAIN MENU</button>
+  <div class="stats" id="pstats"></div>
+</div>
+
+<script type="module" src="./src/main.js?v=202609222216"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 /**
  * A render rig, for any Three.js game in this format.
  *
- *     import { createRig } from './rig.js?v=202609220418';
+ *     import { createRig } from './rig.js?v=202609222216';
  *     const rig = createRig(THREE, renderer, scene, { hour: 16.5, azimuth: 250 });
  *     rig.render(camera, dt);        // once a frame, instead of renderer.render(scene, camera)
  *
@@ -546,7 +546,16 @@ void main() {
  *
  * Built at load and again on `setTime()`. Never per frame.
  */
+// The dome, its material and the PMREM generator are kept between builds: making them fresh each time
+// compiled three programs per setTime() and stalled a running game for 30 ms or more every few seconds.
+let envCache = null;
 function buildEnvironment(THREE, renderer, uniforms, ground) {
+  if (envCache && envCache.renderer === renderer) {
+    const c = envCache;
+    c.mat.uniforms.uEnvGround.value.setRGB(ground[0], ground[1], ground[2]);
+    try { return c.pmrem.fromScene(c.scene, 0.02, 1, 100).texture; }
+    catch (e) { console.warn('[rig] environment build failed:', e && e.message); return null; }
+  }
   const envScene = new THREE.Scene();
   const mat = new THREE.ShaderMaterial({
     uniforms: { ...uniforms, uEnvGround: { value: new THREE.Color(ground[0], ground[1], ground[2]) } },
@@ -567,7 +576,7 @@ void main() {
   let tex = null;
   try { tex = pmrem.fromScene(envScene, 0.02, 1, 100).texture; }
   catch (e) { console.warn('[rig] environment build failed:', e && e.message); }
-  pmrem.dispose(); dome.geometry.dispose(); mat.dispose();
+  envCache = { renderer, scene: envScene, mat, pmrem };
   return tex;
 }
 
@@ -802,8 +811,10 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     // A light of intensity 0 still renders a shadow map, because three keys that off castShadow
     // and not off intensity: below the horizon that is a whole pass for nothing. Measured on one
     // night scene: 1004 draw calls and 19k triangles a frame, all of it discarded.
-    for (const l of csmLights()) l.castShadow = !!o.shadows && sunI > 0.01;
-    if (!csm) sun.castShadow = !!o.shadows && sunI > 0.01;
+    // (MINIDRIFT) castShadow stays constant: it is part of every lit shader, and switching it at dusk and
+    // dawn recompiled every material in the scene, a freeze of seconds. The maps simply stop updating instead.
+    for (const l of csmLights()) { const on = sunI > 0.01; if (l.shadow.autoUpdate !== on) { l.shadow.autoUpdate = on; if (on) l.shadow.needsUpdate = true; } }
+    if (!csm) { sun.castShadow = !!o.shadows; sun.shadow.autoUpdate = sunI > 0.01; if (sunI > 0.01) sun.shadow.needsUpdate = true; }
     // And say the quiet part out loud, once. Below the horizon this rig is a sky and a haze: the
     // key is off by construction and the warm ground bounce goes with it, so a night scene lit by
     // the rig ALONE has one colour temperature, which is the failure the rig exists to prevent.
@@ -892,6 +903,7 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     for (const l of csm.lights) {
       l.color.copy(sun.color);
       l.intensity = sun.intensity;
+      l.shadow.autoUpdate = keyIntensity > 0.01;
       l.shadow.normalBias = T.name === 'phone' ? 0.08 : 0.035;
       l.name = 'rig.sun';
     }

@@ -1,0 +1,8 @@
+[
+  { "click": "#startb" }, { "wait": 400 },
+  { "js": "__DEBUG__.teleport(300, 70); 1" }, { "wait": 1500 },
+  { "shot": "L0_all" },
+  { "js": "window.__lights = []; __DEBUG__.scene.traverse(o => { if (o.isLight) __lights.push(o); }); __lights.map(l => [l.type, +l.intensity.toFixed(2), l.parent && l.parent.name]).filter(x => x[1] > 0)" },
+  { "js": "__DEBUG__.scene.traverse(o => { if (o.isSpotLight && o.parent && o.parent.name === 'bodyPivot' && o.intensity > 2 && o.intensity < 3) o.visible = false; }); 1" }, { "wait": 300 }, { "shot": "L1_noHeadlights" },
+  { "js": "__DEBUG__.scene.traverse(o => { if (o.isPointLight && o.parent && o.parent.name === 'bodyPivot') o.userData.i = o.intensity; }); __DEBUG__.scene.traverse(o => { if (o.isPointLight && o.parent && o.parent.name === 'bodyPivot') o.intensity = 0; }); 1" }, { "wait": 300 }, { "shot": "L2_noCarPoints" }
+]

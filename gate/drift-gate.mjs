@@ -68,7 +68,7 @@ const box = await page.$eval('#startb', (e) => { const r = e.getBoundingClientRe
 if (!box.visible) { console.error('#startb is not visible'); process.exit(1); }
 if (PHONE) await page.touchscreen.tap(box.x, box.y); else await page.mouse.click(box.x, box.y);
 await sleep(600);
-const startGone = await page.evaluate(() => { const e = document.getElementById('start'); return !e.classList.contains('on'); });
+const startGone = await page.evaluate(() => { const e = document.getElementById('title'); return !e.classList.contains('on'); });
 
 const read = () => page.evaluate(() => window.__GAME__ || null);
 

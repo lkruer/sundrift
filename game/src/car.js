@@ -34,8 +34,8 @@ export const CAR = {
   boostForce: 6200,
   assist: 0.62,                   // counter-steer assist, 0..1, added to the player's steer at slip
   assistTouch: 0.78,
-  lineAssist: 0.55,               // hands off the keys, the car follows the road; 0 is none
-  lineAssistTouch: 0.7,
+  steerGainMin: 0.72,             // A/D on a straight give this share of the lock a tight corner gets
+  holdAngle: 0.62,                // rad: past this the rear finds grip again, so a held slide does not spin
   offroadMu: 0.55, offroadDrag: 260,
   wheelRadius: 0.32, track: 1.5,
   lowSpeed: 2.5,                  // below this the model blends toward kinematic
@@ -69,6 +69,7 @@ export class Car {
     this.slipRear = 0;              // 0..1, how far past peak the rear is (drives smoke, sound, skid alpha)
     this.slipFront = 0;
     this.gForce = 0;
+    this._assist = 0; this._gain = 1; this._dAB = 0; this._prevAB = 0;
   }
 
   get speed() { return Math.hypot(this.vF, this.vL); }
@@ -80,6 +81,7 @@ export class Car {
     this.x = x; this.z = z; this.yaw = yaw;
     this.vF = this.vL = this.omega = 0; this.steer = 0; this.boost = 0; this.handGrip = 1;
     this.beta = this.alphaR = this.alphaF = 0; this.slipRear = this.slipFront = 0;
+    this._assist = 0; this._gain = 1; this._dAB = 0; this._prevAB = 0;
   }
 
   /** World-space position of a point given in car space (left, forward). */
@@ -128,22 +130,17 @@ export class Car {
     const frontSlipDir = Math.atan2(this.vL + P.a * this.omega, Math.max(Math.abs(this.vF), 0.8));
     const bigSlip = sstep(0.55, 1.0, Math.abs(frontSlipDir));
     const assist = assist0 + (0.97 - assist0) * bigSlip;
-    const assistAngle = clamp(frontSlipDir, -P.maxSteer, P.maxSteer) * assist * sstep(1.5, 6, speed) * (this.vF < 0 ? 0 : 1);
+    const assistRaw = clamp(frontSlipDir, -P.maxSteer, P.maxSteer) * assist * sstep(1.5, 6, speed) * (this.vF < 0 ? 0 : 1);
+    // filtered: the assist follows the slide, not every wobble of it, so the front wheels never chatter
+    this._assist += (assistRaw - this._assist) * Math.min(1, h * 22);
     const playerSteer = inp.steer * steerMax * (1 - 0.7 * bigSlip * (Math.sign(inp.steer) === -Math.sign(frontSlipDir) ? 1 : 0));
-    // the line: with no key held the car follows the road, and A or D commits to the corner with as much lock as
-    // the corner needs (a hairpin gets full lock, a gentle curve half), so a slide stays on the road and the
-    // combo keeps going instead of ending on the rail
-    let lineSteer = 0, gain = 1;
+    // A and D ask for as much lock as the corner ahead needs: a hairpin gets full lock, a straight a gentler
+    // correction. Nothing steers the car when no key is held.
+    let gainT = 1;
     const LN = inp.line;
-    if (LN && speed > 4) {
-      const velHead = this.yaw + this.beta;
-      let e = LN.roadHeading - velHead; while (e > Math.PI) e -= 2 * Math.PI; while (e < -Math.PI) e += 2 * Math.PI;
-      const want = Math.atan(LN.curv * L_) * 1.15 + e * 0.5 - LN.lat * 0.02;
-      const hands = Math.min(1, Math.abs(inp.steer) * 1.4);
-      lineSteer = clamp(want, -0.32, 0.32) * (inp.touch ? P.lineAssistTouch : P.lineAssist) * (1 - hands) * (this.vF > 0 ? 1 : 0);
-      gain = clamp(Math.abs(LN.curv) * 30 + Math.abs(e) * 1.2 + 0.15, 0.55, 1.0);
-    }
-    const target = clamp(playerSteer * gain + lineSteer + assistAngle, -P.maxSteer, P.maxSteer);
+    if (LN && speed > 4) gainT = clamp(Math.abs(LN.curv) * 30 + P.steerGainMin, P.steerGainMin, 1.0);
+    this._gain += (gainT - this._gain) * Math.min(1, h * 4);
+    const target = clamp(playerSteer * this._gain + this._assist, -P.maxSteer, P.maxSteer);
     this.steer += clamp(target - this.steer, -P.steerRate * h, P.steerRate * h);
     const d = this.steer;
 
@@ -182,6 +179,16 @@ export class Car {
     // ---- lateral tyre forces (left positive)
     const FmaxF = P.muFront * muScale * FzF;
     let FmaxR = P.muRear * muScale * FzR * this.handGrip;
+    // drift hold: past a comfortable angle the rear finds a little grip back, so a held slide settles instead of
+    // spinning; below it, on the throttle, the rear gives a little, so a slide does not die on its own
+    {
+      const aB = Math.abs(this.beta);
+      const inDrift = sstep(0.14, 0.3, aB) * sstep(6, 11, speed) * (this.vF > 0 ? 1 : 0);
+      let hold = 0;
+      if (aB > P.holdAngle) hold = Math.min(0.35, (aB - P.holdAngle) * 1.1);
+      else if (this.throttle > 0.5 && aB > 0.2 && aB < P.holdAngle - 0.15) hold = -0.06 * sstep(0.2, 0.3, aB);
+      FmaxR *= 1 + hold * inDrift;
+    }
     // friction circle on the rear: longitudinal demand eats lateral capacity
     const used = Math.min(0.97, Math.abs(FxR) * P.circleGain / Math.max(1, FmaxR));
     FmaxR *= Math.sqrt(1 - used * used);
@@ -205,9 +212,16 @@ export class Car {
     this.vF += (aFwd + this.vL * this.omega) * h;
     this.vL += (aLat - this.vF * this.omega) * h;
     this.omega += omegaDot * h;
-    const recovering = Math.abs(this.beta) < Math.abs(this._prevBeta || 0) && Math.abs(this.beta) > 0.1;
-    this.omega *= Math.exp(-(0.35 + (recovering ? 1.6 : 0)) * h);
-    this._prevBeta = this.beta;
+    // yaw damping: a little always; more while a slide is being caught (continuous, so it never twitches on and
+    // off); and past about 50 degrees, against the yaw that would take the car further round
+    {
+      const aB = Math.abs(this.beta);
+      const dAB = (aB - this._prevAB) / h; this._prevAB = aB;
+      this._dAB += (dAB - this._dAB) * Math.min(1, h * 25);
+      const recov = clamp(-this._dAB * 1.5, 0, 1) * sstep(0.06, 0.18, aB);
+      const over = this.omega * this.beta < 0 ? 4.0 * sstep(0.85, 1.2, aB) : 0;
+      this.omega *= Math.exp(-(0.35 + 1.6 * recov + over) * h);
+    }
 
     if (lowT > 0) {
       const omegaKin = this.vF * Math.tan(d) / L;
@@ -248,12 +262,24 @@ export class Car {
     const nF = s * nx + c * nz;           // forward component
     const rCross = f * nL - l * nF;       // r x n, the lever for yaw
     const inv = 1 / this.P.mass + (rCross * rCross) / this.P.izz;
-    const j = (1.25 * vin) / inv;         // restitution 0.25
+    const j = (1.2 * vin) / inv;          // restitution 0.2
     this.vL += (j * nL) / this.P.mass;
     this.vF += (j * nF) / this.P.mass;
     this.omega += (j * rCross) / this.P.izz;
-    // friction along the wall scrubs speed
-    const scrub = Math.exp(-0.06 * vin);
+    // friction along the wall, bounded by the normal impulse (Coulomb): a glancing touch slides along the
+    // rail and keeps most of its speed, a hard hit grabs
+    const tx = -nz, tz = nx;
+    const [ux, uz] = this.pointVelocity(l, f);
+    const vt = ux * tx + uz * tz;
+    const tL = c * tx - s * tz, tF = s * tx + c * tz;
+    const rT = f * tL - l * tF;
+    const invT = 1 / this.P.mass + (rT * rT) / this.P.izz;
+    const lim = 0.3 * j;
+    const jt = Math.max(-lim, Math.min(lim, -vt / invT));
+    this.vL += (jt * tL) / this.P.mass;
+    this.vF += (jt * tF) / this.P.mass;
+    this.omega += (jt * rT) / this.P.izz;
+    const scrub = Math.exp(-0.02 * vin);
     this.vF *= scrub; this.vL *= scrub;
     return vin;
   }

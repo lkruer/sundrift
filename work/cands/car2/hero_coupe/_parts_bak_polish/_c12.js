@@ -1,3 +1,16 @@
+// hero_coupe — arm C: a hand-built loft hull (ten 12-point stations skinned into one
+// surface, the glasshouse a second material group inside the same skin) carrying every
+// fitting as its own part. Bumpers, lip, lamp band, tail panel and skirts are bands
+// SWEPT along a plan path so they follow the nose and tail corners; flares are a
+// four-point loop swept around each arch; shut lines are thin dark strips lofted along
+// the hull's own surface; tyres, rims, discs, helmet and torso are revolved loops;
+// tread blocks, calipers and the binnacle hood are partial lathes.
+// Nose = +Z, base y = 0. Body 1.72 W x 1.28 H x 4.45 L (mirrors stand outside the body).
+//
+// Moving parts: g.userData.joints = { hubFL, hubFR, wheelFL, wheelFR, wheelRL, wheelRR }.
+// A hub is a Group at the wheel centre (steer about y, camber baked into rotation.z) and
+// carries the brake disc and caliper; its child wheel Group (spin about x) carries the
+// tyre, rim and lug nuts. Everything static is under the Group named 'body'.
 export default function (THREE) {
   const g = new THREE.Group();
   const body = new THREE.Group(); body.name = 'body'; g.add(body);
@@ -161,8 +174,9 @@ export default function (THREE) {
     const rows = prof.map((_, k) => k);
     return loft(secs, Object.assign({ creaseRows: rows, capFront: 0, capBack: 0 }, o || {}));
   };
-  // The nose in plan: a straight middle and corners that sweep back.
+  // The nose and tail in plan: a straight middle and corners that sweep back.
   const wrapF = (x) => 0.14 * Math.pow(c01((Math.abs(x) - 0.42) / 0.38), 1.6);
+  const wrapR = (x) => 0.10 * Math.pow(c01((Math.abs(x) - 0.48) / 0.32), 1.5);
   // A plan path around an end of the car: side legs at |x| = 0.815 from zs to the corner,
   // then the curved face. dir = +1 nose (z increases toward the face), -1 tail.
   const endPath = (dir, zf, zs, wrapFn) => {

@@ -1,5 +1,39 @@
 # hero_coupe (round 2, "much more detailed") — candidate notes (receipts)
 
+## Sporty tail pass (MINIDRIFT: "make the rear end less bulky, think more sporty end")
+
+- Shipped: **30,050 triangles**, 427 meshes, 1.941 x 1.333 x 4.263 m (was 4.455: the tail face sits
+  0.16 m closer to the rear axle, and the tips no longer stand out behind it). `game/assets` re-verified 22/22 clean. Joints, 'body', material names and palette
+  unchanged. Re-checked at runtime: the hubs sit at the wheel centres (z +1.192 / -1.308 after
+  recentring, wheelbase 2.50), steering moves the caliper with the hub and leaves the wheel centre fixed.
+  expect.json left at the style-lock 4.45 depth, which the car passes at 4 % off.
+- Construction: the hull loft gains eight rings behind the rear glass. Over the arch the skin carries on
+  as before; behind it the rings drop to y 0.44 (a dark wall facing the wheel, a dark underside), pinch
+  from 0.815 to 0.775, round their corners in plan (radius 0.17, five rings) and lean, so the loft's back
+  cap IS the rear face, undercut 20 degrees (a point at height y sits (0.95 - y) tan 20 further forward).
+  The deck dips to 0.917 and kicks up 0.035 into a ducktail lip at z -2.03. `ringAt` now finds rings by
+  their crown point because the tail rings lean. New chunk `_parts/_tail.js` places every rear fitting
+  from the same rings (`ringPt`, `outline`, `tailStrip`, `onTail`, `sideAt`), so it sits on the skin:
+  a thin painted lip wrapping to the arches, a 0.105 dark garnish wrapping the corners, two slim lamp
+  units a side (0.07 lens on a polished backing, white line; the outer unit wraps the corner), shallow
+  plate pocket and lamp, vertical reflectors, side markers, fuel filler, a dark diffuser (ramp 0.17 to
+  0.39, five fins, two side walls) ending just behind the lip, 0.09 tips on the left tucked into its
+  left channel, and a 0.02 blade at y 1.10 on two lofted swan necks hooked over its top, with thin end
+  plates, brake lamp and gurney. Rear flares widened to 0.905 with the top at 0.79 so they read as hips.
+- Rounds: (1) the rebuild; the diffuser, fins and tips stuck 0.1 m out behind the lip like a comb, and
+  the flare feet ran down to y 0.24 as white plates. (2) Diffuser cut back to z -1.89, fins to 0.17,
+  tips only 0.04 proud, and the rear flares now end at the lip line (the sweep stops at y 0.40).
+  (3) Lamps A/B'd at the chase camera (`_verify/lamps_ab.png`): four round units against slim wrap-
+  around units; the slim ones read far better at distance and suit the pop-up nose (180SX/AE86), so
+  they shipped. The first slim try buried the lens inside a prouder bezel slab (grey blocks); the
+  bezel now sits behind the lens as a border. Before/after at the chase camera: `_verify/before_after.png`.
+- For the game (not edited, main.js is outside this task): the tips' mouths are now at x 0.315 and
+  0.435, y 0.253, z -2.013, so `flame.set(0.42, 0.28, -2.15)` wants about (0.375, 0.253, -2.01) and
+  `car.point(0.42, -2.2)` about (0.375, -2.03); the car now spans z -2.132 to +2.132, so the rear
+  `CORNERS` at -2.25 (and the front at 2.2) sit about 0.1 m outside the body.
+- Receipts: `_parts/_sporty1.py`, `_sporty2.py` (and the lamp edits in `_tail.js`); the pre-pass
+  chunks are in `_parts_bak_polish/`. Assembly order: `_hdr_c _core _paths _body_c _fit _tail _c5`.
+
 ## Polish pass ("the back side feels a little bulky", "perfection is the goal")
 
 - Shipped from the same chunks (`_parts/_polish1.py`, `_polish2.py` are the receipts): **34,176 triangles**,

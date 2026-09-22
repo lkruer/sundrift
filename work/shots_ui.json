@@ -1,0 +1,9 @@
+[
+  { "wait": 1200 }, { "shot": "U0_title" },
+  { "click": "#startb" }, { "wait": 300 },
+  { "keys": ["KeyW"], "ms": 2500 },
+  { "keys": ["KeyW", "KeyA", "Space"], "ms": 450 },
+  { "keys": ["KeyW", "KeyA"], "ms": 700 },
+  { "shot": "U1_drive" },
+  { "keys": ["Escape"], "ms": 60 }, { "wait": 400 }, { "shot": "U2_pause" }
+]

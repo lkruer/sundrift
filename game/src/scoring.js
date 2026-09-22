@@ -11,13 +11,13 @@
  * Every consequence is emitted as an event ({ type, value }) so the HUD and the audio can react without
  * this file knowing either exists.
  */
-import { SCORE, clamp } from './config.js?v=202609220418';
+import { SCORE, clamp } from './config.js?v=202609222216';
 
 export class Scoring {
   constructor() {
     this.total = 0;
     this.best = 0;
-    try { this.best = Number(localStorage.getItem('sundrift.best') || 0) || 0; } catch { this.best = 0; }
+    this.best = 0;
     this.reset();
   }
 
@@ -129,10 +129,7 @@ export class Scoring {
       this.stats.longest = Math.max(this.stats.longest, this.time);
       this.stats.biggest = Math.max(this.stats.biggest, banked);
       this.emit('bank', banked, { tier: this.tier, boost, chain: this.chain, mult: this.mult });
-      if (this.total > this.best) {
-        this.best = this.total;
-        try { localStorage.setItem('sundrift.best', String(this.best)); } catch {}
-      }
+      if (this.total > this.best) this.best = this.total;
     }
     this.chainTimer = SCORE.chainGrace;
     this.points = 0; this.mult = 1; this.time = 0; this.tier = 0; this.endTimer = 0;

@@ -91,7 +91,7 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height 
   composer.addPass(cel);
   composer.addPass(new OutputPass());
   return {
-    composer, cel, bloomPass,
+    composer, cel, bloomPass, sceneRT,
     render(dt) {
       renderer.setRenderTarget(sceneRT);
       renderer.render(scene, camera);

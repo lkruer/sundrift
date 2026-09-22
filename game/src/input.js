@@ -18,9 +18,11 @@ export class Input {
     this.touchMode = false;
     this.anyKey = false;
     this.zoom = 1;                // chase camera distance factor, mouse wheel or plus and minus
-    try { this.zoom = Math.min(2.6, Math.max(0.7, Number(localStorage.getItem('sundrift.zoom')) || 1)); } catch {}
+    try { this.zoom = Math.min(2.6, Math.max(0.7, Number(localStorage.getItem('minidrift.zoom')) || 1)); } catch {}
     addEventListener('wheel', (e) => this.setZoom(this.zoom * (1 + Math.sign(e.deltaY) * 0.12)), { passive: true });
     this.onAny = null;            // called on the first real input, to unlock audio
+    this.onPause = null;          // Escape or P
+    this.onMute = null;           // M
     this._bindKeys();
     this._bindTouch();
     this.setTouchMode(this.detectTouch());
@@ -28,7 +30,7 @@ export class Input {
 
   setZoom(z) {
     this.zoom = Math.min(2.6, Math.max(0.7, z));
-    try { localStorage.setItem('sundrift.zoom', String(this.zoom)); } catch {}
+    try { localStorage.setItem('minidrift.zoom', String(this.zoom)); } catch {}
   }
 
   detectTouch() {
@@ -41,8 +43,7 @@ export class Input {
     this.touchMode = !!on;
     const layer = document.getElementById('touch');
     if (layer) layer.classList.toggle('on', this.touchMode);
-    const start = document.getElementById('start');
-    if (start) start.classList.toggle('touchmode', this.touchMode);
+    document.body.classList.toggle('touch', this.touchMode);
   }
 
   _bindKeys() {
@@ -52,6 +53,8 @@ export class Input {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
       if (e.code === 'Equal' || e.code === 'NumpadAdd') this.setZoom(this.zoom / 1.12);
       if (e.code === 'Minus' || e.code === 'NumpadSubtract') this.setZoom(this.zoom * 1.12);
+      if ((e.code === 'Escape' || e.code === 'KeyP') && this.onPause) { this.onPause(); e.preventDefault(); }
+      if (e.code === 'KeyM' && this.onMute) this.onMute();
       this.anyKey = true;
       if (this.onAny) this.onAny();
     };

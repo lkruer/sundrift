@@ -161,8 +161,9 @@ export default function (THREE) {
     const rows = prof.map((_, k) => k);
     return loft(secs, Object.assign({ creaseRows: rows, capFront: 0, capBack: 0 }, o || {}));
   };
-  // The nose in plan: a straight middle and corners that sweep back.
+  // The nose and tail in plan: a straight middle and corners that sweep back.
   const wrapF = (x) => 0.14 * Math.pow(c01((Math.abs(x) - 0.42) / 0.38), 1.6);
+  const wrapR = (x) => 0.10 * Math.pow(c01((Math.abs(x) - 0.48) / 0.32), 1.5);
   // A plan path around an end of the car: side legs at |x| = 0.815 from zs to the corner,
   // then the curved face. dir = +1 nose (z increases toward the face), -1 tail.
   const endPath = (dir, zf, zs, wrapFn) => {
