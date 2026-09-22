@@ -142,7 +142,10 @@ while (covered < METRES && Date.now() - startAt < cap) {
   await setKeys(want);
   if (covered >= nextShot && frames.length < 8 && g.kmh > 38) {
     const f = path.join(OUT, `f${frames.length}.png`);
+    // a screenshot blocks the page for a while (0.8 s at a phone's 3x): tell the game, so it is not counted as a slow frame
+    await page.evaluate(() => { window.__SHOT__ = performance.now(); });
     await page.screenshot({ path: f });
+    await page.evaluate(() => { window.__SHOT__ = performance.now(); });
     frames.push(f); nextShot += shotEvery;
     console.log(`  frame ${frames.length - 1}  ${Math.round(covered)} m  ${g.kmh} km/h  slip ${g.slip}  drift ${g.drift}  score ${g.score}  draws ${g.draws}  tris ${g.tris}  fps ${g.fps}`);
   }
@@ -187,6 +190,7 @@ console.log(`peak slip       ${maxSlip} deg   samples in drift ${driftFrames} of
 console.log(`score           ${last ? last.score : '?'}`);
 console.log(`peak draws      ${peakDraws}   peak tris ${peakTris.toLocaleString('en-US')}   median fps ${medFps}`);
 console.log(`slow frames     ${last && last.longFrames !== undefined ? last.longFrames : '?'} over 34 ms, worst ${last && last.worstFrame !== undefined ? last.worstFrame : '?'} ms (after the first second of the run)`);
+if (last && last.slowLog && last.slowLog.length) console.log(`                [t s, at m, frame ms, sim, world, render] ${JSON.stringify(last.slowLog)}`);
 console.log(`filmstrip       ${path.join(OUT, 'filmstrip.png')}`);
 fs.writeFileSync(path.join(OUT, 'gate.json'), JSON.stringify({ phone: PHONE, readyS, covered, banks, driftBankedAt, maxSlip, driftFrames, peakDraws, peakTris, medFps, avgKmh, errors, missing, problems, samples }, null, 2));
 if (problems.length) { console.log('\nproblems:'); for (const p of problems) console.log('  ' + p); process.exit(1); }

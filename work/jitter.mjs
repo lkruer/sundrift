@@ -18,7 +18,7 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
 const page = await browser.newPage();
-await page.setViewport({ width: 1280, height: 720 });
+if (process.env.PHONE) { await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 3, isMobile: true, hasTouch: true }); await page.setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'); } else await page.setViewport({ width: 1280, height: 720 });
 await page.goto(`http://127.0.0.1:${server.address().port}/?prof`, { waitUntil: 'load' });
 await page.waitForFunction('window.__READY__ === true', { timeout: 60000 });
 await new Promise((r) => setTimeout(r, 900)); await page.click('#startb');

@@ -6,19 +6,19 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609222255';
-import { createRig, detectTier } from '../rig.js?v=202609222255';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222255';
-import { Car, gearbox } from './car.js?v=202609222255';
-import { Track, DIFFS } from './track.js?v=202609222255';
-import { World } from './world.js?v=202609222255';
-import { ChaseCam } from './camera.js?v=202609222255';
-import { Input } from './input.js?v=202609222255';
-import { Scoring } from './scoring.js?v=202609222255';
-import { Hud } from './hud.js?v=202609222255';
-import { Audio } from './audio.js?v=202609222255';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222255';
-import { makePost } from './post.js?v=202609222255';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609222301';
+import { createRig, detectTier } from '../rig.js?v=202609222301';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222301';
+import { Car, gearbox } from './car.js?v=202609222301';
+import { Track, DIFFS } from './track.js?v=202609222301';
+import { World } from './world.js?v=202609222301';
+import { ChaseCam } from './camera.js?v=202609222301';
+import { Input } from './input.js?v=202609222301';
+import { Scoring } from './scoring.js?v=202609222301';
+import { Hud } from './hud.js?v=202609222301';
+import { Audio } from './audio.js?v=202609222301';
+import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222301';
+import { makePost } from './post.js?v=202609222301';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -469,8 +469,12 @@ function frame(now) {
   // every run keeps count of its slow frames, for the gate (the first second of a run is the start itself)
   if (G.mode === 'playing') {
     G.playT = (G.playT || 0) + real;
-    if (G.playT > 1.2) { if (real > 0.034) G.longFrames = (G.longFrames || 0) + 1; G.worstFrame = Math.max(G.worstFrame || 0, real * 1000); }
-    g.longFrames = G.longFrames || 0; g.worstFrame = Math.round(G.worstFrame || 0);
+    const shot = window.__SHOT__ && Math.abs(now - window.__SHOT__) < 2000;   // the test harness was taking a screenshot
+    if (G.playT > 1.2 && !shot) {
+      if (real > 0.034) { G.longFrames = (G.longFrames || 0) + 1; (G.slowLog = G.slowLog || []).push([Math.round(G.playT * 10) / 10, Math.round(G.s), Math.round(real * 1000), +(G.simMs || 0).toFixed(1), +(G.worldMs || 0).toFixed(1), +(G.renderMs || 0).toFixed(1)]); if (G.slowLog.length > 30) G.slowLog.shift(); }
+      G.worstFrame = Math.max(G.worstFrame || 0, real * 1000);
+    }
+    g.longFrames = G.longFrames || 0; g.worstFrame = Math.round(G.worstFrame || 0); g.slowLog = G.slowLog || [];
   }
   if (hud && (hud.perfOn || prof.on)) {
     perfLine = `${G.fps} fps  ${g.draws} draws  ${(g.tris / 1000).toFixed(0)}k tris  ${tier}\n` +
