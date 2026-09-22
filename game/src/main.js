@@ -24,7 +24,7 @@ const canvas = $('c');
 const loadEl = $('load'), barf = $('barf'), loadmsg = $('loadmsg');
 
 const G = {
-  playing: false, over: false, hour: 17.35, hourShown: 0, lastSunApply: 0,
+  playing: false, over: false, hour: 17.6, hourShown: 0, lastSunApply: 0,
   fps: 60, frameAvg: 1 / 60, s: 0, u: 0, idx: 0, dist: 0, lastS: 0, boostMax: SCORE.boostMax, night: 0,
 };
 window.__GAME__ = { pos: [0, 0], fps: 0, speed: 0, score: 0, over: false, draws: 0, tris: 0 };
@@ -72,7 +72,15 @@ async function boot() {
   rig.refresh(scene);
   // compile every shader variant now, not on the first frame that needs it
   try { renderer.compile(scene, camera); } catch (e) { console.warn('compile', e.message); }
-  window.__DEBUG__ = { world, track, car, rig, scene, renderer, G, get scoring() { return scoring; } };
+  window.__DEBUG__ = { world, track, car, rig, scene, renderer, G, chase, get scoring() { return scoring; },
+    // put the car on the centreline at distance s, facing along the road, camera snapped: for the critic's fixed views
+    teleport(s, kmh = 0) {
+      const p = track.sample(s);
+      car.reset(p.x, p.z, p.h); car.vF = kmh / 3.6;
+      G.idx = track.index(s); G.s = s; G.lastS = s;
+      world.prime(s); chase.snap(car, p.y); placeCar(p.y, 0);
+      return p;
+    } };
   input.onAny = () => audio.unlock();
   hud.setBest(scoring.best);
   prog(1, 'ready');
@@ -144,7 +152,7 @@ function restartRun() {
   scoring.reset();
   const start = track.sample(8);
   car.reset(start.x, start.z, start.h);
-  G.idx = 0; G.dist = 0; G.lastS = 8; G.hour = 17.35;
+  G.idx = 0; G.dist = 0; G.lastS = 8; G.hour = 17.6;
   chase.snap(car, start.y);
   hud.toast('NEW RUN', '', false);
 }
