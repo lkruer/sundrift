@@ -79,6 +79,10 @@ function buildNight() {
   halo.position.z = -1;
   disc.add(halo, dm); disc.userData = { dm, halo };
   scene.add(disc); night.disc = disc;
+  // a showroom key for the start screen, so the hero is lit before the first lamp
+  const hero = new THREE.SpotLight(0xffd9a0, 0, 24, 0.7, 0.6, 1.2);
+  hero.castShadow = false;
+  scene.add(hero); scene.add(hero.target); night.hero = hero;
   // horizon glow: a band around the camera, warm at the horizon fading into the blue, the retro night sky
   const H = 420, R = 2300, seg = 48;
   const gpos = new Float32Array((seg + 1) * 2 * 3), gcol = new Float32Array((seg + 1) * 2 * 4), gidx = [];
@@ -124,7 +128,7 @@ async function boot() {
   rig.refresh(scene);
   // compile every shader variant now, not on the first frame that needs it
   try { renderer.compile(scene, camera); } catch (e) { console.warn('compile', e.message); }
-  window.__DEBUG__ = { world, track, car, rig, scene, renderer, G, chase, audio, get scoring() { return scoring; },
+  window.__DEBUG__ = { world, track, car, rig, scene, renderer, G, chase, audio, post, get scoring() { return scoring; },
     // put the car on the centreline at distance s, facing along the road, camera snapped: for the critic's fixed views
     teleport(s, kmh = 0) {
       const p = track.sample(s);
@@ -236,6 +240,7 @@ function startGame() {
   if (G.playing) return;
   $('start').classList.remove('on');
   document.body.classList.add('playing');
+  if (night.hero) night.hero.intensity = 0;
   chase.snap(car, track.sample(G.s || 8).y);
   hud.show(true);
   audio.unlock();
@@ -294,6 +299,11 @@ function idle(dt) {
   camera.position.set(car.x + Math.sin(a) * d, y + 1.35 + 0.25 * Math.cos(orbitT * 0.7), car.z + Math.cos(a) * d);
   camera.up.set(0, 1, 0);
   camera.lookAt(car.x, y + 0.55, car.z);
+  if (night.hero) {
+    night.hero.intensity = 160;
+    night.hero.position.set(car.x - Math.sin(car.yaw + 0.6) * 6, y + 6, car.z - Math.cos(car.yaw + 0.6) * 6);
+    night.hero.target.position.set(car.x, y + 0.6, car.z); night.hero.target.updateMatrixWorld();
+  }
   if (Math.abs(camera.fov - 48) > 0.1) { camera.fov = 48; camera.updateProjectionMatrix(); }
   placeCar(y, 0);
   world.updateFar(car.x, y, car.z);

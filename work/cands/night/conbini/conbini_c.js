@@ -35,9 +35,9 @@ export default function (THREE) {
   box(9, 0.26, 6, 0, 3.93, 0, concrete);
   box(9.2, 0.14, 6.2, 0, 4.13, 0, dark);
   // canopy fascia: projecting vermilion box, white stripe on its face, three down-lights under it
-  box(9.2, 0.6, 0.7, 0, 2.9, 3.1, verm);
-  box(9.2, 0.1, 0.04, 0, 2.72, 3.47, white);
-  for (const x of [-3, 0, 3]) { box(0.36, 0.04, 0.36, x, 2.58, 3.25, dark); box(0.3, 0.03, 0.3, x, 2.555, 3.25, lampLens); }
+  box(9.2, 0.6, 0.55, 0, 2.9, 3.025, verm);
+  box(9.2, 0.1, 0.04, 0, 2.72, 3.32, white);
+  for (const x of [-3, 0, 3]) { box(0.36, 0.04, 0.36, x, 2.58, 3.12, dark); box(0.3, 0.03, 0.3, x, 2.555, 3.12, lampLens); }
   // glazing: upper glass, mid-rail at 1.3 m, lane-white spandrel panels below, mullions, head, sill
   for (const x of [-2.65, 2.65]) {
     box(3.5, 1.3, 0.04, x, 1.95, 2.9, glass);
@@ -61,10 +61,12 @@ export default function (THREE) {
     box(0.9, 0.12, 0.05, x, 0.41, z, galv);
   }
   box(1.8, 0.03, 0.3, 0, 0.315, 2.82, dark);
-  box(2.4, 0.15, 0.5, 0, 0.075, 3.25, concrete);
-  // interior: ceiling backing, emissive panel in a galvanised grid, gondolas with goods, counter
+  box(2.4, 0.15, 0.35, 0, 0.075, 3.175, concrete);
+  // interior: ceiling backing, emissive panel in a galvanised grid, three pendant lamps low enough to
+  // show through the upper glass from any camera height, gondolas with goods, counter
   box(8.6, 0.1, 5.6, 0, 2.95, 0, concrete);
   box(8, 0.05, 5, 0, 2.875, 0, ceiling);
+  for (const x of [-2.4, 0, 2.4]) { cyl(0.02, 0.4, 6, x, 2.65, 0.2, dark); box(0.36, 0.04, 0.36, x, 2.45, 0.2, dark); box(0.3, 0.03, 0.3, x, 2.42, 0.2, lampLens); }
   for (const z of [-1.25, 0, 1.25]) box(8, 0.04, 0.06, 0, 2.85, z, galv);
   for (const x of [-2.4, -0.8, 0.8, 2.4]) box(0.06, 0.04, 5, x, 2.85, 0, galv);
   for (const z of [0.9, -0.8]) for (const x of [-3.0, -1.7]) {
@@ -80,20 +82,20 @@ export default function (THREE) {
   box(3.0, 2.0, 0.4, 2.6, 1.36, -2.55, timber);
   box(0.7, 2.0, 3.0, -3.9, 1.36, -1.2, galv);
   box(0.02, 1.6, 2.8, -3.54, 1.46, -1.2, glass);
-  // roof plant: two AC units on a dark plinth frame, an access hatch, a vent stack
-  box(4.4, 0.12, 1.0, -0.4, 4.26, -1.4, dark);
+  // roof plant: two AC units on a thin dark frame, an access hatch, a vent stack
+  box(4.4, 0.06, 1.0, -0.4, 4.23, -1.4, dark);
   for (const x of [-2.2, 1.4]) {
-    box(1.2, 0.55, 0.8, x, 4.6, -1.4, galv);
-    box(1.1, 0.04, 0.7, x, 4.89, -1.4, dark);
-    put(new THREE.TorusGeometry(0.26, 0.05, 4, 10), dark, [x, 4.92, -1.4], [Math.PI / 2, 0, 0]);
+    box(1.2, 0.4, 0.8, x, 4.46, -1.4, galv);
+    box(1.1, 0.04, 0.7, x, 4.68, -1.4, dark);
+    put(new THREE.TorusGeometry(0.26, 0.05, 4, 10), dark, [x, 4.71, -1.4], [Math.PI / 2, 0, 0]);
   }
   box(0.9, 0.3, 0.9, 3.5, 4.35, 1.6, dark);
-  cyl(0.1, 0.5, 8, -3.6, 4.45, 1.8, galv);
-  cyl(0.16, 0.06, 8, -3.6, 4.73, 1.8, galv);
+  cyl(0.1, 0.35, 8, -3.6, 4.375, 1.8, galv);
+  cyl(0.16, 0.06, 8, -3.6, 4.58, 1.8, galv);
   // pavement slab, kerb and bollards in front
-  box(9.4, 0.08, 0.9, 0, 0.04, 3.45, concrete);
-  box(9.4, 0.12, 0.12, 0, 0.06, 3.84, dark);
-  for (const x of [-3.4, -1.7, 1.7, 3.4]) { cyl(0.07, 0.9, 8, x, 0.53, 3.6, dark); cyl(0.075, 0.1, 8, x, 0.83, 3.6, white); }
+  box(9.4, 0.08, 0.45, 0, 0.04, 3.225, concrete);
+  box(9.4, 0.12, 0.1, 0, 0.06, 3.4, dark);
+  for (const x of [-3.4, -1.7, 1.7, 3.4]) { cyl(0.07, 0.9, 8, x, 0.53, 3.28, dark); cyl(0.075, 0.1, 8, x, 0.83, 3.28, white); }
   // back: steel door and frame, lamp, downpipe, condenser
   box(0.9, 2.1, 0.08, 2.5, 1.35, -3.04, dark);
   box(0.08, 2.2, 0.1, 1.99, 1.4, -3.05, galv);
@@ -103,13 +105,25 @@ export default function (THREE) {
   box(0.24, 0.04, 0.18, 2.5, 2.69, -3.12, lampLens);
   cyl(0.05, 3.9, 6, -4.2, 1.95, -3.08, galv);
   box(0.2, 0.2, 0.2, -4.2, 4.0, -3.1, galv);
-  box(0.9, 0.7, 0.35, -2.0, 0.65, -3.2, galv);
-  put(new THREE.TorusGeometry(0.22, 0.04, 4, 10), dark, [-2.0, 0.7, -3.38]);
-  box(0.9, 0.1, 0.35, -2.0, 0.35, -3.2, dark);
+  box(0.9, 0.7, 0.3, -2.0, 0.65, -3.15, galv);
+  put(new THREE.TorusGeometry(0.22, 0.04, 4, 10), dark, [-2.0, 0.7, -3.31]);
+  box(0.9, 0.1, 0.3, -2.0, 0.35, -3.15, dark);
+  // back: roof-access ladder, a small framed staff window, a meter cabinet
+  for (const x of [-3.5, -3.1]) box(0.05, 3.9, 0.05, x, 2.05, -3.12, galv);
+  for (let y = 0.3; y < 4.0; y += 0.3) box(0.4, 0.04, 0.04, -3.3, y, -3.12, galv);
+  box(1.2, 0.5, 0.06, 0.5, 3.1, -3.03, glass);
+  box(1.3, 0.06, 0.1, 0.5, 3.38, -3.05, galv);
+  box(1.3, 0.06, 0.1, 0.5, 2.82, -3.05, galv);
+  box(0.06, 0.6, 0.1, -0.13, 3.1, -3.05, galv);
+  box(0.06, 0.6, 0.1, 1.13, 3.1, -3.05, galv);
+  box(0.6, 0.9, 0.25, 1.0, 0.75, -3.12, galv);
+  box(0.5, 0.8, 0.02, 1.0, 0.75, -3.25, dark);
   // sides: downpipes, meter box and a framed window on the left, exhaust hood on the right
   cyl(0.05, 3.9, 6, -4.58, 1.95, -2.4, galv);
   cyl(0.05, 3.9, 6, 4.58, 1.95, -2.4, galv);
   box(0.15, 0.6, 0.5, -4.58, 1.6, 1.0, galv);
+  box(0.1, 0.4, 0.6, -4.55, 1.5, -1.8, galv);
+  for (const y of [1.38, 1.5, 1.62]) box(0.04, 0.04, 0.5, -4.62, y, -1.8, dark);
   box(0.06, 0.6, 1.2, -4.53, 3.2, -0.6, glass);
   box(0.1, 0.06, 1.3, -4.55, 3.53, -0.6, galv);
   box(0.1, 0.06, 1.3, -4.55, 2.87, -0.6, galv);

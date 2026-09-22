@@ -1,4 +1,4 @@
-// bus_shelter — candidate C: a different breakdown, carpentry you can count. Every plank is its own board
+// bus_shelter — WINNER (candidate C, a different breakdown): carpentry you can count. Every plank is its own board
 // (0.18 m boards with 0.02 m gaps over a dark backing board, so the grooves are real gaps), the roof is
 // five overlapping tile courses per slope stepping down over exposed cedar rafters, the gables are left
 // open showing the king posts and ridge beam, the bench slab sits on two log rounds, the sign disc has a

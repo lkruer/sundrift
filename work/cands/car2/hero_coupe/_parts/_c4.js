@@ -52,9 +52,13 @@
   for (const x of [-0.62, -0.44, 0.44, 0.62]) {
     const f = faceAt(tail, x), lamp = new THREE.Group();
     lamp.position.set(f.x, 0.87, f.z); lamp.rotation.y = f.yaw; body.add(lamp);
-    add(lamp, cyl(0.073, 0.073, 0.018, 28), DARK, 0, 0, 0.022, PI / 2);                              // bezel
-    add(lamp, cyl(0.058, 0.058, 0.014, 28), TAIL, 0, 0, 0.036, PI / 2);                              // lens
+    add(lamp, cyl(0.073, 0.073, 0.018, 32), DARK, 0, 0, 0.022, PI / 2);                              // bezel
+    add(lamp, cyl(0.058, 0.058, 0.014, 32), TAIL, 0, 0, 0.036, PI / 2);                              // lens
   }
+  add(body, sweep(tail, plainProf(0.17, 0.31, 0.10, 0.006)), DARK);                                  // lower valance, wraps the corners
+  add(body, sweep(tail, plainProf(0.495, 0.507, 0.03, 0.005)), DARK);                                // rubbing strip round the bumper
+  add(body, box(0.44, 0.16, 0.024), DARK, 0, 0.60, -2.19);                                           // plate recess, blank
+  for (const s of [-1, 1]) onFace(tail, s * 0.66, 0.42, 0.10, 0.035, 0.02, TAIL, 0.008);             // corner reflectors
   add(body, box(0.64, 0.13, 0.026), DARK, 0, 0.87, -2.212);                                          // centre garnish
   add(body, box(0.64, 0.012, 0.03), GALV, 0, 0.941, -2.213);                                         // its bright top trim
   add(body, box(0.32, 0.15, 0.02), DARK, 0.44, 0.27, -2.20);                                         // exhaust cut-out
@@ -120,7 +124,7 @@
     add(body, loft(secs, { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), PAINT);
     for (let k = 0; k < 8; k++) {                                                                    // rivet row on the flare face
       const th = (20 + 140 * k / 7) * PI / 180;
-      add(body, hemi(0.014), DARK, s * 0.86, 0.32 + 0.39 * Math.sin(th), az + 0.39 * Math.cos(th), 0, 0, -s * PI / 2);
+      add(body, new THREE.SphereGeometry(0.014, 10, 5, 0, PI * 2, 0, PI / 2), DARK, s * 0.86, 0.32 + 0.39 * Math.sin(th), az + 0.39 * Math.cos(th), 0, 0, -s * PI / 2);
     }
   }
   for (const s of [-1, 1]) {

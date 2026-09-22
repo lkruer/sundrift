@@ -124,7 +124,7 @@
   add(body, box(1.22, 0.028, 0.10), PAINT, 0, 1.236, -0.995, 0.34);                            // roof spoiler lip, trailing edge up
   add(body, box(1.22, 0.012, 0.04), DARK, 0, 1.243, -1.03, 0.34);                              // its rubber edge
   add(body, cyl(0.022, 0.026, 0.024, 12), DARK, 0.50, topY(0.50, -0.88) + 0.008, -0.88);      // antenna base
-  add(body, cyl(0.007, 0.011, 0.13, 8), RUB, 0.50, topY(0.50, -0.88) + 0.068, -0.91, -0.45);   // rubber mast, raked back
+  add(body, cyl(0.007, 0.011, 0.09, 8), RUB, 0.50, topY(0.50, -0.88) + 0.048, -0.90, -0.45);   // rubber mast, raked back
   {                                                                                            // fuel filler on the left rear quarter
     const fx = flankX(1, 0.80, -1.72);
     add(body, new THREE.TorusGeometry(0.055, 0.009, 8, 24), DARK, fx + 0.004, 0.80, -1.72, 0, PI / 2, 0);

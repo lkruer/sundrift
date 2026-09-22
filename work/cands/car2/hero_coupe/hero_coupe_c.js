@@ -337,7 +337,7 @@ export default function (THREE) {
   add(body, box(1.22, 0.028, 0.10), PAINT, 0, 1.236, -0.995, 0.34);                            // roof spoiler lip, trailing edge up
   add(body, box(1.22, 0.012, 0.04), DARK, 0, 1.243, -1.03, 0.34);                              // its rubber edge
   add(body, cyl(0.022, 0.026, 0.024, 12), DARK, 0.50, topY(0.50, -0.88) + 0.008, -0.88);      // antenna base
-  add(body, cyl(0.007, 0.011, 0.13, 8), RUB, 0.50, topY(0.50, -0.88) + 0.068, -0.91, -0.45);   // rubber mast, raked back
+  add(body, cyl(0.007, 0.011, 0.09, 8), RUB, 0.50, topY(0.50, -0.88) + 0.048, -0.90, -0.45);   // rubber mast, raked back
   {                                                                                            // fuel filler on the left rear quarter
     const fx = flankX(1, 0.80, -1.72);
     add(body, new THREE.TorusGeometry(0.055, 0.009, 8, 24), DARK, fx + 0.004, 0.80, -1.72, 0, PI / 2, 0);
@@ -397,9 +397,13 @@ export default function (THREE) {
   for (const x of [-0.62, -0.44, 0.44, 0.62]) {
     const f = faceAt(tail, x), lamp = new THREE.Group();
     lamp.position.set(f.x, 0.87, f.z); lamp.rotation.y = f.yaw; body.add(lamp);
-    add(lamp, cyl(0.073, 0.073, 0.018, 28), DARK, 0, 0, 0.022, PI / 2);                              // bezel
-    add(lamp, cyl(0.058, 0.058, 0.014, 28), TAIL, 0, 0, 0.036, PI / 2);                              // lens
+    add(lamp, cyl(0.073, 0.073, 0.018, 32), DARK, 0, 0, 0.022, PI / 2);                              // bezel
+    add(lamp, cyl(0.058, 0.058, 0.014, 32), TAIL, 0, 0, 0.036, PI / 2);                              // lens
   }
+  add(body, sweep(tail, plainProf(0.17, 0.31, 0.10, 0.006)), DARK);                                  // lower valance, wraps the corners
+  add(body, sweep(tail, plainProf(0.495, 0.507, 0.03, 0.005)), DARK);                                // rubbing strip round the bumper
+  add(body, box(0.44, 0.16, 0.024), DARK, 0, 0.60, -2.19);                                           // plate recess, blank
+  for (const s of [-1, 1]) onFace(tail, s * 0.66, 0.42, 0.10, 0.035, 0.02, TAIL, 0.008);             // corner reflectors
   add(body, box(0.64, 0.13, 0.026), DARK, 0, 0.87, -2.212);                                          // centre garnish
   add(body, box(0.64, 0.012, 0.03), GALV, 0, 0.941, -2.213);                                         // its bright top trim
   add(body, box(0.32, 0.15, 0.02), DARK, 0.44, 0.27, -2.20);                                         // exhaust cut-out
@@ -465,7 +469,7 @@ export default function (THREE) {
     add(body, loft(secs, { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), PAINT);
     for (let k = 0; k < 8; k++) {                                                                    // rivet row on the flare face
       const th = (20 + 140 * k / 7) * PI / 180;
-      add(body, hemi(0.014), DARK, s * 0.86, 0.32 + 0.39 * Math.sin(th), az + 0.39 * Math.cos(th), 0, 0, -s * PI / 2);
+      add(body, new THREE.SphereGeometry(0.014, 10, 5, 0, PI * 2, 0, PI / 2), DARK, s * 0.86, 0.32 + 0.39 * Math.sin(th), az + 0.39 * Math.cos(th), 0, 0, -s * PI / 2);
     }
   }
   for (const s of [-1, 1]) {
@@ -575,14 +579,14 @@ export default function (THREE) {
       geo.rotateZ(-PI / 2); at(geo, RUB2);
     }
     const bead = at(new THREE.TorusGeometry(0.262, 0.008, 6, 44), RUB, hw - 0.012); bead.rotation.y = PI / 2;
-    at(rv([[0.24, -hw + 0.02], [0.222, -hw + 0.05], [0.222, hw - 0.07], [0.215, hw - 0.03]], 32), BRONZ2);        // barrel
-    at(rv([[0.20, hw - 0.03], [0.238, hw - 0.03], [0.238, hw + 0.004], [0.20, hw + 0.004]], 32), LIP);            // polished lip
+    at(rv([[0.24, -hw + 0.02], [0.222, -hw + 0.05], [0.222, hw - 0.07], [0.215, hw - 0.03]], 40), BRONZ2);        // barrel
+    at(rv([[0.20, hw - 0.03], [0.238, hw - 0.03], [0.238, hw + 0.004], [0.20, hw + 0.004]], 40), LIP);            // polished lip
     const os = hw - 0.10;
     at(rv([[0.001, os - 0.06], [0.08, os - 0.06], [0.08, os], [0.05, os], [0.05, os + 0.012], [0.001, os + 0.012]], 16), BRONZE);
     at(rv([[0.001, os + 0.012], [0.040, os + 0.012], [0.040, os + 0.020], [0.001, os + 0.020]], 16), DARK);         // centre cap
     for (let k = 0; k < 5; k++) {
       const a = k * PI * 2 / 5 + PI / 2;
-      at(box(0.034, 0.17, 0.05), BRONZE, os - 0.015, 0.135 * Math.cos(a), 0.135 * Math.sin(a), a);
+      at(loft([rect(1, [0, 0.045, 0], [0.025, 0.016]), rect(1, [0, 0.16, 0], [0.025, 0.026]), rect(1, [0, 0.228, 0], [0.022, 0.032])], { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), BRONZE, os - 0.015, 0, 0, a);   // tapered spoke
       at(cyl(0.011, 0.011, 0.014, 6), DARK, os + 0.016, 0.058 * Math.cos(a + PI / 5), 0.058 * Math.sin(a + PI / 5), 0, PI / 2);   // lug nut
     }
     at(rv([[0.062, -0.05], [0.062, os - 0.06]], 16), DARK2);                                                       // hub bell
