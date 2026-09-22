@@ -45,7 +45,7 @@ export default function (THREE) {
 
   // --- walls: front in three pieces around the door, back, two sides ------------
   const WY = FLOOR + WALL_H / 2;
-  const DX0 = -0.25, DX1 = 0.85, DOOR_H = 2.0, DXC = (DX0 + DX1) / 2, DW = DX1 - DX0;
+  const DX0 = -0.85, DX1 = 0.25, DOOR_H = 2.0, DXC = (DX0 + DX1) / 2, DW = DX1 - DX0;
   box(X1 - DX1, WALL_H, WT, (X1 + DX1) / 2, WY, Z1 - WT / 2, timber);
   box(DX0 - X0, WALL_H, WT, (X0 + DX0) / 2, WY, Z1 - WT / 2, timber);
   box(DW, WALL_H - DOOR_H, WT, DXC, FLOOR + DOOR_H + (WALL_H - DOOR_H) / 2, Z1 - WT / 2, timber);
@@ -142,7 +142,7 @@ export default function (THREE) {
   grooves(faces.right, [win(RIDGE_Z)]);
 
   // --- bench on the deck, under the eave, right of the door --------------------------
-  const BX = -0.95, BZ = Z1 + 0.2;
+  const BX = 0.95, BZ = Z1 + 0.2;
   box(1.2, 0.06, 0.4, BX, FLOOR + 0.39, BZ, timber);
   for (const s of [1, -1]) box(0.08, 0.36, 0.34, BX + s * 0.5, FLOOR + 0.18, BZ, timber);
   box(1.0, 0.05, 0.05, BX, FLOOR + 0.12, BZ, bark);

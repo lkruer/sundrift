@@ -98,28 +98,48 @@ async function buildCar() {
   const obj = await ASSET('./assets/hero_coupe.js', { keepHierarchy: true });
   joints = obj.userData.joints || {};
   // paint gets a clearcoat; the rig gives it a sky to reflect. Glass gets a little transmission-free gloss.
+  const upgraded = new Map();
+  const upgrade = (m) => {
+    if (!m || !m.color) return m;
+    if (upgraded.has(m)) return upgraded.get(m);
+    let out = m;
+    if (m.name === 'paint' || m.color.getHex() === PAL.pearl) {
+      out = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.32, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.0 });
+      out.name = 'paint';
+    } else if (m.name === 'glass' || m.color.getHex() === PAL.glass) {
+      out = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.08, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2 });
+      out.name = 'glass';
+    }
+    upgraded.set(m, out);
+    return out;
+  };
   obj.traverse((o) => {
     if (!o.isMesh) return;
-    const m = o.material;
-    if (!m) return;
-    if (m.name === 'paint' || m.color.getHex() === PAL.pearl) {
-      const p = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.32, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.0 });
-      p.name = 'paint'; o.material = p;
-    } else if (m.name === 'glass' || m.color.getHex() === PAL.glass) {
-      o.material = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.08, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2 });
-      o.material.name = 'glass';
-    }
+    o.material = Array.isArray(o.material) ? o.material.map(upgrade) : upgrade(o.material);
     o.castShadow = true; o.receiveShadow = true;
   });
-  // bake the still parts per joint: the body into one mesh per material, each wheel into its own
-  const bodyNode = obj.getObjectByName('body');
+  // bake the still parts per joint: the body into one mesh per material, and each wheel into its own few
+  // meshes in the wheel's own frame, so the pivots keep working and the car is a few dozen draws, not 150
   obj.updateMatrixWorld(true);
+  const bakeInto = (node, parent) => {
+    const baked = bakeStatic(node);
+    const inv = new THREE.Matrix4().copy(parent.matrixWorld).invert();
+    baked.traverse((o) => { if (o.isMesh) { o.geometry.applyMatrix4(inv); o.castShadow = true; o.receiveShadow = true; } });
+    return baked;
+  };
+  const bodyNode = obj.getObjectByName('body');
   if (bodyNode) {
-    const baked = bakeStatic(bodyNode);
-    baked.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    const baked = bakeInto(bodyNode, obj);
     bodyNode.parent.remove(bodyNode);
     obj.add(baked);
   }
+  for (const key of ['wheelFL', 'wheelFR', 'wheelRL', 'wheelRR']) {
+    const w = joints[key]; if (!w) continue;
+    const baked = bakeInto(w, w);
+    for (const c of [...w.children]) w.remove(c);
+    for (const c of [...baked.children]) w.add(c);
+  }
+  obj.updateMatrixWorld(true);
   carRoot = obj;
   scene.add(carRoot);
   flame = new ExhaustFlame(carRoot);
@@ -143,6 +163,7 @@ function startGame() {
   if (G.playing) return;
   $('start').classList.remove('on');
   document.body.classList.add('playing');
+  chase.snap(car, track.sample(G.s || 8).y);
   hud.show(true);
   audio.unlock();
   G.playing = true;
@@ -187,10 +208,18 @@ function frame(now) {
   if (hud && hud.perfOn) perfLine = `${G.fps} fps  ${g.draws} draws  ${(g.tris / 1000).toFixed(0)}k tris  ${tier}`;
 }
 
+// before the start: the camera circles the car slowly, low and close, the hero shot
+let orbitT = 0.6;
 function idle(dt) {
   if (!car) return;
   const y = track.sample(G.s || 8).y;
-  chase.update(dt, car, y, (x, z) => track.groundAt(x, z, G.idx), 0);
+  orbitT += dt * 0.16;
+  const a = car.yaw + Math.PI + Math.sin(orbitT) * 1.15;
+  const d = 5.6;
+  camera.position.set(car.x + Math.sin(a) * d, y + 1.35 + 0.25 * Math.cos(orbitT * 0.7), car.z + Math.cos(a) * d);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(car.x, y + 0.55, car.z);
+  if (Math.abs(camera.fov - 48) > 0.1) { camera.fov = 48; camera.updateProjectionMatrix(); }
   placeCar(y, 0);
   world.updateFar(car.x, y, car.z);
 }

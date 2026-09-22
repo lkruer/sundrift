@@ -26,8 +26,8 @@ export const ROAD = {
 
 /** Chase camera. */
 export const CAM = {
-  dist: 6.6, height: 2.35, lookAhead: 5.0, lookUp: 0.95,
-  fov: 62, fovBoost: 12, fovSpeed: 8,
+  dist: 5.0, height: 1.85, lookAhead: 4.2, lookUp: 0.85,
+  fov: 60, fovBoost: 11, fovSpeed: 7,
   followRate: 5.5, yawBlend: 0.62,   // 0 = behind the car's heading, 1 = behind the velocity vector
   roll: 0.045,
 };

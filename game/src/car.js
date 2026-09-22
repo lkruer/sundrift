@@ -144,7 +144,9 @@ export class Car {
     let Fdrive = this.throttle * P.engineForce * fade;
     if (this.boost > 0) { Fdrive += P.boostForce * (0.6 + 0.4 * this.throttle); this.boost = Math.max(0, this.boost - h); }
     if (inp.reverse && this.vF < 1.0) Fdrive = -P.engineForce * 0.45 * (this.vF > -8 ? 1 : 0);
-    const Fbrake = -Math.sign(this.vF) * this.brake * P.brakeForce * Math.min(1, Math.abs(this.vF) / 0.6);
+    // the brake key is also reverse once the car has stopped, so it must not fight the reverse drive
+    const braking = inp.reverse && this.vF < 0.5 ? 0 : this.brake;
+    const Fbrake = -Math.sign(this.vF) * braking * P.brakeForce * Math.min(1, Math.abs(this.vF) / 0.6);
     const Fhand = -Math.sign(this.vF) * this.hand * P.handbrakeForce * Math.min(1, Math.abs(this.vF) / 0.6);
     const Fdrag = -(P.dragCoef * this.vF * Math.abs(this.vF) + P.rollCoef * this.vF) - (1 - surface) * P.offroadDrag * this.vF;
     let FxR = Fdrive + Fbrake * 0.4 + Fhand;      // rear carries 40 % of the brakes and all of the drive

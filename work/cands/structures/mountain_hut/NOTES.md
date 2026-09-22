@@ -1,0 +1,7 @@
+# mountain_hut — receipts
+
+Winner: **mountain_hut_c** (clapboard construction). 1,924 triangles, measured 4.32 x 3.81 x 3.34 m against 4.0 x 3.6 x 3.0 (tol 0.2).
+Why: the brief's "plank groove every 0.25 m" is real geometry here, overlapping weatherboards tilted 6 degrees whose proud bottom edges throw a shadow line on every face and in every view, where A and B carry thin dark strips that read as drawn lines. The exposed rafter tails and bargeboards make the 0.5 m overhang read from the sides and the three-quarter view, the two-leaf sliding door reads as sliding, and the cross-mullion windows and log-round bench give the small parts character.
+A (boxes, 3-segment-prism gables, strip grooves) is clean and correct; its grooves are the weakest feature. B (extruded elevations with Path holes, one-piece extruded roof band, V ridge cap) is the tidiest build and the roof band is a good technique, but the lathe chimney hood reads as a bucket and its walls are flatter than C.
+Changed after the first render: in all three the bench sat on the viewer's LEFT of the door. The camera at +Z has world +X on its right, so "right of the door" is +X; the door moved to x = -0.3 and the bench to x = +0.95 in every candidate, re-verified clean.
+Sizes: the walls are 3.2 x 2.2 m so the 0.5 m overhang on every side lands the roof at 4.2 x 3.2 m (the brief's 3.6 x 2.7 deck with a 0.5 m overhang would be 4.6 x 3.7, outside the 3.0 m depth gate); the deck is 3.6 x 2.7 with the bench on its 0.4 m front strip under the eave. Eaves 2.35 m, ridge 3.55 m under a 0.12 m cap.

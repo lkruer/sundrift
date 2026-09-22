@@ -50,7 +50,7 @@ export default function (THREE) {
   const front = wallGroup('front'), back = wallGroup('back'), left = wallGroup('left'), right = wallGroup('right');
 
   // --- walls ---------------------------------------------------------------------
-  const DX0 = -0.25, DX1 = 0.85, DOOR_H = 2.0, DXC = (DX0 + DX1) / 2;
+  const DX0 = -0.85, DX1 = 0.25, DOOR_H = 2.0, DXC = (DX0 + DX1) / 2;
   const WY0 = 1.2;
   const winHole = () => hole(-0.35, WY0 - 0.35, 0.35, WY0 + 0.35);
   skin(front, poly([[X0, 0], [DX0, 0], [DX0, DOOR_H], [DX1, DOOR_H], [DX1, 0], [X1, 0], [X1, WALL_H], [X0, WALL_H]]), WT, 0, timber);
@@ -139,7 +139,7 @@ export default function (THREE) {
     const k = extrude(rect(-1.84, FLOOR - 0.10, 1.84, FLOOR), 0.04, bark); k.position.z = s * 1.37 - 0.02; g.add(k);
     const k2 = extrude(rect(-1.35, FLOOR - 0.10, 1.35, FLOOR), 0.04, bark); k2.rotation.y = Math.PI / 2; k2.position.x = s * 1.82 - 0.02; g.add(k2);
   }
-  const BX = -0.95, BZ = Z1 + 0.2;
+  const BX = 0.95, BZ = Z1 + 0.2;
   const seat = extrude(rect(BX - 0.6, FLOOR + 0.36, BX + 0.6, FLOOR + 0.42), 0.4, timber); seat.position.z = BZ - 0.2; g.add(seat);
   for (const s of [1, -1]) {
     const lg = extrude(rect(BX + s * 0.5 - 0.04, FLOOR, BX + s * 0.5 + 0.04, FLOOR + 0.36), 0.34, timber); lg.position.z = BZ - 0.17; g.add(lg);
