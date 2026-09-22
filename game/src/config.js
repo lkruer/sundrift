@@ -35,7 +35,7 @@ export const CAM = {
 /** Scoring. */
 export const SCORE = {
   minSpeed: 6.0,         // m/s before a slide counts
-  minSlip: 0.19,         // rad, drift begins
+  minSlip: 0.17,         // rad, drift begins
   endSlip: 0.11,         // rad, drift ends below this for endGrace seconds
   endGrace: 0.55,
   chainGrace: 1.6,       // seconds between drifts that keep the chain alive

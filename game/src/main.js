@@ -18,6 +18,7 @@ import { Scoring } from './scoring.js';
 import { Hud } from './hud.js';
 import { Audio } from './audio.js';
 import { SkidMarks, Particles, ExhaustFlame } from './fx.js';
+import { makePost } from './post.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -40,7 +41,10 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.4, 4500);
 scene.add(camera);
-const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 55, fogDensity: 0.0013, exposure: 1.05, bloomThreshold: 1.6, bloomStrength: 0.22 });
+const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 55, fogDensity: 0.0013, exposure: 1.05, post: false });
+const post = makePost(renderer, scene, camera, { bloom: tier !== 'phone', width: innerWidth, height: innerHeight });
+// the composer renders several passes; count the whole frame for the telemetry, the way the rig's own post did
+renderer.info.autoReset = false;
 
 let track, world, car, carRoot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, beams;
 const lampLights = [];
@@ -48,7 +52,7 @@ const night = { moon: null, stars: null, disc: null, dir: new THREE.Vector3(0.35
 
 /** The night's own light: a cool moon with a shadow box around the car, stars, and a moon disc. */
 function buildNight() {
-  const moon = new THREE.DirectionalLight(0x9fb4e0, 0);
+  const moon = new THREE.DirectionalLight(0x6f8fd8, 0);
   moon.castShadow = Q.shadow;
   const sm = tier === 'phone' ? 1024 : 2048;
   moon.shadow.mapSize.set(sm, sm);
@@ -151,6 +155,11 @@ async function buildCar() {
     if (!m || !m.color) return m;
     if (upgraded.has(m)) return upgraded.get(m);
     let out = m;
+    if (m.emissive && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0) {
+      out = m.clone();
+      out.emissiveIntensity = m.emissive.getHex() === PAL.tailRed ? 3.2 : 2.2;
+      upgraded.set(m, out); return out;
+    }
     if (m.name === 'paint' || m.color.getHex() === PAL.pearl) {
       out = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.2, metalness: 0.12, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 1.2 });
       out.name = 'paint';
@@ -195,20 +204,25 @@ async function buildCar() {
   // headlights for dusk
   headlights = [];
   for (const x of [-0.6, 0.6]) {
-    const sp = new THREE.SpotLight(0xfff0d0, 0, 46, 0.42, 0.6, 1.4);
+    const sp = new THREE.SpotLight(0xf6f8ff, 0, 46, 0.42, 0.6, 1.4);
     sp.position.set(x, 0.7, 2.0);
     sp.target.position.set(x * 1.5, 0.1, 30);
     carRoot.add(sp); carRoot.add(sp.target);
     headlights.push(sp);
   }
   for (let i = 0; i < (tier === 'phone' ? 3 : 5); i++) {
-    const pl = new THREE.PointLight(0xffc266, 0, 30, 2.0);
+    const pl = new THREE.PointLight(0xffa040, 0, 26, 2.0);
     scene.add(pl); lampLights.push(pl);
   }
   // fake volumetric beams: two additive cones ahead of the lamps, the way arcade racers draw headlights
   beams = new THREE.Group();
-  const beamGeo = new THREE.ConeGeometry(2.6, 16, 14, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 8);
-  const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff0c8, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const beamGeo = new THREE.ConeGeometry(2.1, 18, 14, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 9);
+  {
+    const pos = beamGeo.attributes.position, col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) { const t = 1 - Math.min(1, Math.max(0, pos.getZ(i) / 18)); const v = t * t; col[i * 3] = v; col[i * 3 + 1] = v; col[i * 3 + 2] = v; }
+    beamGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  }
+  const beamMat = new THREE.MeshBasicMaterial({ color: 0xf0f4ff, vertexColors: true, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
   for (const x of [-0.6, 0.6]) {
     const b = new THREE.Mesh(beamGeo, beamMat);
     b.position.set(x, 0.62, 2.1); b.rotation.x = 0.04;
@@ -257,7 +271,9 @@ function frame(now) {
   if (G.playing) step(dt);
   else idle(dt);
 
-  rig.render(camera, dt);
+  renderer.info.reset();
+  rig.update(camera, dt);
+  post.render(dt);
 
   const g = window.__GAME__;
   g.pos[0] = car ? car.x : 0; g.pos[1] = car ? car.z : 0;
@@ -395,9 +411,9 @@ function applySun(dt) {
   // headlights and lamps come on as the sun goes
   const nightAmt = smoothstep(4, -3, el);
   G.night = nightAmt; night.amt = nightAmt;
-  for (const h of headlights) h.intensity = 120 * nightAmt;
-  if (beams) beams.userData.mat.opacity = 0.06 * nightAmt;
-  if (night.moon) night.moon.intensity = 0.32 * nightAmt;
+  for (const h of headlights) h.intensity = 110 * nightAmt;
+  if (beams) beams.userData.mat.opacity = 0.09 * nightAmt;
+  if (night.moon) night.moon.intensity = 0.5 * nightAmt;
   if (night.glow) night.glow.material.opacity = 0.30 * smoothstep(-0.5, -5, el);
   if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.82 * nightAmt);
   if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el);
@@ -455,7 +471,7 @@ function effects(dt, y, boost01) {
       const e = near[i];
       if (!e || e.d > 70 * 70) { pl.intensity = 0; return; }
       pl.position.set(e.l.x, e.l.y, e.l.z);
-      pl.intensity = e.l.tunnel ? 110 : 300 * Math.max(G.night, 0.12);
+      pl.intensity = e.l.tunnel ? 110 : 340 * Math.max(G.night, 0.12);
     });
   } else lampLights.forEach((pl) => { pl.intensity = 0; });
 }
@@ -465,7 +481,7 @@ function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
-  rig.resize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
+  post.resize(w, h);
   if (particles) particles.setScale(h);
 }
 addEventListener('resize', resize);

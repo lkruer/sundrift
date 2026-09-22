@@ -40,7 +40,7 @@ function roadTextures() {
     const u = uOf(x), au = Math.abs(u);
     const vm = (y / H) * 12;                                     // metres along, 12 m per tile
     let c, rough;
-    const grain = (rnd() - 0.5) * 22;
+    const grain = (rnd() - 0.5) * 10;
     if (au > HALF) { c = gravel.map((v) => v + grain * 1.6); rough = 0.96; }
     else {
       const wear = 1 - 0.07 * Math.exp(-Math.pow((au - 1.55) / 0.5, 2));       // darker tyre tracks
@@ -503,7 +503,7 @@ export class World {
       place('lamp', x, y, z, ry);
       const hx = x + Math.cos(ry) * 0.5, hz = z - Math.sin(ry) * 0.5;      // the head, half a metre along the arm
       this.lamps.push({ x: hx, y: y + 5.75, z: hz, ci });
-      this.pool(hx, y, hz, 11.5, 1.0);
+      this.pool(hx, y, hz, 10, 1.0);
       // the bulb: a small glowing ball under the head that reads as the source from any angle
       this._bulbMat = this._bulbMat || new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffd28a, emissiveIntensity: 2.6, roughness: 0.6 });
       this._bulbGeo = this._bulbGeo || new THREE.SphereGeometry(0.22, 10, 8);
@@ -519,7 +519,7 @@ export class World {
       const sz = 128, cv = document.createElement('canvas'); cv.width = cv.height = sz;
       const ctx = cv.getContext('2d');
       const g = ctx.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
-      g.addColorStop(0, 'rgba(255,200,120,0.7)'); g.addColorStop(0.3, 'rgba(255,180,95,0.34)'); g.addColorStop(1, 'rgba(255,160,80,0)');
+      g.addColorStop(0, 'rgba(255,165,70,0.72)'); g.addColorStop(0.3, 'rgba(255,150,60,0.34)'); g.addColorStop(1, 'rgba(255,135,50,0)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, sz, sz);
       this._poolTex = new THREE.CanvasTexture(cv); this._poolTex.colorSpace = THREE.SRGBColorSpace;
       this._poolMat = new THREE.MeshBasicMaterial({ map: this._poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
@@ -723,8 +723,22 @@ export class World {
     this.far = g; this.scene.add(g);
   }
 
-  /** How bright the lamp pools are: 0 by day, 1 at night. */
-  setNight(n) { if (this._poolMat) this._poolMat.opacity = 1.0 * n; }
+  /** Night: lamp pools come up, and the ground and foliage take a cool dark tint so warm albedo does not read as daylight. */
+  setNight(n) {
+    if (this._poolMat) this._poolMat.opacity = 1.0 * n;
+    if (!this._tinted) {
+      this._tinted = [];
+      const grab = (mat) => { if (mat && mat.color && !this._tinted.some((t) => t.mat === mat)) this._tinted.push({ mat, base: mat.color.clone() }); };
+      grab(this.groundMat); grab(this.roadMat);
+      for (const name of ['maple', 'shrub', 'broadleaf', 'cedar']) { const tpl = this.templates[name]; if (tpl) tpl.traverse((o) => { if (o.isMesh && o.material && /foliage/.test(o.material.name)) grab(o.material); }); }
+      this._mapleMats && this._mapleMats.forEach((m) => grab(m));
+    }
+    const k = n;
+    for (const t of this._tinted) {
+      const g = t.mat === this.groundMat ? [0.42, 0.55, 0.95] : t.mat === this.roadMat ? [0.62, 0.70, 0.95] : [0.40, 0.52, 0.92];
+      t.mat.color.setRGB(t.base.r * (1 + (g[0] - 1) * k), t.base.g * (1 + (g[1] - 1) * k), t.base.b * (1 + (g[2] - 1) * k));
+    }
+  }
 
   updateFar(x, y, z) {
     if (!this.far) return;

@@ -17,23 +17,23 @@ export const CAR = {
   a: 1.18, b: 1.32,               // CG to front and rear axle, metres (wheelbase 2.5)
   cgHeight: 0.42,
   maxSteer: 0.58,                 // rad at standstill
-  steerFalloff: 0.040,            // per m/s: 0.58 / (1 + 0.040 * 25 m/s) = 0.29 rad at 90 km/h
+  steerFalloff: 0.030,            // per m/s: 0.58 / (1 + 0.030 * 25 m/s) = 0.33 rad at 90 km/h
   steerRate: 7.5,                 // rad/s the wheels move toward the target
   engineForce: 8200,              // N at low speed, rear wheels
   engineTop: 64,                  // m/s where engine force has faded to zero (230 km/h)
   brakeForce: 10500,
-  handbrakeForce: 3800,
+  handbrakeForce: 3300,
   dragCoef: 0.46,                 // N / (m/s)^2 ; terminal about 190 km/h without boost
   rollCoef: 40,                   // N / (m/s)
   muFront: 1.35, muRear: 1.30,
-  muRearHandbrake: 0.55,
-  muSlide: 0.80,                  // fraction of peak grip once a tyre is past its peak slip angle
+  muRearHandbrake: 0.50,
+  muSlide: 0.86,                  // fraction of peak grip once a tyre is past its peak slip angle
   peakSlip: 0.12,                 // rad (~7 deg)
-  slideSoft: 0.30,                // rad over which grip falls from peak to muSlide
+  slideSoft: 0.36,                // rad over which grip falls from peak to muSlide
   circleGain: 0.50,               // how much of the rear longitudinal force eats into rear lateral grip
   boostForce: 6200,
-  assist: 0.48,                   // counter-steer assist, 0..1, added to the player's steer at slip
-  assistTouch: 0.66,
+  assist: 0.62,                   // counter-steer assist, 0..1, added to the player's steer at slip
+  assistTouch: 0.78,
   offroadMu: 0.55, offroadDrag: 260,
   wheelRadius: 0.32, track: 1.5,
   lowSpeed: 2.5,                  // below this the model blends toward kinematic
@@ -124,8 +124,8 @@ export class Car {
     // 45 degrees of slip the assist takes over almost entirely, which is what gives the car a natural maximum
     // angle instead of a spin when a player keeps the key held into the slide.
     const frontSlipDir = Math.atan2(this.vL + P.a * this.omega, Math.max(Math.abs(this.vF), 0.8));
-    const bigSlip = sstep(0.55, 1.05, Math.abs(frontSlipDir));
-    const assist = assist0 + (0.95 - assist0) * bigSlip;
+    const bigSlip = sstep(0.55, 1.0, Math.abs(frontSlipDir));
+    const assist = assist0 + (0.97 - assist0) * bigSlip;
     const assistAngle = clamp(frontSlipDir, -P.maxSteer, P.maxSteer) * assist * sstep(1.5, 6, speed);
     const playerSteer = inp.steer * steerMax * (1 - 0.7 * bigSlip * (Math.sign(inp.steer) === -Math.sign(frontSlipDir) ? 1 : 0));
     const target = clamp(playerSteer + assistAngle, -P.maxSteer, P.maxSteer);
@@ -141,7 +141,8 @@ export class Car {
 
     // ---- longitudinal forces on the rear (RWD)
     const fade = clamp(1 - Math.pow(Math.max(0, this.vF) / P.engineTop, 2), 0, 1);
-    let Fdrive = this.throttle * P.engineForce * fade;
+    const antiSpin = 1 - 0.55 * sstep(0.7, 1.1, Math.abs(this.beta));
+    let Fdrive = this.throttle * P.engineForce * fade * antiSpin;
     if (this.boost > 0) { Fdrive += P.boostForce * (0.6 + 0.4 * this.throttle); this.boost = Math.max(0, this.boost - h); }
     if (inp.reverse && this.vF < 1.0) Fdrive = -P.engineForce * 0.45 * (this.vF > -8 ? 1 : 0);
     // the brake key is also reverse once the car has stopped, so it must not fight the reverse drive
@@ -187,7 +188,9 @@ export class Car {
     this.vF += (aFwd + this.vL * this.omega) * h;
     this.vL += (aLat - this.vF * this.omega) * h;
     this.omega += omegaDot * h;
-    this.omega *= Math.exp(-0.35 * h);
+    const recovering = Math.abs(this.beta) < Math.abs(this._prevBeta || 0) && Math.abs(this.beta) > 0.1;
+    this.omega *= Math.exp(-(0.35 + (recovering ? 1.6 : 0)) * h);
+    this._prevBeta = this.beta;
 
     if (lowT > 0) {
       const omegaKin = this.vF * Math.tan(d) / L;

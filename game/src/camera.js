@@ -52,7 +52,9 @@ export class ChaseCam {
     // the camera's own heading eases toward the target, faster at speed; on a spin it lags rather than whips
     this.dir = lerpAngle(this.dir, want, 1 - Math.exp(-(3.2 + speed * 0.08) * dt));
 
-    const dist = CAM.dist + speed * 0.012 + boost01 * 0.4;
+    // a portrait phone sees less width, so the camera stands further back to keep the road in frame
+    const aspectK = this.cam.aspect < 1 ? 1 + 0.55 * (1 - this.cam.aspect) : 1;
+    const dist = (CAM.dist + speed * 0.012 + boost01 * 0.4) * aspectK;
     const tx = car.x - Math.sin(this.dir) * dist;
     const tz = car.z - Math.cos(this.dir) * dist;
     let ty = y + CAM.height + boost01 * 0.15;
