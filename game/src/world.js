@@ -9,9 +9,9 @@
  * Nothing here is a file. The road markings and the ground grain are canvases drawn at load.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609220343';
-import { surface } from '../surfaces.js?v=202609220343';
-import { ROAD, PAL, mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609220343';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609220418';
+import { surface } from '../surfaces.js?v=202609220418';
+import { ROAD, PAL, mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609220418';
 
 const ASSETS = {
   cedar: './assets/cedar_tree.js', maple: './assets/maple_tree.js', boulder: './assets/boulder.js',

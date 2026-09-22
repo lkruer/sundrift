@@ -9,7 +9,7 @@
  * sides). Everything else in the world (terrain height, where trees go, where the wall is) is a function of
  * (s, u): distance along the road and signed lateral offset from it, left positive.
  */
-import { ROAD, mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609220343';
+import { ROAD, mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609220418';
 
 const TAU = Math.PI * 2;
 

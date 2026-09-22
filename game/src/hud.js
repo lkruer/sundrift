@@ -3,7 +3,7 @@
  * speedometer bottom-right with the boost bar above it. Everything is DOM and SVG, updated only when a value
  * changes so a phone is not re-laying out text sixty times a second.
  */
-import { SCORE, clamp, damp } from './config.js?v=202609220343';
+import { SCORE, clamp, damp } from './config.js?v=202609220418';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
