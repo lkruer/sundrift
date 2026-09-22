@@ -1,0 +1,12 @@
+{
+  "name": "sundrift",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SUNDRIFT: an endless autumn mountain-pass drift game. Every 3D object is Three.js code made through the 404 recipe.",
+  "scripts": {
+    "sim": "node work/sim.mjs",
+    "gate": "node gate/drift-gate.mjs game",
+    "serve": "node ../404-game-recipe/harness/serve.mjs game"
+  }
+}

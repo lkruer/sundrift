@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1b1a22">
+<title>SUNDRIFT</title>
+<!-- The only network dependencies: Three.js pinned to the version the recipe's verifier renders with, and one font. -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap">
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --ink:#f4efe6; --dim:#b9b0a2; --orange:#e8892a; --gold:#f0c24a; --red:#e04a2e; --teal:#7fd0c8;
+    --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
+  html,body { margin:0; padding:0; height:100%; overflow:hidden; background:#1b1a22; color:var(--ink);
+              font-family:"Rajdhani","Segoe UI",Roboto,Helvetica,Arial,sans-serif; font-weight:600; }
+  canvas#c { display:block; width:100%; height:100%; touch-action:none; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---- loading ---- */
+  #load { position:fixed; inset:0; z-index:40; background:linear-gradient(180deg,#2a2331 0%,#5a3a3a 55%,#c9743a 100%);
+          display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; }
+  #load h1, .screen h1 { margin:0; font-size:clamp(44px,12vw,104px); letter-spacing:.18em; font-weight:700; line-height:.9;
+             color:#fff3df; text-indent:.18em; text-shadow:0 6px 30px rgba(0,0,0,.35); }
+  #load .sub, .screen .sub { font-size:clamp(12px,2.6vw,16px); letter-spacing:.42em; color:#ffe2b8; text-indent:.42em; opacity:.85; }
+  #bar { width:min(340px,64vw); height:3px; background:rgba(0,0,0,.28); overflow:hidden; border-radius:2px; }
+  #barf { height:100%; width:0%; background:#fff3df; transition:width .15s linear; }
+  #loadmsg { font-size:12px; color:#ffe2b8; letter-spacing:.16em; height:14px; opacity:.8; }
+
+  /* ---- screens ---- */
+  .screen { position:fixed; inset:0; z-index:35; display:none; flex-direction:column; align-items:center; justify-content:center;
+            gap:18px; text-align:center; padding:24px;
+            background:radial-gradient(ellipse at 50% 60%, rgba(20,16,24,.35), rgba(12,10,16,.78)); }
+  .screen.on { display:flex; }
+  .screen .ctl { display:flex; gap:22px; flex-wrap:wrap; justify-content:center; font-size:14px; letter-spacing:.12em; color:var(--dim); }
+  .screen .ctl div { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .screen .ctl b { color:var(--ink); font-size:13px; letter-spacing:.2em; }
+  .screen.touchmode .ctl.keys { display:none; }
+  .screen:not(.touchmode) .ctl.fingers { display:none; }
+  kbd { display:inline-block; min-width:30px; padding:4px 8px; border:1.5px solid rgba(244,239,230,.45); border-radius:6px;
+        font:inherit; font-size:14px; color:var(--ink); background:rgba(0,0,0,.25); margin:0 2px; }
+  .btn { padding:16px 44px; border:2px solid var(--gold); border-radius:999px; background:rgba(240,194,74,.16); color:#fff3df;
+         font:inherit; font-size:22px; font-weight:700; letter-spacing:.32em; text-indent:.32em; cursor:pointer;
+         box-shadow:0 0 0 0 rgba(240,194,74,.55); animation:pulse 2.2s ease-out infinite; }
+  .btn:active { transform:scale(.97); }
+  @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(240,194,74,.55);} 100% { box-shadow:0 0 0 22px rgba(240,194,74,0);} }
+  .best { font-size:13px; letter-spacing:.3em; color:var(--gold); }
+  .tiny { font-size:11px; letter-spacing:.2em; color:var(--dim); max-width:min(520px,88vw); line-height:1.7; }
+
+  /* ---- hud ---- */
+  #hud { position:fixed; inset:0; z-index:12; display:none; pointer-events:none; }
+  #hud.on { display:block; }
+  #score { position:absolute; left:0; right:0; top:calc(var(--safe-t) + 10px); text-align:center; text-shadow:0 2px 10px rgba(0,0,0,.55); }
+  #score .lab { font-size:11px; letter-spacing:.42em; color:var(--dim); text-indent:.42em; }
+  #scoren { font-size:clamp(34px,7vw,54px); font-weight:700; line-height:1; letter-spacing:.04em; }
+  #drift { position:absolute; left:0; right:0; top:calc(var(--safe-t) + 78px); text-align:center; opacity:0; transition:opacity .18s;
+           text-shadow:0 2px 10px rgba(0,0,0,.6); }
+  #drift.on { opacity:1; }
+  #driftpts { font-size:clamp(24px,5vw,38px); font-weight:700; color:var(--gold); letter-spacing:.04em; }
+  #mult { font-size:clamp(16px,3.2vw,22px); color:var(--orange); margin-left:8px; font-weight:700; }
+  #tier { font-size:clamp(13px,2.6vw,17px); letter-spacing:.38em; text-indent:.38em; color:var(--ink); margin-top:2px; height:20px; }
+  #tier.t1 { color:var(--ink);} #tier.t2 { color:var(--gold);} #tier.t3 { color:var(--orange);} #tier.t4 { color:var(--red);}
+  #combo { position:absolute; left:calc(var(--safe-l) + 18px); top:calc(var(--safe-t) + 14px); font-size:13px; letter-spacing:.3em;
+           color:var(--dim); text-shadow:0 2px 8px rgba(0,0,0,.6); }
+  #combo b { display:block; font-size:30px; color:var(--ink); letter-spacing:.02em; line-height:1; }
+  #combo .chain { height:3px; width:90px; background:rgba(255,255,255,.14); margin-top:6px; border-radius:2px; overflow:hidden; }
+  #combo .chain i { display:block; height:100%; width:100%; background:var(--gold); transform-origin:left; }
+  #daydial { position:absolute; right:calc(var(--safe-r) + 16px); top:calc(var(--safe-t) + 12px); width:64px; height:36px; opacity:.9; }
+  #dist { position:absolute; left:calc(var(--safe-l) + 18px); bottom:calc(var(--safe-b) + 16px); font-size:12px; letter-spacing:.28em;
+          color:var(--dim); text-shadow:0 2px 8px rgba(0,0,0,.6); }
+  #dist b { color:var(--ink); font-size:18px; letter-spacing:.04em; }
+
+  #speedo { position:absolute; right:calc(var(--safe-r) + 12px); bottom:calc(var(--safe-b) + 8px); width:170px; height:120px; }
+  #speedo svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+  #kmh { position:absolute; left:0; right:0; bottom:22px; text-align:center; font-size:44px; font-weight:700; line-height:1;
+         text-shadow:0 2px 10px rgba(0,0,0,.6); }
+  #speedo .unit { position:absolute; left:0; right:0; bottom:8px; text-align:center; font-size:11px; letter-spacing:.4em; color:var(--dim); text-indent:.4em; }
+  #boost { position:absolute; right:calc(var(--safe-r) + 16px); bottom:calc(var(--safe-b) + 132px); width:160px; height:8px;
+           background:rgba(255,255,255,.14); border-radius:4px; overflow:hidden; transform:skewX(-18deg); }
+  #boostf { height:100%; width:0%; background:linear-gradient(90deg,var(--orange),var(--gold)); }
+  #boost.hot #boostf { background:linear-gradient(90deg,#fff,var(--gold)); }
+  #boostlab { position:absolute; right:calc(var(--safe-r) + 16px); bottom:calc(var(--safe-b) + 144px); font-size:10px; letter-spacing:.4em; color:var(--dim); }
+
+  #toasts { position:absolute; left:0; right:0; top:38%; text-align:center; pointer-events:none; }
+  .toast { position:absolute; left:0; right:0; font-size:clamp(20px,4.6vw,34px); font-weight:700; letter-spacing:.3em; text-indent:.3em;
+           color:var(--gold); text-shadow:0 3px 14px rgba(0,0,0,.6); animation:toast 1.25s ease-out forwards; }
+  .toast.bad { color:var(--red); } .toast.good { color:var(--teal); } .toast.big { font-size:clamp(28px,7vw,52px); }
+  @keyframes toast { 0% { opacity:0; transform:translateY(14px) scale(.85);} 12% { opacity:1; transform:translateY(0) scale(1.06);} 30% { transform:scale(1);} 100% { opacity:0; transform:translateY(-36px);} }
+
+  #vign { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:0;
+          background:radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%); }
+  #hit { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:0; background:radial-gradient(ellipse at center, rgba(224,74,46,0) 50%, rgba(224,74,46,.5) 100%); }
+  #perf { position:absolute; right:calc(var(--safe-r) + 16px); top:calc(var(--safe-t) + 56px); font-size:10px; color:var(--dim); letter-spacing:.06em;
+          text-align:right; line-height:1.6; display:none; }
+  #perf.on { display:block; }
+
+  /* ---- top-right buttons ---- */
+  #tools { position:fixed; right:calc(var(--safe-r) + 12px); top:calc(var(--safe-t) + 54px); z-index:16; display:none; gap:8px; }
+  #tools.on { display:flex; }
+  .tb { width:36px; height:36px; border-radius:50%; border:1.5px solid rgba(244,239,230,.35); background:rgba(0,0,0,.3); color:var(--ink);
+        font:inherit; font-size:12px; font-weight:700; cursor:pointer; pointer-events:auto; display:flex; align-items:center; justify-content:center; }
+  .tb.off { opacity:.45; text-decoration:line-through; }
+
+  /* ---- touch ---- */
+  #touch { position:fixed; inset:0; z-index:14; display:none; }
+  #touch.on { display:block; }
+  #stick { position:absolute; left:0; top:22%; bottom:0; width:60%; }
+  #brake { position:absolute; right:0; top:22%; bottom:0; width:40%; }
+  #stick .hint, #brake .hint { position:absolute; left:50%; bottom:calc(var(--safe-b) + 150px); transform:translateX(-50%);
+        font-size:11px; letter-spacing:.34em; text-indent:.34em; color:rgba(244,239,230,.55); white-space:nowrap; text-shadow:0 2px 8px rgba(0,0,0,.6);
+        transition:opacity .4s; }
+  #brake .hint { bottom:calc(var(--safe-b) + 190px); }
+  #touch.used .hint { opacity:0; }
+  #wheel { position:absolute; width:180px; height:56px; margin:-28px 0 0 -90px; opacity:0; transition:opacity .15s; }
+  #wheel .track { position:absolute; left:0; right:0; top:26px; height:4px; border-radius:2px; background:rgba(244,239,230,.35); }
+  #wheel .tick { position:absolute; left:50%; top:18px; width:2px; height:20px; margin-left:-1px; background:rgba(244,239,230,.5); }
+  #wheel .nub { position:absolute; left:50%; top:28px; width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%;
+                border:2px solid rgba(244,239,230,.85); background:rgba(240,194,74,.35); box-shadow:0 2px 12px rgba(0,0,0,.4); }
+  #brake .pad { position:absolute; right:calc(var(--safe-r) + 26px); bottom:calc(var(--safe-b) + 210px); width:88px; height:88px; border-radius:50%;
+        border:2px solid rgba(244,239,230,.45); background:rgba(0,0,0,.22); display:flex; align-items:center; justify-content:center;
+        font-size:11px; letter-spacing:.2em; color:rgba(244,239,230,.8); text-align:center; line-height:1.3; }
+  #brake.dn .pad { background:rgba(224,74,46,.5); border-color:var(--red); color:#fff; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="load">
+  <h1>SUNDRIFT</h1>
+  <div class="sub">AUTUMN TOUGE</div>
+  <div id="bar"><div id="barf"></div></div>
+  <div id="loadmsg">warming up</div>
+</div>
+
+<div id="vign"></div>
+<div id="hit"></div>
+
+<div id="hud">
+  <div id="combo">COMBO<b id="combon" class="num">0</b><div class="chain"><i id="chainf"></i></div></div>
+  <div id="score"><div class="lab">SCORE</div><div id="scoren" class="num">0</div></div>
+  <div id="drift"><span id="driftpts" class="num">0</span><span id="mult" class="num">x1.0</span><div id="tier"></div></div>
+  <svg id="daydial" viewBox="0 0 64 36" aria-hidden="true">
+    <path d="M4 32 A28 28 0 0 1 60 32" fill="none" stroke="rgba(244,239,230,.35)" stroke-width="1.5"/>
+    <circle id="sundot" cx="32" cy="4" r="4" fill="#f0c24a"/>
+    <line x1="2" y1="32" x2="62" y2="32" stroke="rgba(244,239,230,.35)" stroke-width="1.5"/>
+  </svg>
+  <div id="dist">DISTANCE <b id="distn" class="num">0.0</b> km</div>
+  <div id="boostlab">BOOST</div>
+  <div id="boost"><div id="boostf"></div></div>
+  <div id="speedo">
+    <svg viewBox="0 0 170 120" aria-hidden="true">
+      <path d="M20 100 A65 65 0 1 1 150 100" fill="none" stroke="rgba(244,239,230,.18)" stroke-width="9" stroke-linecap="round"/>
+      <path id="speedarc" d="M20 100 A65 65 0 1 1 150 100" fill="none" stroke="#f0c24a" stroke-width="9" stroke-linecap="round"
+            stroke-dasharray="306" stroke-dashoffset="306"/>
+      <g id="needle" style="transform-origin:85px 100px; transform:rotate(-135deg)">
+        <line x1="85" y1="100" x2="85" y2="44" stroke="#fff3df" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="85" cy="100" r="6" fill="#fff3df"/>
+      </g>
+    </svg>
+    <div id="kmh" class="num">0</div>
+    <div class="unit">KM/H</div>
+  </div>
+  <div id="toasts"></div>
+  <div id="perf"></div>
+</div>
+
+<div id="tools"><button class="tb" id="mute" title="sound">♪</button><button class="tb" id="restart" title="restart run">↺</button></div>
+
+<div id="touch">
+  <div id="stick"><div class="hint">HOLD TO DRIVE · SLIDE TO STEER</div><div id="wheel"><div class="track"></div><div class="tick"></div><div class="nub"></div></div></div>
+  <div id="brake"><div class="hint">HOLD FOR HANDBRAKE</div><div class="pad">E-BRAKE</div></div>
+</div>
+
+<div class="screen" id="start">
+  <h1>SUNDRIFT</h1>
+  <div class="sub">AUTUMN TOUGE · ENDLESS</div>
+  <div class="ctl keys">
+    <div><span><kbd>W</kbd><kbd>S</kbd></span><b>GAS · BRAKE</b></div>
+    <div><span><kbd>A</kbd><kbd>D</kbd></span><b>STEER</b></div>
+    <div><span><kbd>SPACE</kbd></span><b>HANDBRAKE</b></div>
+  </div>
+  <div class="ctl fingers">
+    <div><b>LEFT THUMB</b><span>hold to drive, slide to steer</span></div>
+    <div><b>RIGHT THUMB</b><span>hold for handbrake</span></div>
+  </div>
+  <div class="tiny">Chain drifts to bank score and earn boost. Every banked drift pushes the sun across the sky. Clip the guardrail without touching it for a bonus. Crashing drops the drift you are holding.</div>
+  <button class="btn" id="startb">DRIVE</button>
+  <div class="best" id="best"></div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

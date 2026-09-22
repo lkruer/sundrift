@@ -1,0 +1,9 @@
+node_modules/
+_playtest/
+_verify/
+_jam/
+_live/
+_gate/
+work/cands/**/_verify/
+.claude/
+*.log
