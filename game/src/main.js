@@ -40,7 +40,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.4, 4500);
 scene.add(camera);
-const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 55, fogDensity: 0.0013, exposure: 1.05 });
+const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 55, fogDensity: 0.0013, exposure: 1.05, bloomThreshold: 1.6, bloomStrength: 0.22 });
 
 let track, world, car, carRoot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, beams;
 const lampLights = [];
@@ -152,10 +152,10 @@ async function buildCar() {
     if (upgraded.has(m)) return upgraded.get(m);
     let out = m;
     if (m.name === 'paint' || m.color.getHex() === PAL.pearl) {
-      out = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.32, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.0 });
+      out = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.2, metalness: 0.12, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 1.2 });
       out.name = 'paint';
     } else if (m.name === 'glass' || m.color.getHex() === PAL.glass) {
-      out = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.08, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2 });
+      out = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.08, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.2, transparent: true, opacity: 0.5 });
       out.name = 'glass';
     }
     upgraded.set(m, out);
@@ -195,14 +195,14 @@ async function buildCar() {
   // headlights for dusk
   headlights = [];
   for (const x of [-0.6, 0.6]) {
-    const sp = new THREE.SpotLight(0xfff0d0, 0, 60, 0.55, 0.5, 1.2);
+    const sp = new THREE.SpotLight(0xfff0d0, 0, 46, 0.42, 0.6, 1.4);
     sp.position.set(x, 0.7, 2.0);
     sp.target.position.set(x * 1.5, 0.1, 30);
     carRoot.add(sp); carRoot.add(sp.target);
     headlights.push(sp);
   }
   for (let i = 0; i < (tier === 'phone' ? 3 : 5); i++) {
-    const pl = new THREE.PointLight(0xffcf7a, 0, 36, 1.5);
+    const pl = new THREE.PointLight(0xffc266, 0, 30, 2.0);
     scene.add(pl); lampLights.push(pl);
   }
   // fake volumetric beams: two additive cones ahead of the lamps, the way arcade racers draw headlights
@@ -395,11 +395,11 @@ function applySun(dt) {
   // headlights and lamps come on as the sun goes
   const nightAmt = smoothstep(4, -3, el);
   G.night = nightAmt; night.amt = nightAmt;
-  for (const h of headlights) h.intensity = 150 * nightAmt;
-  if (beams) beams.userData.mat.opacity = 0.07 * nightAmt;
-  if (night.moon) night.moon.intensity = 0.95 * nightAmt;
-  if (night.glow) night.glow.material.opacity = 0.32 * smoothstep(-0.5, -5, el);
-  if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.55 * nightAmt);
+  for (const h of headlights) h.intensity = 120 * nightAmt;
+  if (beams) beams.userData.mat.opacity = 0.06 * nightAmt;
+  if (night.moon) night.moon.intensity = 0.32 * nightAmt;
+  if (night.glow) night.glow.material.opacity = 0.30 * smoothstep(-0.5, -5, el);
+  if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.82 * nightAmt);
   if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el);
   if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el); }
   world.setNight(nightAmt);
@@ -433,7 +433,7 @@ function effects(dt, y, boost01) {
     const [wx, wz] = car.point(l, f);
     const a = onRoad ? clamp(slip * 1.2 + (car.hand ? 0.5 : 0) * clamp(car.speed / 8, 0, 1), 0, 1) : 0;
     skids.add(i, wx, y + 0.02, wz, lx, lz, a);
-    if (a > 0.25 && Math.random() < a * 0.9) particles.smoke(wx, y, wz, vx, vz, a, sunColor);
+    if (a > 0.25 && car.speed > 6 && Math.random() < a * 0.9) particles.smoke(wx, y, wz, vx, vz, a, sunColor);
     if (!onRoad && car.speed > 4 && Math.random() < 0.6) particles.dust(wx, y, wz, vx, vz, clamp(car.speed / 20, 0, 1));
   });
   FRONT.forEach(([l, f], i) => {
@@ -455,7 +455,7 @@ function effects(dt, y, boost01) {
       const e = near[i];
       if (!e || e.d > 70 * 70) { pl.intensity = 0; return; }
       pl.position.set(e.l.x, e.l.y, e.l.z);
-      pl.intensity = e.l.tunnel ? 70 : 130 * Math.max(G.night, 0.12);
+      pl.intensity = e.l.tunnel ? 110 : 300 * Math.max(G.night, 0.12);
     });
   } else lampLights.forEach((pl) => { pl.intensity = 0; });
 }

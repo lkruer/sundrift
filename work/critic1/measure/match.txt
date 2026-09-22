@@ -1,0 +1,8 @@
+pair_01: game side = left (frame f0, mean abs diff 8.8)
+pair_02: game side = right (frame f1, mean abs diff 8.6)
+pair_03: game side = right (frame f2, mean abs diff 9.6)
+pair_04: game side = right (frame f3, mean abs diff 11.4)
+pair_05: game side = left (frame f4, mean abs diff 17.7)
+pair_06: game side = right (frame f5, mean abs diff 13.4)
+pair_07: game side = left (frame f6, mean abs diff 8.3)
+pair_08: game side = left (frame f7, mean abs diff 21.8)

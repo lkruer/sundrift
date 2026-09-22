@@ -140,7 +140,7 @@ while (covered < METRES && Date.now() - startAt < cap) {
   // in a slide, steer into the direction of travel when the angle gets big
   if (Math.abs(g.slip) > 38) { want.left = g.slip > 0; want.right = g.slip < 0; }
   await setKeys(want);
-  if (covered >= nextShot && frames.length < 8) {
+  if (covered >= nextShot && frames.length < 8 && g.kmh > 38) {
     const f = path.join(OUT, `f${frames.length}.png`);
     await page.screenshot({ path: f });
     frames.push(f); nextShot += shotEvery;

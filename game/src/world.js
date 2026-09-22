@@ -45,7 +45,7 @@ function roadTextures() {
     else {
       const wear = 1 - 0.07 * Math.exp(-Math.pow((au - 1.55) / 0.5, 2));       // darker tyre tracks
       c = asphalt.map((v) => (v + grain) * wear);
-      rough = 0.66 + (rnd() - 0.5) * 0.10 - 0.05 * (1 - wear) * 6;
+      rough = 0.55 + 0.08 * Math.sin(x * 0.11 + y * 0.05) * Math.sin(y * 0.09) - 0.05 * (1 - wear) * 6;
       const onEdge = Math.abs(au - 3.35) < 0.075;
       const onCentre = au < 0.06 && (vm % 12) < 4.2;
       if (onEdge || onCentre) { const k = onCentre ? 0.92 : 1; c = line.map((v) => v * k + grain * 0.5); rough = 0.62; }
@@ -181,6 +181,7 @@ export class World {
 
     // static props, baked per chunk
     const statics = new THREE.Group();
+    this._statics = statics;
     this._pools = [];
     const place = (name, x, y, z, ry, scale = 1, sx = 1, colour = 0) => {
       const tpl = this.templates[name]; if (!tpl) return null;
@@ -503,6 +504,12 @@ export class World {
       const hx = x + Math.cos(ry) * 0.5, hz = z - Math.sin(ry) * 0.5;      // the head, half a metre along the arm
       this.lamps.push({ x: hx, y: y + 5.75, z: hz, ci });
       this.pool(hx, y, hz, 11.5, 1.0);
+      // the bulb: a small glowing ball under the head that reads as the source from any angle
+      this._bulbMat = this._bulbMat || new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffd28a, emissiveIntensity: 2.6, roughness: 0.6 });
+      this._bulbGeo = this._bulbGeo || new THREE.SphereGeometry(0.22, 10, 8);
+      const bulb = new THREE.Mesh(this._bulbGeo, this._bulbMat);
+      bulb.position.set(hx, y + 5.62, hz);
+      this._statics.add(bulb);
     }
   }
 
