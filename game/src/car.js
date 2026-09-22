@@ -126,7 +126,7 @@ export class Car {
     const frontSlipDir = Math.atan2(this.vL + P.a * this.omega, Math.max(Math.abs(this.vF), 0.8));
     const bigSlip = sstep(0.55, 1.0, Math.abs(frontSlipDir));
     const assist = assist0 + (0.97 - assist0) * bigSlip;
-    const assistAngle = clamp(frontSlipDir, -P.maxSteer, P.maxSteer) * assist * sstep(1.5, 6, speed);
+    const assistAngle = clamp(frontSlipDir, -P.maxSteer, P.maxSteer) * assist * sstep(1.5, 6, speed) * (this.vF < 0 ? 0 : 1);
     const playerSteer = inp.steer * steerMax * (1 - 0.7 * bigSlip * (Math.sign(inp.steer) === -Math.sign(frontSlipDir) ? 1 : 0));
     const target = clamp(playerSteer + assistAngle, -P.maxSteer, P.maxSteer);
     this.steer += clamp(target - this.steer, -P.steerRate * h, P.steerRate * h);
@@ -144,7 +144,7 @@ export class Car {
     const antiSpin = 1 - 0.55 * sstep(0.7, 1.1, Math.abs(this.beta));
     let Fdrive = this.throttle * P.engineForce * fade * antiSpin;
     if (this.boost > 0) { Fdrive += P.boostForce * (0.6 + 0.4 * this.throttle); this.boost = Math.max(0, this.boost - h); }
-    if (inp.reverse && this.vF < 1.0) Fdrive = -P.engineForce * 0.45 * (this.vF > -8 ? 1 : 0);
+    if (inp.reverse && this.vF < 1.0) Fdrive = -P.engineForce * 0.45 * (this.vF > -5 ? 1 : 0);
     // the brake key is also reverse once the car has stopped, so it must not fight the reverse drive
     const braking = inp.reverse && this.vF < 0.5 ? 0 : this.brake;
     const Fbrake = -Math.sign(this.vF) * braking * P.brakeForce * Math.min(1, Math.abs(this.vF) / 0.6);
@@ -176,8 +176,10 @@ export class Car {
     FxR = clamp(FxR, -FmaxR * 1.4, FmaxR * 1.4);
     FxF = clamp(FxF, -FmaxF, FmaxF);
 
-    // ---- low speed: blend toward a kinematic bicycle so the car parks without twitching
-    const lowT = 1 - sstep(0.4, P.lowSpeed, speed);
+    // ---- low speed, and reverse: blend toward a kinematic bicycle so the car parks without twitching and
+    // backs up the way a car does (the tyre model above assumes forward travel)
+    const rev = this.vF < -0.15 ? sstep(0.15, 0.8, -this.vF) : 0;
+    const lowT = Math.max(1 - sstep(0.4, P.lowSpeed, speed), rev);
 
     // ---- accelerations in the body frame
     let aFwd = (FxR + FxF * Math.cos(d) - FyF * Math.sin(d) + Fdrag) / m;

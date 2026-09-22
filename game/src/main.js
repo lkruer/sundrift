@@ -374,7 +374,7 @@ function step(dt) {
   audio.update(dt, car, gb.rpm, scoring.active, boost01, surface);
 
   // ---- camera, world
-  chase.update(dt, car, road.y, (x, z) => track.groundAt(x, z, G.idx), boost01);
+  chase.update(dt, car, road.y, (x, z) => track.groundAt(x, z, G.idx), boost01, input.zoom);
   nightFollow();
   world.update(G.s);
   world.updateFar(car.x, road.y, car.z);

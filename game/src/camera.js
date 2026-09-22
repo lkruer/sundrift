@@ -40,13 +40,13 @@ export class ChaseCam {
    * @param groundAt (x, z) => terrain height, to keep the camera out of the hill
    * @param boost01 0..1 boost intensity
    */
-  update(dt, car, y, groundAt, boost01) {
+  update(dt, car, y, groundAt, boost01, zoom = 1) {
     if (!this.init) this.snap(car, y);
     const speed = car.speed;
     const [fx, fz] = car.forward();
     const [lx, lz] = car.left();
     const vx = fx * car.vF + lx * car.vL, vz = fz * car.vF + lz * car.vL;
-    const velDir = speed > 2 ? Math.atan2(vx, vz) : car.yaw;
+    const velDir = speed > 2 && car.vF > 0 ? Math.atan2(vx, vz) : car.yaw;   // reversing: stay behind the car
     const blend = CAM.yawBlend * smoothstep(2, 9, speed);
     const want = lerpAngle(car.yaw, velDir, blend);
     // the camera's own heading eases toward the target, faster at speed; on a spin it lags rather than whips
@@ -54,10 +54,10 @@ export class ChaseCam {
 
     // a portrait phone sees less width, so the camera stands further back to keep the road in frame
     const aspectK = this.cam.aspect < 1 ? 1 + 0.55 * (1 - this.cam.aspect) : 1;
-    const dist = (CAM.dist + speed * 0.012 + boost01 * 0.4) * aspectK;
+    const dist = (CAM.dist + speed * 0.012 + boost01 * 0.4) * aspectK * zoom;
     const tx = car.x - Math.sin(this.dir) * dist;
     const tz = car.z - Math.cos(this.dir) * dist;
-    let ty = y + CAM.height + boost01 * 0.15;
+    let ty = y + CAM.height * Math.pow(zoom, 0.8) + boost01 * 0.15;
     const g = groundAt ? groundAt(tx, tz) : y;
     if (g + 1.3 > ty) ty = g + 1.3;
 

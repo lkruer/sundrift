@@ -17,10 +17,18 @@ export class Input {
     this.t = { active: false, id: null, x0: 0, y0: 0, steer: 0, throttle: 0, brake: 0, hand: false };
     this.touchMode = false;
     this.anyKey = false;
+    this.zoom = 1;                // chase camera distance factor, mouse wheel or plus and minus
+    try { this.zoom = Math.min(2.6, Math.max(0.7, Number(localStorage.getItem('sundrift.zoom')) || 1)); } catch {}
+    addEventListener('wheel', (e) => this.setZoom(this.zoom * (1 + Math.sign(e.deltaY) * 0.12)), { passive: true });
     this.onAny = null;            // called on the first real input, to unlock audio
     this._bindKeys();
     this._bindTouch();
     this.setTouchMode(this.detectTouch());
+  }
+
+  setZoom(z) {
+    this.zoom = Math.min(2.6, Math.max(0.7, z));
+    try { localStorage.setItem('sundrift.zoom', String(this.zoom)); } catch {}
   }
 
   detectTouch() {
@@ -42,6 +50,8 @@ export class Input {
       if (e.repeat) return;
       this.keys.add(e.code);
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
+      if (e.code === 'Equal' || e.code === 'NumpadAdd') this.setZoom(this.zoom / 1.12);
+      if (e.code === 'Minus' || e.code === 'NumpadSubtract') this.setZoom(this.zoom * 1.12);
       this.anyKey = true;
       if (this.onAny) this.onAny();
     };
