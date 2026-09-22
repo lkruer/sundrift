@@ -25,16 +25,19 @@ load time.
 | drive / brake | `W` / `S` | hold the left half of the screen |
 | steer | `A` / `D` | slide the finger left or right |
 | handbrake | `Space` | hold the right half of the screen |
+| camera zoom | mouse wheel, `+` / `-` | |
+| reverse | hold `S` when stopped | pull the finger down |
 
 Drift: lift or tap the handbrake into a corner, steer into the slide, hold it with the throttle. The car does
-part of the counter-steer for you, more on a phone.
+part of the counter-steer for you, more on a phone, and with no key held it follows the road; A and D commit
+to a corner with as much lock as that corner needs.
 
 ## What is in the repo
 
 | path | what |
 |---|---|
 | `game/` | the shipped folder: `index.html`, `src/`, `assets/` and the three recipe files (`assetlib.js`, `surfaces.js`, `rig.js`) copied in as the recipe asks |
-| `game/assets/*.js` | fourteen code assets, one module each, with `*.expect.json` sizes beside them |
+| `game/assets/*.js` | twenty-two code assets, one module each, with `*.expect.json` sizes beside them |
 | `STYLE_LOCK.md` | the locked style every asset agent was handed |
 | `work/BRIEFS.md` | the form briefs the assets were written from (there were no reference images; this text was the reference) |
 | `work/cands/` | every candidate that was written, the verifier sheets, and a `NOTES.md` per object saying which won and what was thrown away |

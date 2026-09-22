@@ -174,6 +174,43 @@ save the afternoon: 29,844 triangles, 418 meshes, baked per joint at load into a
 clean in the shipped folder with the other 21 assets. Notes and the unassembled parts of the two rejected
 strategies are under `work/cands/car2`.
 
+## Round 3, and the owner's second list (22 Sep)
+
+Critic round 3 (fresh critic, `work/critic3`): 0 of 8 again, but 1 decisive, 5 clear and 2 slight, and it
+called the build "a finished illustration style" that loses "on one property": the lamp pool was a distant
+decal and the road under the camera was black, so the hero never sat inside light. Fixed by giving the car its
+own spill (a point light at the nose and a red one at the tail), widening the headlight cones, lamps every
+30 m with 15 m pools, a brighter blue moon and a third of the day fill at night instead of a fifth, a
+stronger horizon glow, and a radial speed smear at the frame's edge so a frame at 100 km/h no longer reads as
+parked.
+
+The owner's list at the same time, all done: the road must never clip into itself or the mountain (the
+generator was crossing its own earlier road at 2.8 km; it now snapshots every feature and, on running within
+15 m of road older than 200 m, rolls back up to three features and plans the other way; measured 0 overlaps in
+8 km; the road's shoulder now follows the wall through a widened hairpin, which had left a strip of ditch the
+car drove on); the rear of the car reworked (garnish with rimmed lamp units, plate pocket, reflector strips,
+ducktail, taller wing, hollow twin tips, five-fin diffuser, 33 k triangles); a line-following steering assist
+(hands off the keys the car follows the road; A and D commit to a corner with as much lock as the corner
+needs, a hairpin full and a gentle curve about half, so a slide stays on the road and the chain keeps going);
+reverse steers like a car and the camera stays behind it; the mouse wheel and the plus and minus keys zoom the
+chase camera; props placed by rule (chevrons on a corner's outside facing traffic, mirrors at hairpin apexes,
+snow poles and power poles on the mountain side, lamps alternating, shrines cut into the mountain side, the
+store, hut and bus stop on lay-bys on the valley side, boulders at the foot of the cutting, nothing on the road).
+
+## Final measurements (22 Sep, commit c43c9d0)
+
+`harness/jam.mjs` on the live URL: ready 12.4 s, 1.2 MB, started from a real tap, 75.8 m moved in the hold,
+413 peak draws, 751 k peak triangles, 0 errors, 0 404s, RESULT PASS. Desktop gate: 600 m, seven drifts banked,
+458 draws, 1.05 M triangles, 60 fps. Phone gate: 424 draws, 0.86 M triangles, 60 fps.
+
 ## Still wrong, or not attempted
 
-(kept up to date at the end)
+- The blind pairs against night photographs never went above 0 of 8; the margins moved from six decisive
+  losses to one, and the last critic said the losses were on one property. Another round would spend on that
+  property (the pool owning the bottom of the frame at every point of a lap, not only under a lamp).
+- Never measured on a real phone. The phone tier drops bloom and halves the trees; the headless phone
+  viewport runs on a desktop GPU.
+- Tyre smoke near the camera still reads as discs in stills. It should be sprites that stretch with velocity.
+- The far ridges are one silhouette strip per ring; a real range has layers that slide past each other.
+- The music is a loop that opens up while drifting; it is not the eurobeat the subject deserves.
+- No traffic, no ghosts, no leaderboards beyond a local best score.
