@@ -3,7 +3,7 @@ _playtest/
 _verify/
 _jam/
 _live/
-_gate/
+_gate*/
 work/cands/**/_verify/
 .claude/
 *.log
