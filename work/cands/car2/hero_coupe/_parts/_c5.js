@@ -53,7 +53,7 @@
   const helm = [];
   for (let k = 0; k <= 12; k++) { const t = -1.25 + (PI / 2 + 1.25) * k / 12; helm.push([0.13 * Math.cos(t), 0.13 * Math.sin(t)]); }
   add(body, revolve(1, helm, 32), HELMET, -0.36, 1.00, -0.52);
-  const visor = new THREE.TorusGeometry(0.118, 0.032, 8, 16, 2.4); visor.rotateZ(PI / 2 - 1.2); visor.rotateX(PI / 2);
+  const visor = new THREE.TorusGeometry(0.118, 0.032, 10, 24, 2.4); visor.rotateZ(PI / 2 - 1.2); visor.rotateX(PI / 2);
   add(body, visor, DARK, -0.36, 1.01, -0.52);
   for (const b of [-1, 1]) {
     rod(body, [-0.36 + b * 0.17, 0.83, -0.53], [-0.36 + b * 0.14, 0.85, -0.10], 0.035, SUIT, 10);
@@ -85,14 +85,14 @@
     };
     at(rv([[0.25, -hw + 0.03], [0.292, -hw + 0.006], [0.306, -hw + 0.045], [0.306, hw - 0.045], [0.292, hw - 0.006], [0.25, hw - 0.03]], 48), RUB);
     for (let k = 0; k < 12; k++) {
-      const geo = lathe([[0.300, -hw + 0.04], [0.32, -hw + 0.062], [0.32, hw - 0.062], [0.300, hw - 0.04]], 4, k * PI / 6 + 0.04, PI / 6 - 0.08);
+      const geo = lathe([[0.300, -hw + 0.04], [0.32, -hw + 0.062], [0.32, hw - 0.062], [0.300, hw - 0.04]], 6, k * PI / 6 + 0.04, PI / 6 - 0.08);
       geo.rotateZ(-PI / 2); at(geo, RUB2);
     }
     const bead = at(new THREE.TorusGeometry(0.262, 0.008, 6, 44), RUB, hw - 0.012); bead.rotation.y = PI / 2;
     at(rv([[0.24, -hw + 0.02], [0.222, -hw + 0.05], [0.222, hw - 0.07], [0.215, hw - 0.03]], 40), BRONZ2);        // barrel
     at(rv([[0.20, hw - 0.03], [0.238, hw - 0.03], [0.238, hw + 0.004], [0.20, hw + 0.004]], 40), LIP);            // polished lip
     const os = hw - 0.10;
-    at(rv([[0.001, os - 0.06], [0.08, os - 0.06], [0.08, os], [0.05, os], [0.05, os + 0.012], [0.001, os + 0.012]], 16), BRONZE);
+    at(rv([[0.001, os - 0.06], [0.08, os - 0.06], [0.08, os], [0.05, os], [0.05, os + 0.012], [0.001, os + 0.012]], 24), BRONZE);
     at(rv([[0.001, os + 0.012], [0.040, os + 0.012], [0.040, os + 0.020], [0.001, os + 0.020]], 16), DARK);         // centre cap
     for (let k = 0; k < 5; k++) {
       const a = k * PI * 2 / 5 + PI / 2;

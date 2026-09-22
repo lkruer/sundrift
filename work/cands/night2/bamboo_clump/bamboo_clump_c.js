@@ -3,8 +3,9 @@
 // two-piece kinked path, tapering 30 % foot to top, with the knee height and its offset
 // varied per culm so the culms zig outward at different heights; every 0.45 m a 6-vertex
 // rim plus an apex on the axis makes a node skirt in the same mesh. The leaves are a
-// second BufferGeometry of 27 four-sided spindles (apex, fat ring, narrow ring, apex:
-// 0.34 x 0.9 x 0.34 m), three per culm, drooping down and sideways at hash angles.
+// second BufferGeometry of 32 four-sided spindles (apex, fat ring, narrow ring, apex:
+// 0.34 x 0.9 x 0.34 m), three per culm plus a fourth on every other culm, drooping down
+// and sideways (the fourth inward) at hash angles.
 // ONE stem material, ONE foliage material. 2.4 m wide, 7.0 m tall.
 //
 // Budget note: icosahedron detail 1 blobs (80 tris) times 27 are 2,160 triangles alone,
@@ -105,6 +106,11 @@ export default function (THREE) {
     spindle(at(h - 0.6, f1, 0.32), f1, j(9) * 6.28);
     const f2 = hz(az - side * (55 + 45 * j(10)) * D2R).multiplyScalar(0.9).addScaledVector(Y, -0.3 - 0.3 * j(11)).normalize();
     spindle(at(h - 1.15, f2, 0.30), f2, j(12) * 6.28);
+    // every other culm gets a fourth frond, lower and drooping inward over the clump
+    if (k % 2 === 0) {
+      const f3 = hz(az + Math.PI + (j(13) - 0.5) * 80 * D2R).multiplyScalar(0.85).addScaledVector(Y, -0.5 - 0.2 * j(14)).normalize();
+      spindle(at(h - 1.55, f3, 0.30), f3, j(15) * 6.28);
+    }
   });
 
   const build = (buf, mat) => {
