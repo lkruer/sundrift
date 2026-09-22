@@ -10,5 +10,5 @@
     grp.position.set(f.x, y, f.z); grp.rotation.y = f.yaw + (ry || 0); body.add(grp);
     add(grp, box(w, h, d), m, 0, 0, (proud || 0) + d / 2 - d);
     return grp;
-  const tail = endPath(-1, -2.19, -1.56, wrapR).reverse();                                        // reversed so the swept normal faces out
   };
+  const tail = endPath(-1, -2.19, -1.56, wrapR).reverse();                                        // reversed so the swept normal faces out

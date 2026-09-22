@@ -10,7 +10,8 @@
 // Moving parts: g.userData.joints = { hubFL, hubFR, wheelFL, wheelFR, wheelRL, wheelRR }.
 // A hub is a Group at the wheel centre (steer about y, camber baked into rotation.z) and
 // carries the brake disc and caliper; its child wheel Group (spin about x) carries the
-// tyre, rim and lug nuts. Everything static is under the Group named 'body'.export default function (THREE) {
+// tyre, rim and lug nuts. Everything static is under the Group named 'body'.
+export default function (THREE) {
   const g = new THREE.Group();
   const body = new THREE.Group(); body.name = 'body'; g.add(body);
   const PI = Math.PI, DS = THREE.DoubleSide;
@@ -222,8 +223,9 @@
     grp.position.set(f.x, y, f.z); grp.rotation.y = f.yaw + (ry || 0); body.add(grp);
     add(grp, box(w, h, d), m, 0, 0, (proud || 0) + d / 2 - d);
     return grp;
-  const tail = endPath(-1, -2.19, -1.56, wrapR).reverse();                                        // reversed so the swept normal faces out
   };
+  const tail = endPath(-1, -2.19, -1.56, wrapR).reverse();                                        // reversed so the swept normal faces out
+
   // ---- the hull: ten stations, twelve points each --------------------------------------
   // rows: 0 floor centre, 1 floor edge, 2 flank, 3 belt, 4 roof edge, 5 roof mid, 6 crown,
   // then 7..11 mirror rows 5..1. Bands 3-4 / 8-9 are the tumblehome (glass through the
@@ -377,10 +379,13 @@
     }
     add(body, loft(secs, { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), PAINT);
   }
+  for (const s of [-1, 1]) {
     add(body, loft([rect(1, [s * 0.775, 0.865, 0.26], [0.03, 0.05]), rect(1, [s * 0.66, 1.245, -0.36], [0.03, 0.05])], { capFront: 0, capBack: 0 }), PAINT);   // A pillar
     add(body, loft([rect(1, [s * 0.78, 0.915, -0.825], [0.03, 0.045]), rect(1, [s * 0.663, 1.245, -0.825], [0.03, 0.045])], { capFront: 0, capBack: 0 }), PAINT); // B pillar
     add(body, loft([[[s * 0.75, 0.925, -1.47], [s * 0.81, 0.925, -1.47], [s * 0.81, 0.925, -1.21], [s * 0.75, 0.925, -1.21]],
                     [[s * 0.633, 1.24, -0.965], [s * 0.693, 1.24, -0.965], [s * 0.693, 1.24, -0.955], [s * 0.633, 1.24, -0.955]]], { capFront: 0, capBack: 0 }), PAINT); // C pillar
+  }
+
   // ---- shared fittings: everything below is the same in all three candidates ------------
   for (const s of [-1, 1]) {
     for (let k = 0; k < 3; k++) {                                                              // bonnet louvres, three per side
