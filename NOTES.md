@@ -197,6 +197,22 @@ chase camera; props placed by rule (chevrons on a corner's outside facing traffi
 snow poles and power poles on the mountain side, lamps alternating, shrines cut into the mountain side, the
 store, hut and bus stop on lay-bys on the valley side, boulders at the foot of the cutting, nothing on the road).
 
+## The owner's third list (22 Sep): coherency, hitches, a wider road
+
+- Void patches and trees through the road: the pass doubles back on itself, and chunks were kept only by
+  index (two behind, five ahead), so road laid ten chunks ago could sit 20 m away as a hole. Chunks are now
+  kept while within 330 m of the car and old road that comes back into view is rebuilt; the generator keeps new
+  road 40 m from old road. Trees are no longer placed where another stretch of road is nearer than their own
+  (that terrain is folded away, which is where trees floated), nor within a lamp's station.
+- Hitches: a chunk build is now a generator advanced one phase per frame (road, terrain left, terrain right
+  and tunnel, statics, bake half, bake half, trees; the bake was 15 ms, the rest 1 to 3 ms); every shader
+  program is compiled at boot after the rig has patched the materials, which is what the one-second stall on
+  the first convenience store was; the sky is not rebuilt (30 ms) while the sun is below the rig's clamp;
+  the sun's two cascaded shadow maps stop refreshing once the sun is down; pixel ratio capped at 1.5 and the
+  moon shadow at 1536. Generator rollbacks used to leave stale grid entries behind; pruned.
+- Road 8.8 m wide (was 7.2), the wall 5.5 m out (was 4.55), hairpins 2.4 m wider on the outside, and a wall
+  hit drops a drift only above 6 m/s of lateral impact (was 4.5).
+
 ## Final measurements (22 Sep, commit c43c9d0)
 
 `harness/jam.mjs` on the live URL: ready 12.4 s, 1.2 MB, started from a real tap, 75.8 m moved in the hold,
