@@ -162,6 +162,18 @@ A town of lights sits in the valley (900 warm points on the far plane that follo
 gravel. The pane in the desktop app stopped repainting its canvas at one point and returned the same frame
 for three different lighting states; the headless gate on the real GPU is the check that counts.
 
+## The hero, second time (22 Sep)
+
+The owner asked for a much more detailed car. One agent, a brief with every part named (shut lines, bonnet
+louvres, an intercooler behind the bumper opening, fog lamps, canards, a tow hook, riveted box flares, mirrors
+with faces, four round tail lamps, a five-fin diffuser, twin tips, a wing with end plates and a brake lamp,
+deep-dish wheels with lug nuts, brake discs and vermilion calipers on the hubs, a dashboard with gauges, a
+right-hand wheel, bucket seats with harnesses, a cage, a helmeted driver), three construction strategies
+planned, and the loft candidate was good enough on its first clean render that the other two were dropped to
+save the afternoon: 29,844 triangles, 418 meshes, baked per joint at load into a few dozen draws, verified
+clean in the shipped folder with the other 21 assets. Notes and the unassembled parts of the two rejected
+strategies are under `work/cands/car2`.
+
 ## Still wrong, or not attempted
 
 (kept up to date at the end)
