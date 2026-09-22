@@ -102,7 +102,7 @@ async function setKeys(want) {
 
 const frames = [], samples = [];
 let covered = 0, prev = null, driftFrames = 0, maxSlip = 0, banks = 0, lastScore = 0, drifting = false, driftBankedAt = [];
-let handUntil = 0, handCooldown = 0, stalled = 0, peakDraws = 0, peakTris = 0;
+let handUntil = 0, handCooldown = 0, stalled = 0, peakDraws = 0, peakTris = 0, stuckSince = 0, reverseUntil = 0;
 const shotEvery = METRES / 8;
 let nextShot = shotEvery * 0.5;
 const startAt = Date.now();
@@ -133,6 +133,10 @@ while (covered < METRES && Date.now() - startAt < cap) {
   const tight = k > 1 / 32 && g.kmh > 42;
   if (tight && now > handCooldown) { handUntil = now + 380; handCooldown = now + 3200; }
   const want = { gas: !tooFast, brake: tooFast && Math.abs(g.slip) < 15, hand: now < handUntil, left: cmd > 0.05, right: cmd < -0.05 };
+  // wedged against a rail: reverse out with the wheels turned the other way, the way a player would
+  if (g.kmh < 4 && samples.length > 20) stuckSince = stuckSince || now; else if (g.kmh > 8) stuckSince = 0;
+  if (stuckSince && now - stuckSince > 1200) { reverseUntil = now + 1300; stuckSince = 0; }
+  if (now < reverseUntil) { want.gas = false; want.brake = true; want.hand = false; want.left = cmd < 0; want.right = cmd > 0; }
   // in a slide, steer into the direction of travel when the angle gets big
   if (Math.abs(g.slip) > 38) { want.left = g.slip > 0; want.right = g.slip < 0; }
   await setKeys(want);

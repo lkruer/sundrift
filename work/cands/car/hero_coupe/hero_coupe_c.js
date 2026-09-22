@@ -174,14 +174,16 @@ export default function (THREE) {
 
   // ---- lower body: bumpers, lip, lamp band, doors, skirts, tubs, plate ------------------
   const bumper = (z, hw, top) => ring(z, 0.16, hw - 0.04, hw, 0.30, hw, top - 0.09, hw - 0.03, top - 0.012, top);
+  // both ends capped: the inner end faces the wheel well and would read as a hole
   add(body, loft([bumper(1.62, 0.84, 0.585), bumper(1.95, 0.82, 0.585), bumper(2.145, 0.72, 0.585)],
-                 { creaseRows: [1, 11, 4, 8], capFront: 0 }), PAINT);
+                 { creaseRows: [1, 11, 4, 8], capFront: 0, capBack: 0 }), PAINT);
   add(body, loft([bumper(-1.62, 0.84, 0.70), bumper(-2.0, 0.83, 0.77), bumper(-2.21, 0.74, 0.78)],
-                 { creaseRows: [1, 11, 4, 8], capBack: 0 }), PAINT);
+                 { creaseRows: [1, 11, 4, 8], capFront: 0, capBack: 0 }), PAINT);
   const band = (z, hw, y0, y1) => [[hw, y0, z], [hw, y1, z], [-hw, y1, z], [-hw, y0, z]];
-  add(body, loft([band(1.95, 0.80, 0.14, 0.17), band(2.16, 0.76, 0.14, 0.17), band(2.225, 0.60, 0.14, 0.17)], { capFront: 0 }), DARK);   // splitter lip
-  add(body, loft([band(2.03, 0.80, 0.575, 0.685), band(2.10, 0.74, 0.575, 0.685), band(2.16, 0.52, 0.575, 0.685)], { capFront: 0 }), DARK); // lamp band
-  add(body, loft([band(-2.05, 0.79, 0.78, 0.94), band(-2.13, 0.76, 0.78, 0.94), band(-2.16, 0.62, 0.78, 0.94)], { capBack: 0 }), DARK);     // tail lamp panel
+  const HARD = [0, 1, 2, 3];
+  add(body, loft([band(1.95, 0.80, 0.14, 0.17), band(2.16, 0.76, 0.14, 0.17), band(2.225, 0.60, 0.14, 0.17)], { creaseRows: HARD, capFront: 0 }), DARK);   // splitter lip
+  add(body, loft([band(2.03, 0.80, 0.575, 0.685), band(2.10, 0.74, 0.575, 0.685), band(2.16, 0.52, 0.575, 0.685)], { creaseRows: HARD, capFront: 0 }), DARK); // lamp band
+  add(body, loft([band(-2.05, 0.79, 0.78, 0.94), band(-2.13, 0.76, 0.78, 0.94), band(-2.16, 0.62, 0.78, 0.94)], { creaseRows: HARD, capBack: 0 }), DARK);     // tail lamp panel
   for (const s of [-1, 1]) {
     add(body, box(0.34, 0.09, 0.03), HEAD, s * 0.31, 0.63, 2.17);
     add(body, box(0.34, 0.09, 0.03), HEAD, s * 0.66, 0.63, 2.085, 0, s * 0.42, 0);
@@ -249,7 +251,7 @@ export default function (THREE) {
     const out = [];
     for (let k = 0; k < 12; k++) {
       const t = k / 12, u = 0.5 - 0.5 * Math.cos(2 * PI * t);                // chord fraction 0..1..0
-      const th = 0.017 * (1.2 * Math.sqrt(u) - 0.3 * u - 0.9 * u * u) / 0.31;  // half thickness, rounded nose, thin tail
+      const th = 0.017 * (1.2 * Math.sqrt(u) - 0.3 * u - 0.9 * u * u) / 0.50;  // half thickness (peak 0.017), rounded nose, sharp tail
       out.push([x, t < 0.5 ? th + 0.006 : -th * 0.9 + 0.006, 0.11 - 0.22 * u]);
     }
     return out;

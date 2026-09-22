@@ -532,24 +532,24 @@ export class World {
       m4.compose(v.set(x, y, z), q, sc);
       list.push({ m: m4.clone(), ...extra });
     };
-    for (let i = i0; i < i1; i += 4) {              // every 8 m
+    for (let i = i0; i < i1; i += 5) {              // every 10 m
       const p = pts[i];
       const tun = this.nearTunnel(p.s, 14);
       for (const side of [1, -1]) {
         const mountainHere = side > 0 ? (p.mount + 1) * 0.5 : (1 - p.mount) * 0.5;
         const lay = t.terraceAt(p.s);
         const start = tun ? RAIL + 12 : (lay && lay.side === side ? lay.u1 + 3 : (mountainHere > 0.5 ? RAIL + 8.5 : RAIL + 5));
-        const spacing = mountainHere > 0.5 ? 12 : 14;
+        const spacing = mountainHere > 0.5 ? 13 : 15.5;
         for (let u = start + rng() * spacing; u < RAIL + 150; u += spacing / density) {
           if (rng() < 0.22) continue;
           const uu = u + (rng() - 0.5) * 5;
           const [x, , z] = this.at(p, uu * side + (rng() - 0.5) * 2);
           if (t.onRoad(x, z, i, 2.5)) continue;
           const y = t.groundAt(x, z, i) - 0.4;
-          put(cedars, x, y, z, rng() * Math.PI * 2, 0.7 + rng() * 0.6, { near: uu < 45 });
+          put(cedars, x, y, z, rng() * Math.PI * 2, 0.7 + rng() * 0.6, { near: uu < 34 });
         }
         // the accent trees at the road's edge: maples and a looser broadleaf, red a minority
-        if (!tun && !(lay && lay.side === side) && rng() < 0.55) {
+        if (!tun && !(lay && lay.side === side) && rng() < 0.5) {
           const u = mountainHere > 0.5 ? RAIL + 2.2 + rng() * 5 : RAIL + 1.4 + rng() * 3;
           const [x, , z] = this.at(p, u * side);
           if (t.onRoad(x, z, i, 1.2)) continue;
@@ -564,7 +564,7 @@ export class World {
           }
         }
         // a second rank on the mountain slope, so the hillside above the road is not bare grass
-        if (!tun && mountainHere > 0.5 && !(lay && lay.side === side) && rng() < 0.4) {
+        if (!tun && mountainHere > 0.5 && !(lay && lay.side === side) && rng() < 0.28) {
           const u = RAIL + 7 + rng() * 6;
           const [x, , z] = this.at(p, u * side);
           if (t.onRoad(x, z, i, 2.5)) continue;

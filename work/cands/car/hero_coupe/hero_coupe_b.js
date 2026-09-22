@@ -97,9 +97,12 @@ export default function (THREE) {
   const tailWrap = (x) => 0.10 * Math.pow(c01((Math.abs(x) - 0.50) / 0.33), 1.5);
   // plan outline between a straight back edge zb and a curved front edge z0 - wrap(x)
   const planShape = (hw, zb, z0, wrapFn, notch) => {
+    const xs = [];
+    for (let k = 0; k <= 12; k++) xs.push(-hw + (2 * hw * k) / 12);
+    if (notch) xs.push(-notch[0] - 0.001, -notch[0], notch[0], notch[0] + 0.001);   // crisp slot ends
+    xs.sort((a, b) => a - b);
     const pts = [[-hw, -zb]];
-    for (let k = 0; k <= 12; k++) {
-      const x = -hw + (2 * hw * k) / 12;
+    for (const x of xs) {
       let z = z0 - wrapFn(x);
       if (notch && Math.abs(x) <= notch[0]) z -= notch[1];
       pts.push([x, -z]);
