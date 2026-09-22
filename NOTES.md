@@ -239,29 +239,29 @@ with a sportier tail, a bigger 90s JDM dash, easier clean drifting, easy/medium/
 with paint (white by default) and a pause menu, more retro, softer headlights, and no hands-off autosteer.
 
 - **The world, rebuilt on one height field.** The old road-relative terrain strips folded where two legs of a
-  switchback met and left voids between them. Now  is the mountain;  grows the pass as a
+  switchback met and left voids between them. Now `field.js` is the mountain; `track.js` grows the pass as a
   switchback ladder up it (each leg held above a floor built from the legs below), tests every candidate
   feature against the road already laid, and backs up over the last four provisional features when it paints
   itself into a corner. Measured: 0 dead ends and 0 overlaps over 12 seeds x 30 km x 3 courses (before the
-  backtracking: 24 dead ends and 380 overlapping pairs), about 15 ms to generate 30 km.  carves the
+  backtracking: 24 dead ends and 380 overlapping pairs), about 15 ms to generate 30 km. `ground.js` carves the
   field to the road with ceilings and floors (cut 1.25, fill 0.8, retaining faces where two legs cannot both be
-  met);  probes ~50,000 points on the road per course and the finest terrain triangles sit
+  met); `work/tile_test.mjs` probes ~50,000 points on the road per course and the finest terrain triangles sit
   at most 2.6 cm above the ribbon's shoulder (the first version: 15 cm, from the shrine terrace starting inside
   the verge).
 - **Freezes, each found by measurement.** (1) The boost flame's light toggled visibility: a light-count
   change recompiles every material. (2) The rig rebuilt its sky PMREM with a fresh generator and dome material
-  on every , a few compiles every few seconds from dusk on: now cached. (3) The sun's cascades
-  rendered their shadow maps all night at zero intensity (the rig switched them off only in , before
-  the cascades existed) and switching  at dawn would have recompiled everything: now castShadow is
+  on every `setTime`, a few compiles every few seconds from dusk on: now cached. (3) The sun's cascades
+  rendered their shadow maps all night at zero intensity (the rig switched them off only in `setTime`, before
+  the cascades existed) and switching `castShadow` at dawn would have recompiled everything: now castShadow is
   constant and the maps stop updating. (4) A second shadowed directional light (the moon) broke three's cascade
-  shader ( out of range): the moon is a far spot light. (5) Shaders were compiled for the
+  shader (`CSM_cascades[2]` out of range): the moon is a far spot light. (5) Shaders were compiled for the
   canvas and then again for the post chain's linear target: now compiled once, in parallel, into the real
   target, with nothing drawn during loading. Ready went from 20.8 s to 5.0 s. (6) A 100 ms stall at the first
   drift of every run: a Chrome trace put it in the GPU process, bisecting the page put it on the full-screen
-  vignette and hit-flash layers over the canvas; both are now drawn by the post pass.  drives
+  vignette and hit-flash layers over the canvas; both are now drawn by the post pass. `work/jitter.mjs` drives
   a scripted run: every frame 16.7-17.2 ms after the first.
 - **Jitter.** The chase camera chased a damped position (a lag that depends on the frame time), shook with
-  , and rolled about the world's z axis from raw lateral g. Now it is rigid on the car with a
+  `Math.random()`, and rolled about the world's z axis from raw lateral g. Now it is rigid on the car with a
   critically damped spring on its heading, rolls about the view axis from filtered g, and shakes with smooth
   noise. The body rolls and pitches on springs driven by low-passed accelerations; the counter-steer assist is
   filtered (the front wheels chattered); wheels never turn more than half a spoke a frame. Measured on screen:
