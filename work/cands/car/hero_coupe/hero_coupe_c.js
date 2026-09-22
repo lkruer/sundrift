@@ -175,9 +175,11 @@ export default function (THREE) {
   // ---- lower body: bumpers, lip, lamp band, doors, skirts, tubs, plate ------------------
   const bumper = (z, hw, top) => ring(z, 0.16, hw - 0.04, hw, 0.30, hw, top - 0.09, hw - 0.03, top - 0.012, top);
   // both ends capped: the inner end faces the wheel well and would read as a hole
-  add(body, loft([bumper(1.62, 0.84, 0.585), bumper(1.95, 0.82, 0.585), bumper(2.145, 0.72, 0.585)],
+  // The inner sections reach into the arch openings so the bumper meets the flare's
+  // sloped face; ending them at the arch edge left a dark wedge of wheel tub showing.
+  add(body, loft([bumper(1.56, 0.81, 0.585), bumper(1.95, 0.80, 0.585), bumper(2.145, 0.72, 0.585)],
                  { creaseRows: [1, 11, 4, 8], capFront: 0, capBack: 0 }), PAINT);
-  add(body, loft([bumper(-1.62, 0.84, 0.70), bumper(-2.0, 0.83, 0.77), bumper(-2.21, 0.74, 0.78)],
+  add(body, loft([bumper(-1.56, 0.81, 0.70), bumper(-2.0, 0.80, 0.77), bumper(-2.21, 0.72, 0.78)],
                  { creaseRows: [1, 11, 4, 8], capFront: 0, capBack: 0 }), PAINT);
   const band = (z, hw, y0, y1) => [[hw, y0, z], [hw, y1, z], [-hw, y1, z], [-hw, y0, z]];
   const HARD = [0, 1, 2, 3];
@@ -185,11 +187,11 @@ export default function (THREE) {
   add(body, loft([band(2.03, 0.80, 0.575, 0.685), band(2.10, 0.74, 0.575, 0.685), band(2.16, 0.52, 0.575, 0.685)], { creaseRows: HARD, capFront: 0 }), DARK); // lamp band
   add(body, loft([band(-2.05, 0.79, 0.78, 0.94), band(-2.13, 0.76, 0.78, 0.94), band(-2.16, 0.62, 0.78, 0.94)], { creaseRows: HARD, capBack: 0 }), DARK);     // tail lamp panel
   for (const s of [-1, 1]) {
-    add(body, box(0.34, 0.09, 0.03), HEAD, s * 0.31, 0.63, 2.17);
-    add(body, box(0.34, 0.09, 0.03), HEAD, s * 0.66, 0.63, 2.085, 0, s * 0.42, 0);
+    add(body, box(0.34, 0.09, 0.03), HEAD, s * 0.31, 0.63, 2.17);                          // inner lens on the band's face
+    add(body, box(0.24, 0.09, 0.03), HEAD, s * 0.63, 0.63, 2.143, 0, s * 0.27, 0);        // outer lens on the band's chamfer
     for (const x of [0.44, 0.62]) add(body, cyl(0.055, 0.055, 0.03, 24), TAIL, s * x, 0.86, -2.165, PI / 2);
-    add(body, cyl(0.05, 0.05, 0.02, 20), DARK, s * 0.66, 0.30, 2.105, PI / 2);
-    add(body, cyl(0.032, 0.032, 0.012, 16), HEAD, s * 0.66, 0.30, 2.117, PI / 2);
+    add(body, cyl(0.05, 0.05, 0.02, 20), DARK, s * 0.64, 0.30, 2.152, PI / 2);            // fog recess, proud of the bumper cap
+    add(body, cyl(0.032, 0.032, 0.012, 16), HEAD, s * 0.64, 0.30, 2.166, PI / 2);
     add(body, box(0.06, 0.48, 1.80), PAINT, s * 0.76, 0.48, 0.025);                        // door, sill to the arch line
     add(body, box(0.06, 0.10, 1.78), DARK, s * 0.79, 0.19, 0.03);                          // skirt
     add(body, box(0.18, 0.04, 1.78), DARK, s * 0.71, 0.16, 0.03);
@@ -275,7 +277,7 @@ export default function (THREE) {
   add(body, revolve(1, [[0.10, 0], [0.17, 0.05], [0.19, 0.25], [0.17, 0.38], [0.11, 0.44], [0.001, 0.47]], 14), SUIT, -0.36, 0.44, -0.55, -0.15);
   const helm = [];
   for (let k = 0; k <= 10; k++) { const t = -1.25 + (PI / 2 + 1.25) * k / 10; helm.push([0.13 * Math.cos(t), 0.13 * Math.sin(t)]); }
-  add(body, revolve(1, helm, 20), HELMET, -0.36, 1.00, -0.52);
+  add(body, revolve(1, helm, 24), HELMET, -0.36, 1.00, -0.52);
   const visor = new THREE.TorusGeometry(0.115, 0.03, 8, 14, 2.4); visor.rotateZ(PI / 2 - 1.2); visor.rotateX(PI / 2);
   add(body, visor, DARK, -0.36, 1.01, -0.52);
   for (const s of [-1, 1]) {
@@ -299,8 +301,8 @@ export default function (THREE) {
       const mesh = new THREE.Mesh(geo, m); mesh.position.set(side * (o || 0), y || 0, z || 0);
       if (rx) mesh.rotation.x = rx; wh.add(mesh); return mesh;
     };
-    at(rv([[0.235, -hw + 0.03], [0.30, -hw + 0.005], [0.32, -hw + 0.05], [0.32, hw - 0.05], [0.30, hw - 0.005], [0.235, hw - 0.03]], 36), RUB);
-    at(rv([[0.245, -hw + 0.02], [0.225, -hw + 0.05], [0.225, hw - 0.07], [0.245, hw - 0.01], [0.215, hw - 0.01]], 28), BRONZ2);
+    at(rv([[0.235, -hw + 0.03], [0.30, -hw + 0.005], [0.32, -hw + 0.05], [0.32, hw - 0.05], [0.30, hw - 0.005], [0.235, hw - 0.03]], 40), RUB);
+    at(rv([[0.245, -hw + 0.02], [0.225, -hw + 0.05], [0.225, hw - 0.07], [0.245, hw - 0.01], [0.215, hw - 0.01]], 32), BRONZ2);
     const os = hw - 0.10;
     at(rv([[0.001, os - 0.06], [0.075, os - 0.06], [0.075, os], [0.045, os], [0.045, os + 0.012], [0.001, os + 0.012]], 16), BRONZE);
     at(rv([[0.001, os + 0.012], [0.042, os + 0.012], [0.042, os + 0.018], [0.001, os + 0.018]], 12), DARK);
@@ -309,7 +311,7 @@ export default function (THREE) {
       at(box(0.03, 0.17, 0.05), BRONZE, os - 0.015, 0.135 * Math.cos(a), 0.135 * Math.sin(a), a);
       at(rv([[0.001, os + 0.005], [0.011, os + 0.005], [0.011, os + 0.018], [0.001, os + 0.018]], 6, [0.056 * Math.cos(a), 0.056 * Math.sin(a)]), DARK);
     }
-    at(rv([[0.07, -(hw - 0.08) - 0.012], [0.165, -(hw - 0.08) - 0.012], [0.165, -(hw - 0.08) + 0.012], [0.07, -(hw - 0.08) + 0.012]], 28), GALV);
+    at(rv([[0.07, -(hw - 0.08) - 0.012], [0.165, -(hw - 0.08) - 0.012], [0.165, -(hw - 0.08) + 0.012], [0.07, -(hw - 0.08) + 0.012]], 32), GALV);
     at(rv([[0.06, -(hw - 0.08)], [0.06, os - 0.06]], 12), DARK2);
     return wh;
   }

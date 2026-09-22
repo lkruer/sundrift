@@ -250,6 +250,10 @@ function step(dt) {
   const rate = (h > 18.3 || h < 5.6) ? 10 : h < 15 ? 5 : h < 17.2 ? 2.5 : 1;
   G.hour += ds / 3800 * rate;
   if (G.hour >= 24) { G.hour -= 24; }
+  // the day's two moments, called out once each
+  const crossed = (edge) => h < edge && G.hour >= edge;
+  if (crossed(18.05)) { const e = { type: 'sun', value: 'SUNSET' }; hud.onEvent(e); audio.onEvent(e); }
+  if (crossed(5.95)) { const e = { type: 'sun', value: 'SUNRISE' }; hud.onEvent(e); audio.onEvent(e); }
   applySun(dt);
 
   // ---- car placement, fx, audio
