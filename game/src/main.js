@@ -395,7 +395,7 @@ function step(dt) {
   // ---- camera, world
   chase.update(dt, car, road.y, (x, z) => track.groundAt(x, z, G.idx), boost01, input.zoom);
   nightFollow();
-  world.update(G.s);
+  world.update(G.s, car.x, car.z);
   world.updateFar(car.x, road.y, car.z);
   hud.update(dt, scoring, car, G.hour, G.dist, car.boost, SCORE.boostMax, perfLine);
 }
@@ -422,7 +422,8 @@ function applySun(dt) {
   sunTimer += dt;
   // setTime rebuilds the sky (about 25 ms), so it is throttled: every 2.5 s, or sooner after a big bank
   const moved = Math.abs(G.hour - G.hourShown);
-  if (sunTimer < 2.5 && moved < 0.12) return;
+  const deepNight = G.night > 0.98;
+  if (sunTimer < (deepNight ? 7 : 2.5) && moved < 0.12) return;
   if (moved < 0.004) return;
   sunTimer = 0; G.hourShown = G.hour;
   const t = rig.setTime({ hour: G.hour });
@@ -437,6 +438,16 @@ function applySun(dt) {
   if (night.spill) night.spill.intensity = 22 * nightAmt;
   if (night.tailGlow) night.tailGlow.intensity = 6 * nightAmt;
   if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.66 * nightAmt);
+  // the sun's cascaded shadow maps are pure cost once the sun is down: stop refreshing them until dawn
+  const sunDown = nightAmt > 0.98;
+  if (sunDown !== G.sunDown) {
+    G.sunDown = sunDown;
+    scene.traverse((o) => {
+      if (!o.isDirectionalLight || o === night.moon || !o.shadow) return;
+      o.shadow.autoUpdate = !sunDown;
+      if (!sunDown) o.shadow.needsUpdate = true;
+    });
+  }
   if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el);
   if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el); }
   world.setNight(nightAmt);

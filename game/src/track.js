@@ -40,13 +40,13 @@ export class Track {
 
   /** True when (x, z) is within 30 m of road older than 120 m, looking at the nine cells around it. */
   _collides(x, z, newestOk) {
-    const cx = Math.floor(x / 24), cz = Math.floor(z / 24);
+    const cx = Math.floor(x / 24), cz = Math.floor(z / 24);   // cells are 24 m, so two cells each way covers 40 m
     for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
       const c = this._cells.get((cx + dx) + ',' + (cz + dz)); if (!c) continue;
       for (const j of c) {
         if (j >= this.pts.length || j > newestOk) continue;
         const q = this.pts[j];
-        if ((x - q.x) * (x - q.x) + (z - q.z) * (z - q.z) < 15 * 15) return true;
+        if ((x - q.x) * (x - q.x) + (z - q.z) * (z - q.z) < 40 * 40) return true;
       }
     }
     return false;
@@ -92,7 +92,7 @@ export class Track {
         const p = this._point(seg.type);
         if (seg.widenOuter) {
           // hairpins are wider on the outside, the way a real pass is cut
-          const w = ROAD.railOffset + 1.6 * Math.sin(Math.PI * t);
+          const w = ROAD.railOffset + 2.4 * Math.sin(Math.PI * t);
           if (seg.dir > 0) p.wr = w; else p.wl = w;
         }
         this.pts.push(p);

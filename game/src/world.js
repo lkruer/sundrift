@@ -48,7 +48,7 @@ function roadTextures() {
       const wear = 1 - 0.07 * Math.exp(-Math.pow((au - 1.55) / 0.5, 2));       // darker tyre tracks
       c = asphalt.map((v) => (v + grain) * wear);
       rough = 0.55 + 0.08 * Math.sin(x * 0.11 + y * 0.05) * Math.sin(y * 0.09) - 0.05 * (1 - wear) * 6;
-      const onEdge = Math.abs(au - 3.35) < 0.075;
+      const onEdge = Math.abs(au - (HALF - 0.25)) < 0.075;
       const onCentre = au < 0.06 && (vm % 12) < 4.2;
       if (onEdge || onCentre) { const k = onCentre ? 0.92 : 1; c = line.map((v) => v * k + grain * 0.5); rough = 0.62; }
     }
@@ -139,16 +139,38 @@ export class World {
   nearTunnel(s, pad = 8) { for (const tn of this.tunnels) if (s >= tn.s0 - pad && s <= tn.s1 + pad) return tn; return null; }
 
   /** Keep the chunks around distance s built; at most one new chunk per call so a frame never hitches twice. */
-  update(s) {
+  update(s, x = null, z = null) {
     const ci = Math.floor(s / ROAD.chunkLen);
     const lo = ci - ROAD.behind, hi = ci + ROAD.ahead;
-    for (const [k, c] of this.chunks) if (k < lo || k > hi) { this.dropChunk(c); this.chunks.delete(k); }
-    for (let i = Math.max(0, lo); i <= hi; i++) if (!this.chunks.has(i)) { this.buildChunk(i); return true; }
+    const near = (k) => {
+      if (x === null) return false;
+      const p = this.track.sample((k + 0.5) * ROAD.chunkLen);
+      return (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z) < 330 * 330;
+    };
+    // drop what is behind, unless it is still close by (the pass doubles back on itself)
+    for (const [k, c] of this.chunks) if ((k < lo || k > hi) && !near(k)) { this.dropChunk(c); this.chunks.delete(k); }
+    // one build phase per frame, never more, so a chunk never costs a whole frame
+    if (this._job) {
+      const r = this._job.it.next();
+      if (r.done) { this._job = null; }
+      return true;
+    }
+    for (let i = Math.max(0, lo); i <= hi; i++) if (!this.chunks.has(i)) { this._job = { ci: i, it: this.buildSteps(i) }; this._job.it.next(); return true; }
+    // old road that has come back into view
+    if (x !== null) for (let k = Math.max(0, ci - 40); k < lo; k++) if (!this.chunks.has(k) && near(k)) { this._job = { ci: k, it: this.buildSteps(k) }; this._job.it.next(); return true; }
     return false;
   }
 
   /** Build everything the first frame needs, synchronously. */
-  prime(s) { for (let i = 0; i < 40 && this.update(s); i++) {} }
+  prime(s) {
+    for (let n = 0; n < 60; n++) {
+      if (this._job) { while (!this._job.it.next().done) {} this._job = null; }
+      if (!this.update(s)) break;
+    }
+    if (this._job) { while (!this._job.it.next().done) {} this._job = null; }
+  }
+
+  buildChunk(ci) { const it = this.buildSteps(ci); let r; do { r = it.next(); } while (!r.done); return r.value; }
 
   dropChunk(c) {
     this.root.remove(c.group);
@@ -159,7 +181,9 @@ export class World {
     this.lamps = this.lamps.filter((l) => l.ci !== c.ci);
   }
 
-  buildChunk(ci) {
+  /** The chunk build, in phases: the caller advances it one phase per frame. */
+  *buildSteps(ci) {
+    if (this.chunks.has(ci)) return this.chunks.get(ci);
     const t = this.track;
     const s0 = ci * ROAD.chunkLen, s1 = s0 + ROAD.chunkLen;
     t.ensure(s1 + 600);
@@ -180,9 +204,12 @@ export class World {
     }
 
     group.add(this.buildRoad(i0, i1, own));
+    yield;
     group.add(this.buildTerrain(i0, i1, +1, own));
+    yield;
     group.add(this.buildTerrain(i0, i1, -1, own));
     const tube = this.buildTunnel(i0, i1, own); if (tube) group.add(tube);
+    yield;
 
     // static props, baked per chunk
     const statics = new THREE.Group();
@@ -202,6 +229,7 @@ export class World {
     this.placePoles(s0, s1, place, ci);
     this.placeSetPieces(s0, s1, place, rng, ci);
     this.placeStuds(i0, i1, group);
+    yield;
     statics.updateMatrixWorld(true);
     const baked = bakeStatic(statics);
     baked.traverse((o) => { if (o.isMesh) { own.add(o.geometry); o.castShadow = true; o.receiveShadow = true; } });
@@ -213,11 +241,18 @@ export class World {
       group.add(pb);
     }
 
+    yield;
     this.placeTrees(i0, i1, s0, s1, group, rng);
 
     this.root.add(group);
     this.chunks.set(ci, c);
     return c;
+  }
+
+  /** True where another stretch of road is nearer than this tree's own: the terrain there was folded away. */
+  folded(x, z, i, u) {
+    const n = this.track.nearestScan(x, z, i, 90);
+    return Math.abs(n.i - i) > 10 && n.d < Math.abs(u) - 2;
   }
 
   /** One material per maple colour, for baked clones. */
@@ -670,15 +705,16 @@ export class World {
           if (rng() < 0.22) continue;
           const uu = u + (rng() - 0.5) * 5;
           const [x, , z] = this.at(p, uu * side + (rng() - 0.5) * 2);
-          if (t.onRoad(x, z, i, 2.5)) continue;
+          if (t.onRoad(x, z, i, 2.5) || this.folded(x, z, i, uu)) continue;
           const y = t.groundAt(x, z, i) - 0.4;
           put(cedars, x, y, z, rng() * Math.PI * 2, 0.7 + rng() * 0.6, { near: uu < 34 });
         }
-        // the accent trees at the road's edge: maples and a looser broadleaf, red a minority
-        if (!tun && !(lay && lay.side === side) && rng() < 0.5) {
+        // the accent trees at the road's edge: maples and a looser broadleaf, red a minority; not on a lamp
+        const lampNear = Math.abs(((p.s % 30) + 30) % 30 - 15) > 11.5;
+        if (!tun && !lampNear && !(lay && lay.side === side) && rng() < 0.5) {
           const u = mountainHere > 0.5 ? RAIL + 2.2 + rng() * 5 : RAIL + 1.4 + rng() * 3;
           const [x, , z] = this.at(p, u * side);
-          if (t.onRoad(x, z, i, 1.2)) continue;
+          if (t.onRoad(x, z, i, 1.2) || this.folded(x, z, i, u)) continue;
           const y = t.groundAt(x, z, i) - 0.25;
           const pick = rng();
           const kind = rng();
@@ -696,7 +732,7 @@ export class World {
         if (!tun && mountainHere > 0.5 && !(lay && lay.side === side) && rng() < 0.28) {
           const u = RAIL + 7 + rng() * 6;
           const [x, , z] = this.at(p, u * side);
-          if (t.onRoad(x, z, i, 2.5)) continue;
+          if (t.onRoad(x, z, i, 2.5) || this.folded(x, z, i, u)) continue;
           const y = t.groundAt(x, z, i) - 0.3;
           const pick = rng();
           const colour = pick < 0.4 ? PAL.mapleGold : pick < 0.7 ? PAL.mapleOrange : pick < 0.85 ? PAL.dryGrass : PAL.mapleRed;
@@ -730,7 +766,7 @@ export class World {
         const w = side > 0 ? p.wl : p.wr;
         const u = w + 0.6 + rng() * (mountainHere > 0.5 ? 2.4 : 1.7);
         const [x, , z] = this.at(p, u * side + (rng() - 0.5) * 1.2);
-        if (t.onRoad(x, z, i, 0.6)) continue;
+        if (t.onRoad(x, z, i, 0.6) || this.folded(x, z, i, u)) continue;
         const y = t.groundAt(x, z, i) - 0.12;
         const pick = rng();
         const colour = pick < 0.4 ? PAL.dryGrass : pick < 0.68 ? PAL.moss : pick < 0.9 ? PAL.mapleGold : PAL.mapleOrange;

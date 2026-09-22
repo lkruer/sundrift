@@ -14,9 +14,9 @@ export const PAL = {
 
 /** Road geometry, metres. */
 export const ROAD = {
-  halfWidth: 3.6,        // asphalt half width (7.2 m two-lane mountain road)
+  halfWidth: 4.4,        // asphalt half width (8.8 m: a generous two-lane pass)
   shoulder: 0.9,         // gravel shoulder each side before the rail or the cutting
-  railOffset: 4.55,      // guardrail / cutting face distance from the centreline
+  railOffset: 5.5,       // guardrail / cutting face distance from the centreline
   sliceStep: 2.0,        // metres between centreline samples
   chunkLen: 120,         // metres of road per streamed chunk
   ahead: 5,              // chunks kept ahead of the car
@@ -49,7 +49,7 @@ export const SCORE = {
   boostMax: 3.4,
   clipDist: 0.55,        // metres from the rail that count as a clip
   clipBonus: 250,
-  crashSpeed: 4.5,       // m/s of lateral impact that drops the held drift
+  crashSpeed: 6.0,       // m/s of lateral impact that drops the held drift
 };
 
 export const QUALITY = {
