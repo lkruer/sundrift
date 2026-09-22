@@ -1,5 +1,8 @@
 
   // ---- shared fittings: everything below is the same in all three candidates ------------
+  const POLISH = mk(0xb9bcc0, { roughness: 0.2, metalness: 0.8 });                                POLISH.name = 'metal';
+  const LANE   = mk(0xe8e4da, { roughness: 0.4, emissive: new THREE.Color(0xe8e4da), emissiveIntensity: 0.5 });
+  const REFL   = mk(0xd11c1c, { roughness: 0.4, emissive: new THREE.Color(0xd11c1c), emissiveIntensity: 0.6 });
   for (const s of [-1, 1]) {
     for (let k = 0; k < 3; k++) {                                                              // bonnet louvres, three per side
       const z = 1.14 + 0.17 * k, x = s * 0.40, y = topY(x, z);
@@ -56,26 +59,33 @@
   for (const x of [-0.62, -0.44, 0.44, 0.62]) {
     const f = faceAt(tail, x), lamp = new THREE.Group();
     lamp.position.set(f.x, 0.87, f.z); lamp.rotation.y = f.yaw; body.add(lamp);
-    add(lamp, cyl(0.073, 0.073, 0.018, 32), DARK, 0, 0, 0.022, PI / 2);                              // bezel
-    add(lamp, cyl(0.058, 0.058, 0.014, 32), TAIL, 0, 0, 0.036, PI / 2);                              // lens
+    add(lamp, new THREE.CylinderGeometry(0.076, 0.076, 0.03, 32, 1, true), DARK2, 0, 0, 0.045, PI / 2);   // cup, open, the lamp sits down inside it
+    add(lamp, cyl(0.062, 0.062, 0.012, 32), TAIL, 0, 0, 0.036, PI / 2);                              // lens, sunk below the rim
+    add(lamp, new THREE.TorusGeometry(0.076, 0.005, 8, 32), POLISH, 0, 0, 0.06);                     // polished rim ring
+    add(lamp, new THREE.TorusGeometry(0.031, 0.004, 6, 24), LANE, 0, 0, 0.043);                      // white inner ring
   }
-  add(body, box(0.44, 0.16, 0.024), DARK, 0, 0.60, -2.19);                                           // plate recess, blank
-  for (const s of [-1, 1]) onFace(tail, s * 0.66, 0.42, 0.10, 0.035, 0.02, TAIL, 0.008);             // corner reflectors
-  add(body, box(0.64, 0.13, 0.026), DARK, 0, 0.87, -2.212);                                          // centre garnish
-  add(body, box(0.64, 0.012, 0.03), GALV, 0, 0.941, -2.213);                                         // its bright top trim
-  add(body, box(0.32, 0.15, 0.02), DARK, 0.44, 0.27, -2.20);                                         // exhaust cut-out
-  for (const x of [0.36, 0.52]) {
-    add(body, cyl(0.0425, 0.0425, 0.17, 24, true), CHROME, x, 0.27, -2.15, PI / 2);                  // twin tips, left side
-    add(body, cyl(0.036, 0.036, 0.01, 20), RUB, x, 0.27, -2.20, PI / 2);
+  {                                                                                                  // number-plate pocket: proud rim, blank plate, lamp above
+    const zf = -2.19;
+    for (const [w, h, x, y] of [[0.46, 0.022, 0, 0.635], [0.46, 0.022, 0, 0.415], [0.022, 0.24, -0.219, 0.525], [0.022, 0.24, 0.219, 0.525]]) add(body, box(w, h, 0.05), DARK, x, y, zf - 0.005);
+    add(body, box(0.42, 0.20, 0.008), DARK, 0, 0.525, zf - 0.008);                                   // pocket floor
+    add(body, box(0.33, 0.165, 0.008), LANE, 0, 0.525, zf - 0.014);                                  // blank plate
+    add(body, box(0.09, 0.024, 0.05), DARK, 0, 0.665, zf - 0.006);                                   // plate lamp housing under the step
+    add(body, box(0.05, 0.010, 0.012), HEAD, 0, 0.657, zf - 0.030);
+  }
+  for (const s of [-1, 1]) onFace(tail, s * 0.70, 0.46, 0.03, 0.30, 0.024, REFL, 0.012);             // vertical corner reflector strips
+  add(body, box(0.40, 0.17, 0.02), DARK, 0.42, 0.28, -2.20);                                         // exhaust cut-out
+  for (const x of [0.35, 0.49]) {
+    add(body, cyl(0.05, 0.05, 0.16, 28, true), CHROME, x, 0.28, -2.16, PI / 2);                      // twin tips, left side, hollow
+    add(body, cyl(0.034, 0.034, 0.16, 20), DARK, x, 0.28, -2.14, PI / 2);                            // the dark inner pipe seen down the tip
   }
   add(body, box(1.30, 0.05, 0.42), DARK, 0, 0.155, -2.00);                                           // diffuser plate
-  for (const x of [-0.60, -0.30, 0, 0.30, 0.60]) add(body, box(0.012, 0.11, 0.36), DARK, x, 0.155, -2.02);
-  for (const s of [-1, 1]) add(body, box(0.20, 0.20, 0.016), RUB2, s * 0.75, 0.22, -1.60);           // mud flaps
+  for (const x of [-0.60, -0.30, 0, 0.30, 0.60]) add(body, box(0.012, 0.16, 0.40), DARK, x, 0.16, -2.03);   // five deep fins
+  for (const s of [-1, 1]) add(body, box(0.22, 0.22, 0.016), RUB2, s * 0.75, 0.21, -1.60);           // mud flaps
   for (const s of [-1, 1]) {
-    add(body, box(0.012, 0.11, 0.28), DARK, s * 0.716, 1.255, -2.0, 0.12);                           // end plate
+    add(body, box(0.012, 0.12, 0.32), DARK, s * 0.716, 1.30, -2.02, 0.12);                           // end plate
   }
-  add(body, box(0.26, 0.024, 0.035), TAIL, 0, 1.252, -2.10, 0.12);                                   // high-mount brake lamp
-  add(body, box(1.40, 0.022, 0.012), DARK, 0, 1.262, -2.108, 0.12);                                  // gurney flap on the trailing edge
+  add(body, box(0.26, 0.024, 0.035), TAIL, 0, 1.307, -2.12, 0.12);                                   // high-mount brake lamp
+  add(body, box(1.40, 0.022, 0.012), DARK, 0, 1.317, -2.128, 0.12);                                  // gurney flap on the trailing edge
   add(body, box(0.42, 0.14, 0.44), DARK, 0.44, 0.23, -1.66);                                         // muffler, seen under the rear bumper
   rod(body, [0.44, 0.23, -1.88], [0.44, 0.27, -2.12], 0.03, DARK, 10);                               // tailpipe into the tips
   for (const s of [-1, 1]) {                                                                         // bonnet pins at the front corners

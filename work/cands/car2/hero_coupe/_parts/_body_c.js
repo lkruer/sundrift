@@ -96,7 +96,7 @@
     topPanel(s * 0.30, s * 0.62, 1.79, 2.05, 0.003, PAINT, 3);                                 // pop-up lamp lid, closed
     const lid = [[s * 0.30, 1.79], [s * 0.62, 1.79], [s * 0.62, 2.05], [s * 0.30, 2.05], [s * 0.30, 1.79]];
     for (let k = 0; k < 4; k++) topStrip(linePts(lid[k], lid[k + 1], 4), 0.012);
-    topStrip(linePts([s * 0.60, -1.52], [s * 0.60, -2.06], 6), 0.012);                        // boot edges
+    topStrip(linePts([s * 0.60, -1.52], [s * 0.60, -2.13], 7), 0.012);                        // boot edges, run out through the ducktail
     flankStrip(s, linePts([0.25, 0.42], [0.80, 0.42], 6), 0.012);                             // door front edge
     flankStrip(s, linePts([0.25, -0.93], [0.80, -0.93], 6), 0.012);                           // door rear edge
   }
@@ -112,6 +112,15 @@
     }
     add(body, loft(secs, { creaseRows: [0, 1, 4, 5] }), PAINT);
   }
+  {                                                                                            // ducktail: the boot lid trailing edge kicks up
+    const secs = [];
+    for (let k = 0; k <= 7; k++) {
+      const z = lerp(-1.90, -2.19, k / 7), h = 0.062 * Math.pow(c01((-1.90 - z) / 0.29), 1.6), lo = [], hi = [];
+      for (let j = 0; j <= 6; j++) { const x = lerp(-0.58, 0.58, j / 6), y = topY(x, z); lo.push([x, y - 0.012, z]); hi.push([x, y + h + 0.002, z]); }
+      secs.push(lo.concat(hi.reverse()));
+    }
+    add(body, loft(secs, { creaseRows: [0, 6, 7, 13], capBack: 0 }), PAINT);
+  }
 
 
   const topF = (x, z) => lerp(0.605, 0.648, c01((1.96 - z) / 0.40));         // the hull floor rises over the arch
@@ -122,10 +131,9 @@
   add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.135, 0.168, 0.10, 0.055)), DARK);          // splitter lip, proud of the face
   add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.578, 0.69, 0.10, 0.012)), DARK);           // lamp band
   const topR = (x, z) => lerp(0.725, 0.80, c01((-1.60 - z) / 0.59));
-  add(body, sweep(tail, bandProf(0.17, topR, 0.10, 0.05)), PAINT);                                   // rear bumper
-  add(body, sweep(clipX(tail, -0.80, 0.80), plainProf(0.785, 0.955, 0.10, 0.015)), DARK);           // tail lamp panel
+  add(body, sweep(tail, [[0, 0.17], [0, 0.66], [-0.03, 0.68], [-0.03, topR], [-0.10, topR], [-0.10, 0.17]]), PAINT);   // rear bumper, stepped in under the garnish
+  add(body, sweep(clipX(tail, -0.80, 0.80), [[0.005, 0.78], [0.03, 0.80], [0.03, 0.94], [0.005, 0.96], [-0.08, 0.96], [-0.08, 0.78]]), DARK);   // full-width garnish, chamfered edges
   add(body, sweep(tail, plainProf(0.17, 0.31, 0.10, 0.006)), DARK);                                  // lower valance, wraps the corners
-  add(body, sweep(tail, plainProf(0.495, 0.507, 0.03, 0.005)), DARK);                                // rubbing strip round the bumper
   // rear wing: aerofoil lofted across, swept uprights, end plates, high-mount brake lamp
   const foil = (x) => {
     const out = [];
@@ -136,8 +144,8 @@
     }
     return out;
   };
-  add(body, loft([foil(-0.71), foil(-0.30), foil(0.30), foil(0.71)], { capFront: 0, capBack: 0 }), DARK, 0, 1.245, -2.0, 0.12);
-  for (const s of [-1, 1]) add(body, loft([rect(1, [s * 0.45, 0.945, -1.85], [0.02, 0.08]), rect(1, [s * 0.45, 1.10, -1.93], [0.02, 0.075]), rect(1, [s * 0.45, 1.24, -1.98], [0.02, 0.07])], { capFront: 0, capBack: 0 }), DARK);
+  add(body, loft([foil(-0.71), foil(-0.30), foil(0.30), foil(0.71)], { capFront: 0, capBack: 0 }), DARK, 0, 1.30, -2.02, 0.12);
+  for (const s of [-1, 1]) add(body, loft([rect(1, [s * 0.45, 0.94, -1.83], [0.022, 0.10]), rect(1, [s * 0.45, 1.12, -1.92], [0.022, 0.085]), rect(1, [s * 0.45, 1.295, -2.01], [0.022, 0.07])], { capFront: 0, capBack: 0 }), DARK);   // taller swept uprights
   for (const s of [-1, 1]) for (const [az, top] of [[1.275, 0.74], [-1.225, 0.78]]) {
     const th0 = Math.atan2(-0.08, 0.50), secs = [];
     const outer = (th) => {

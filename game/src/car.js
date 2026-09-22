@@ -34,6 +34,8 @@ export const CAR = {
   boostForce: 6200,
   assist: 0.62,                   // counter-steer assist, 0..1, added to the player's steer at slip
   assistTouch: 0.78,
+  lineAssist: 0.55,               // hands off the keys, the car follows the road; 0 is none
+  lineAssistTouch: 0.7,
   offroadMu: 0.55, offroadDrag: 260,
   wheelRadius: 0.32, track: 1.5,
   lowSpeed: 2.5,                  // below this the model blends toward kinematic
@@ -110,7 +112,7 @@ export class Car {
 
   _sub(h, inp, surface) {
     const P = this.P;
-    const g = 9.81, m = P.mass, L = P.a + P.b;
+    const g = 9.81, m = P.mass, L_ = P.a + P.b, L = L_;
     this.surface = surface;
     const muScale = 1 - (1 - P.offroadMu) * (1 - surface);
 
@@ -128,7 +130,20 @@ export class Car {
     const assist = assist0 + (0.97 - assist0) * bigSlip;
     const assistAngle = clamp(frontSlipDir, -P.maxSteer, P.maxSteer) * assist * sstep(1.5, 6, speed) * (this.vF < 0 ? 0 : 1);
     const playerSteer = inp.steer * steerMax * (1 - 0.7 * bigSlip * (Math.sign(inp.steer) === -Math.sign(frontSlipDir) ? 1 : 0));
-    const target = clamp(playerSteer + assistAngle, -P.maxSteer, P.maxSteer);
+    // the line: with no key held the car follows the road, and A or D commits to the corner with as much lock as
+    // the corner needs (a hairpin gets full lock, a gentle curve half), so a slide stays on the road and the
+    // combo keeps going instead of ending on the rail
+    let lineSteer = 0, gain = 1;
+    const LN = inp.line;
+    if (LN && speed > 4) {
+      const velHead = this.yaw + this.beta;
+      let e = LN.roadHeading - velHead; while (e > Math.PI) e -= 2 * Math.PI; while (e < -Math.PI) e += 2 * Math.PI;
+      const want = Math.atan(LN.curv * L_) * 1.15 + e * 0.5 - LN.lat * 0.02;
+      const hands = Math.min(1, Math.abs(inp.steer) * 1.4);
+      lineSteer = clamp(want, -0.32, 0.32) * (inp.touch ? P.lineAssistTouch : P.lineAssist) * (1 - hands) * (this.vF > 0 ? 1 : 0);
+      gain = clamp(Math.abs(LN.curv) * 30 + Math.abs(e) * 1.2 + 0.15, 0.55, 1.0);
+    }
+    const target = clamp(playerSteer * gain + lineSteer + assistAngle, -P.maxSteer, P.maxSteer);
     this.steer += clamp(target - this.steer, -P.steerRate * h, P.steerRate * h);
     const d = this.steer;
 

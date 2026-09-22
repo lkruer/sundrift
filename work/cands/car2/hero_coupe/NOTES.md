@@ -1,5 +1,27 @@
 # hero_coupe (round 2, "much more detailed") — candidate notes (receipts)
 
+## Rear pass (chase camera sees the tail all game)
+
+- Shipped again from the same chunks: **33,000 triangles**, 431 meshes, 1.941 x 1.382 x 4.47 m (wing end
+  plates and antenna set the height, the new tips the depth; both inside tolerance). `game/assets` re-verified
+  22/22 clean. Joints, 'body', names, palette and the hierarchy are untouched.
+- What changed, all real geometry: a full-width chrome-dark garnish swept round the tail with chamfered top
+  and bottom edges (proud 0.03); each tail lamp is now a unit (open dark cup 0.03 deep, lens sunk below its
+  rim, a polished galvanised rim ring at metalness 0.8, a lane-white inner ring at emissive 0.5); the rear
+  bumper steps in 0.03 under the garnish (y 0.66-0.80); a number-plate pocket with a proud rim, a recessed
+  floor and a blank lane-white plate, with a lamp-warm plate lamp in a housing under the step; two vertical
+  tail-red reflector strips (emissive 0.6) on the corners, replacing the horizontal ones and the rubbing
+  strip; a ducktail lofted across the boot lid (rises 0.062 over the last 0.29 m, vertical trailing face)
+  with the boot shut lines run out through it; the wing raised to y 1.30 on taller, more swept lofted
+  uprights with larger end plates, the brake lamp and gurney moved with it; twin tips 0.10 dia x 0.16 long,
+  hollow (open chrome-dark cylinders, metalness 0.85 / roughness 0.25) with a dark inner pipe visible down
+  each, both on the left; five diffuser fins deepened to 0.16; mud flaps enlarged to 0.22 x 0.22.
+- Looked at from the chase camera (`_parts/_chase.mjs`: 4 m back, 1.5 m up, three-quarter rear, plus a
+  dead-rear low view; `_verify/chase.png`, `chase_shipped.png`): nothing floats; the step under the garnish
+  reads as a shadow line; the tips read as hollow. Trimmed the end plates from 0.15 to 0.12 tall after the
+  first look because they made the wing look boxy and set the height at 1.407 m.
+- Not done: rear glass defroster (not needed per the brief).
+
 - Shipped: **hero_coupe_c.js** (loft hull + every fitting as its own part) as `game/assets/hero_coupe.js`
   with `hero_coupe.expect.json` {1.72 x 1.28 x 4.45, tolerance 0.25}. Final: **29,844 triangles**, 418 meshes,
   measured 1.941 x 1.335 x 4.45 m (width includes the mirrors, height the antenna and wing; the body is

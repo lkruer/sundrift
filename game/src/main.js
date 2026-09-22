@@ -161,7 +161,7 @@ async function buildCar() {
     let out = m;
     if (m.emissive && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0) {
       out = m.clone();
-      out.emissiveIntensity = m.emissive.getHex() === PAL.tailRed ? 3.2 : 2.2;
+      out.emissiveIntensity = m.emissive.getHex() === PAL.tailRed ? 6.0 : 2.6;
       upgraded.set(m, out); return out;
     }
     if (m.name === 'paint' || m.color.getHex() === PAL.pearl) {
@@ -208,7 +208,7 @@ async function buildCar() {
   // headlights for dusk
   headlights = [];
   for (const x of [-0.6, 0.6]) {
-    const sp = new THREE.SpotLight(0xf6f8ff, 0, 46, 0.42, 0.6, 1.4);
+    const sp = new THREE.SpotLight(0xf6f8ff, 0, 52, 0.56, 0.55, 1.3);
     sp.position.set(x, 0.7, 2.0);
     sp.target.position.set(x * 1.5, 0.1, 30);
     carRoot.add(sp); carRoot.add(sp.target);
@@ -234,6 +234,13 @@ async function buildCar() {
   }
   beams.userData.mat = beamMat;
   carRoot.add(beams);
+  // spill: the road around the car is lit by its own lamps, so the hero always sits inside light
+  const spill = new THREE.PointLight(0xfff1dc, 0, 16, 1.6);
+  spill.position.set(0, 0.5, 1.4);
+  carRoot.add(spill); night.spill = spill;
+  const tailGlow = new THREE.PointLight(0xff3020, 0, 7, 1.8);
+  tailGlow.position.set(0, 0.55, -2.4);
+  carRoot.add(tailGlow); night.tailGlow = tailGlow;
 }
 
 function startGame() {
@@ -278,6 +285,7 @@ function frame(now) {
 
   renderer.info.reset();
   rig.update(camera, dt);
+  post.cel.uniforms.uSpeed.value = car ? clamp((car.speed - 8) / 32, 0, 1) * (1 + 0.6 * clamp(car.boost / 1.2, 0, 1)) : 0;
   post.render(dt);
 
   const g = window.__GAME__;
@@ -319,6 +327,7 @@ function step(dt) {
   const p = n.p;
   const au = Math.abs(n.u);
   const surface = au < ROAD.halfWidth ? 1 : au < ROAD.halfWidth + 0.9 ? 0.7 : 0.35;
+  inp.line = { roadHeading: p.h, lat: n.u, curv: track.sample(G.s + 12 + car.speed * 0.55).k };
   car.step(dt, inp, surface);
 
   // ---- walls: the rail on the valley side, the cutting on the mountain side, the tunnel lining
@@ -423,9 +432,11 @@ function applySun(dt) {
   G.night = nightAmt; night.amt = nightAmt;
   for (const h of headlights) h.intensity = 110 * nightAmt;
   if (beams) beams.userData.mat.opacity = 0.09 * nightAmt;
-  if (night.moon) night.moon.intensity = 0.5 * nightAmt;
-  if (night.glow) night.glow.material.opacity = 0.30 * smoothstep(-0.5, -5, el);
-  if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.82 * nightAmt);
+  if (night.moon) night.moon.intensity = 0.85 * nightAmt;
+  if (night.glow) night.glow.material.opacity = 0.42 * smoothstep(-0.5, -5, el);
+  if (night.spill) night.spill.intensity = 34 * nightAmt;
+  if (night.tailGlow) night.tailGlow.intensity = 9 * nightAmt;
+  if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.66 * nightAmt);
   if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el);
   if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el); }
   world.setNight(nightAmt);

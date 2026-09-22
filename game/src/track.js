@@ -29,7 +29,27 @@ export class Track {
     this._featureIndex = 0;
     this._sinceHairpin = 0; this._sinceSet = 120;
     this._lastType = 'straight';
+    this._cells = new Map();     // coarse grid of sample indices, so a new feature can see old road
+    this._snap = null; this._retries = 0; this._forceDir = 0;
     this.pts.push(this._point('straight'));
+    this._cell(0);
+  }
+
+  _cellKey(x, z) { return Math.floor(x / 24) + ',' + Math.floor(z / 24); }
+  _cell(i) { const p = this.pts[i]; const k = this._cellKey(p.x, p.z); const c = this._cells.get(k); if (c) c.push(i); else this._cells.set(k, [i]); }
+
+  /** True when (x, z) is within 30 m of road older than 120 m, looking at the nine cells around it. */
+  _collides(x, z, newestOk) {
+    const cx = Math.floor(x / 24), cz = Math.floor(z / 24);
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+      const c = this._cells.get((cx + dx) + ',' + (cz + dz)); if (!c) continue;
+      for (const j of c) {
+        if (j >= this.pts.length || j > newestOk) continue;
+        const q = this.pts[j];
+        if ((x - q.x) * (x - q.x) + (z - q.z) * (z - q.z) < 15 * 15) return true;
+      }
+    }
+    return false;
   }
 
   _point(feature) {
@@ -40,7 +60,17 @@ export class Track {
   /** Grow the centreline until it covers distance sMax. */
   ensure(sMax) {
     while (this._s < sMax) {
-      if (!this._pending.length) this._plan();
+      if (!this._pending.length) {
+        // a snapshot at the start of every feature, so road that runs into old road can be undone, up to three
+        // features back, which is room enough to turn away
+        this._snaps = this._snaps || [];
+        this._snaps.push({ x: this._x, z: this._z, h: this._h, k: this._k, y: this._y, s: this._s, grade: this._grade, mount: this._mount,
+          mountTarget: this._mountTarget, ptsLen: this.pts.length, markersLen: this.markers.length, featuresLen: this.features.length,
+          sinceHairpin: this._sinceHairpin, sinceSet: this._sinceSet, lastType: this._lastType });
+        if (this._snaps.length > 4) this._snaps.shift();
+        this._snap = this._snaps[this._snaps.length - 1];
+        this._plan();
+      }
       const seg = this._pending[0];
       const n = Math.max(1, Math.round(seg.len / this.step));
       const ds = seg.len / n;
@@ -66,8 +96,24 @@ export class Track {
           if (seg.dir > 0) p.wr = w; else p.wl = w;
         }
         this.pts.push(p);
+        this._cell(this.pts.length - 1);
+        // ran into road laid more than 120 m ago: undo this feature and plan it the other way
+        if (this._retries < 8 && this._collides(p.x, p.z, this._snap.ptsLen - 100)) {
+          const depth = Math.min(this._snaps.length, 1 + Math.floor(this._retries / 2));
+          const S = this._snaps[this._snaps.length - depth];
+          this._snaps.length = this._snaps.length - depth;
+          this.pts.length = S.ptsLen; this.markers.length = S.markersLen; this.features.length = S.featuresLen;
+          Object.assign(this, { _x: S.x, _z: S.z, _h: S.h, _k: S.k, _y: S.y, _s: S.s, _grade: S.grade, _mount: S.mount, _mountTarget: S.mountTarget,
+            _sinceHairpin: S.sinceHairpin, _sinceSet: S.sinceSet, _lastType: S.lastType });
+          const lastDir = this.features.length ? this.features[this.features.length - 1].dir : 1;
+          this._forceDir = this._retries % 2 === 0 ? -(seg.dir || lastDir) : (seg.dir || lastDir);
+          this._forceType = this._retries >= 4 ? 'straight' : this._retries >= 2 ? 'sweeper' : null;
+          this._retries++;
+          this._pending = [];
+          break;
+        }
       }
-      this._pending.shift();
+      if (this._pending.length) { this._pending.shift(); if (!this._pending.length) this._retries = 0; }
     }
   }
 
@@ -85,7 +131,9 @@ export class Track {
     else type = 'straight';
     if (this._lastType === 'straight' && type === 'straight') type = 'sweeper';
     this._lastType = type;
-    const dir = r() < 0.5 ? 1 : -1;        // +1 left
+    if (this._forceType) { type = this._forceType; this._forceType = null; }
+    const dir = this._forceDir || (r() < 0.5 ? 1 : -1);        // +1 left
+    this._forceDir = 0;
     const grade = clamp((r() - 0.45) * 0.14, -0.075, 0.075);
     const push = (len, k0, k1, extra = {}) => this._pending.push({ len, k0, k1, grade, type, dir, ...extra });
     const ramp = 10 + r() * 8;

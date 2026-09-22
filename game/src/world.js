@@ -120,8 +120,9 @@ export class World {
   /** Every marker becomes a plan once, when the road reaches it. */
   planMarkers() {
     const t = this.track;
-    for (; this._plannedMarkers < t.markers.length; this._plannedMarkers++) {
-      const m = t.markers[this._plannedMarkers];
+    // rebuilt from the markers every time, so a marker undone by the generator's rollback leaves nothing behind
+    this.tunnels = []; t.terraces = [];
+    for (const m of t.markers) {
       if (m.kind === 'tunnel') {
         this.tunnels.push({ s0: m.s, s1: m.s + TUNNEL_LEN });
       } else if (m.kind === 'shrine') {
@@ -241,18 +242,19 @@ export class World {
 
   buildRoad(i0, i1, own) {
     const t = this.track, pts = t.pts;
-    const us = [-RAIL, -HALF, 0, HALF, RAIL];
-    const n = i1 - i0 + 1, cols = us.length;
+    const cols = 5;
+    const n = i1 - i0 + 1;
     const pos = new Float32Array(n * cols * 3), uv = new Float32Array(n * cols * 2);
     const idx = [];
     for (let k = 0; k < n; k++) {
       const p = pts[i0 + k];
       const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      const us = [-p.wr, -HALF, 0, HALF, p.wl];             // the shoulder reaches the wall, wider through a hairpin
       for (let j = 0; j < cols; j++) {
         const u = us[j], o = (k * cols + j);
         const dy = Math.abs(u) > HALF ? -0.02 : 0.012 * (1 - Math.abs(u) / HALF);     // a slight crown
         pos[o * 3] = p.x + lx * u; pos[o * 3 + 1] = p.y + dy; pos[o * 3 + 2] = p.z + lz * u;
-        uv[o * 2] = (u + RAIL) / (2 * RAIL); uv[o * 2 + 1] = p.s / 12;
+        uv[o * 2] = clamp((u + RAIL) / (2 * RAIL), 0, 1); uv[o * 2 + 1] = p.s / 12;
       }
       if (k < n - 1) for (let j = 0; j < cols - 1; j++) {
         const a = k * cols + j, b = a + 1, c2 = a + cols, d = c2 + 1;
@@ -288,8 +290,9 @@ export class World {
       const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side;
       const tun = this.nearTunnel(p.s, 10);
       let folded = false, fx = 0, fy = 0, fz = 0;
+      const wallShift = (side > 0 ? p.wl : p.wr) - RAIL;     // the terrain starts where the road's shoulder ends
       for (let j = 0; j < cols; j++) {
-        let u = US[j];
+        let u = US[j] + wallShift;
         let h;
         if (folded) {
           // past the fold (the inside of a hairpin, say) another stretch of road is nearer: collapse the rest of
@@ -496,10 +499,10 @@ export class World {
       }
     }
     // street lamps every 36 m, alternating sides, the arm reaching over the road: at night they are the light
-    for (let sl = Math.ceil(s0 / 36) * 36; sl < s1; sl += 36) {
+    for (let sl = Math.ceil(s0 / 30) * 30; sl < s1; sl += 30) {
       const p = t.sample(sl);
       if (p.tunnel || this.nearTunnel(p.s, 8)) continue;
-      const side = (Math.round(sl / 36) % 2 === 0) ? 1 : -1;
+      const side = (Math.round(sl / 30) % 2 === 0) ? 1 : -1;
       const lay = t.terraceAt(p.s);
       if (lay && lay.layby && lay.side === side) continue;
       const w = side > 0 ? p.wl : p.wr;
@@ -509,7 +512,7 @@ export class World {
       place('lamp', x, y, z, ry);
       const hx = x + Math.cos(ry) * 0.5, hz = z - Math.sin(ry) * 0.5;      // the head, half a metre along the arm
       this.lamps.push({ x: hx, y: y + 5.75, z: hz, ci });
-      this.pool(hx, y, hz, 10, 1.0);
+      this.pool(hx, y, hz, 15, 1.0);
       // the bulb: a small glowing ball under the head that reads as the source from any angle
       this._bulbMat = this._bulbMat || new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffd28a, emissiveIntensity: 2.6, roughness: 0.6 });
       this._bulbGeo = this._bulbGeo || new THREE.SphereGeometry(0.22, 10, 8);

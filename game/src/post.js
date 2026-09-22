@@ -22,11 +22,11 @@ const Cel = {
   uniforms: {
     tDiffuse: { value: null }, tDepth: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uNear: { value: 0.4 }, uFar: { value: 4500 }, uTime: { value: 0 },
-    uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.06 },
+    uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.06 }, uSpeed: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan;
+    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed;
     varying vec2 vUv;
     float lin(vec2 uv){ float z = texture2D(tDepth, uv).x * 2.0 - 1.0; return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear)); }
     float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -35,6 +35,14 @@ const Cel = {
     void main(){
       vec2 px = 1.0 / uRes;
       vec3 c = texture2D(tDiffuse, vUv).rgb;
+      // speed: the edges of the frame smear toward the centre, the way a drift anime draws speed
+      vec2 toC = vUv - vec2(0.5, 0.42);
+      float edge = smoothstep(0.12, 0.5, dot(toC, toC));
+      if (uSpeed > 0.01 && edge > 0.001) {
+        vec3 acc = c; float wsum = 1.0;
+        for (int i = 1; i <= 5; i++) { float t = float(i) / 5.0; vec2 uv2 = vUv - toC * t * 0.05 * uSpeed * edge; acc += texture2D(tDiffuse, uv2).rgb; wsum += 1.0; }
+        c = acc / wsum;
+      }
       // silhouettes: relative depth discontinuity
       float d0 = lin(vUv);
       float dl = lin(vUv - vec2(px.x, 0.0)), dr = lin(vUv + vec2(px.x, 0.0)), du = lin(vUv + vec2(0.0, px.y)), dd = lin(vUv - vec2(0.0, px.y));
