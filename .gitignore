@@ -10,3 +10,5 @@ work/cands/**/_verify/
 work/refs/
 work/jam_*/*.png
 work/jam_*/samples.json
+work/critic*/pairs/
+work/critic*/frames/
