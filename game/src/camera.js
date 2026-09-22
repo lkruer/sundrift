@@ -10,7 +10,7 @@
  * It is kept above the ground so a hairpin cut into the mountain can never put it inside the rock.
  */
 import * as THREE from 'three';
-import { CAM, clamp, damp, smoothstep } from './config.js?v=202609222245';
+import { CAM, clamp, damp, smoothstep } from './config.js?v=202609222255';
 
 const TAU = Math.PI * 2;
 function wrapA(d) { while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; return d; }

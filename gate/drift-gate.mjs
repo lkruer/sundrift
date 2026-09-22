@@ -186,6 +186,7 @@ console.log(`drifts banked   ${banks}  at metres ${driftBankedAt.join(', ')}`);
 console.log(`peak slip       ${maxSlip} deg   samples in drift ${driftFrames} of ${samples.length}`);
 console.log(`score           ${last ? last.score : '?'}`);
 console.log(`peak draws      ${peakDraws}   peak tris ${peakTris.toLocaleString('en-US')}   median fps ${medFps}`);
+console.log(`slow frames     ${last && last.longFrames !== undefined ? last.longFrames : '?'} over 34 ms, worst ${last && last.worstFrame !== undefined ? last.worstFrame : '?'} ms (after the first second of the run)`);
 console.log(`filmstrip       ${path.join(OUT, 'filmstrip.png')}`);
 fs.writeFileSync(path.join(OUT, 'gate.json'), JSON.stringify({ phone: PHONE, readyS, covered, banks, driftBankedAt, maxSlip, driftFrames, peakDraws, peakTris, medFps, avgKmh, errors, missing, problems, samples }, null, 2));
 if (problems.length) { console.log('\nproblems:'); for (const p of problems) console.log('  ' + p); process.exit(1); }

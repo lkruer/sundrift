@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222245';
-import { REACH } from './ground.js?v=202609222245';
-import { instanceGroup } from './instancing.js?v=202609222245';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222255';
+import { REACH } from './ground.js?v=202609222255';
+import { instanceGroup } from './instancing.js?v=202609222255';
 
 export const TILE = 96;
 export const LODS = [
@@ -303,14 +303,16 @@ export class Terrain {
       const m = _m4.compose(_v.set(x, y, z), _q, _s).clone();
       const patch = f.vnoise(x / 70, z / 70, 11);
       const pick = rng();
-      if (patch > 0.42 && lod === 0) {
+      if (patch > 0.5 && lod === 0) {
         if (pick < 0.12) bare.push({ m });
         else if (pick < 0.55) broad.push({ m, colour: pick < 0.3 ? PAL.mapleGold : PAL.dryGrass });
         else maples.push({ m, colour: pick < 0.75 ? PAL.mapleOrange : pick < 0.9 ? PAL.mapleRed : PAL.mapleGold });
       } else cedars.push({ m });
     }
     const g = new THREE.Group(); g.name = 'forest';
-    const cast = lod === 0;
+    // the forest casts no shadow: at night the moon's tree shadows barely read, and drawing a forest twice was a
+    // quarter of the frame's triangles
+    const cast = false;
     if (cedars.length && P.cedar) g.add(instanceGroup(P.cedar, cedars, { castShadow: cast }));
     if (maples.length && P.maple) g.add(instanceGroup(P.maple, maples, { castShadow: cast, tint: true }));
     if (broad.length && P.broadleaf) g.add(instanceGroup(P.broadleaf, broad, { castShadow: cast, tint: true }));

@@ -6,19 +6,19 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609222245';
-import { createRig, detectTier } from '../rig.js?v=202609222245';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222245';
-import { Car, gearbox } from './car.js?v=202609222245';
-import { Track, DIFFS } from './track.js?v=202609222245';
-import { World } from './world.js?v=202609222245';
-import { ChaseCam } from './camera.js?v=202609222245';
-import { Input } from './input.js?v=202609222245';
-import { Scoring } from './scoring.js?v=202609222245';
-import { Hud } from './hud.js?v=202609222245';
-import { Audio } from './audio.js?v=202609222245';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222245';
-import { makePost } from './post.js?v=202609222245';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609222255';
+import { createRig, detectTier } from '../rig.js?v=202609222255';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222255';
+import { Car, gearbox } from './car.js?v=202609222255';
+import { Track, DIFFS } from './track.js?v=202609222255';
+import { World } from './world.js?v=202609222255';
+import { ChaseCam } from './camera.js?v=202609222255';
+import { Input } from './input.js?v=202609222255';
+import { Scoring } from './scoring.js?v=202609222255';
+import { Hud } from './hud.js?v=202609222255';
+import { Audio } from './audio.js?v=202609222255';
+import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222255';
+import { makePost } from './post.js?v=202609222255';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -362,6 +362,7 @@ function startGame() {
   hud.warm(false);
   scoring.reset(); hud.reset();
   G.hour = 20.6; G.dist = 0; G.newBest = false; G.runBest = G.best[G.diff] || 0;
+  G.playT = 0; G.longFrames = 0; G.worstFrame = 0;
   const p = track.sample(G.s || START_S);
   chase.snap(car, p.y);
   hud.show(true);
@@ -436,6 +437,8 @@ function frame(now) {
   else if (G.mode === 'title') idle(dt, t0);
   else if (G.mode === 'paused') { if (world && car) world.update(car.x, car.z, G.s, t0 + 2); }
 
+  // a debug camera for inspecting the world from anywhere (set window.__CAM__ = { pos: [x,y,z], look: [x,y,z], fov })
+  if (window.__CAM__) { const c = window.__CAM__; camera.position.set(...c.pos); camera.up.set(0, 1, 0); camera.lookAt(...c.look); if (c.fov && camera.fov !== c.fov) { camera.fov = c.fov; camera.updateProjectionMatrix(); } }
   const t1 = performance.now();
   renderer.info.reset();
   rig.update(camera, dt);
@@ -463,6 +466,12 @@ function frame(now) {
     prof.worst = Math.max(prof.worst * 0.999, ms);
   }
   if (window.__ONFRAME__) window.__ONFRAME__(dt, real);
+  // every run keeps count of its slow frames, for the gate (the first second of a run is the start itself)
+  if (G.mode === 'playing') {
+    G.playT = (G.playT || 0) + real;
+    if (G.playT > 1.2) { if (real > 0.034) G.longFrames = (G.longFrames || 0) + 1; G.worstFrame = Math.max(G.worstFrame || 0, real * 1000); }
+    g.longFrames = G.longFrames || 0; g.worstFrame = Math.round(G.worstFrame || 0);
+  }
   if (hud && (hud.perfOn || prof.on)) {
     perfLine = `${G.fps} fps  ${g.draws} draws  ${(g.tris / 1000).toFixed(0)}k tris  ${tier}\n` +
       `sim ${prof.parts.sim.toFixed(1)}  world ${prof.parts.world.toFixed(1)}  render ${prof.parts.render.toFixed(1)} ms\n` +
