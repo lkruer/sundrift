@@ -12,10 +12,10 @@
     const hx = flankX(s, 0.72, -0.62);                                                         // door handle, flush
     add(body, box(0.006, 0.05, 0.16), DARK, hx + s * 0.003, 0.72, -0.62);
     add(body, box(0.014, 0.028, 0.12), DARK, hx + s * 0.010, 0.725, -0.62);
-    add(body, box(0.012, 0.035, 0.09), TAIL, s * 0.822, 0.60, -1.86);                          // rear side marker
+    add(body, box(0.012, 0.035, 0.09), TAIL, s * 0.832, 0.60, -1.86);                          // rear side marker
   }
-  add(body, box(1.22, 0.028, 0.10), PAINT, 0, 1.236, -0.995, 0.34);                            // roof spoiler lip, trailing edge up
-  add(body, box(1.22, 0.012, 0.04), DARK, 0, 1.243, -1.03, 0.34);                              // its rubber edge
+  add(body, box(1.10, 0.028, 0.10), PAINT, 0, 1.236, -0.995, 0.34);                            // roof spoiler lip, trailing edge up
+  add(body, box(1.10, 0.012, 0.04), DARK, 0, 1.243, -1.03, 0.34);                              // its rubber edge
   add(body, cyl(0.022, 0.026, 0.024, 12), DARK, 0.50, topY(0.50, -0.88) + 0.008, -0.88);      // antenna base
   add(body, cyl(0.007, 0.011, 0.09, 8), RUB, 0.50, topY(0.50, -0.88) + 0.048, -0.90, -0.45);   // rubber mast, raked back
   {                                                                                            // fuel filler on the left rear quarter
@@ -25,28 +25,28 @@
   }
 
   // ---- front end: bands swept round the nose, a real opening with the intercooler in it ----
-  add(body, box(1.02, 0.20, 0.10), DARK, 0, 0.31, 1.955);                                           // intercooler core
-  for (let k = 0; k < 12; k++) add(body, box(0.94, 0.007, 0.05), GALV, 0, 0.226 + k * 0.0155, 1.985); // its fins
+  add(body, box(1.20, 0.19, 0.10), DARK, 0, 0.295, 1.955);                                           // intercooler core
+  for (let k = 0; k < 12; k++) add(body, box(1.12, 0.007, 0.05), GALV, 0, 0.215 + k * 0.0145, 1.985); // its fins
   for (const s of [-1, 1]) {
-    add(body, box(0.07, 0.22, 0.11), DARK, s * 0.545, 0.31, 1.955);                                   // intercooler end tanks
-    add(body, new THREE.TorusGeometry(0.05, 0.022, 8, 12, PI / 2), DARK, s * 0.60, 0.36, 1.90, 0, s * PI / 2, 0);   // charge pipe elbows
-    add(body, cyl(0.036, 0.036, 0.03, 24), DARK, s * 0.62, 0.194, 2.15, PI / 2);                     // brake duct in the lower band
+    add(body, box(0.07, 0.21, 0.11), DARK, s * 0.635, 0.295, 1.955);                                   // intercooler end tanks
+    add(body, new THREE.TorusGeometry(0.05, 0.022, 8, 12, PI / 2), DARK, s * 0.69, 0.35, 1.90, 0, s * PI / 2, 0);   // charge pipe elbows
+    add(body, cyl(0.02, 0.02, 0.03, 16), DARK, s * 0.62, 0.185, 2.15, PI / 2);                     // brake duct in the lower band
   }
   add(body, box(1.40, 0.34, 0.02), DARK, 0, 0.31, 1.88);                                            // closes the bay behind it
   add(body, box(0.90, 0.05, 0.02), DARK, 0, 0.535, 2.155);                                          // mouth slot on the upper band
   for (const s of [-1, 1]) {
-    const f = faceAt(nose, s * 0.655), fog = new THREE.Group();                                     // fog lamp in a cup
-    fog.position.set(f.x, 0.31, f.z); fog.rotation.y = f.yaw; body.add(fog);
-    add(fog, cyl(0.057, 0.057, 0.04, 28), DARK, 0, 0, -0.006, PI / 2);
-    add(fog, cyl(0.043, 0.043, 0.012, 20), HEAD, 0, 0, 0.018, PI / 2);
-    add(fog, new THREE.TorusGeometry(0.05, 0.006, 6, 24), DARK, 0, 0, 0.016);
+    const f = faceAt(nose, s * 0.69), fog = new THREE.Group();                                     // fog lamp in a cup
+    fog.position.set(f.x, 0.295, f.z); fog.rotation.y = f.yaw; body.add(fog);
+    add(fog, cyl(0.05, 0.05, 0.04, 28), DARK, 0, 0, -0.006, PI / 2);
+    add(fog, cyl(0.038, 0.038, 0.012, 20), HEAD, 0, 0, 0.018, PI / 2);
+    add(fog, new THREE.TorusGeometry(0.044, 0.005, 6, 24), DARK, 0, 0, 0.016);
     const c = faceAt(nose, s * 0.70), can = new THREE.Group();                                      // canard at the corner
     can.position.set(c.x, 0.245, c.z - 0.03); can.rotation.set(-0.32, c.yaw, 0, 'YXZ'); body.add(can);
-    add(can, box(0.13, 0.008, 0.16), DARK, 0, 0, 0.06);
-    add(can, box(0.008, 0.04, 0.16), DARK, s * 0.065, 0.02, 0.06);                                   // its little end plate
-    onFace(nose, s * 0.31, 0.632, 0.34, 0.085, 0.024, HEAD, 0.028);                                 // inner headlamp lens
-    onFace(nose, s * 0.545, 0.632, 0.13, 0.085, 0.024, HEAD, 0.028);                                // outer lens pair, following the corner
-    onFace(nose, s * 0.685, 0.632, 0.12, 0.085, 0.024, HEAD, 0.028);
+    add(can, box(0.13, 0.005, 0.16), DARK, 0, 0, 0.06);
+    add(can, box(0.005, 0.035, 0.16), DARK, s * 0.065, 0.018, 0.06);                                   // its little end plate
+    onFace(nose, s * 0.31, 0.625, 0.34, 0.06, 0.024, HEAD, 0.028);                                 // inner headlamp lens
+    onFace(nose, s * 0.545, 0.625, 0.13, 0.06, 0.024, HEAD, 0.028);                                // outer lens pair, following the corner
+    onFace(nose, s * 0.685, 0.625, 0.12, 0.06, 0.024, HEAD, 0.028);
   }
   {                                                                                                  // tow hook, low on the right
     const f = faceAt(nose, -0.56), hook = new THREE.Group();
@@ -59,33 +59,31 @@
   for (const x of [-0.62, -0.44, 0.44, 0.62]) {
     const f = faceAt(tail, x), lamp = new THREE.Group();
     lamp.position.set(f.x, 0.87, f.z); lamp.rotation.y = f.yaw; body.add(lamp);
-    add(lamp, new THREE.CylinderGeometry(0.076, 0.076, 0.03, 32, 1, true), DARK2, 0, 0, 0.045, PI / 2);   // cup, open, the lamp sits down inside it
-    add(lamp, cyl(0.062, 0.062, 0.012, 32), TAIL, 0, 0, 0.036, PI / 2);                              // lens, sunk below the rim
-    add(lamp, new THREE.TorusGeometry(0.076, 0.005, 8, 32), POLISH, 0, 0, 0.06);                     // polished rim ring
-    add(lamp, new THREE.TorusGeometry(0.031, 0.004, 6, 24), LANE, 0, 0, 0.043);                      // white inner ring
+    add(lamp, new THREE.CylinderGeometry(0.06, 0.06, 0.024, 32, 1, true), DARK2, 0, 0, 0.026, PI / 2);   // cup, open, the lamp sits down inside it
+    add(lamp, cyl(0.048, 0.048, 0.01, 32), TAIL, 0, 0, 0.019, PI / 2);                              // lens, sunk below the rim
+    add(lamp, new THREE.TorusGeometry(0.06, 0.004, 8, 32), POLISH, 0, 0, 0.038);                     // polished rim ring
+    add(lamp, new THREE.TorusGeometry(0.024, 0.0035, 6, 24), LANE, 0, 0, 0.025);                      // white inner ring
   }
   {                                                                                                  // number-plate pocket: proud rim, blank plate, lamp above
     const zf = -2.19;
-    for (const [w, h, x, y] of [[0.46, 0.022, 0, 0.635], [0.46, 0.022, 0, 0.415], [0.022, 0.24, -0.219, 0.525], [0.022, 0.24, 0.219, 0.525]]) add(body, box(w, h, 0.05), DARK, x, y, zf - 0.005);
-    add(body, box(0.42, 0.20, 0.008), DARK, 0, 0.525, zf - 0.008);                                   // pocket floor
-    add(body, box(0.33, 0.165, 0.008), LANE, 0, 0.525, zf - 0.014);                                  // blank plate
-    add(body, box(0.09, 0.024, 0.05), DARK, 0, 0.665, zf - 0.006);                                   // plate lamp housing under the step
-    add(body, box(0.05, 0.010, 0.012), HEAD, 0, 0.657, zf - 0.030);
+    for (const [w, h, x, y] of [[0.36, 0.015, 0, 0.7575], [0.36, 0.015, 0, 0.5725], [0.015, 0.20, -0.1725, 0.665], [0.015, 0.20, 0.1725, 0.665]]) add(body, box(w, h, 0.03), DARK, x, y, zf - 0.008);
+    add(body, box(0.33, 0.17, 0.006), LANE, 0, 0.665, zf - 0.011);                                   // blank plate, just inside the rim
+    add(body, box(0.08, 0.018, 0.04), DARK, 0, 0.787, zf - 0.012);                                   // plate lamp housing under the garnish
+    add(body, box(0.05, 0.008, 0.01), HEAD, 0, 0.78, zf - 0.033);
   }
-  for (const s of [-1, 1]) onFace(tail, s * 0.70, 0.46, 0.03, 0.30, 0.024, REFL, 0.012);             // vertical corner reflector strips
-  add(body, box(0.40, 0.17, 0.02), DARK, 0.42, 0.28, -2.20);                                         // exhaust cut-out
-  for (const x of [0.35, 0.49]) {
-    add(body, cyl(0.05, 0.05, 0.16, 28, true), CHROME, x, 0.28, -2.16, PI / 2);                      // twin tips, left side, hollow
-    add(body, cyl(0.034, 0.034, 0.16, 20), DARK, x, 0.28, -2.14, PI / 2);                            // the dark inner pipe seen down the tip
+  for (const s of [-1, 1]) onFace(tail, s * 0.70, 0.63, 0.028, 0.24, 0.02, REFL, 0.014);             // vertical corner reflector strips
+  for (const x of [0.36, 0.48]) {
+    add(body, cyl(0.045, 0.045, 0.16, 28, true), CHROME, x, 0.29, -2.16, PI / 2);                      // twin tips, left side, hollow
+    add(body, cyl(0.03, 0.03, 0.16, 20), DARK, x, 0.29, -2.14, PI / 2);                            // the dark inner pipe seen down the tip
   }
   add(body, box(1.30, 0.05, 0.42), DARK, 0, 0.155, -2.00);                                           // diffuser plate
-  for (const x of [-0.60, -0.30, 0, 0.30, 0.60]) add(body, box(0.012, 0.16, 0.40), DARK, x, 0.16, -2.03);   // five deep fins
+  for (const x of [-0.60, -0.30, 0, 0.30, 0.60]) add(body, box(0.012, 0.10, 0.30), DARK, x, 0.13, -1.95);   // five fins, set back
   for (const s of [-1, 1]) add(body, box(0.22, 0.22, 0.016), RUB2, s * 0.75, 0.21, -1.60);           // mud flaps
   for (const s of [-1, 1]) {
-    add(body, box(0.012, 0.12, 0.32), DARK, s * 0.716, 1.30, -2.02, 0.12);                           // end plate
+    add(body, box(0.008, 0.09, 0.26), DARK, s * 0.714, 1.24, -2.02, 0.10);                           // end plate
   }
-  add(body, box(0.26, 0.024, 0.035), TAIL, 0, 1.307, -2.12, 0.12);                                   // high-mount brake lamp
-  add(body, box(1.40, 0.022, 0.012), DARK, 0, 1.317, -2.128, 0.12);                                  // gurney flap on the trailing edge
+  add(body, box(0.24, 0.018, 0.03), TAIL, 0, 1.243, -2.115, 0.10);                                   // high-mount brake lamp
+  add(body, box(1.40, 0.016, 0.010), DARK, 0, 1.249, -2.126, 0.10);                                  // gurney flap on the trailing edge
   add(body, box(0.42, 0.14, 0.44), DARK, 0.44, 0.23, -1.66);                                         // muffler, seen under the rear bumper
   rod(body, [0.44, 0.23, -1.88], [0.44, 0.27, -2.12], 0.03, DARK, 10);                               // tailpipe into the tips
   for (const s of [-1, 1]) {                                                                         // bonnet pins at the front corners
@@ -111,17 +109,17 @@
   add(body, box(1.24, 0.04, 4.20), DARK, 0, 0.16, 0);                                                // underbody plate
   for (const s of [-1, 1]) for (const az of [1.275, -1.225]) for (let k = 0; k < 8; k++) {                                                                    // rivet row on the flare face
       const th = (20 + 140 * k / 7) * PI / 180;
-      add(body, new THREE.SphereGeometry(0.014, 10, 5, 0, PI * 2, 0, PI / 2), DARK, s * 0.86, 0.32 + 0.39 * Math.sin(th), az + 0.39 * Math.cos(th), 0, 0, -s * PI / 2);
+      add(body, new THREE.SphereGeometry(0.014, 10, 5, 0, PI * 2, 0, PI / 2), DARK, s * (az > 0 ? 0.875 : 0.89), 0.32 + 0.39 * Math.sin(th), az + 0.39 * Math.cos(th), 0, 0, -s * PI / 2);
     }
   for (const s of [-1, 1]) {
-    add(body, box(0.03, 0.03, 1.66), RUB, s * 0.79, 0.935, -0.60);                                   // belt trim
-    add(body, box(0.03, 0.03, 0.62), RUB, s * 0.67, 1.245, -0.65);                                   // drip rail
-    add(body, box(0.024, 0.024, 0.34), RUB, s * 0.79, 0.915, -1.24);                                 // quarter window lower trim
+    add(body, box(0.03, 0.03, 1.66), RUB, s * 0.79, 0.905, -0.60);                                   // belt trim
+    add(body, box(0.03, 0.03, 0.62), RUB, s * 0.61, 1.245, -0.65);                                   // drip rail
+    add(body, box(0.024, 0.024, 0.34), RUB, s * 0.79, 0.912, -1.24);                                 // quarter window lower trim
     rod(body, [s * 0.77, 0.94, 0.20], [s * 0.85, 0.97, 0.17], 0.022, DARK, 10);                      // mirror stalk
     const head = new THREE.Group(); head.position.set(s * 0.885, 0.975, 0.16); head.rotation.y = s * 0.30; body.add(head);
     const shell = add(head, sph(1, 20, 12), DARK); shell.scale.set(0.088, 0.048, 0.062);
     add(head, box(0.13, 0.066, 0.008), MIRROR, 0, 0, -0.052);                                        // mirror face
   }
   add(body, box(1.52, 0.03, 0.03), RUB, 0, 0.875, 0.285);                                            // windscreen base trim
-  add(body, box(1.44, 0.03, 0.03), RUB, 0, 0.965, -1.475);                                           // rear glass base trim
+  add(body, box(1.40, 0.03, 0.03), RUB, 0, 0.945, -1.475);                                           // rear glass base trim
   for (const s of [-1, 1]) add(body, box(0.50, 0.014, 0.022), DARK, s * 0.30, 0.914, 0.22, 0.546, s * 0.30, 0);   // wipers, parked on the glass

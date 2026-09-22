@@ -54,7 +54,7 @@ const night = { moon: null, stars: null, disc: null, dir: new THREE.Vector3(0.35
 function buildNight() {
   const moon = new THREE.DirectionalLight(0x6f8fd8, 0);
   moon.castShadow = Q.shadow;
-  const sm = tier === 'phone' ? 1024 : 2048;
+  const sm = tier === 'phone' ? 1024 : 1536;
   moon.shadow.mapSize.set(sm, sm);
   moon.shadow.camera.near = 1; moon.shadow.camera.far = 120;
   moon.shadow.bias = -0.0008; moon.shadow.normalBias = 0.04;
@@ -127,6 +127,8 @@ async function boot() {
   particles.setScale(innerHeight);
   rig.refresh(scene);
   // compile every shader variant now, not on the first frame that needs it
+  world.mapleMat(PAL.mapleRed); world.mapleMat(PAL.mapleGold);
+  world.precompile(renderer, camera, (root) => rig.refresh(root));
   try { renderer.compile(scene, camera); } catch (e) { console.warn('compile', e.message); }
   window.__DEBUG__ = { world, track, car, rig, scene, renderer, G, chase, audio, post, get scoring() { return scoring; },
     // put the car on the centreline at distance s, facing along the road, camera snapped: for the critic's fixed views
@@ -409,7 +411,7 @@ function nightFollow() {
     night.disc.lookAt(camera.position);
   }
   // the moon key sits over the car; snapped to texels so the shadow edges do not crawl
-  const texel = 68 / (tier === 'phone' ? 1024 : 2048);
+  const texel = 68 / (tier === 'phone' ? 1024 : 1536);
   const sx = Math.round(car.x / texel) * texel, sz = Math.round(car.z / texel) * texel;
   const m = night.moon;
   m.position.set(sx + night.dir.x * 60, carRoot.position.y + night.dir.y * 60, sz + night.dir.z * 60);
@@ -422,10 +424,12 @@ function applySun(dt) {
   sunTimer += dt;
   // setTime rebuilds the sky (about 25 ms), so it is throttled: every 2.5 s, or sooner after a big bank
   const moved = Math.abs(G.hour - G.hourShown);
-  const deepNight = G.night > 0.98;
-  if (sunTimer < (deepNight ? 7 : 2.5) && moved < 0.12) return;
+  // below the rig's own clamp of -12 degrees the sky does not change at all, so a rebuild (30 ms) is skipped
+  const elOf = (h) => Math.max(-12, 62 * Math.sin(Math.PI * (h - 6) / 12));
+  if (elOf(G.hour) <= -12 && elOf(G.hourShown) <= -12 && G.sunApplied) return;
+  if (sunTimer < 2.5 && moved < 0.12) return;
   if (moved < 0.004) return;
-  sunTimer = 0; G.hourShown = G.hour;
+  sunTimer = 0; G.hourShown = G.hour; G.sunApplied = true;
   const t = rig.setTime({ hour: G.hour });
   const el = t.elevation;
   // headlights and lamps come on as the sun goes

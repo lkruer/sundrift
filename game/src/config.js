@@ -53,7 +53,7 @@ export const SCORE = {
 };
 
 export const QUALITY = {
-  high:  { pixelRatio: 2, shadow: true, smoke: 420, skid: 900, trees: 1.0, far: 900 },
+  high:  { pixelRatio: 1.5, shadow: true, smoke: 420, skid: 900, trees: 1.0, far: 900 },
   phone: { pixelRatio: 1.5, shadow: true, smoke: 200, skid: 500, trees: 0.7, far: 700 },
   low:   { pixelRatio: 1, shadow: false, smoke: 120, skid: 300, trees: 0.5, far: 600 },
 };

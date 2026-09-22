@@ -4,7 +4,7 @@
   add(body, box(0.24, 0.14, 1.30), DARK, 0, 0.39, -0.45);                                            // tunnel
   add(body, box(1.46, 0.24, 0.36), DARK, 0, 0.72, 0.16);                                             // dashboard
   add(body, box(1.46, 0.05, 0.22), DARK, 0, 0.855, 0.18);                                            // its upper pad
-  add(body, box(1.40, 0.04, 0.45), DARK, 0, 0.92, -1.26);                                            // parcel shelf
+  add(body, box(1.40, 0.04, 0.45), DARK, 0, 0.90, -1.26);                                            // parcel shelf
   add(body, new THREE.CylinderGeometry(0.095, 0.095, 0.30, 12, 1, true, 0, PI), DARK2, -0.36, 0.86, 0.10, 0, 0, PI / 2);   // binnacle hood
   {
     const gz = new THREE.Group(); gz.position.set(-0.36, 0.87, 0.11); gz.rotation.x = -PI / 2 + 0.28; body.add(gz);      // gauges face the driver
@@ -85,18 +85,20 @@
     };
     at(rv([[0.25, -hw + 0.03], [0.292, -hw + 0.006], [0.306, -hw + 0.045], [0.306, hw - 0.045], [0.292, hw - 0.006], [0.25, hw - 0.03]], 48), RUB);
     for (let k = 0; k < 12; k++) {
-      const geo = lathe([[0.300, -hw + 0.04], [0.32, -hw + 0.062], [0.32, hw - 0.062], [0.300, hw - 0.04]], 6, k * PI / 6 + 0.04, PI / 6 - 0.08);
+      const geo = lathe([[0.306, -hw + 0.04], [0.32, -hw + 0.058], [0.32, hw - 0.058], [0.306, hw - 0.04]], 6, k * PI / 6 + 0.03, PI / 6 - 0.06);
       geo.rotateZ(-PI / 2); at(geo, RUB2);
     }
     const bead = at(new THREE.TorusGeometry(0.262, 0.008, 6, 44), RUB, hw - 0.012); bead.rotation.y = PI / 2;
     at(rv([[0.24, -hw + 0.02], [0.222, -hw + 0.05], [0.222, hw - 0.07], [0.215, hw - 0.03]], 40), BRONZ2);        // barrel
     at(rv([[0.20, hw - 0.03], [0.238, hw - 0.03], [0.238, hw + 0.004], [0.20, hw + 0.004]], 40), LIP);            // polished lip
-    const os = hw - 0.10;
+    at(rv([[0.194, hw - 0.034], [0.206, hw - 0.034], [0.206, hw + 0.007], [0.194, hw + 0.007]], 40), GALV);       // machined ring at the lip's inner edge
+    const os = hw - 0.075;                                                                                       // a slight dish
     at(rv([[0.001, os - 0.06], [0.08, os - 0.06], [0.08, os], [0.05, os], [0.05, os + 0.012], [0.001, os + 0.012]], 24), BRONZE);
     at(rv([[0.001, os + 0.012], [0.040, os + 0.012], [0.040, os + 0.020], [0.001, os + 0.020]], 16), DARK);         // centre cap
     for (let k = 0; k < 5; k++) {
       const a = k * PI * 2 / 5 + PI / 2;
-      at(loft([rect(1, [0, 0.045, 0], [0.025, 0.016]), rect(1, [0, 0.16, 0], [0.025, 0.026]), rect(1, [0, 0.228, 0], [0.022, 0.032])], { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), BRONZE, os - 0.015, 0, 0, a);   // tapered spoke
+      const spk = (y, t, w) => [[-t, y, -w], [-t, y, w], [t * 0.5, y, w * 0.72], [t * 1.15, y, 0], [t * 0.5, y, -w * 0.72]].map(([x, yy, z]) => [side * x, yy, z]);   // peaked cross-section
+      at(loft([spk(0.045, 0.02, 0.016), spk(0.16, 0.02, 0.026), spk(0.228, 0.018, 0.032)], { creaseRows: [0, 1, 2, 3, 4], capFront: 0, capBack: 0 }), BRONZE, os - 0.015, 0, 0, a);   // tapered spoke
       at(cyl(0.011, 0.011, 0.014, 6), DARK, os + 0.016, 0.058 * Math.cos(a + PI / 5), 0.058 * Math.sin(a + PI / 5), 0, PI / 2);   // lug nut
     }
     at(rv([[0.062, -0.05], [0.062, os - 0.06]], 16), DARK2);                                                       // hub bell

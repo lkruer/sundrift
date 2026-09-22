@@ -103,6 +103,8 @@ export class Track {
           const S = this._snaps[this._snaps.length - depth];
           this._snaps.length = this._snaps.length - depth;
           this.pts.length = S.ptsLen; this.markers.length = S.markersLen; this.features.length = S.featuresLen;
+          // and forget the undone samples in the grid, or every rollback leaves stale entries that pile up
+          for (const [k, c] of this._cells) { const kept = c.filter((j) => j < S.ptsLen); if (kept.length) this._cells.set(k, kept); else this._cells.delete(k); }
           Object.assign(this, { _x: S.x, _z: S.z, _h: S.h, _k: S.k, _y: S.y, _s: S.s, _grade: S.grade, _mount: S.mount, _mountTarget: S.mountTarget,
             _sinceHairpin: S.sinceHairpin, _sinceSet: S.sinceSet, _lastType: S.lastType });
           const lastDir = this.features.length ? this.features[this.features.length - 1].dir : 1;

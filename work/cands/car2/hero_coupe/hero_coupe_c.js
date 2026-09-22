@@ -224,36 +224,39 @@ export default function (THREE) {
     add(grp, box(w, h, d), m, 0, 0, (proud || 0) + d / 2 - d);
     return grp;
   };
-  const tail = endPath(-1, -2.19, -1.56, wrapR).reverse();                                        // reversed so the swept normal faces out
+  const tail = endPath(-1, -2.19, -1.56, wrapR).reverse();
+  // the part of a tail path at or behind z = zl, with exact points inserted at the cuts
+  const clipZ = (path, zl) => { const out = []; for (let i = 0; i < path.length; i++) { const p = path[i], q = path[i + 1]; if (p[1] <= zl + 1e-9) out.push(p); if (q && (p[1] - zl) * (q[1] - zl) < 0) { const t = (zl - p[1]) / (q[1] - p[1]); out.push([lerp(p[0], q[0], t), zl]); } } return out; };                                        // reversed so the swept normal faces out
 
   // ---- the hull: ten stations, twelve points each --------------------------------------
-  // rows: 0 floor centre, 1 floor edge, 2 flank, 3 belt, 4 roof edge, 5 roof mid, 6 crown,
-  // then 7..11 mirror rows 5..1. Bands 3-4 / 8-9 are the tumblehome (glass through the
-  // cabin), bands 4..8 the top (glass at the windscreen and rear glass segments).
+  // rows: 0 floor centre, 1 floor edge, 2 flank, 3 belt, 4 roof edge, 5-7 crown, 8 crown centre,
+  // then 9..15 mirror rows 7..1. Bands 3 / 12 are the tumblehome (glass through the cabin),
+  // bands 4..11 the top (glass at the windscreen and rear glass segments).
   const ring = (z, lo, hwLo, hwMid, yMid, hwBelt, yBelt, hwRoof, yRoof, yTop) => {
-    const R = [[0, lo], [hwLo, lo], [hwMid, yMid], [hwBelt, yBelt], [hwRoof, yRoof], [hwRoof * 0.5, yRoof + (yTop - yRoof) * 0.75], [0, yTop]];
+    const R = [[0, lo], [hwLo, lo], [hwMid, yMid], [hwBelt, yBelt], [hwRoof, yRoof]];
+    for (let k = 1; k <= 4; k++) { const x = hwRoof * (1 - k / 4); R.push([x, yRoof + (yTop - yRoof) * (1 - Math.pow(x / hwRoof, 2))]); }   // crown: a parabola, four segments a side
     const out = [];
-    for (let i = 0; i < 7; i++) out.push([R[i][0], R[i][1], z]);
-    for (let i = 5; i >= 1; i--) out.push([-R[i][0], R[i][1], z]);
+    for (let i = 0; i < R.length; i++) out.push([R[i][0], R[i][1], z]);
+    for (let i = R.length - 2; i >= 1; i--) out.push([-R[i][0], R[i][1], z]);
     return out;
   };
   const stations = [
-    [2.12,  0.59, 0.72, 0.75,  0.615, 0.75,  0.655, 0.66, 0.68,  0.70],     // nose
-    [1.64,  0.59, 0.80, 0.815, 0.65,  0.80,  0.712, 0.70, 0.727, 0.752],    // front arch, front edge
-    [1.275, 0.70, 0.80, 0.815, 0.71,  0.80,  0.745, 0.70, 0.762, 0.787],    // front axle
-    [0.92,  0.70, 0.80, 0.815, 0.72,  0.80,  0.78,  0.70, 0.797, 0.822],    // front arch, rear edge
-    [0.275, 0.70, 0.80, 0.815, 0.76,  0.795, 0.85,  0.74, 0.86,  0.885],    // scuttle
-    [-0.35, 0.70, 0.80, 0.815, 0.78,  0.78,  0.92,  0.66, 1.235, 1.265],    // windscreen top
-    [-0.65, 0.70, 0.80, 0.815, 0.79,  0.78,  0.925, 0.66, 1.245, 1.28],     // roof peak
-    [-0.95, 0.70, 0.80, 0.815, 0.80,  0.78,  0.93,  0.65, 1.225, 1.255],    // rear glass top
-    [-1.48, 0.70, 0.80, 0.815, 0.80,  0.80,  0.94,  0.73, 0.96,  0.975],    // rear glass base
-    [-2.12, 0.78, 0.78, 0.79,  0.85,  0.78,  0.93,  0.71, 0.975, 0.99],     // tail, with a lip
+    [2.12,  0.59, 0.72, 0.75,  0.615, 0.75,  0.655, 0.66, 0.686, 0.698],    // nose
+    [1.64,  0.59, 0.80, 0.815, 0.65,  0.80,  0.712, 0.70, 0.733, 0.746],    // front arch, front edge
+    [1.275, 0.70, 0.80, 0.815, 0.71,  0.80,  0.745, 0.70, 0.768, 0.781],    // front axle
+    [0.92,  0.70, 0.80, 0.815, 0.72,  0.80,  0.78,  0.70, 0.803, 0.816],    // front arch, rear edge
+    [0.275, 0.70, 0.80, 0.815, 0.76,  0.795, 0.85,  0.74, 0.866, 0.88],     // scuttle
+    [-0.35, 0.70, 0.80, 0.815, 0.78,  0.78,  0.895, 0.60, 1.235, 1.265],    // windscreen top
+    [-0.65, 0.70, 0.80, 0.815, 0.79,  0.78,  0.905, 0.60, 1.245, 1.28],     // roof peak
+    [-0.95, 0.70, 0.80, 0.815, 0.80,  0.78,  0.912, 0.59, 1.225, 1.255],    // rear glass top
+    [-1.48, 0.70, 0.80, 0.815, 0.80,  0.80,  0.915, 0.70, 0.94,  0.952],    // rear glass base
+    [-2.12, 0.78, 0.78, 0.79,  0.85,  0.78,  0.905, 0.71, 0.915, 0.93],     // tail, deck lowered
   ];
   const rings = stations.map((s) => ring(...s));
   add(body, loft(rings, {
-    creaseRows: [1, 3, 4, 8, 9, 11], creaseSecs: [4, 5, 7, 8], capFront: 0, capBack: 0,
+    creaseRows: [1, 3, 4, 12, 13, 15], creaseSecs: [4, 5, 7, 8], capFront: 0, capBack: 0,
     matOf: (seg, row) => {
-      const top = row >= 4 && row <= 7, side = row === 3 || row === 8;
+      const top = row >= 4 && row <= 11, side = row === 3 || row === 12;
       if (top && (seg === 4 || seg === 7)) return 1;
       if (side && seg >= 4 && seg <= 7) return 1;
       return 0;
@@ -266,9 +269,9 @@ export default function (THREE) {
     const a = rings[i], b = rings[i + 1], t = c01((a[0][2] - z) / (a[0][2] - b[0][2]));
     return a.map((p, k) => [lerp(p[0], b[k][0], t), lerp(p[1], b[k][1], t), z]);
   };
-  // height of the top skin at (x, z): belt(+x), roof edge, mid, crown, mid, roof edge, belt(-x)
+  // height of the top skin at (x, z): belt(+x), roof edge, crown points, roof edge, belt(-x)
   const topY = (x, z) => {
-    const r = ringAt(z), pts = [r[3], r[4], r[5], r[6], r[7], r[8], r[9]];
+    const r = ringAt(z), pts = r.slice(3, 14);
     for (let k = 0; k < pts.length - 1; k++) {
       const a = pts[k], b = pts[k + 1];
       if (x <= a[0] + 1e-9 && x >= b[0] - 1e-9) return lerp(a[1], b[1], (a[0] - x) / ((a[0] - b[0]) || 1e-9));
@@ -285,14 +288,14 @@ export default function (THREE) {
     return s * (y < pts[0][1] ? pts[0][0] : pts[3][0]);
   };
   const linePts = (a, b, n) => { const out = []; for (let k = 0; k <= n; k++) out.push([lerp(a[0], b[0], k / n), lerp(a[1], b[1], k / n)]); return out; };
-  // A shut line: a dark strip w wide, sunk 0.006 and proud 0.003, lofted along [x, z]
+  // A shut line: a dark strip w wide, sunk 0.006 and proud 0.002, lofted along [x, z]
   // points on the top skin. Sample enough points that it follows the crown.
   const topStrip = (pts, w, m) => {
     const secs = pts.map(([x, z], i) => {
       const y = topY(x, z), q = pts[Math.min(i + 1, pts.length - 1)], p = pts[Math.max(i - 1, 0)];
       let dx = q[0] - p[0], dz = q[1] - p[1]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
       const nx = dz * w / 2, nz = -dx * w / 2;
-      return [[x - nx, y - 0.006, z - nz], [x + nx, y - 0.006, z + nz], [x + nx, y + 0.003, z + nz], [x - nx, y + 0.003, z - nz]];
+      return [[x - nx, y - 0.006, z - nz], [x + nx, y - 0.006, z + nz], [x + nx, y + 0.002, z + nz], [x - nx, y + 0.002, z - nz]];
     });
     return add(body, loft(secs, { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), m || DARK);
   };
@@ -301,7 +304,7 @@ export default function (THREE) {
     const secs = pts.map(([y, z], i) => {
       const x = flankX(s, y, z), q = pts[Math.min(i + 1, pts.length - 1)], p = pts[Math.max(i - 1, 0)];
       let dy = q[0] - p[0], dz = q[1] - p[1]; const L = Math.hypot(dy, dz) || 1; dy /= L; dz /= L;
-      const ny = dz * w / 2, nz = -dy * w / 2, o = s * 0.003, i2 = -s * 0.006;
+      const ny = dz * w / 2, nz = -dy * w / 2, o = s * 0.002, i2 = -s * 0.006;
       return [[x + i2, y - ny, z - nz], [x + i2, y + ny, z + nz], [x + o, y + ny, z + nz], [x + o, y - ny, z - nz]];
     });
     return add(body, loft(secs, { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), m || DARK);
@@ -319,21 +322,21 @@ export default function (THREE) {
 
   // ---- panel map: shut lines, pop-up lids, bulge, vents, roof furniture ---------------
   for (const s of [-1, 1]) {
-    topStrip(linePts([s * 0.60, 0.34], [s * 0.60, 1.74], 8), 0.012);                          // bonnet edges
+    topStrip(linePts([s * 0.60, 0.34], [s * 0.60, 1.74], 8), 0.010);                          // bonnet edges
     topPanel(s * 0.30, s * 0.62, 1.79, 2.05, 0.003, PAINT, 3);                                 // pop-up lamp lid, closed
     const lid = [[s * 0.30, 1.79], [s * 0.62, 1.79], [s * 0.62, 2.05], [s * 0.30, 2.05], [s * 0.30, 1.79]];
-    for (let k = 0; k < 4; k++) topStrip(linePts(lid[k], lid[k + 1], 4), 0.012);
-    topStrip(linePts([s * 0.60, -1.52], [s * 0.60, -2.13], 7), 0.012);                        // boot edges, run out through the ducktail
-    flankStrip(s, linePts([0.25, 0.42], [0.80, 0.42], 6), 0.012);                             // door front edge
-    flankStrip(s, linePts([0.25, -0.93], [0.80, -0.93], 6), 0.012);                           // door rear edge
+    for (let k = 0; k < 4; k++) topStrip(linePts(lid[k], lid[k + 1], 4), 0.010);
+    topStrip(linePts([s * 0.60, -1.52], [s * 0.60, -2.13], 7), 0.010);                        // boot edges, run out through the ducktail
+    flankStrip(s, linePts([0.25, 0.42], [0.80, 0.42], 6), 0.010);                             // door front edge
+    flankStrip(s, linePts([0.25, -0.93], [0.80, -0.93], 6), 0.010);                           // door rear edge
   }
-  topStrip(linePts([-0.60, 1.74], [0.60, 1.74], 12), 0.012);                                  // bonnet front edge
-  topStrip(linePts([-0.60, 0.34], [0.60, 0.34], 12), 0.012);                                  // bonnet rear edge (scuttle)
-  topStrip(linePts([-0.60, -1.52], [0.60, -1.52], 12), 0.012);                                // boot front edge
+  topStrip(linePts([-0.60, 1.74], [0.60, 1.74], 12), 0.010);                                  // bonnet front edge
+  topStrip(linePts([-0.60, 0.34], [0.60, 0.34], 12), 0.010);                                  // bonnet rear edge (scuttle)
+  topStrip(linePts([-0.60, -1.52], [0.60, -1.52], 12), 0.010);                                // boot front edge
   {                                                                                            // bonnet bulge, riding the crown
     const secs = [];
     for (let k = 0; k <= 8; k++) {
-      const z = lerp(0.50, 1.72, k / 8), e = Math.sin(PI * k / 8), h = 0.05 * Math.pow(e, 0.6);
+      const z = lerp(0.50, 1.72, k / 8), e = Math.sin(PI * k / 8), h = 0.03 * Math.pow(e, 0.6);
       const y = (x) => topY(x, z);
       secs.push([[0.25, y(0.25) - 0.012, z], [0.25, y(0.25) + 0.002, z], [0.13, y(0.13) + h, z], [-0.13, y(-0.13) + h, z], [-0.25, y(-0.25) + 0.002, z], [-0.25, y(-0.25) - 0.012, z]]);
     }
@@ -342,7 +345,7 @@ export default function (THREE) {
   {                                                                                            // ducktail: the boot lid trailing edge kicks up
     const secs = [];
     for (let k = 0; k <= 7; k++) {
-      const z = lerp(-1.90, -2.19, k / 7), h = 0.062 * Math.pow(c01((-1.90 - z) / 0.29), 1.6), lo = [], hi = [];
+      const z = lerp(-1.90, -2.19, k / 7), h = 0.04 * Math.pow(c01((-1.90 - z) / 0.29), 1.6), lo = [], hi = [];
       for (let j = 0; j <= 6; j++) { const x = lerp(-0.58, 0.58, j / 6), y = topY(x, z); lo.push([x, y - 0.012, z]); hi.push([x, y + h + 0.002, z]); }
       secs.push(lo.concat(hi.reverse()));
     }
@@ -351,28 +354,28 @@ export default function (THREE) {
 
 
   const topF = (x, z) => lerp(0.605, 0.648, c01((1.96 - z) / 0.40));         // the hull floor rises over the arch
-  add(body, sweep(nose, bandProf(0.40, topF, 0.10, 0.05)), PAINT);                                 // upper bumper
-  add(body, sweep(nose, plainProf(0.165, 0.222, 0.10)), PAINT);                                     // lower bumper band
-  add(body, sweep(clipX(nose, 0.50, 0.815), plainProf(0.20, 0.42, 0.10)), PAINT);                    // pillar beside the opening
-  add(body, sweep(clipX(nose, -0.815, -0.50), plainProf(0.20, 0.42, 0.10)), PAINT);
+  add(body, sweep(nose, bandProf(0.38, topF, 0.10, 0.05)), PAINT);                                 // upper bumper
+  add(body, sweep(nose, plainProf(0.16, 0.21, 0.10)), PAINT);                                     // lower bumper band
+  add(body, sweep(clipX(nose, 0.58, 0.815), plainProf(0.19, 0.40, 0.10)), PAINT);                    // pillar beside the opening
+  add(body, sweep(clipX(nose, -0.815, -0.58), plainProf(0.19, 0.40, 0.10)), PAINT);
   add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.135, 0.168, 0.10, 0.055)), DARK);          // splitter lip, proud of the face
-  add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.578, 0.69, 0.10, 0.012)), DARK);           // lamp band
+  add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.585, 0.665, 0.10, 0.012)), DARK);           // lamp band
   const topR = (x, z) => lerp(0.725, 0.80, c01((-1.60 - z) / 0.59));
-  add(body, sweep(tail, [[0, 0.17], [0, 0.66], [-0.03, 0.68], [-0.03, topR], [-0.10, topR], [-0.10, 0.17]]), PAINT);   // rear bumper, stepped in under the garnish
-  add(body, sweep(clipX(tail, -0.80, 0.80), [[0.005, 0.78], [0.03, 0.80], [0.03, 0.94], [0.005, 0.96], [-0.08, 0.96], [-0.08, 0.78]]), DARK);   // full-width garnish, chamfered edges
-  add(body, sweep(tail, plainProf(0.17, 0.31, 0.10, 0.006)), DARK);                                  // lower valance, wraps the corners
+  add(body, sweep(tail, [[0, 0.46], [0.012, 0.52], [0.004, topR], [-0.10, topR], [-0.10, 0.46]]), PAINT);   // rear bumper face, 0.34 tall with a soft crease
+  add(body, sweep(clipZ(tail, -1.86), [[0.0, 0.80], [0.014, 0.812], [0.014, 0.928], [0.0, 0.94], [-0.08, 0.94], [-0.08, 0.80]]), DARK);   // garnish, 0.14 tall, chamfered, wrapping into the quarters
+  add(body, sweep(tail, plainProf(0.17, 0.47, 0.10, 0.006)), DARK);                                  // lower valance, wraps the corners
   // rear wing: aerofoil lofted across, swept uprights, end plates, high-mount brake lamp
   const foil = (x) => {
     const out = [];
     for (let k = 0; k < 14; k++) {
       const t = k / 14, u = 0.5 - 0.5 * Math.cos(2 * PI * t);
-      const th = 0.018 * (1.2 * Math.sqrt(u) - 0.3 * u - 0.9 * u * u) / 0.50;
+      const th = 0.011 * (1.2 * Math.sqrt(u) - 0.3 * u - 0.9 * u * u) / 0.50;
       out.push([x, t < 0.5 ? th + 0.006 : -th * 0.9 + 0.006, 0.11 - 0.22 * u]);
     }
     return out;
   };
-  add(body, loft([foil(-0.71), foil(-0.30), foil(0.30), foil(0.71)], { capFront: 0, capBack: 0 }), DARK, 0, 1.30, -2.02, 0.12);
-  for (const s of [-1, 1]) add(body, loft([rect(1, [s * 0.45, 0.94, -1.83], [0.022, 0.10]), rect(1, [s * 0.45, 1.12, -1.92], [0.022, 0.085]), rect(1, [s * 0.45, 1.295, -2.01], [0.022, 0.07])], { capFront: 0, capBack: 0 }), DARK);   // taller swept uprights
+  add(body, loft([foil(-0.71), foil(-0.30), foil(0.30), foil(0.71)], { capFront: 0, capBack: 0 }), DARK, 0, 1.235, -2.02, 0.10);
+  for (const s of [-1, 1]) add(body, loft([rect(1, [s * 0.45, 0.905, -1.83], [0.018, 0.09]), rect(1, [s * 0.45, 1.08, -1.92], [0.018, 0.075]), rect(1, [s * 0.45, 1.232, -2.01], [0.018, 0.06])], { capFront: 0, capBack: 0 }), DARK);   // taller swept uprights
   for (const s of [-1, 1]) for (const [az, top] of [[1.275, 0.74], [-1.225, 0.78]]) {
     const th0 = Math.atan2(-0.08, 0.50), secs = [];
     const outer = (th) => {
@@ -383,15 +386,16 @@ export default function (THREE) {
     };
     for (let k = 0; k <= 18; k++) {
       const th = th0 + (PI - 2 * th0) * k / 18, iz = az + 0.35 * Math.cos(th), iy = 0.32 + 0.35 * Math.sin(th), [oz, oy] = outer(th);
-      secs.push([[s * 0.785, iy, iz], [s * 0.86, iy, iz], [s * 0.86, oy, oz], [s * 0.785, oy, oz]]);
+      const ox = az > 0 ? 0.875 : 0.89;
+      secs.push([[s * 0.785, iy, iz], [s * ox, iy, iz], [s * ox, oy, oz], [s * 0.785, oy, oz]]);
     }
     add(body, loft(secs, { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), PAINT);
   }
   for (const s of [-1, 1]) {
-    add(body, loft([rect(1, [s * 0.775, 0.865, 0.26], [0.03, 0.05]), rect(1, [s * 0.66, 1.245, -0.36], [0.03, 0.05])], { capFront: 0, capBack: 0 }), PAINT);   // A pillar
-    add(body, loft([rect(1, [s * 0.78, 0.915, -0.825], [0.03, 0.045]), rect(1, [s * 0.663, 1.245, -0.825], [0.03, 0.045])], { capFront: 0, capBack: 0 }), PAINT); // B pillar
-    add(body, loft([[[s * 0.75, 0.925, -1.47], [s * 0.81, 0.925, -1.47], [s * 0.81, 0.925, -1.21], [s * 0.75, 0.925, -1.21]],
-                    [[s * 0.633, 1.24, -0.965], [s * 0.693, 1.24, -0.965], [s * 0.693, 1.24, -0.955], [s * 0.633, 1.24, -0.955]]], { capFront: 0, capBack: 0 }), PAINT); // C pillar
+    add(body, loft([rect(1, [s * 0.775, 0.865, 0.26], [0.03, 0.05]), rect(1, [s * 0.60, 1.245, -0.36], [0.03, 0.05])], { capFront: 0, capBack: 0 }), PAINT);   // A pillar
+    add(body, loft([rect(1, [s * 0.78, 0.905, -0.825], [0.03, 0.045]), rect(1, [s * 0.603, 1.245, -0.825], [0.03, 0.045])], { capFront: 0, capBack: 0 }), PAINT); // B pillar
+    add(body, loft([[[s * 0.75, 0.915, -1.47], [s * 0.81, 0.915, -1.47], [s * 0.81, 0.915, -1.21], [s * 0.75, 0.915, -1.21]],
+                    [[s * 0.573, 1.24, -0.965], [s * 0.633, 1.24, -0.965], [s * 0.633, 1.24, -0.955], [s * 0.573, 1.24, -0.955]]], { capFront: 0, capBack: 0 }), PAINT); // C pillar
   }
 
   // ---- shared fittings: everything below is the same in all three candidates ------------
@@ -407,10 +411,10 @@ export default function (THREE) {
     const hx = flankX(s, 0.72, -0.62);                                                         // door handle, flush
     add(body, box(0.006, 0.05, 0.16), DARK, hx + s * 0.003, 0.72, -0.62);
     add(body, box(0.014, 0.028, 0.12), DARK, hx + s * 0.010, 0.725, -0.62);
-    add(body, box(0.012, 0.035, 0.09), TAIL, s * 0.822, 0.60, -1.86);                          // rear side marker
+    add(body, box(0.012, 0.035, 0.09), TAIL, s * 0.832, 0.60, -1.86);                          // rear side marker
   }
-  add(body, box(1.22, 0.028, 0.10), PAINT, 0, 1.236, -0.995, 0.34);                            // roof spoiler lip, trailing edge up
-  add(body, box(1.22, 0.012, 0.04), DARK, 0, 1.243, -1.03, 0.34);                              // its rubber edge
+  add(body, box(1.10, 0.028, 0.10), PAINT, 0, 1.236, -0.995, 0.34);                            // roof spoiler lip, trailing edge up
+  add(body, box(1.10, 0.012, 0.04), DARK, 0, 1.243, -1.03, 0.34);                              // its rubber edge
   add(body, cyl(0.022, 0.026, 0.024, 12), DARK, 0.50, topY(0.50, -0.88) + 0.008, -0.88);      // antenna base
   add(body, cyl(0.007, 0.011, 0.09, 8), RUB, 0.50, topY(0.50, -0.88) + 0.048, -0.90, -0.45);   // rubber mast, raked back
   {                                                                                            // fuel filler on the left rear quarter
@@ -420,28 +424,28 @@ export default function (THREE) {
   }
 
   // ---- front end: bands swept round the nose, a real opening with the intercooler in it ----
-  add(body, box(1.02, 0.20, 0.10), DARK, 0, 0.31, 1.955);                                           // intercooler core
-  for (let k = 0; k < 12; k++) add(body, box(0.94, 0.007, 0.05), GALV, 0, 0.226 + k * 0.0155, 1.985); // its fins
+  add(body, box(1.20, 0.19, 0.10), DARK, 0, 0.295, 1.955);                                           // intercooler core
+  for (let k = 0; k < 12; k++) add(body, box(1.12, 0.007, 0.05), GALV, 0, 0.215 + k * 0.0145, 1.985); // its fins
   for (const s of [-1, 1]) {
-    add(body, box(0.07, 0.22, 0.11), DARK, s * 0.545, 0.31, 1.955);                                   // intercooler end tanks
-    add(body, new THREE.TorusGeometry(0.05, 0.022, 8, 12, PI / 2), DARK, s * 0.60, 0.36, 1.90, 0, s * PI / 2, 0);   // charge pipe elbows
-    add(body, cyl(0.036, 0.036, 0.03, 24), DARK, s * 0.62, 0.194, 2.15, PI / 2);                     // brake duct in the lower band
+    add(body, box(0.07, 0.21, 0.11), DARK, s * 0.635, 0.295, 1.955);                                   // intercooler end tanks
+    add(body, new THREE.TorusGeometry(0.05, 0.022, 8, 12, PI / 2), DARK, s * 0.69, 0.35, 1.90, 0, s * PI / 2, 0);   // charge pipe elbows
+    add(body, cyl(0.02, 0.02, 0.03, 16), DARK, s * 0.62, 0.185, 2.15, PI / 2);                     // brake duct in the lower band
   }
   add(body, box(1.40, 0.34, 0.02), DARK, 0, 0.31, 1.88);                                            // closes the bay behind it
   add(body, box(0.90, 0.05, 0.02), DARK, 0, 0.535, 2.155);                                          // mouth slot on the upper band
   for (const s of [-1, 1]) {
-    const f = faceAt(nose, s * 0.655), fog = new THREE.Group();                                     // fog lamp in a cup
-    fog.position.set(f.x, 0.31, f.z); fog.rotation.y = f.yaw; body.add(fog);
-    add(fog, cyl(0.057, 0.057, 0.04, 28), DARK, 0, 0, -0.006, PI / 2);
-    add(fog, cyl(0.043, 0.043, 0.012, 20), HEAD, 0, 0, 0.018, PI / 2);
-    add(fog, new THREE.TorusGeometry(0.05, 0.006, 6, 24), DARK, 0, 0, 0.016);
+    const f = faceAt(nose, s * 0.69), fog = new THREE.Group();                                     // fog lamp in a cup
+    fog.position.set(f.x, 0.295, f.z); fog.rotation.y = f.yaw; body.add(fog);
+    add(fog, cyl(0.05, 0.05, 0.04, 28), DARK, 0, 0, -0.006, PI / 2);
+    add(fog, cyl(0.038, 0.038, 0.012, 20), HEAD, 0, 0, 0.018, PI / 2);
+    add(fog, new THREE.TorusGeometry(0.044, 0.005, 6, 24), DARK, 0, 0, 0.016);
     const c = faceAt(nose, s * 0.70), can = new THREE.Group();                                      // canard at the corner
     can.position.set(c.x, 0.245, c.z - 0.03); can.rotation.set(-0.32, c.yaw, 0, 'YXZ'); body.add(can);
-    add(can, box(0.13, 0.008, 0.16), DARK, 0, 0, 0.06);
-    add(can, box(0.008, 0.04, 0.16), DARK, s * 0.065, 0.02, 0.06);                                   // its little end plate
-    onFace(nose, s * 0.31, 0.632, 0.34, 0.085, 0.024, HEAD, 0.028);                                 // inner headlamp lens
-    onFace(nose, s * 0.545, 0.632, 0.13, 0.085, 0.024, HEAD, 0.028);                                // outer lens pair, following the corner
-    onFace(nose, s * 0.685, 0.632, 0.12, 0.085, 0.024, HEAD, 0.028);
+    add(can, box(0.13, 0.005, 0.16), DARK, 0, 0, 0.06);
+    add(can, box(0.005, 0.035, 0.16), DARK, s * 0.065, 0.018, 0.06);                                   // its little end plate
+    onFace(nose, s * 0.31, 0.625, 0.34, 0.06, 0.024, HEAD, 0.028);                                 // inner headlamp lens
+    onFace(nose, s * 0.545, 0.625, 0.13, 0.06, 0.024, HEAD, 0.028);                                // outer lens pair, following the corner
+    onFace(nose, s * 0.685, 0.625, 0.12, 0.06, 0.024, HEAD, 0.028);
   }
   {                                                                                                  // tow hook, low on the right
     const f = faceAt(nose, -0.56), hook = new THREE.Group();
@@ -454,33 +458,31 @@ export default function (THREE) {
   for (const x of [-0.62, -0.44, 0.44, 0.62]) {
     const f = faceAt(tail, x), lamp = new THREE.Group();
     lamp.position.set(f.x, 0.87, f.z); lamp.rotation.y = f.yaw; body.add(lamp);
-    add(lamp, new THREE.CylinderGeometry(0.076, 0.076, 0.03, 32, 1, true), DARK2, 0, 0, 0.045, PI / 2);   // cup, open, the lamp sits down inside it
-    add(lamp, cyl(0.062, 0.062, 0.012, 32), TAIL, 0, 0, 0.036, PI / 2);                              // lens, sunk below the rim
-    add(lamp, new THREE.TorusGeometry(0.076, 0.005, 8, 32), POLISH, 0, 0, 0.06);                     // polished rim ring
-    add(lamp, new THREE.TorusGeometry(0.031, 0.004, 6, 24), LANE, 0, 0, 0.043);                      // white inner ring
+    add(lamp, new THREE.CylinderGeometry(0.06, 0.06, 0.024, 32, 1, true), DARK2, 0, 0, 0.026, PI / 2);   // cup, open, the lamp sits down inside it
+    add(lamp, cyl(0.048, 0.048, 0.01, 32), TAIL, 0, 0, 0.019, PI / 2);                              // lens, sunk below the rim
+    add(lamp, new THREE.TorusGeometry(0.06, 0.004, 8, 32), POLISH, 0, 0, 0.038);                     // polished rim ring
+    add(lamp, new THREE.TorusGeometry(0.024, 0.0035, 6, 24), LANE, 0, 0, 0.025);                      // white inner ring
   }
   {                                                                                                  // number-plate pocket: proud rim, blank plate, lamp above
     const zf = -2.19;
-    for (const [w, h, x, y] of [[0.46, 0.022, 0, 0.635], [0.46, 0.022, 0, 0.415], [0.022, 0.24, -0.219, 0.525], [0.022, 0.24, 0.219, 0.525]]) add(body, box(w, h, 0.05), DARK, x, y, zf - 0.005);
-    add(body, box(0.42, 0.20, 0.008), DARK, 0, 0.525, zf - 0.008);                                   // pocket floor
-    add(body, box(0.33, 0.165, 0.008), LANE, 0, 0.525, zf - 0.014);                                  // blank plate
-    add(body, box(0.09, 0.024, 0.05), DARK, 0, 0.665, zf - 0.006);                                   // plate lamp housing under the step
-    add(body, box(0.05, 0.010, 0.012), HEAD, 0, 0.657, zf - 0.030);
+    for (const [w, h, x, y] of [[0.36, 0.015, 0, 0.7575], [0.36, 0.015, 0, 0.5725], [0.015, 0.20, -0.1725, 0.665], [0.015, 0.20, 0.1725, 0.665]]) add(body, box(w, h, 0.03), DARK, x, y, zf - 0.008);
+    add(body, box(0.33, 0.17, 0.006), LANE, 0, 0.665, zf - 0.011);                                   // blank plate, just inside the rim
+    add(body, box(0.08, 0.018, 0.04), DARK, 0, 0.787, zf - 0.012);                                   // plate lamp housing under the garnish
+    add(body, box(0.05, 0.008, 0.01), HEAD, 0, 0.78, zf - 0.033);
   }
-  for (const s of [-1, 1]) onFace(tail, s * 0.70, 0.46, 0.03, 0.30, 0.024, REFL, 0.012);             // vertical corner reflector strips
-  add(body, box(0.40, 0.17, 0.02), DARK, 0.42, 0.28, -2.20);                                         // exhaust cut-out
-  for (const x of [0.35, 0.49]) {
-    add(body, cyl(0.05, 0.05, 0.16, 28, true), CHROME, x, 0.28, -2.16, PI / 2);                      // twin tips, left side, hollow
-    add(body, cyl(0.034, 0.034, 0.16, 20), DARK, x, 0.28, -2.14, PI / 2);                            // the dark inner pipe seen down the tip
+  for (const s of [-1, 1]) onFace(tail, s * 0.70, 0.63, 0.028, 0.24, 0.02, REFL, 0.014);             // vertical corner reflector strips
+  for (const x of [0.36, 0.48]) {
+    add(body, cyl(0.045, 0.045, 0.16, 28, true), CHROME, x, 0.29, -2.16, PI / 2);                      // twin tips, left side, hollow
+    add(body, cyl(0.03, 0.03, 0.16, 20), DARK, x, 0.29, -2.14, PI / 2);                            // the dark inner pipe seen down the tip
   }
   add(body, box(1.30, 0.05, 0.42), DARK, 0, 0.155, -2.00);                                           // diffuser plate
-  for (const x of [-0.60, -0.30, 0, 0.30, 0.60]) add(body, box(0.012, 0.16, 0.40), DARK, x, 0.16, -2.03);   // five deep fins
+  for (const x of [-0.60, -0.30, 0, 0.30, 0.60]) add(body, box(0.012, 0.10, 0.30), DARK, x, 0.13, -1.95);   // five fins, set back
   for (const s of [-1, 1]) add(body, box(0.22, 0.22, 0.016), RUB2, s * 0.75, 0.21, -1.60);           // mud flaps
   for (const s of [-1, 1]) {
-    add(body, box(0.012, 0.12, 0.32), DARK, s * 0.716, 1.30, -2.02, 0.12);                           // end plate
+    add(body, box(0.008, 0.09, 0.26), DARK, s * 0.714, 1.24, -2.02, 0.10);                           // end plate
   }
-  add(body, box(0.26, 0.024, 0.035), TAIL, 0, 1.307, -2.12, 0.12);                                   // high-mount brake lamp
-  add(body, box(1.40, 0.022, 0.012), DARK, 0, 1.317, -2.128, 0.12);                                  // gurney flap on the trailing edge
+  add(body, box(0.24, 0.018, 0.03), TAIL, 0, 1.243, -2.115, 0.10);                                   // high-mount brake lamp
+  add(body, box(1.40, 0.016, 0.010), DARK, 0, 1.249, -2.126, 0.10);                                  // gurney flap on the trailing edge
   add(body, box(0.42, 0.14, 0.44), DARK, 0.44, 0.23, -1.66);                                         // muffler, seen under the rear bumper
   rod(body, [0.44, 0.23, -1.88], [0.44, 0.27, -2.12], 0.03, DARK, 10);                               // tailpipe into the tips
   for (const s of [-1, 1]) {                                                                         // bonnet pins at the front corners
@@ -506,19 +508,19 @@ export default function (THREE) {
   add(body, box(1.24, 0.04, 4.20), DARK, 0, 0.16, 0);                                                // underbody plate
   for (const s of [-1, 1]) for (const az of [1.275, -1.225]) for (let k = 0; k < 8; k++) {                                                                    // rivet row on the flare face
       const th = (20 + 140 * k / 7) * PI / 180;
-      add(body, new THREE.SphereGeometry(0.014, 10, 5, 0, PI * 2, 0, PI / 2), DARK, s * 0.86, 0.32 + 0.39 * Math.sin(th), az + 0.39 * Math.cos(th), 0, 0, -s * PI / 2);
+      add(body, new THREE.SphereGeometry(0.014, 10, 5, 0, PI * 2, 0, PI / 2), DARK, s * (az > 0 ? 0.875 : 0.89), 0.32 + 0.39 * Math.sin(th), az + 0.39 * Math.cos(th), 0, 0, -s * PI / 2);
     }
   for (const s of [-1, 1]) {
-    add(body, box(0.03, 0.03, 1.66), RUB, s * 0.79, 0.935, -0.60);                                   // belt trim
-    add(body, box(0.03, 0.03, 0.62), RUB, s * 0.67, 1.245, -0.65);                                   // drip rail
-    add(body, box(0.024, 0.024, 0.34), RUB, s * 0.79, 0.915, -1.24);                                 // quarter window lower trim
+    add(body, box(0.03, 0.03, 1.66), RUB, s * 0.79, 0.905, -0.60);                                   // belt trim
+    add(body, box(0.03, 0.03, 0.62), RUB, s * 0.61, 1.245, -0.65);                                   // drip rail
+    add(body, box(0.024, 0.024, 0.34), RUB, s * 0.79, 0.912, -1.24);                                 // quarter window lower trim
     rod(body, [s * 0.77, 0.94, 0.20], [s * 0.85, 0.97, 0.17], 0.022, DARK, 10);                      // mirror stalk
     const head = new THREE.Group(); head.position.set(s * 0.885, 0.975, 0.16); head.rotation.y = s * 0.30; body.add(head);
     const shell = add(head, sph(1, 20, 12), DARK); shell.scale.set(0.088, 0.048, 0.062);
     add(head, box(0.13, 0.066, 0.008), MIRROR, 0, 0, -0.052);                                        // mirror face
   }
   add(body, box(1.52, 0.03, 0.03), RUB, 0, 0.875, 0.285);                                            // windscreen base trim
-  add(body, box(1.44, 0.03, 0.03), RUB, 0, 0.965, -1.475);                                           // rear glass base trim
+  add(body, box(1.40, 0.03, 0.03), RUB, 0, 0.945, -1.475);                                           // rear glass base trim
   for (const s of [-1, 1]) add(body, box(0.50, 0.014, 0.022), DARK, s * 0.30, 0.914, 0.22, 0.546, s * 0.30, 0);   // wipers, parked on the glass
 
   // ---- interior: dash, binnacle, gauges, seats, harness, cage, driver, wheel, shifter ------
@@ -526,7 +528,7 @@ export default function (THREE) {
   add(body, box(0.24, 0.14, 1.30), DARK, 0, 0.39, -0.45);                                            // tunnel
   add(body, box(1.46, 0.24, 0.36), DARK, 0, 0.72, 0.16);                                             // dashboard
   add(body, box(1.46, 0.05, 0.22), DARK, 0, 0.855, 0.18);                                            // its upper pad
-  add(body, box(1.40, 0.04, 0.45), DARK, 0, 0.92, -1.26);                                            // parcel shelf
+  add(body, box(1.40, 0.04, 0.45), DARK, 0, 0.90, -1.26);                                            // parcel shelf
   add(body, new THREE.CylinderGeometry(0.095, 0.095, 0.30, 12, 1, true, 0, PI), DARK2, -0.36, 0.86, 0.10, 0, 0, PI / 2);   // binnacle hood
   {
     const gz = new THREE.Group(); gz.position.set(-0.36, 0.87, 0.11); gz.rotation.x = -PI / 2 + 0.28; body.add(gz);      // gauges face the driver
@@ -607,18 +609,20 @@ export default function (THREE) {
     };
     at(rv([[0.25, -hw + 0.03], [0.292, -hw + 0.006], [0.306, -hw + 0.045], [0.306, hw - 0.045], [0.292, hw - 0.006], [0.25, hw - 0.03]], 48), RUB);
     for (let k = 0; k < 12; k++) {
-      const geo = lathe([[0.300, -hw + 0.04], [0.32, -hw + 0.062], [0.32, hw - 0.062], [0.300, hw - 0.04]], 6, k * PI / 6 + 0.04, PI / 6 - 0.08);
+      const geo = lathe([[0.306, -hw + 0.04], [0.32, -hw + 0.058], [0.32, hw - 0.058], [0.306, hw - 0.04]], 6, k * PI / 6 + 0.03, PI / 6 - 0.06);
       geo.rotateZ(-PI / 2); at(geo, RUB2);
     }
     const bead = at(new THREE.TorusGeometry(0.262, 0.008, 6, 44), RUB, hw - 0.012); bead.rotation.y = PI / 2;
     at(rv([[0.24, -hw + 0.02], [0.222, -hw + 0.05], [0.222, hw - 0.07], [0.215, hw - 0.03]], 40), BRONZ2);        // barrel
     at(rv([[0.20, hw - 0.03], [0.238, hw - 0.03], [0.238, hw + 0.004], [0.20, hw + 0.004]], 40), LIP);            // polished lip
-    const os = hw - 0.10;
+    at(rv([[0.194, hw - 0.034], [0.206, hw - 0.034], [0.206, hw + 0.007], [0.194, hw + 0.007]], 40), GALV);       // machined ring at the lip's inner edge
+    const os = hw - 0.075;                                                                                       // a slight dish
     at(rv([[0.001, os - 0.06], [0.08, os - 0.06], [0.08, os], [0.05, os], [0.05, os + 0.012], [0.001, os + 0.012]], 24), BRONZE);
     at(rv([[0.001, os + 0.012], [0.040, os + 0.012], [0.040, os + 0.020], [0.001, os + 0.020]], 16), DARK);         // centre cap
     for (let k = 0; k < 5; k++) {
       const a = k * PI * 2 / 5 + PI / 2;
-      at(loft([rect(1, [0, 0.045, 0], [0.025, 0.016]), rect(1, [0, 0.16, 0], [0.025, 0.026]), rect(1, [0, 0.228, 0], [0.022, 0.032])], { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), BRONZE, os - 0.015, 0, 0, a);   // tapered spoke
+      const spk = (y, t, w) => [[-t, y, -w], [-t, y, w], [t * 0.5, y, w * 0.72], [t * 1.15, y, 0], [t * 0.5, y, -w * 0.72]].map(([x, yy, z]) => [side * x, yy, z]);   // peaked cross-section
+      at(loft([spk(0.045, 0.02, 0.016), spk(0.16, 0.02, 0.026), spk(0.228, 0.018, 0.032)], { creaseRows: [0, 1, 2, 3, 4], capFront: 0, capBack: 0 }), BRONZE, os - 0.015, 0, 0, a);   // tapered spoke
       at(cyl(0.011, 0.011, 0.014, 6), DARK, os + 0.016, 0.058 * Math.cos(a + PI / 5), 0.058 * Math.sin(a + PI / 5), 0, PI / 2);   // lug nut
     }
     at(rv([[0.062, -0.05], [0.062, os - 0.06]], 16), DARK2);                                                       // hub bell
