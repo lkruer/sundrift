@@ -8,3 +8,5 @@ work/cands/**/_verify/
 .claude/
 *.log
 work/refs/
+work/jam_*/*.png
+work/jam_*/samples.json

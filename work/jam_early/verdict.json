@@ -1,0 +1,445 @@
+{
+  "url": "https://lkruer.github.io/sundrift/game/",
+  "utc": "2026-09-22T00:40:42.620Z",
+  "commit": "not given",
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "deviceScaleFactor": 3,
+    "isMobile": true,
+    "hasTouch": true
+  },
+  "desktop": false,
+  "network": {
+    "name": "4G",
+    "downMbps": 4,
+    "upMbps": 1,
+    "latencyMs": 60,
+    "cpuSlowdown": 2
+  },
+  "budgets": {
+    "READY_S": 20,
+    "MB": 10,
+    "DRAWS": 900,
+    "TRIS": 1500000,
+    "MOVE_M": 1
+  },
+  "ready_s": 6.143,
+  "load_note": null,
+  "body_bytes": 1060589,
+  "wire_bytes": 318431,
+  "mb": 1.06,
+  "mb_note": "body bytes over 1e6; wire_bytes is the compressed transfer",
+  "start_control": "#startb",
+  "tapped": true,
+  "started": true,
+  "start_gone_after_tap": true,
+  "start_note": null,
+  "held": "#stick",
+  "hold_ms": 6000,
+  "pos_before": [
+    0.1291451512879023,
+    8.221078467828708
+  ],
+  "pos_after": [
+    23.465716503586773,
+    63.895140351789045
+  ],
+  "moved_m": 60.37,
+  "path_m": 85.5,
+  "peak_draws": 150,
+  "peak_tris": 635018,
+  "median_fps": 60,
+  "software": false,
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "webgpu": true,
+  "errors": [],
+  "missing": [
+    "404 https://lkruer.github.io/sundrift/game/assets/mountain_hut.js",
+    "404 https://lkruer.github.io/sundrift/game/assets/vending_machine.js",
+    "404 https://lkruer.github.io/sundrift/game/assets/hero_coupe.js"
+  ],
+  "requests": 39,
+  "external_hosts": [],
+  "cdn_hosts": [
+    "fonts.googleapis.com",
+    "cdn.jsdelivr.net",
+    "fonts.gstatic.com"
+  ],
+  "outside_folder": [],
+  "screenshots": {
+    "loaded": "C:\\Users\\liamk\\sundrift\\work\\jam_early\\loaded.png",
+    "started": "C:\\Users\\liamk\\sundrift\\work\\jam_early\\started.png",
+    "moving": "C:\\Users\\liamk\\sundrift\\work\\jam_early\\moving.png"
+  },
+  "samples": [
+    {
+      "t": 10021,
+      "g": {
+        "fps": 60,
+        "draws": 113,
+        "tris": 521814,
+        "pos": [
+          0.1291451512879023,
+          8.221078467828708
+        ],
+        "speed": 0
+      }
+    },
+    {
+      "t": 10272,
+      "g": {
+        "fps": 36,
+        "draws": 113,
+        "tris": 521814,
+        "pos": [
+          0.13528221485783481,
+          8.35528762618963
+        ],
+        "speed": 1.3
+      }
+    },
+    {
+      "t": 10528,
+      "g": {
+        "fps": 53,
+        "draws": 113,
+        "tris": 521814,
+        "pos": [
+          0.16211846913829192,
+          8.942159679818928
+        ],
+        "speed": 3.1
+      }
+    },
+    {
+      "t": 10780,
+      "g": {
+        "fps": 59,
+        "draws": 113,
+        "tris": 521814,
+        "pos": [
+          0.20642004781977313,
+          9.910974410373724
+        ],
+        "speed": 4.7
+      }
+    },
+    {
+      "t": 11040,
+      "g": {
+        "fps": 60,
+        "draws": 113,
+        "tris": 521814,
+        "pos": [
+          0.2739186566286323,
+          11.387076356449828
+        ],
+        "speed": 6.4
+      }
+    },
+    {
+      "t": 11300,
+      "g": {
+        "fps": 60,
+        "draws": 113,
+        "tris": 521814,
+        "pos": [
+          0.3558021890004259,
+          13.177756840367104
+        ],
+        "speed": 7.9
+      }
+    },
+    {
+      "t": 11557,
+      "g": {
+        "fps": 60,
+        "draws": 113,
+        "tris": 521814,
+        "pos": [
+          0.46274752839371536,
+          15.51650465144028
+        ],
+        "speed": 9.6
+      }
+    },
+    {
+      "t": 11824,
+      "g": {
+        "fps": 60,
+        "draws": 112,
+        "tris": 521494,
+        "pos": [
+          0.5896184716172347,
+          18.290998074305747
+        ],
+        "speed": 11.2
+      }
+    },
+    {
+      "t": 12080,
+      "g": {
+        "fps": 60,
+        "draws": 111,
+        "tris": 521174,
+        "pos": [
+          0.7262538708103181,
+          21.279026749428983
+        ],
+        "speed": 12.7
+      }
+    },
+    {
+      "t": 12338,
+      "g": {
+        "fps": 60,
+        "draws": 111,
+        "tris": 521174,
+        "pos": [
+          0.8796869372271158,
+          24.63439735523816
+        ],
+        "speed": 14.2
+      }
+    },
+    {
+      "t": 12590,
+      "g": {
+        "fps": 60,
+        "draws": 111,
+        "tris": 521174,
+        "pos": [
+          1.0614159553174038,
+          28.608561593514537
+        ],
+        "speed": 15.7
+      }
+    },
+    {
+      "t": 12855,
+      "g": {
+        "fps": 43,
+        "draws": 114,
+        "tris": 526714,
+        "pos": [
+          1.4597768516901408,
+          31.281895134810828
+        ],
+        "speed": 12.4
+      }
+    },
+    {
+      "t": 13122,
+      "g": {
+        "fps": 56,
+        "draws": 140,
+        "tris": 608728,
+        "pos": [
+          2.414047510868282,
+          34.57789213442288
+        ],
+        "speed": 12.7
+      }
+    },
+    {
+      "t": 13375,
+      "g": {
+        "fps": 59,
+        "draws": 150,
+        "tris": 635018,
+        "pos": [
+          3.9578334366098966,
+          38.065260594965196
+        ],
+        "speed": 13.1
+      }
+    },
+    {
+      "t": 14113,
+      "g": {
+        "fps": 39,
+        "draws": 149,
+        "tris": 634826,
+        "pos": [
+          5.787962257184948,
+          41.61357998034032
+        ],
+        "speed": 13.4
+      }
+    },
+    {
+      "t": 14374,
+      "g": {
+        "fps": 55,
+        "draws": 146,
+        "tris": 634158,
+        "pos": [
+          7.622110641205382,
+          44.765777197519235
+        ],
+        "speed": 13.7
+      }
+    },
+    {
+      "t": 14640,
+      "g": {
+        "fps": 59,
+        "draws": 144,
+        "tris": 633594,
+        "pos": [
+          9.642784646003033,
+          47.88061096602772
+        ],
+        "speed": 13.8
+      }
+    },
+    {
+      "t": 14906,
+      "g": {
+        "fps": 60,
+        "draws": 142,
+        "tris": 633114,
+        "pos": [
+          11.697295903978452,
+          50.740352809202165
+        ],
+        "speed": 14.5
+      }
+    },
+    {
+      "t": 15157,
+      "g": {
+        "fps": 60,
+        "draws": 140,
+        "tris": 631682,
+        "pos": [
+          14.081364929351132,
+          53.73164303082735
+        ],
+        "speed": 14.6
+      }
+    },
+    {
+      "t": 15423,
+      "g": {
+        "fps": 60,
+        "draws": 136,
+        "tris": 623948,
+        "pos": [
+          16.62568525694528,
+          56.65185873013782
+        ],
+        "speed": 14.8
+      }
+    },
+    {
+      "t": 15690,
+      "g": {
+        "fps": 60,
+        "draws": 126,
+        "tris": 591564,
+        "pos": [
+          19.36226633120886,
+          59.600773386628774
+        ],
+        "speed": 15.5
+      }
+    },
+    {
+      "t": 15955,
+      "g": {
+        "fps": 60,
+        "draws": 123,
+        "tris": 579708,
+        "pos": [
+          22.116882060580835,
+          62.48937841272997
+        ],
+        "speed": 16.4
+      }
+    },
+    {
+      "t": 16206,
+      "g": {
+        "fps": 60,
+        "draws": 122,
+        "tris": 578588,
+        "pos": [
+          25.02075207446031,
+          65.51485392504513
+        ],
+        "speed": 16.7
+      }
+    },
+    {
+      "t": 16472,
+      "g": {
+        "fps": 60,
+        "draws": 121,
+        "tris": 578168,
+        "pos": [
+          28.06726453082761,
+          68.68818382377516
+        ],
+        "speed": 16.3
+      }
+    },
+    {
+      "t": 16724,
+      "g": {
+        "fps": 60,
+        "draws": 121,
+        "tris": 578168,
+        "pos": [
+          31.03242131313098,
+          71.77720246599891
+        ],
+        "speed": 15.8
+      }
+    },
+    {
+      "t": 16984,
+      "g": {
+        "fps": 60,
+        "draws": 121,
+        "tris": 578168,
+        "pos": [
+          33.74020519622393,
+          74.59823051668235
+        ],
+        "speed": 15.4
+      }
+    },
+    {
+      "t": 17239,
+      "g": {
+        "fps": 60,
+        "draws": 121,
+        "tris": 578168,
+        "pos": [
+          36.37948920484283,
+          77.34789425988399
+        ],
+        "speed": 15.1
+      }
+    },
+    {
+      "t": 17490,
+      "g": {
+        "fps": 60,
+        "draws": 120,
+        "tris": 576248,
+        "pos": [
+          39.12386403078409,
+          80.20703100642228
+        ],
+        "speed": 14.7
+      }
+    }
+  ],
+  "fails": [
+    "3 file(s) 404ed, starting with 404 https://lkruer.github.io/sundrift/game/assets/mountain_hut.js"
+  ],
+  "result": "FAIL"
+}
