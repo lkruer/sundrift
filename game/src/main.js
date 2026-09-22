@@ -72,7 +72,7 @@ async function boot() {
   rig.refresh(scene);
   // compile every shader variant now, not on the first frame that needs it
   try { renderer.compile(scene, camera); } catch (e) { console.warn('compile', e.message); }
-  window.__DEBUG__ = { world, track, car, rig, scene, renderer, get scoring() { return scoring; } };
+  window.__DEBUG__ = { world, track, car, rig, scene, renderer, G, get scoring() { return scoring; } };
   input.onAny = () => audio.unlock();
   hud.setBest(scoring.best);
   prog(1, 'ready');

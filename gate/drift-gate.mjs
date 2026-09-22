@@ -73,7 +73,7 @@ const startGone = await page.evaluate(() => { const e = document.getElementById(
 const read = () => page.evaluate(() => window.__GAME__ || null);
 
 // ---- the driver: steer toward the centre of the road, handbrake into tight corners
-const held = { left: false, right: false, hand: false, gas: false };
+const held = { left: false, right: false, hand: false, gas: false, brake: false };
 let finger = null, thumb = null, fingerX = 0, fingerY = 0;
 async function setKeys(want) {
   if (PHONE) {
@@ -84,13 +84,14 @@ async function setKeys(want) {
       finger = await page.touchscreen.touchStart(fingerX, fingerY);
     }
     const dx = want.left ? -60 : want.right ? 60 : 0;
-    await finger.move(fingerX + dx, fingerY);
+    const dy = want.brake ? 110 : 0;             // pulling the finger down is the brake
+    await finger.move(fingerX + dx, fingerY + dy);
     if (want.hand && !thumb) {
       const b = await page.$eval('#brake .pad', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
       thumb = await page.touchscreen.touchStart(b.x, b.y);
     } else if (!want.hand && thumb) { await thumb.end(); thumb = null; }
   } else {
-    const map = { left: 'KeyA', right: 'KeyD', hand: 'Space', gas: 'KeyW' };
+    const map = { left: 'KeyA', right: 'KeyD', hand: 'Space', gas: 'KeyW', brake: 'KeyS' };
     for (const k of Object.keys(map)) {
       if (want[k] && !held[k]) await page.keyboard.down(map[k]);
       if (!want[k] && held[k]) await page.keyboard.up(map[k]);
@@ -109,7 +110,7 @@ const cap = software ? 240000 : 90000;
 let g = await read();
 if (!g || !Array.isArray(g.pos)) { console.error('no __GAME__.pos'); process.exit(1); }
 prev = g.pos;
-await setKeys({ gas: true, left: false, right: false, hand: false });
+await setKeys({ gas: true, brake: false, left: false, right: false, hand: false });
 while (covered < METRES && Date.now() - startAt < cap) {
   await sleep(70);
   g = await read();
@@ -125,9 +126,13 @@ while (covered < METRES && Date.now() - startAt < cap) {
   const headErr = (() => { let d = g.roadHeading - g.heading; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; })();
   const cmd = headErr * 1.3 - g.lat * 0.12 + g.curvAhead * 9;
   const now = Date.now();
-  const tight = Math.abs(g.curvAhead) > 1 / 30 && g.kmh > 45;
-  if (tight && now > handCooldown) { handUntil = now + 420; handCooldown = now + 3500; }
-  const want = { gas: true, hand: now < handUntil, left: cmd > 0.05, right: cmd < -0.05 };
+  // speed for the corner ahead: what the tyres can hold plus a margin the handbrake will scrub
+  const k = Math.abs(g.curvAhead);
+  const vmax = k > 0.002 ? Math.sqrt(11 / k) * 3.6 : 999;
+  const tooFast = g.kmh > vmax * 1.15;
+  const tight = k > 1 / 32 && g.kmh > 42;
+  if (tight && now > handCooldown) { handUntil = now + 380; handCooldown = now + 3200; }
+  const want = { gas: !tooFast, brake: tooFast && Math.abs(g.slip) < 15, hand: now < handUntil, left: cmd > 0.05, right: cmd < -0.05 };
   // in a slide, steer into the direction of travel when the angle gets big
   if (Math.abs(g.slip) > 38) { want.left = g.slip > 0; want.right = g.slip < 0; }
   await setKeys(want);
@@ -139,7 +144,7 @@ while (covered < METRES && Date.now() - startAt < cap) {
   }
   if (g.kmh < 3 && samples.length > 40) stalled++;
 }
-await setKeys({ gas: false, left: false, right: false, hand: false });
+await setKeys({ gas: false, brake: false, left: false, right: false, hand: false });
 if (finger) await finger.end();
 await sleep(300);
 const last = await read();
