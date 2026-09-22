@@ -1,4 +1,4 @@
-# SUNDRIFT build notes
+# MINIDRIFT build notes (the game was called SUNDRIFT until 22 September)
 
 The receipts: what was decided, what was measured, what was thrown away, what is still wrong. Dates are UTC.
 Everything was built between 21 and 25 September 2026 for the 404 game jam 001, by one person driving Claude
@@ -230,3 +230,52 @@ triangles, median 60 fps. The car is 34,176 triangles in 431 meshes, baked per j
 - The far ridges are one silhouette strip per ring; a real range has layers that slide past each other.
 - The music is a loop that opens up while drifting; it is not the eurobeat the subject deserves.
 - No traffic, no ghosts, no leaderboards beyond a local best score.
+
+
+## 22 September, evening: MINIDRIFT, one mountain
+
+Asked for: no jitter, no freezes, no terrain that clips or road that floats, the name MINIDRIFT, a smaller car
+with a sportier tail, a bigger 90s JDM dash, easier clean drifting, easy/medium/hard courses, a title screen
+with paint (white by default) and a pause menu, more retro, softer headlights, and no hands-off autosteer.
+
+- **The world, rebuilt on one height field.** The old road-relative terrain strips folded where two legs of a
+  switchback met and left voids between them. Now  is the mountain;  grows the pass as a
+  switchback ladder up it (each leg held above a floor built from the legs below), tests every candidate
+  feature against the road already laid, and backs up over the last four provisional features when it paints
+  itself into a corner. Measured: 0 dead ends and 0 overlaps over 12 seeds x 30 km x 3 courses (before the
+  backtracking: 24 dead ends and 380 overlapping pairs), about 15 ms to generate 30 km.  carves the
+  field to the road with ceilings and floors (cut 1.25, fill 0.8, retaining faces where two legs cannot both be
+  met);  probes ~50,000 points on the road per course and the finest terrain triangles sit
+  at most 2.6 cm above the ribbon's shoulder (the first version: 15 cm, from the shrine terrace starting inside
+  the verge).
+- **Freezes, each found by measurement.** (1) The boost flame's light toggled visibility: a light-count
+  change recompiles every material. (2) The rig rebuilt its sky PMREM with a fresh generator and dome material
+  on every , a few compiles every few seconds from dusk on: now cached. (3) The sun's cascades
+  rendered their shadow maps all night at zero intensity (the rig switched them off only in , before
+  the cascades existed) and switching  at dawn would have recompiled everything: now castShadow is
+  constant and the maps stop updating. (4) A second shadowed directional light (the moon) broke three's cascade
+  shader ( out of range): the moon is a far spot light. (5) Shaders were compiled for the
+  canvas and then again for the post chain's linear target: now compiled once, in parallel, into the real
+  target, with nothing drawn during loading. Ready went from 20.8 s to 5.0 s. (6) A 100 ms stall at the first
+  drift of every run: a Chrome trace put it in the GPU process, bisecting the page put it on the full-screen
+  vignette and hit-flash layers over the canvas; both are now drawn by the post pass.  drives
+  a scripted run: every frame 16.7-17.2 ms after the first.
+- **Jitter.** The chase camera chased a damped position (a lag that depends on the frame time), shook with
+  , and rolled about the world's z axis from raw lateral g. Now it is rigid on the car with a
+  critically damped spring on its heading, rolls about the view axis from filtered g, and shakes with smooth
+  noise. The body rolls and pitches on springs driven by low-passed accelerations; the counter-steer assist is
+  filtered (the front wheels chattered); wheels never turn more than half a spoke a frame. Measured on screen:
+  the car's position wobbles 0.25-0.4 px RMS frame to frame.
+- **Drifting.** The hands-off line assist is gone (the user did not like the car steering itself). A drift
+  hold gives the rear a little grip back past 35 degrees and takes a little away below it on the throttle; the
+  yaw that would take the car past ~50 degrees is damped; the catch is damped continuously instead of by an
+  on/off switch; a drift starts at 8.6 degrees, survives 0.7 s straight and chains within 2.2 s. Wall contact is
+  an impulse with Coulomb friction along the wall, so a glancing touch keeps its speed.
+- **Look.** Car drawn at 0.75 scale with the new tail (the agent's diffuser fins read as teeth from the chase
+  camera and were cut). No fake headlight beams; the lamps throw an even soft pool (decay 0) instead of a white
+  blob at the bumper. The car's white spill light shone through the body onto the road behind it and was
+  removed. Concrete slope lattices on steep cuttings (mapped by distance along the road: mapped by world
+  position through the face normal they smeared into streaks). The store and vending machines glow. Bloom runs
+  after the cel bands so halos stay round. A faint tube colour fringe at the frame's edges.
+- **Measured on commit after this section** (desktop gate / phone gate): ready 5.3 s / 4.4 s, 60 fps, peak
+  463 / 367 draws, peak 1.30 M / 0.91 M triangles, 0 console errors, drifts banked every run.

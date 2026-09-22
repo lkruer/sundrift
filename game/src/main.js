@@ -6,19 +6,19 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609222241';
-import { createRig, detectTier } from '../rig.js?v=202609222241';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222241';
-import { Car, gearbox } from './car.js?v=202609222241';
-import { Track, DIFFS } from './track.js?v=202609222241';
-import { World } from './world.js?v=202609222241';
-import { ChaseCam } from './camera.js?v=202609222241';
-import { Input } from './input.js?v=202609222241';
-import { Scoring } from './scoring.js?v=202609222241';
-import { Hud } from './hud.js?v=202609222241';
-import { Audio } from './audio.js?v=202609222241';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222241';
-import { makePost } from './post.js?v=202609222241';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609222245';
+import { createRig, detectTier } from '../rig.js?v=202609222245';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222245';
+import { Car, gearbox } from './car.js?v=202609222245';
+import { Track, DIFFS } from './track.js?v=202609222245';
+import { World } from './world.js?v=202609222245';
+import { ChaseCam } from './camera.js?v=202609222245';
+import { Input } from './input.js?v=202609222245';
+import { Scoring } from './scoring.js?v=202609222245';
+import { Hud } from './hud.js?v=202609222245';
+import { Audio } from './audio.js?v=202609222245';
+import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222245';
+import { makePost } from './post.js?v=202609222245';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -57,7 +57,7 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.3, 45
 scene.add(camera);
 // the camera goes in at creation, so the rig builds its shadow cascades as soon as they load, before any shader compiles
 const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 60, fogDensity: 0.0012, exposure: 1.05, post: false, camera });
-const post = makePost(renderer, scene, camera, { bloom: tier !== 'phone', width: innerWidth, height: innerHeight });
+const post = makePost(renderer, scene, camera, { bloom: tier !== 'phone', fringe: tier !== 'phone', width: innerWidth, height: innerHeight });
 renderer.info.autoReset = false;
 
 let track, world, car, carRoot, bodyPivot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, paintMat;

@@ -23,11 +23,11 @@ const Cel = {
     tDiffuse: { value: null }, tDepth: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uNear: { value: 0.4 }, uFar: { value: 4500 }, uTime: { value: 0 },
     uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.06 }, uSpeed: { value: 0 },
-    uVig: { value: 0 }, uHit: { value: 0 },
+    uVig: { value: 0 }, uHit: { value: 0 }, uCA: { value: 0.006 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed, uVig, uHit;
+    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed, uVig, uHit, uCA;
     varying vec2 vUv;
     float lin(vec2 uv){ float z = texture2D(tDepth, uv).x * 2.0 - 1.0; return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear)); }
     float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -36,6 +36,12 @@ const Cel = {
     void main(){
       vec2 px = 1.0 / uRes;
       vec3 c = texture2D(tDiffuse, vUv).rgb;
+      // a tube's colour fringe: red and blue slip apart toward the edges of the frame
+      if (uCA > 0.0) {
+        vec2 fr = (vUv - 0.5) * uCA * dot(vUv - 0.5, vUv - 0.5) * 4.0;
+        c.r = texture2D(tDiffuse, vUv + fr).r;
+        c.b = texture2D(tDiffuse, vUv - fr).b;
+      }
       // speed: the edges of the frame smear toward the centre, the way a drift anime draws speed
       vec2 toC = vUv - vec2(0.5, 0.42);
       float edge = smoothstep(0.12, 0.5, dot(toC, toC));
@@ -83,19 +89,22 @@ const Cel = {
     }`,
 };
 
-export function makePost(renderer, scene, camera, { bloom = true, width, height }) {
+export function makePost(renderer, scene, camera, { bloom = true, width, height, fringe = true }) {
   const pr = renderer.getPixelRatio();
   const w = Math.floor(width * pr), h = Math.floor(height * pr);
   const sceneRT = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(w, h), depthBuffer: true });
   const composer = new EffectComposer(renderer);
   composer.addPass(new TexturePass(sceneRT.texture));
-  let bloomPass = null;
-  if (bloom) { bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.45, 1.35); composer.addPass(bloomPass); }
   const cel = new ShaderPass(Cel);
   cel.uniforms.tDepth.value = sceneRT.depthTexture;
   cel.uniforms.uRes.value.set(w, h);
+  cel.uniforms.uCA.value = fringe ? 0.006 : 0;
   cel.uniforms.uNear.value = camera.near; cel.uniforms.uFar.value = camera.far;
   composer.addPass(cel);
+  // bloom after the bands, so a lamp's halo stays a soft round glow over the inked frame instead of being cut
+  // into flat rings by the banding
+  let bloomPass = null;
+  if (bloom) { bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.45, 1.35); composer.addPass(bloomPass); }
   composer.addPass(new OutputPass());
   return {
     composer, cel, bloomPass, sceneRT,
