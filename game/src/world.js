@@ -502,7 +502,7 @@ export class World {
       place('lamp', x, y, z, ry);
       const hx = x + Math.cos(ry) * 0.5, hz = z - Math.sin(ry) * 0.5;      // the head, half a metre along the arm
       this.lamps.push({ x: hx, y: y + 5.75, z: hz, ci });
-      this.pool(hx, y, hz, 9, 1.0);
+      this.pool(hx, y, hz, 11.5, 1.0);
     }
   }
 
@@ -512,7 +512,7 @@ export class World {
       const sz = 128, cv = document.createElement('canvas'); cv.width = cv.height = sz;
       const ctx = cv.getContext('2d');
       const g = ctx.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
-      g.addColorStop(0, 'rgba(255,205,130,0.55)'); g.addColorStop(0.35, 'rgba(255,190,110,0.28)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+      g.addColorStop(0, 'rgba(255,200,120,0.7)'); g.addColorStop(0.3, 'rgba(255,180,95,0.34)'); g.addColorStop(1, 'rgba(255,160,80,0)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, sz, sz);
       this._poolTex = new THREE.CanvasTexture(cv); this._poolTex.colorSpace = THREE.SRGBColorSpace;
       this._poolMat = new THREE.MeshBasicMaterial({ map: this._poolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 });
@@ -717,7 +717,7 @@ export class World {
   }
 
   /** How bright the lamp pools are: 0 by day, 1 at night. */
-  setNight(n) { if (this._poolMat) this._poolMat.opacity = 0.85 * n; }
+  setNight(n) { if (this._poolMat) this._poolMat.opacity = 1.0 * n; }
 
   updateFar(x, y, z) {
     if (!this.far) return;

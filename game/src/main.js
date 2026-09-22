@@ -75,6 +75,21 @@ function buildNight() {
   halo.position.z = -1;
   disc.add(halo, dm); disc.userData = { dm, halo };
   scene.add(disc); night.disc = disc;
+  // horizon glow: a band around the camera, warm at the horizon fading into the blue, the retro night sky
+  const H = 420, R = 2300, seg = 48;
+  const gpos = new Float32Array((seg + 1) * 2 * 3), gcol = new Float32Array((seg + 1) * 2 * 4), gidx = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = (i / seg) * Math.PI * 2, x = Math.sin(a) * R, z = Math.cos(a) * R;
+    gpos.set([x, -40, z, x, H, z], i * 6);
+    gcol.set([0.95, 0.55, 0.28, 0.55, 0.35, 0.35, 0.7, 0.0], i * 8);
+    if (i < seg) { const b0 = i * 2; gidx.push(b0, b0 + 2, b0 + 1, b0 + 1, b0 + 2, b0 + 3); }
+  }
+  const gg = new THREE.BufferGeometry();
+  gg.setAttribute('position', new THREE.BufferAttribute(gpos, 3)); gg.setAttribute('color', new THREE.BufferAttribute(gcol, 4)); gg.setIndex(gidx);
+  const glow = new THREE.Mesh(gg, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  glow.frustumCulled = false; glow.renderOrder = -1;
+  scene.add(glow); night.glow = glow;
+  night.hemiDay = rig.hemi ? rig.hemi.intensity : 1;
 }
 
 // ---------------------------------------------------------------- boot
@@ -353,6 +368,7 @@ function step(dt) {
 function nightFollow() {
   if (!night.moon) return;
   if (night.stars) night.stars.position.copy(camera.position);
+  if (night.glow) night.glow.position.set(camera.position.x, camera.position.y - 60, camera.position.z);
   if (night.disc) {
     night.disc.position.copy(camera.position).addScaledVector(night.dir, 2400);
     night.disc.lookAt(camera.position);
@@ -379,9 +395,11 @@ function applySun(dt) {
   // headlights and lamps come on as the sun goes
   const nightAmt = smoothstep(4, -3, el);
   G.night = nightAmt; night.amt = nightAmt;
-  for (const h of headlights) h.intensity = 220 * nightAmt;
-  if (beams) beams.userData.mat.opacity = 0.075 * nightAmt;
-  if (night.moon) night.moon.intensity = 1.35 * nightAmt;
+  for (const h of headlights) h.intensity = 150 * nightAmt;
+  if (beams) beams.userData.mat.opacity = 0.07 * nightAmt;
+  if (night.moon) night.moon.intensity = 0.95 * nightAmt;
+  if (night.glow) night.glow.material.opacity = 0.32 * smoothstep(-0.5, -5, el);
+  if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.55 * nightAmt);
   if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el);
   if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el); }
   world.setNight(nightAmt);
