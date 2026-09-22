@@ -6,19 +6,19 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609222301';
-import { createRig, detectTier } from '../rig.js?v=202609222301';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222301';
-import { Car, gearbox } from './car.js?v=202609222301';
-import { Track, DIFFS } from './track.js?v=202609222301';
-import { World } from './world.js?v=202609222301';
-import { ChaseCam } from './camera.js?v=202609222301';
-import { Input } from './input.js?v=202609222301';
-import { Scoring } from './scoring.js?v=202609222301';
-import { Hud } from './hud.js?v=202609222301';
-import { Audio } from './audio.js?v=202609222301';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222301';
-import { makePost } from './post.js?v=202609222301';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609222305';
+import { createRig, detectTier } from '../rig.js?v=202609222305';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222305';
+import { Car, gearbox } from './car.js?v=202609222305';
+import { Track, DIFFS } from './track.js?v=202609222305';
+import { World } from './world.js?v=202609222305';
+import { ChaseCam } from './camera.js?v=202609222305';
+import { Input } from './input.js?v=202609222305';
+import { Scoring } from './scoring.js?v=202609222305';
+import { Hud } from './hud.js?v=202609222305';
+import { Audio } from './audio.js?v=202609222305';
+import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222305';
+import { makePost } from './post.js?v=202609222305';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -530,17 +530,26 @@ function step(dt, t0) {
   car.step(dt, inp, surface);
 
   // ---- walls: the corridor's edges on each side, the tunnel lining
-  let impact = 0, clipping = false;
+  let impact = 0, clipping = false, noseIn = false;
   for (const [l, f] of CORNERS) {
     const [cx, cz] = car.point(l, f);
     const q = track.nearest(cx, cz, G.idx);
     const lx = Math.cos(q.h), lz = -Math.sin(q.h);
-    if (q.u > q.wl) impact = Math.max(impact, car.hitWall(-lx, -lz, q.u - q.wl, l, f));
-    else if (q.u < -q.wr) impact = Math.max(impact, car.hitWall(lx, lz, -q.wr - q.u, l, f));
+    if (q.u > q.wl) { impact = Math.max(impact, car.hitWall(-lx, -lz, q.u - q.wl, l, f)); if (f > 0) noseIn = true; }
+    else if (q.u < -q.wr) { impact = Math.max(impact, car.hitWall(lx, lz, -q.wr - q.u, l, f)); if (f > 0) noseIn = true; }
     else if (f < 0) {
       const gap = Math.min(q.wl - q.u, q.u + q.wr);
       if (gap < SCORE.clipDist && Math.abs(car.beta) > SCORE.minSlip) clipping = true;
     }
+  }
+  // scrape free: nose against the wall, nearly stopped, still on the throttle: the car pivots back toward the road
+  // rather than sitting there until the player thinks to reverse
+  G.pinned = noseIn && car.speed < 3 && inp.throttle > 0.5 ? (G.pinned || 0) + dt : 0;
+  if (G.pinned > 0.3) {
+    let e = G.roadH - car.yaw; while (e > Math.PI) e -= 2 * Math.PI; while (e < -Math.PI) e += 2 * Math.PI;
+    if (Math.abs(e) > Math.PI * 0.75) e = Math.sign(e) * Math.PI * 0.75;           // facing backwards: turn the short way to the wall's side
+    car.yaw += clamp(e * 2.2, -1.4, 1.4) * dt * smoothstep(0.3, 0.6, G.pinned);
+    car.omega = 0;
   }
   if (impact > 1.5) {
     chase.kick(clamp(impact / 10, 0.15, 1));
