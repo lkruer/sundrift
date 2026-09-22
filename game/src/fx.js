@@ -113,8 +113,8 @@ export class Particles {
     for (let i = 0; i < n; i++) this.spawn({
       x: x + (Math.random() - 0.5) * 0.3, y: y + 0.1, z: z + (Math.random() - 0.5) * 0.3,
       vx: vx * 0.35 + (Math.random() - 0.5) * 1.2, vy: 0.9 + Math.random() * 1.3, vz: vz * 0.35 + (Math.random() - 0.5) * 1.2,
-      life: 1.0 + Math.random() * 0.8, s0: 0.45, s1: 1.9 + strength * 1.0,
-      r: warm.r, g: warm.g, b: warm.b, a0: 0.13 + 0.17 * strength, drag: 1.5,
+      life: 0.9 + Math.random() * 0.7, s0: 0.35, s1: 1.3 + strength * 0.7,
+      r: warm.r, g: warm.g, b: warm.b, a0: 0.10 + 0.13 * strength, drag: 1.6,
     });
   }
 
