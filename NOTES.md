@@ -213,11 +213,11 @@ store, hut and bus stop on lay-bys on the valley side, boulders at the foot of t
 - Road 8.8 m wide (was 7.2), the wall 5.5 m out (was 4.55), hairpins 2.4 m wider on the outside, and a wall
   hit drops a drift only above 6 m/s of lateral impact (was 4.5).
 
-## Final measurements (22 Sep, commit c43c9d0)
+## Final measurements (22 Sep, commit 254e54b)
 
-`harness/jam.mjs` on the live URL: ready 12.4 s, 1.2 MB, started from a real tap, 75.8 m moved in the hold,
-413 peak draws, 751 k peak triangles, 0 errors, 0 404s, RESULT PASS. Desktop gate: 600 m, seven drifts banked,
-458 draws, 1.05 M triangles, 60 fps. Phone gate: 424 draws, 0.86 M triangles, 60 fps.
+`harness/jam.mjs` on the live URL, after the polished car: ready 13.0 s, 1.2 MB, started from a real tap,
+501 peak draws, 637 k peak triangles, 0 errors, 0 404s, RESULT PASS. Desktop gate: 600 m, 550 draws, 0.82 M
+triangles, median 60 fps. The car is 34,176 triangles in 431 meshes, baked per joint at load.
 
 ## Still wrong, or not attempted
 
