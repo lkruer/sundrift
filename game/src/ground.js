@@ -12,8 +12,8 @@
  *
  * Pure maths, no Three.js: the terrain tiles, the props, the camera and the tests all ask this one function.
  */
-import { clamp, smoothstep } from './config.js?v=202609222231';
-import { CELL, ckey } from './track.js?v=202609222231';
+import { clamp, smoothstep } from './config.js?v=202609222241';
+import { CELL, ckey } from './track.js?v=202609222241';
 
 export const CUT = 1.25;          // steepest cut face: rise per metre (51 degrees)
 export const FILL = 0.8;          // steepest embankment (39 degrees)
@@ -49,7 +49,7 @@ export class Ground {
     let N = base;
     if (t.tunnels.length) { const sp = this.spur(x, z); if (sp > N) N = sp; }
     out.natural = N;
-    out.flat = false; out.tunnel = false; out.edge = 99;
+    out.flat = false; out.tunnel = false; out.edge = 99; out.s = 0;
 
     let U = Infinity, L = -Infinity, eU = 0, eL = 0;
     let exactD = Infinity, exactY = 0, tunnelD = Infinity, minE = Infinity;
@@ -78,7 +78,7 @@ export class Ground {
         const left = ((x - a.x) * ez - (z - a.z) * ex) >= 0;
         const w = left ? a.wl + (b.wl - a.wl) * tt : a.wr + (b.wr - a.wr) * tt;
         const edge = d - w;
-        if (edge < out.edge) out.edge = edge;
+        if (edge < out.edge) { out.edge = edge; out.s = a.s + (b.s - a.s) * tt; }
         if (a.tunnel && b.tunnel) {
           // the tunnel: the ground is at least the roof over the lining, falling away beside it
           const foot = this.tubeHalf + 1.2;

@@ -1,0 +1,7 @@
+[
+  { "click": "#startb" }, { "wait": 300 },
+  { "js": "__DEBUG__.teleport(1100, 60); 1" }, { "wait": 1200 }, { "shot": "P1_tunnel_approach" },
+  { "js": "__DEBUG__.teleport(1175, 60); 1" }, { "wait": 1200 }, { "shot": "P2_tunnel_inside" },
+  { "js": "__DEBUG__.teleport(596, 50); 1" }, { "wait": 1200 }, { "shot": "P3_busstop" },
+  { "js": "__DEBUG__.teleport(1510, 50); 1" }, { "wait": 1200 }, { "shot": "P4_conbini" }
+]

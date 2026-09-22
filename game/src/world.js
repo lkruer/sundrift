@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609222231';
-import { surface } from '../surfaces.js?v=202609222231';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222231';
-import { Ground } from './ground.js?v=202609222231';
-import { Terrain, LODS } from './terrain.js?v=202609222231';
-import { partsOf, Pool } from './instancing.js?v=202609222231';
+import { ASSET } from '../assetlib.js?v=202609222241';
+import { surface } from '../surfaces.js?v=202609222241';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222241';
+import { Ground } from './ground.js?v=202609222241';
+import { Terrain, LODS } from './terrain.js?v=202609222241';
+import { partsOf, Pool } from './instancing.js?v=202609222241';
 
 const ASSETS = {
   cedar: './assets/cedar_tree.js', maple: './assets/maple_tree.js', boulder: './assets/boulder.js',
@@ -85,6 +85,43 @@ function roadTexture(half, wall) {
   return { map, roughnessMap, len: LEN };
 }
 
+/**
+ * Slope protection, the concrete lattice (法枠) on every steep cutting of a Japanese mountain road: one 3.2 m
+ * cell of grey beams round a pocket of soil and grass, weathered, drawn once into a canvas.
+ */
+function latticeTexture() {
+  const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const ctx = cv.getContext('2d');
+  let seed = 11;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  // the pocket: dark soil with grass
+  // (kept close in value to the beams, so the ink pass draws the grid, not every blade of grass)
+  ctx.fillStyle = '#5c6545'; ctx.fillRect(0, 0, S, S);
+  for (let i = 0; i < 900; i++) {
+    const g = 40 + rnd() * 40;
+    ctx.fillStyle = `rgba(${g * 0.9 + 20 | 0},${g + 34 | 0},${g * 0.6 + 10 | 0},${0.25 + rnd() * 0.3})`;
+    ctx.fillRect(rnd() * S, rnd() * S, 2 + rnd() * 5, 2 + rnd() * 6);
+  }
+  // the beams: a band on every edge, so the tiles meet in a grid
+  const B = 19;
+  const beam = (x, y, w, h) => {
+    ctx.fillStyle = '#9d998f'; ctx.fillRect(x, y, w, h);
+    for (let i = 0; i < (w * h) / 30; i++) { const v = 150 + rnd() * 40; ctx.fillStyle = `rgba(${v},${v - 4},${v - 12},0.35)`; ctx.fillRect(x + rnd() * w, y + rnd() * h, 2, 2); }
+  };
+  beam(0, 0, S, B); beam(0, S - B, S, B); beam(0, 0, B, S); beam(S - B, 0, B, S);
+  // shading under the beams, and rust-dark streaks where water runs off them
+  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(B, B, S - 2 * B, 5); ctx.fillRect(B, B, 4, S - 2 * B);
+  for (let i = 0; i < 9; i++) {
+    const x = B + rnd() * (S - 2 * B), len = 10 + rnd() * 50;
+    const gr = ctx.createLinearGradient(0, S - B - len, 0, S - B);
+    gr.addColorStop(0, 'rgba(40,34,26,0)'); gr.addColorStop(1, 'rgba(40,34,26,0.45)');
+    ctx.fillStyle = gr; ctx.fillRect(x, S - B - len, 2 + rnd() * 3, len);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  return t;
+}
+
 export class World {
   constructor(scene, quality) {
     this.scene = scene; this.q = quality;
@@ -128,6 +165,11 @@ export class World {
         if (hex === PAL.tailRed || hex === PAL.laneWhite) { o.material = o.material.clone(); o.material.emissive.set(hex); o.material.emissiveIntensity = hex === PAL.tailRed ? 0.9 : 0.35; }
       });
     }
+    // the shop and the machines are the brightest things on a night pass: their panels glow for the bloom
+    for (const name of ['conbini', 'vending']) {
+      const tpl = this.templates[name]; if (!tpl) continue;
+      tpl.traverse((o) => { if (o.isMesh && o.material && o.material.emissive && o.material.emissiveIntensity > 0.5) { o.material = o.material.clone(); o.material.emissiveIntensity = 2.6; } });
+    }
     for (const k of names) this.parts[k] = partsOf(this.templates[k]);
     // the lamp's head: the far end of its arm, found from the template rather than assumed
     {
@@ -139,6 +181,31 @@ export class World {
     this.groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: g.map, roughnessMap: g.roughnessMap, normalMap: g.normalMap,
       normalScale: new THREE.Vector2(0.28, 0.28), roughness: 1, metalness: 0, color: 0xffffff });
     this.groundMat.name = 'ground';
+    // steep cuttings by the road wear the lattice: the terrain gives each vertex a weight ('wall'), and the
+    // lattice is mapped up and along the face. Installed before the rig first sees the material, so the rig
+    // keeps this hook and runs it ahead of its own patches.
+    {
+      const lat = latticeTexture();
+      this.groundMat.onBeforeCompile = (shader) => {
+        shader.uniforms.uLattice = { value: lat };
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', `#include <common>
+attribute float wall;
+attribute float wallS;
+varying float vWall;
+varying vec2 vWallUv;`)
+          .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+{ vec4 wp = modelMatrix * vec4(transformed, 1.0); vWallUv = vec2(wallS, wp.y * 1.3) / 3.2; vWall = wall; }`);
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', `#include <common>
+uniform sampler2D uLattice;
+varying float vWall;
+varying vec2 vWallUv;`)
+          .replace('#include <color_fragment>', `#include <color_fragment>
+if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice, vWallUv).rgb, vWall); }`);
+      };
+      this.groundMat.customProgramCacheKey = () => 'ground-lattice';
+    }
     this.farMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 8 });
     this.farMat.name = 'farground';
     this.roadMat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff });
@@ -147,15 +214,16 @@ export class World {
     this.tunnelMat = new THREE.MeshStandardMaterial({ color: 0x55555c, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
     this.tunnelLampMat = new THREE.MeshStandardMaterial({ color: 0xffe2b0, emissive: 0xffb45a, emissiveIntensity: 2.4, roughness: 0.5 });
     this.wireMat = new THREE.LineBasicMaterial({ color: 0x15161a });
-    this.bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffc070, emissiveIntensity: 2.8, roughness: 0.6 });
+    this.bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffc070, emissiveIntensity: 2.1, roughness: 0.6 });
     {
       const sz = 128, cv = document.createElement('canvas'); cv.width = cv.height = sz;
       const ctx = cv.getContext('2d');
       const gr = ctx.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2);
-      gr.addColorStop(0, 'rgba(255,160,70,0.5)'); gr.addColorStop(0.25, 'rgba(255,148,60,0.3)'); gr.addColorStop(0.55, 'rgba(255,135,50,0.1)'); gr.addColorStop(1, 'rgba(255,135,50,0)');
+      gr.addColorStop(0, 'rgba(255,255,255,0.5)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.3)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.1)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = gr; ctx.fillRect(0, 0, sz, sz);
       const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-      this.glowMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+      this.glowMat = new THREE.MeshBasicMaterial({ color: 0xffa046, map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+      this.glowCoolMat = this.glowMat.clone(); this.glowCoolMat.color.set(0xd8ecff);
     }
     // the shared pools
     const bulbParts = [{ geometry: new THREE.SphereGeometry(0.2, 8, 6), material: this.bulbMat, local: new THREE.Matrix4() }];
@@ -474,7 +542,8 @@ export class World {
     g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
     ch.own.add(g);
-    const m = new THREE.Mesh(g, this.tunnelMat); m.receiveShadow = true; m.castShadow = false; m.name = 'tube';
+    // it casts: the moon has no business lighting the inside of a tunnel through the hill
+    const m = new THREE.Mesh(g, this.tunnelMat); m.receiveShadow = true; m.castShadow = true; m.name = 'tube';
     grp.add(m);
     // two rows of sodium lamps high on the walls, every 8 m
     const lamp = new THREE.BoxGeometry(0.3, 0.14, 1.1);
@@ -526,7 +595,7 @@ export class World {
   }
 
   /** Light pools that lie on the ground (a small grid draped over it), so none floats beside an embankment. */
-  _glows(list, ch) {
+  _glows(list, ch, mat = this.glowMat) {
     const g = this.ground, N = 8;
     const pos = [], uv = [], idx = [];
     for (const [cx, cz, size] of list) {
@@ -545,7 +614,7 @@ export class World {
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.setIndex(idx); geo.computeBoundingSphere();
     ch.own.add(geo);
-    const m = new THREE.Mesh(geo, this.glowMat);
+    const m = new THREE.Mesh(geo, mat);
     m.renderOrder = 2; m.name = 'glow';
     return m;
   }
@@ -578,6 +647,9 @@ export class World {
       const mid = m.s + m.len * 0.45;
       if (m.kind === 'conbini') {
         { const a = at(mid, edge + m.depth * 0.55); this._put('conbini', own, a.x, a.y, a.z, face(a.p)); }
+        // the shop's light spills over the lot: a cool pool on the ground, and a place for a lamp light
+        { const a = at(mid, edge - 1.5); const gm = this._glows([[a.x, a.z, 16]], ch, this.glowCoolMat); if (gm) ch.group.add(gm);
+          this.lamps.push({ x: a.x, y: a.y + 3.2, z: a.z, c: ch.c, color: 0xdcecff, power: 260 }); }
         for (const [ds, du] of [[mid - 9, 0.9], [mid - 7.8, 0.9]]) { const a = at(ds, edge + du); this._put('vending', own, a.x, a.y, a.z, face(a.p)); }
         for (const ds of [m.s - 4, m.s + m.len - 6]) { const a = at(ds, edge + 0.4); this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI); }
         { const a = at(m.s + m.len - 2, edge + m.depth - 1); this._put('bare', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.9); }
@@ -849,7 +921,7 @@ export class World {
       }
     }
     const box = new THREE.BoxGeometry(1, 1, 1);
-    for (const m of [this.tunnelMat, this.tunnelLampMat, this.glowMat, this.bulbMat, this.groundMat, this.farMat, this.roadMat, this.railMat]) {
+    for (const m of [this.tunnelMat, this.tunnelLampMat, this.glowMat, this.glowCoolMat, this.bulbMat, this.groundMat, this.farMat, this.roadMat, this.railMat]) {
       const x = new THREE.Mesh(box, m); x.position.y = -500; x.castShadow = true; stage.add(x);
     }
     { const l = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -500, 0), new THREE.Vector3(1, -500, 0)]), this.wireMat); stage.add(l); }
@@ -882,6 +954,7 @@ export class World {
   /** Night: light pools come up, towns light, and ground, road and foliage take a cool dark tint. */
   setNight(n) {
     if (this.glowMat) this.glowMat.opacity = 0.75 * n;
+    if (this.glowCoolMat) this.glowCoolMat.opacity = 0.7 * n;
     if (this.town) this.town.material.opacity = 0.9 * n;
     if (!this._tinted) {
       this._tinted = [];

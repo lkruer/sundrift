@@ -13,8 +13,8 @@
  *
  * Pure maths, no Three.js: the game, the physics sim and the gate share it.
  */
-import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609222231';
-import { Field } from './field.js?v=202609222231';
+import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609222241';
+import { Field } from './field.js?v=202609222241';
 
 const TAU = Math.PI * 2;
 const wrap = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
@@ -24,7 +24,7 @@ export const CELL = 24;
 export const ckey = (cx, cz) => (cx + 40000) * 80000 + (cz + 40000);
 const LAYBY = { conbini: [8, 11, 46], busstop: [4.5, 5, 30], hut: [6, 8, 36], vista: [6, 4, 36] };   // drivable width, pad depth, length
 const LOOK = 4;                                  // provisional features kept ahead of the final road
-const SET_ROTATION = ['busstop', 'conbini', 'tunnel', 'shrine', 'hut', 'vista', 'busstop', 'tunnel', 'shrine', 'conbini', 'hut'];
+const SET_ROTATION = ['busstop', 'tunnel', 'conbini', 'vista', 'shrine', 'tunnel', 'hut', 'busstop', 'conbini', 'tunnel', 'vista', 'shrine'];
 
 export const DIFFS = {
   easy: {
@@ -33,7 +33,7 @@ export const DIFFS = {
     leg: [360, 700], hairpinR: [30, 40], approach: [30, 50],
     sweeperR: [70, 150], sweeperAng: [0.35, 0.9], essR: [55, 95], essAng: [0.4, 0.75],
     kinkR: [110, 220], kinkAng: [0.15, 0.35], straight: [60, 130], ramp: [18, 28],
-    weights: [['sweeper', 0.42], ['ess', 0.2], ['kink', 0.23], ['straight', 0.15]], maxOff: 0.55, setEvery: 5,
+    weights: [['sweeper', 0.42], ['ess', 0.2], ['kink', 0.23], ['straight', 0.15]], maxOff: 0.55, setEvery: 3,
   },
   medium: {
     key: 'medium', label: 'MEDIUM', blurb: 'The pass: hairpins and S-bends', salt: 202,
@@ -41,7 +41,7 @@ export const DIFFS = {
     leg: [190, 380], hairpinR: [16, 22], approach: [22, 40],
     sweeperR: [42, 110], sweeperAng: [0.45, 1.15], essR: [30, 58], essAng: [0.6, 1.1],
     kinkR: [70, 160], kinkAng: [0.2, 0.5], straight: [40, 100], ramp: [12, 20],
-    weights: [['sweeper', 0.4], ['ess', 0.27], ['kink', 0.2], ['straight', 0.13]], maxOff: 0.7, setEvery: 5,
+    weights: [['sweeper', 0.4], ['ess', 0.27], ['kink', 0.2], ['straight', 0.13]], maxOff: 0.7, setEvery: 3,
   },
   hard: {
     key: 'hard', label: 'HARD', blurb: 'Narrow, tight, relentless', salt: 303,
@@ -49,7 +49,7 @@ export const DIFFS = {
     leg: [120, 240], hairpinR: [11.5, 15], approach: [16, 30],
     sweeperR: [30, 80], sweeperAng: [0.6, 1.45], essR: [22, 42], essAng: [0.7, 1.3],
     kinkR: [50, 110], kinkAng: [0.3, 0.6], straight: [25, 65], ramp: [9, 15],
-    weights: [['sweeper', 0.34], ['ess', 0.36], ['kink', 0.2], ['straight', 0.1]], maxOff: 0.8, setEvery: 5,
+    weights: [['sweeper', 0.34], ['ess', 0.36], ['kink', 0.2], ['straight', 0.1]], maxOff: 0.8, setEvery: 3,
   },
 };
 
@@ -401,7 +401,7 @@ export class Track {
       if (this._sinceSet >= D.setEvery) {
         const kind = SET_ROTATION[this._setIdx % SET_ROTATION.length];
         if (kind === 'tunnel') { this._pendingTunnel = true; this._setIdx++; this._sinceSet = 0; }
-        else if ((plan.type === 'straight' || plan.type === 'kink' || (plan.type === 'sweeper' && plan.R >= 55)) && len >= 90) {
+        else if ((plan.type === 'straight' || plan.type === 'kink' || (plan.type === 'sweeper' && plan.R >= 45)) && len >= 86) {
           this._placeSet(kind, s0 + 20, i0, i1);
           this._setIdx++; this._sinceSet = 0;
         }

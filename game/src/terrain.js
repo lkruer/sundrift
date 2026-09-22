@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222231';
-import { REACH } from './ground.js?v=202609222231';
-import { instanceGroup } from './instancing.js?v=202609222231';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222241';
+import { REACH } from './ground.js?v=202609222241';
+import { instanceGroup } from './instancing.js?v=202609222241';
 
 export const TILE = 96;
 export const LODS = [
@@ -159,7 +159,7 @@ export class Terrain {
     const t0 = performance.now();
     const seg = LODS[lod].seg, sp = TILE / seg, n = seg + 3;
     const verge = Math.max(2.2, sp * 1.45);
-    const H = new Float32Array(n * n), E = new Float32Array(n * n), F = new Uint8Array(n * n);
+    const H = new Float32Array(n * n), E = new Float32Array(n * n), F = new Uint8Array(n * n), S = new Float32Array(n * n);
     const x0 = tile.i * TILE - sp, z0 = tile.j * TILE - sp;
     const s = {};
     const g = this.ground;
@@ -168,11 +168,11 @@ export class Terrain {
       for (let i = 0; i < n; i++) {
         g.sample(x0 + i * sp, z0 + j * sp, verge, s);
         const k = j * n + i;
-        H[k] = s.h; E[k] = s.edge; F[k] = (s.flat ? 1 : 0) | (s.tunnel ? 2 : 0);
+        H[k] = s.h; E[k] = s.edge; F[k] = (s.flat ? 1 : 0) | (s.tunnel ? 2 : 0); S[k] = s.s;
       }
       if (j % rowsPerStep === rowsPerStep - 1) yield;
     }
-    const geo = this._geometry(tile, seg, H, E, F);
+    const geo = this._geometry(tile, seg, H, E, F, S);
     yield;
     const trees = lod <= 1 ? this._forest(tile, lod, seg, H, E, F) : null;
     // swap
@@ -216,10 +216,11 @@ export class Terrain {
     return out;
   }
 
-  _geometry(tile, seg, H, E, F) {
+  _geometry(tile, seg, H, E, F, S) {
     const n = seg + 3, sp = TILE / seg, row = seg + 1, V = row * row, per = 4 * seg;
     const total = V + per;
     const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), col = new Float32Array(total * 3), uv = new Float32Array(total * 2);
+    const wall = new Float32Array(total), wallS = new Float32Array(total);
     const ox = tile.i * TILE, oz = tile.j * TILE;
     for (let j = 0; j <= seg; j++) for (let i = 0; i <= seg; i++) {
       const k = (j + 1) * n + (i + 1), v = j * row + i;
@@ -231,6 +232,9 @@ export class Terrain {
       this._colour(x, z, y, ny, E[k], F[k], 0, _c);
       col[v * 3] = _c.r; col[v * 3 + 1] = _c.g; col[v * 3 + 2] = _c.b;
       uv[v * 2] = x / 7; uv[v * 2 + 1] = z / 7;
+      // slope protection on a steep face near the road (a cutting, or the face between two legs)
+      wall[v] = (F[k] & 3) ? 0 : smoothstep(0.42, 0.58, 1 - ny * ny) * (1 - smoothstep(14, 24, E[k]));
+      wallS[v] = S[k];                               // along the lattice: the distance along the road beside it
     }
     // the perimeter, walked once round, and a skirt hanging from it
     const perim = [];
@@ -245,6 +249,7 @@ export class Terrain {
       nor[v * 3] = nor[src * 3]; nor[v * 3 + 1] = nor[src * 3 + 1]; nor[v * 3 + 2] = nor[src * 3 + 2];
       col[v * 3] = col[src * 3] * 0.8; col[v * 3 + 1] = col[src * 3 + 1] * 0.8; col[v * 3 + 2] = col[src * 3 + 2] * 0.8;
       uv[v * 2] = uv[src * 2]; uv[v * 2 + 1] = uv[src * 2 + 1] + drop / 7;
+      wall[v] = wall[src]; wallS[v] = wallS[src];
     }
     const idx = new (total > 65535 ? Uint32Array : Uint16Array)(seg * seg * 6 + per * 6);
     let o = 0;
@@ -264,6 +269,8 @@ export class Terrain {
     geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setAttribute('wall', new THREE.BufferAttribute(wall, 1));
+    geo.setAttribute('wallS', new THREE.BufferAttribute(wallS, 1));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeBoundingSphere();
     return geo;

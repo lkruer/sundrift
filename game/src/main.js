@@ -6,19 +6,19 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609222231';
-import { createRig, detectTier } from '../rig.js?v=202609222231';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222231';
-import { Car, gearbox } from './car.js?v=202609222231';
-import { Track, DIFFS } from './track.js?v=202609222231';
-import { World } from './world.js?v=202609222231';
-import { ChaseCam } from './camera.js?v=202609222231';
-import { Input } from './input.js?v=202609222231';
-import { Scoring } from './scoring.js?v=202609222231';
-import { Hud } from './hud.js?v=202609222231';
-import { Audio } from './audio.js?v=202609222231';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222231';
-import { makePost } from './post.js?v=202609222231';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609222241';
+import { createRig, detectTier } from '../rig.js?v=202609222241';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222241';
+import { Car, gearbox } from './car.js?v=202609222241';
+import { Track, DIFFS } from './track.js?v=202609222241';
+import { World } from './world.js?v=202609222241';
+import { ChaseCam } from './camera.js?v=202609222241';
+import { Input } from './input.js?v=202609222241';
+import { Scoring } from './scoring.js?v=202609222241';
+import { Hud } from './hud.js?v=202609222241';
+import { Audio } from './audio.js?v=202609222241';
+import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222241';
+import { makePost } from './post.js?v=202609222241';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -573,7 +573,7 @@ function step(dt, t0) {
   const t1 = performance.now();
 
   // ---- camera, world
-  chase.update(dt, car, y, (x, z) => world.ground.height(x, z), boost01, input.zoom, susp.accL);
+  chase.update(dt, car, y, camGround, boost01, input.zoom, susp.accL);
   nightFollow();
   // the world builds in the time the frame has spare: less after a slow frame, so a hitch never compounds
   const spare = clamp(13.5 - (performance.now() - t0) - G.renderMs, 0.8, tier === 'phone' ? 3.5 : 4.5);
@@ -583,6 +583,10 @@ function step(dt, t0) {
   hud.update(dt, scoring, car, gb, G.hour, G.dist, car.boost, SCORE.boostMax, perfLine);
   G.simMs = t1 - t0; G.worldMs = performance.now() - t1;
 }
+
+// the ground the camera keeps clear of: in a tunnel that is the road, not the hill over it
+const camProbe = {};
+function camGround(x, z) { const s = world.ground.sample(x, z, 2.2, camProbe); return s.tunnel ? -1e9 : s.h; }
 
 function nightFollow() {
   if (!night.moon) return;
@@ -708,7 +712,9 @@ function lampsFollow() {
     const l = L[pickIdx[j]], d = Math.sqrt(pickD[j]);
     const fade = 1 - smoothstep(cut * 0.72, cut, d);
     pl.position.set(l.x, l.y, l.z);
-    pl.intensity = (l.tunnel ? 110 : 330 * Math.max(G.night, 0.12)) * fade;
+    const col = l.color || 0xffa040;
+    if (pl.userData.col !== col) { pl.color.setHex(col); pl.userData.col = col; }
+    pl.intensity = (l.tunnel ? 110 : (l.power || 330) * Math.max(G.night, 0.12)) * fade;
   }
 }
 
