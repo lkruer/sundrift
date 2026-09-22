@@ -86,6 +86,13 @@ First phone run: real touches drove the car at 76 km/h and produced 49-degree sl
 because the driver entered a hairpin at 110 km/h and hit the rail, which drops the drift. The driver got
 corner speed control; the game was right.
 
+## Measured on the live URL (22 Sep, before the hero car landed)
+
+`harness/jam.mjs https://lkruer.github.io/sundrift/game/`, phone viewport, 4G profile: ready 6.1 s (budget 20),
+weight 1.1 MB (budget 10), started from a real tap, moved 60 m in the hold, 150 peak draws, 635 k peak
+triangles, 0 console errors. Desktop gate with the full forest and verge in view: 338 draws, 1.21 M triangles
+after thinning the cedar grid from 12/14 m to 13/15.5 m spacing (it had reached 1.53 M).
+
 ## Still wrong, or not attempted
 
 (kept up to date at the end)
