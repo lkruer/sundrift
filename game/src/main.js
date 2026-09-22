@@ -72,7 +72,7 @@ async function boot() {
   rig.refresh(scene);
   // compile every shader variant now, not on the first frame that needs it
   try { renderer.compile(scene, camera); } catch (e) { console.warn('compile', e.message); }
-  window.__DEBUG__ = { world, track, car, rig, scene, renderer, G, chase, get scoring() { return scoring; },
+  window.__DEBUG__ = { world, track, car, rig, scene, renderer, G, chase, audio, get scoring() { return scoring; },
     // put the car on the centreline at distance s, facing along the road, camera snapped: for the critic's fixed views
     teleport(s, kmh = 0) {
       const p = track.sample(s);
