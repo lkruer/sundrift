@@ -147,6 +147,21 @@ past 45 degrees of slip, an anti-spin throttle ease past 40 degrees, extra yaw d
 coming back, more lock at speed, a gentler grip curve and a slightly lighter handbrake. The sim scenarios all
 still hold (work/sim.mjs).
 
+## Set dressing for the night (22 Sep)
+
+Six more objects through the loop, in two agents: a concrete power pole (the game strings two sagging wires
+between poles as tubes along a three-point curve, 44 m apart on the mountain side), a cat's-eye road stud
+(instanced every 12 m on the centre line, white lens toward the driver, red at the edges), a bamboo clump, a
+bare tree for the skyline, a lit convenience store at a lay-by with its own lamps, and a bus shelter. Notes and
+rejected candidates under `work/cands/night` and `work/cands/night2`. The agent reports worth keeping: the
+bamboo brief was over its own triangle budget as written (27 blobs alone were 2,160 triangles), so node bulges
+became six-triangle skirts; the store's interior read as a black mirror from an elevated camera until pendant
+lamps were added inside; a cat's-eye housing built on a regular octagon floated past its own facet.
+
+A town of lights sits in the valley (900 warm points on the far plane that follows the car), and lay-bys are
+gravel. The pane in the desktop app stopped repainting its canvas at one point and returned the same frame
+for three different lighting states; the headless gate on the real GPU is the check that counts.
+
 ## Still wrong, or not attempted
 
 (kept up to date at the end)
