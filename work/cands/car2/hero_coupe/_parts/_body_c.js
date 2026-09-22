@@ -16,20 +16,23 @@
     [1.64,  0.59, 0.80, 0.815, 0.65,  0.80,  0.712, 0.70, 0.733, 0.746],    // front arch, front edge
     [1.275, 0.70, 0.80, 0.815, 0.71,  0.80,  0.745, 0.70, 0.768, 0.781],    // front axle
     [0.92,  0.70, 0.80, 0.815, 0.72,  0.80,  0.78,  0.70, 0.803, 0.816],    // front arch, rear edge
-    [0.275, 0.70, 0.80, 0.815, 0.76,  0.795, 0.85,  0.74, 0.866, 0.88],     // scuttle
-    [-0.35, 0.70, 0.80, 0.815, 0.78,  0.78,  0.895, 0.60, 1.235, 1.265],    // windscreen top
-    [-0.65, 0.70, 0.80, 0.815, 0.79,  0.78,  0.905, 0.60, 1.245, 1.28],     // roof peak
+    [0.90,  0.24, 0.80, 0.815, 0.72,  0.80,  0.78,  0.70, 0.803, 0.816],    // door front edge: the skin drops to the sill
+    [0.275, 0.24, 0.80, 0.815, 0.76,  0.795, 0.85,  0.74, 0.866, 0.88],     // scuttle
+    [-0.35, 0.24, 0.80, 0.815, 0.78,  0.78,  0.895, 0.60, 1.235, 1.265],    // windscreen top
+    [-0.65, 0.24, 0.80, 0.815, 0.79,  0.78,  0.905, 0.60, 1.245, 1.28],     // roof peak
+    [-0.87, 0.24, 0.80, 0.815, 0.80,  0.78,  0.910, 0.593, 1.230, 1.262],   // door rear edge
+    [-0.89, 0.70, 0.80, 0.815, 0.80,  0.78,  0.911, 0.592, 1.229, 1.260],   // quarter: the skin ends above the arch
     [-0.95, 0.70, 0.80, 0.815, 0.80,  0.78,  0.912, 0.59, 1.225, 1.255],    // rear glass top
     [-1.48, 0.70, 0.80, 0.815, 0.80,  0.80,  0.915, 0.70, 0.94,  0.952],    // rear glass base
     [-2.12, 0.78, 0.78, 0.79,  0.85,  0.78,  0.905, 0.71, 0.915, 0.93],     // tail, deck lowered
   ];
   const rings = stations.map((s) => ring(...s));
   add(body, loft(rings, {
-    creaseRows: [1, 3, 4, 12, 13, 15], creaseSecs: [4, 5, 7, 8], capFront: 0, capBack: 0,
+    creaseRows: [1, 3, 4, 12, 13, 15], creaseSecs: [5, 6, 10, 11], capFront: 0, capBack: 0,
     matOf: (seg, row) => {
       const top = row >= 4 && row <= 11, side = row === 3 || row === 12;
-      if (top && (seg === 4 || seg === 7)) return 1;
-      if (side && seg >= 4 && seg <= 7) return 1;
+      if (top && (seg === 5 || seg === 10)) return 1;
+      if (side && seg >= 5 && seg <= 10) return 1;
       return 0;
     },
   }), [PAINT, GLASS]);
@@ -132,9 +135,9 @@
   add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.135, 0.168, 0.10, 0.055)), DARK);          // splitter lip, proud of the face
   add(body, sweep(clipX(nose, -0.80, 0.80), plainProf(0.585, 0.665, 0.10, 0.012)), DARK);           // lamp band
   const topR = (x, z) => lerp(0.725, 0.80, c01((-1.60 - z) / 0.59));
-  add(body, sweep(tail, [[0, 0.46], [0.012, 0.52], [0.004, topR], [-0.10, topR], [-0.10, 0.46]]), PAINT);   // rear bumper face, 0.34 tall with a soft crease
-  add(body, sweep(clipZ(tail, -1.86), [[0.0, 0.80], [0.014, 0.812], [0.014, 0.928], [0.0, 0.94], [-0.08, 0.94], [-0.08, 0.80]]), DARK);   // garnish, 0.14 tall, chamfered, wrapping into the quarters
-  add(body, sweep(tail, plainProf(0.17, 0.47, 0.10, 0.006)), DARK);                                  // lower valance, wraps the corners
+  add(body, sweep(tail, [[-0.06, 0.30], [0, 0.46], [0.012, 0.52], [0.004, topR], [-0.10, topR], [-0.10, 0.30]]), PAINT);   // rear bumper: 0.34 face with a soft crease, chin tucked under
+  add(body, sweep(clipZ(tail, -1.92), [[0.0, 0.80], [0.014, 0.812], [0.014, 0.928], [0.0, 0.94], [-0.08, 0.94], [-0.08, 0.80]]), DARK);   // garnish, 0.14 tall, chamfered, wrapping into the quarters
+  add(body, sweep(tail, plainProf(0.17, 0.31, 0.10, -0.054)), DARK);                                  // lower valance, wraps the corners
   // rear wing: aerofoil lofted across, swept uprights, end plates, high-mount brake lamp
   const foil = (x) => {
     const out = [];

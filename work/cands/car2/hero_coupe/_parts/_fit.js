@@ -93,7 +93,6 @@
 
   // ---- flanks: skirts, tubs, plate, flares with rivets, pillars, trims, mirrors -------------
   for (const s of [-1, 1]) {
-    add(body, box(0.07, 0.50, 1.80), PAINT, s * 0.765, 0.47, 0.02);                                  // door skin, sill to the hull's floor line
     add(body, box(0.06, 0.10, 1.78), DARK, s * 0.79, 0.19, 0.03);                                    // skirt blade
     add(body, box(0.11, 0.035, 1.78), DARK, s * 0.805, 0.152, 0.03);                                 // its step
     add(body, box(0.18, 0.04, 1.78), DARK, s * 0.71, 0.16, 0.03);
