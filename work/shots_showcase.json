@@ -1,0 +1,13 @@
+[
+  { "wait": 1500 }, { "shot": "S0_title" },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.teleport(3000, 0); D.atmos.mistY = null; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); })()" },
+  { "wait": 2500 },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car, U = D.track.field.U; const y = D.G.carY; window.__CAM__ = { pos: [c.x + U[1] * 8, y + 16, c.z - U[0] * 8], look: [c.x - U[0] * 500 + U[1] * 120, y - 50, c.z - U[1] * 500 - U[0] * 120], fov: 58 }; })()" },
+  { "wait": 1500 }, { "shot": "S1_unkai_night" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 5.75; D.G.hourShown = 5.75; D.G.lastApplied = -9; })()" },
+  { "wait": 3500 }, { "shot": "S2_unkai_dawn" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 10.5; D.G.hourShown = 10.5; D.G.lastApplied = -9; })()" },
+  { "wait": 3500 }, { "shot": "S3_unkai_day" }
+]

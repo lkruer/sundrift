@@ -8,7 +8,7 @@
  * points; it is tinted by the sun so it reads warm at golden hour and cool in shade.
  */
 import * as THREE from 'three';
-import { clamp } from './config.js?v=202609230440';
+import { clamp } from './config.js?v=202609230706';
 
 function spriteTexture() {
   const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
@@ -23,7 +23,7 @@ const SKID_VS = `attribute float alpha; varying float vA; void main(){ vA = alph
 const SKID_FS = `uniform vec3 uColor; varying float vA; void main(){ gl_FragColor = vec4(uColor, vA * 0.75); }`;
 
 export class SkidMarks {
-  constructor(scene, max = 700) {
+  constructor(scene, max = 900) {
     this.max = max;
     this.tracks = [];
     this.mat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: new THREE.Color(0x141416) } }, vertexShader: SKID_VS, fragmentShader: SKID_FS,
@@ -43,41 +43,92 @@ export class SkidMarks {
       const mesh = new THREE.Mesh(geo, this.mat);
       mesh.frustumCulled = false; mesh.renderOrder = 1;
       scene.add(mesh);
-      this.tracks.push({ mesh, geo, pos, al, head: 0, count: 0, lastX: 0, lastZ: 0, on: false, gap: true });
+      this.tracks.push({ mesh, geo, pos, al, head: 0, count: 0, lastX: 0, lastY: 0, lastZ: 0, px: 1, pz: 0, n: 0, open: false });
     }
   }
 
   /** Wipe every mark (a new course or a new run). */
   clear() {
-    for (const t of this.tracks) { t.al.fill(0); t.head = 0; t.count = 0; t.gap = true; t.geo.attributes.alpha.needsUpdate = true; t.geo.setDrawRange(0, 0); }
+    for (const t of this.tracks) {
+      t.al.fill(0); t.pos.fill(0); t.head = 0; t.count = 0; t.n = 0; t.open = false;
+      t.geo.attributes.position.needsUpdate = true; t.geo.attributes.alpha.needsUpdate = true; t.geo.setDrawRange(0, 0);
+    }
   }
 
   /**
-   * Add a point for wheel i at world (x, y, z), lateral direction (lx, lz) for the width, alpha 0..1.
-   * alpha 0 lifts the pen: the next point starts a new stroke.
+   * Add a point for wheel i at world (x, y, z) with alpha 0..1: y is the road's own surface under the wheel, and
+   * (lx, lz) is the direction across the wheel's travel, which the first point of a stroke is laid along. A low
+   * alpha lifts the pen.
+   *
+   * The ring draws a quad between every pair of neighbouring points, so each stroke is fenced by invisible points
+   * (alpha 0 at its first and its last): the quad that joins one stroke to the next has nothing to show at either
+   * end. The ring's seam, the newest point beside the oldest, is fenced the same way. (Unfenced, both drew a faint
+   * streak: across every gap between two slides, and from the newest mark out to the oldest.) The width is laid
+   * across the stroke's own direction, never across the car, which in a big drift runs along the mark and would
+   * pinch it to a sliver.
    */
   add(i, x, y, z, lx, lz, alpha, width = 0.24) {
     const t = this.tracks[i];
-    if (alpha < 0.03) { t.gap = true; return; }
-    const d = Math.hypot(x - t.lastX, z - t.lastZ);
-    if (!t.gap && d < 0.22) return;
-    const write = (a) => {
-      const v = t.head * 2;
-      t.pos[v * 3] = x + lx * width * 0.5; t.pos[v * 3 + 1] = y; t.pos[v * 3 + 2] = z + lz * width * 0.5;
-      t.pos[v * 3 + 3] = x - lx * width * 0.5; t.pos[v * 3 + 4] = y; t.pos[v * 3 + 5] = z - lz * width * 0.5;
-      t.al[v] = a; t.al[v + 1] = a;
-      t.head = (t.head + 1) % this.max;
-      t.count = Math.min(this.max, t.count + 1);
-    };
-    if (t.gap) { write(0); t.gap = false; }   // an invisible seam so strokes do not join across a gap
-    write(alpha);
-    // the quad that wraps from the head back to the tail must stay invisible
-    const tail = t.head * 2;
-    t.al[tail] = 0; t.al[tail + 1] = 0;
-    t.lastX = x; t.lastZ = z;
+    const dx = x - t.lastX, dz = z - t.lastZ, d = Math.hypot(dx, dz);
+    // (a wheel that jumped, as it does when the car is reset or set down by the magnet, starts a new stroke)
+    const jumped = t.open && (d > 4 || Math.abs(y - t.lastY) > 0.6);
+    if (t.open && (alpha < 0.03 || jumped)) {
+      // close the stroke, fading it out over its last few centimetres toward where the wheel is now
+      const k = !jumped && d > 1e-4 ? Math.min(d, 0.3) / d : 0;
+      this._write(t, t.lastX + dx * k, t.lastY, t.lastZ + dz * k, t.px, t.pz, 0, width);
+      t.open = false;
+      this._flush(t);
+    }
+    if (!t.open) {
+      if (alpha < 0.06) return;                               // (a little more to start a stroke than to keep one going)
+      const l = Math.hypot(lx, lz) || 1;
+      t.px = lx / l; t.pz = lz / l;
+      this._write(t, x, y, z, t.px, t.pz, 0, width);          // the stroke's invisible first point
+      this._write(t, x, y, z, t.px, t.pz, alpha, width);
+      t.open = true; t.n = 1;
+      t.lastX = x; t.lastY = y; t.lastZ = z;
+      this._flush(t);
+      return;
+    }
+    if (d < 0.22) return;
+    // across the stroke, turned to agree with the last point so the ribbon never twists
+    let px = -dz / d, pz = dx / d;
+    if (px * t.px + pz * t.pz < 0) { px = -px; pz = -pz; }
+    if (t.n === 1) {
+      // the stroke's first point was laid across the wheel's travel; lay it across the stroke itself now
+      const m = this.max;
+      this._put(t, (t.head - 1 + m) % m, t.lastX, t.lastY, t.lastZ, px, pz, width);
+      this._put(t, (t.head - 2 + m) % m, t.lastX, t.lastY, t.lastZ, px, pz, width);
+    }
+    this._write(t, x, y, z, px, pz, alpha, width);
+    t.n++;
+    t.lastX = x; t.lastY = y; t.lastZ = z; t.px = px; t.pz = pz;
+    this._flush(t);
+  }
+
+  _put(t, slot, x, y, z, px, pz, width) {
+    const o = slot * 6, hw = width * 0.5;
+    t.pos[o] = x + px * hw; t.pos[o + 1] = y; t.pos[o + 2] = z + pz * hw;
+    t.pos[o + 3] = x - px * hw; t.pos[o + 4] = y; t.pos[o + 5] = z - pz * hw;
+  }
+
+  _write(t, x, y, z, px, pz, a, width) {
+    this._put(t, t.head, x, y, z, px, pz, width);
+    t.al[t.head * 2] = a; t.al[t.head * 2 + 1] = a;
+    t.head = (t.head + 1) % this.max;
+    t.count = Math.min(this.max, t.count + 1);
+  }
+
+  _flush(t) {
+    const m = this.max, h = t.head, p = (h - 1 + m) % m, o = (h + 1) % m;
+    // the seam: the slot to be written next repeats the newest point, invisibly, and the oldest point goes
+    // invisible too, so neither quad at the seam (newest to next, next to oldest) can draw anything
+    t.pos.copyWithin(h * 6, p * 6, p * 6 + 6);
+    t.al[h * 2] = 0; t.al[h * 2 + 1] = 0;
+    t.al[o * 2] = 0; t.al[o * 2 + 1] = 0;
     t.geo.attributes.position.needsUpdate = true;
     t.geo.attributes.alpha.needsUpdate = true;
-    t.geo.setDrawRange(0, this.max * 6);
+    t.geo.setDrawRange(0, m * 6);
   }
 }
 

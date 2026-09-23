@@ -24,10 +24,18 @@ const Cel = {
     uNear: { value: 0.4 }, uFar: { value: 4500 }, uTime: { value: 0 },
     uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.075 }, uSpeed: { value: 0 },
     uVig: { value: 0 }, uHit: { value: 0 }, uCA: { value: 0.006 },
+    uShaft: { value: new THREE.Vector3(0.5, 0.5, 0) }, uShaftCol: { value: new THREE.Color(1, 1, 1) },
+    uMist: { value: new THREE.Vector4(-1e4, 0.03, 14, 0) }, uMistCol: { value: new THREE.Color() }, uMistGlow: { value: new THREE.Color() }, uMistFar: { value: new THREE.Color() },
+    uCamPos: { value: new THREE.Vector3() }, uCamRot: { value: new THREE.Matrix3() }, uTanFov: { value: new THREE.Vector2(1, 1) },
+    uMoonDir: { value: new THREE.Vector3(0, 1, 0) }, uNoise: { value: null }, uMistT: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed, uVig, uHit, uCA;
+    uniform vec3 uShaft, uShaftCol;
+    uniform vec4 uMist; uniform vec3 uMistCol, uMistGlow, uMistFar, uCamPos, uMoonDir; uniform mat3 uCamRot; uniform vec2 uTanFov; uniform sampler2D uNoise; uniform float uMistT;
+    // how much cloud lies between height y and the cloud's top: a ramp over soft metres, then solid
+    float mistG(float y, float top, float soft) { float d = top - y; return d <= 0.0 ? 0.0 : d < soft ? d * d / (2.0 * soft) : d - 0.5 * soft; }
     varying vec2 vUv;
     float lin(vec2 uv){ float z = texture2D(tDepth, uv).x * 2.0 - 1.0; return (2.0 * uNear * uFar) / (uFar + uNear - z * (uFar - uNear)); }
     float luma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
@@ -78,6 +86,41 @@ const Cel = {
       // ink
       float ink = clamp(sil + crease * 0.45 * (1.0 - sky), 0.0, 1.0) * uInk;
       col *= 1.0 - ink * 0.92;
+      // the sea of cloud: a height fog below a billowing top, integrated along this pixel's ray from the depth
+      if (uMist.w > 0.001 && sky < 0.5) {
+        vec3 vd = vec3((vUv * 2.0 - 1.0) * uTanFov, -1.0);
+        vec3 wd = uCamRot * vd;
+        vec3 P = uCamPos + wd * d0;
+        float y0 = uCamPos.y, y1 = P.y;
+        float tt = clamp((y0 - uMist.x) / max(1e-3, y0 - y1), 0.0, 1.0);
+        vec2 hit = mix(uCamPos.xz, P.xz, tt);
+        float nz = dot(texture2D(uNoise, hit / 420.0 + uMistT * vec2(0.0016, 0.0007)), vec4(0.5, 0.27, 0.15, 0.08));
+        nz += 0.35 * (dot(texture2D(uNoise, hit / 130.0 - uMistT * vec2(0.003, 0.0045)), vec4(0.4, 0.3, 0.2, 0.1)) - 0.5);
+        float top = uMist.x + (nz - 0.5) * 16.0;
+        float L = length(P - uCamPos), dy = y0 - y1;
+        float amt = abs(dy) > 0.05 ? abs(mistG(y1, top, uMist.z) - mistG(y0, top, uMist.z)) * L / abs(dy) : clamp((top - y0) / uMist.z, 0.0, 1.0) * L;
+        float tau = min(uMist.y * amt * (0.55 + 0.9 * nz), 30.0);
+        float T = exp(-tau);
+        vec3 mc = uMistCol * (0.68 + 0.7 * nz) + uMistGlow * pow(max(0.0, dot(normalize(wd), uMoonDir)), 5.0);
+        // (the far sea of cloud takes the haze, as everything far does, so it meets the sky without a line)
+        mc = mix(mc, uMistFar, smoothstep(900.0, 3400.0, L) * 0.85);
+        col = mix(mc, col, T);
+      }
+      // light shafts: march from the pixel toward the sun or the moon on the screen, counting the open sky on the
+      // way (the depth buffer's far plane); whatever stands in front breaks the light into rays. Added over the
+      // ink, as light in the air in front of things, and only faintly over the sky itself
+      if (uShaft.z > 0.001) {
+        vec2 dv = (uShaft.xy - vUv) / 22.0;
+        vec2 suv = vUv + dv * hash(gl_FragCoord.xy * 0.71 + fract(uTime * 7.0) * 13.0);
+        float acc = 0.0, wgt = 1.0, wsum = 0.0;
+        for (int i = 0; i < 22; i++) {
+          suv += dv;
+          acc += step(uFar * 0.985, lin(clamp(suv, 0.002, 0.998))) * wgt;
+          wsum += wgt; wgt *= 0.95;
+        }
+        float fall = 1.0 - smoothstep(0.05, 0.95, length((uShaft.xy - vUv) * vec2(uRes.x / uRes.y, 1.0)));
+        col += uShaftCol * (acc / wsum) * fall * fall * uShaft.z * mix(1.0, 0.18, sky);
+      }
       // grain and a faint scanline veneer
       float gr = (hash(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5) * uGrain;
       col += gr * (0.25 + l);

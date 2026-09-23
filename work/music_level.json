@@ -1,0 +1,7 @@
+[
+  { "click": "#startb" },
+  { "wait": 800 },
+  { "js": "(() => { const A = window.__DEBUG__.audio; const c = A.ctx; if (!c) return 'no ctx'; const an = c.createAnalyser(); an.fftSize = 4096; A.musicGain.connect(an); const am = c.createAnalyser(); am.fftSize = 4096; A.master.connect(am); const buf = new Float32Array(4096); const rms = (x) => { x.getFloatTimeDomainData(buf); let s = 0, pk = 0; for (const v of buf) { s += v * v; pk = Math.max(pk, Math.abs(v)); } return [Math.sqrt(s / buf.length), pk]; }; window.__AL__ = []; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); const id = setInterval(() => { const [r, p] = rms(an), [rm, pm] = rms(am); window.__AL__.push([+(c.currentTime.toFixed(1)), +r.toFixed(4), +p.toFixed(3), +rm.toFixed(4), +pm.toFixed(3), c.state]); }, 250); window.__ALID__ = id; return c.state; })()" },
+  { "wait": 26000 },
+  { "js": "(() => { clearInterval(window.__ALID__); const L = window.__AL__; const mus = L.map((x) => x[1]); const avg = mus.reduce((a, b) => a + b, 0) / mus.length; const silent = mus.filter((x) => x < 0.002).length; return { n: L.length, musicRmsAvg: +avg.toFixed(4), musicRmsMax: Math.max(...mus), musicPeak: Math.max(...L.map((x) => x[2])), masterRmsAvg: +(L.map((x) => x[3]).reduce((a, b) => a + b, 0) / L.length).toFixed(4), masterPeak: Math.max(...L.map((x) => x[4])), silentFrac: +(silent / L.length).toFixed(2), state: L[L.length - 1][5], sample: L.filter((x, i) => i % 8 === 0).map((x) => x[1]) }; })()" }
+]

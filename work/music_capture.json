@@ -1,0 +1,8 @@
+[
+  { "click": "#startb" },
+  { "wait": 600 },
+  { "js": "(() => { const A = window.__DEBUG__.audio; const c = A.ctx; const sp = c.createScriptProcessor(4096, 2, 2); const chunks = []; sp.onaudioprocess = (e) => { const l = e.inputBuffer.getChannelData(0), r = e.inputBuffer.getChannelData(1); const m = new Float32Array(l.length / 2); for (let i = 0; i < m.length; i++) m[i] = (l[2 * i] + r[2 * i]) * 0.5; chunks.push(m); }; A.musicGain.connect(sp); const z = c.createGain(); z.gain.value = 0; sp.connect(z); z.connect(c.destination); window.__CAP__ = chunks; window.__SR__ = c.sampleRate / 2; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); return c.sampleRate; })()" },
+  { "wait": 22000 },
+  { "js": "(() => { const ch = window.__CAP__; const n = ch.reduce((a, b) => a + b.length, 0); const out = new Int16Array(n); let o = 0; for (const b of ch) for (const v of b) out[o++] = Math.max(-32767, Math.min(32767, Math.round(v * 32767))); let s = ''; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 32768) s += String.fromCharCode.apply(null, u8.subarray(i, i + 32768)); window.__B64__ = btoa(s); return { n, sr: window.__SR__, len: window.__B64__.length }; })()" },
+  { "js": "window.__B64__" }
+]

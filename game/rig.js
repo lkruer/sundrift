@@ -1,7 +1,7 @@
 /**
  * A render rig, for any Three.js game in this format.
  *
- *     import { createRig } from './rig.js?v=202609230440';
+ *     import { createRig } from './rig.js?v=202609230706';
  *     const rig = createRig(THREE, renderer, scene, { hour: 16.5, azimuth: 250 });
  *     rig.render(camera, dt);        // once a frame, instead of renderer.render(scene, camera)
  *
@@ -373,6 +373,7 @@ const ATMOS_PARS = /* glsl */`
 uniform vec3 uAtmHorizon, uAtmLow, uAtmMid, uAtmHigh, uAtmZenith, uAtmHaze, uAtmBelow, uAtmSunGlow;
 uniform vec3 uAtmSunDir;
 uniform float uAerDensity, uAerLift, uAerStart;
+uniform vec3 uAtmFlash;
 `;
 
 /**
@@ -398,6 +399,8 @@ vec3 atmosSky(vec3 d) {
   float az = max(dot(normalize(vec3(d.x, 0.0, d.z) + 1e-5), normalize(vec3(uAtmSunDir.x, 0.0, uAtmSunDir.z) + 1e-5)), 0.0);
   glow += pow(az, 3.0) * 0.10 * (1.0 - smoothstep(0.0, 0.5, el));
   col += uAtmSunGlow * glow;
+  // (MINIDRIFT) lightning: the whole sky and the haze in it flare for a moment
+  col += uAtmFlash * (0.55 + 0.45 * smoothstep(-0.05, 0.4, y));
   col = mix(col, uAtmBelow, smoothstep(0.004, -0.02, y));
   return col;
 }
@@ -731,6 +734,7 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     uAerDensity: { value: o.fogDensity },
     uAerLift: { value: 1.2 },
     uAerStart: { value: o.fogStart },
+    uAtmFlash: { value: new THREE.Color(0, 0, 0) },
   };
   const bounceU = {
     uBounce: { value: new THREE.Color(0, 0, 0) },
@@ -807,6 +811,12 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     sunPos = sunPosition(THREE, { hour: time.hour, azimuth: time.azimuth, elevation: time.elevation, sunrise: o.sunrise, sunset: o.sunset, maxElevation: o.maxElevation });
     atm = atmosphereAt(sunPos.elevation);
     if (o.overcast > 0) atm = overcastAtm(atm, o.overcast);
+    // (MINIDRIFT) a city's light thrown back by the air: strongest at the horizon, a little of it overhead
+    if (o.glow && o.glowK > 0) {
+      atm = { ...atm };
+      const g = o.glow, k = o.glowK;
+      for (const [s, w] of [['horizon', 1], ['haze', 0.9], ['low', 0.62], ['mid', 0.2], ['high', 0.07], ['zenith', 0.04]]) atm[s] = [atm[s][0] + g[0] * k * w, atm[s][1] + g[1] * k * w, atm[s][2] + g[2] * k * w];
+    }
     renderer.toneMappingExposure = Number.isFinite(o.exposure) ? o.exposure : atm.exposure;
     for (const s of STOPS) atmosU['uAtm' + s[0].toUpperCase() + s.slice(1)].value.setRGB(atm[s][0], atm[s][1], atm[s][2]);
     atmosU.uAtmSunDir.value.copy(sunPos.direction);
@@ -887,7 +897,9 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     const groundLin = [bounceU.uBounce.value.r * 1.6 + 0.02, bounceU.uBounce.value.g * 1.6 + 0.02, bounceU.uBounce.value.b * 1.6 + 0.02];
     // (MINIDRIFT) a light update skips this: the game eases the time of day every frame and rebuilds the
     // environment every few seconds, since a PMREM build is several milliseconds and the sky itself is uniforms
+    const flash = atmosU.uAtmFlash.value.clone(); atmosU.uAtmFlash.value.setRGB(0, 0, 0);
     const next = env ? (opts.envMap || buildEnvironment(THREE, renderer, atmosU, groundLin)) : null;
+    atmosU.uAtmFlash.value.copy(flash);
     if (next) {
       if (envTex && envTex !== opts.envMap && scene.environment === envTex) envTex.dispose();
       envTex = next;
@@ -1143,6 +1155,10 @@ export function createRig(THREE, renderer, scene, opts = {}) {
 
   /** (MINIDRIFT) cloud cover 0..1; takes effect at the next setTime. */
   function setOvercast(x) { o.overcast = x; }
+  /** (MINIDRIFT) Light pollution: a linear colour and an amount, applied at the next setTime(). */
+  function setGlow(rgb, k = 1) { o.glow = rgb; o.glowK = rgb ? k : 0; }
+  /** (MINIDRIFT) Lightning: how bright the flash is right now (0 none); per frame, no rebuild. */
+  function setFlash(k) { atmosU.uAtmFlash.value.setRGB(0.42 * k, 0.46 * k, 0.62 * k); }
 
   function setTime(next = {}, { env = true } = {}) {
     time = { ...time, ...next };
@@ -1183,6 +1199,6 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     get post() { return post; },
     tier: T, atmos: atmosU, bounce: bounceU, wrapU,
     ready: Promise.all([ready, postReady]),
-    update, render, setTime, setOvercast, refresh, setupMaterial, resize, dispose,
+    update, render, setTime, setOvercast, setGlow, setFlash, refresh, setupMaterial, resize, dispose,
   };
 }

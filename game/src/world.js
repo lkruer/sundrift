@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609230440';
-import { surface } from '../surfaces.js?v=202609230440';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230440';
-import { Ground } from './ground.js?v=202609230440';
-import { Terrain, LODS } from './terrain.js?v=202609230440';
-import { partsOf, Pool } from './instancing.js?v=202609230440';
+import { ASSET } from '../assetlib.js?v=202609230706';
+import { surface } from '../surfaces.js?v=202609230706';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230706';
+import { Ground } from './ground.js?v=202609230706';
+import { Terrain, LODS } from './terrain.js?v=202609230706';
+import { partsOf, Pool } from './instancing.js?v=202609230706';
 
 const ASSETS = {
   cedar: './assets/cedar_tree.js', maple: './assets/maple_tree.js', boulder: './assets/boulder.js',
@@ -420,9 +420,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     // the city (NEO TOKYO): its module is loaded here, and its materials made now so they compile with the rest
     try {
       this.glyphs = drawsGlyphs;
-      this.City = await import('./city.js?v=202609230440');
+      this.City = await import('./city.js?v=202609230706');
       this._cityMats = this.City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
-      const L = await import('./landmarks.js?v=202609230440').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+      const L = await import('./landmarks.js?v=202609230706').catch((e) => { console.warn('landmarks', e && e.message); return null; });
       this.citySky = this.City.citySkyBuild(this, L);
       this.citySky.visible = false;
       this.scene.add(this.citySky);

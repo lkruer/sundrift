@@ -223,27 +223,13 @@
      transition:transform .42s cubic-bezier(.2,1.7,.4,1), opacity .25s, border-color .2s, box-shadow .2s; }
   #courseout.on { transform:translate(-50%,0) scale(1); opacity:1; }
   #courseout .co-ring { position:relative; width:52px; height:52px; flex:none; }
-  #courseout .co-svg { position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
-  #courseout .co-bg { fill:rgba(0,0,0,.35); stroke:rgba(255,255,255,.1); stroke-width:5; }
-  #courseout .co-fg { fill:none; stroke:#ffb347; stroke-width:5; stroke-linecap:round; transition:stroke .2s; filter:drop-shadow(0 0 4px rgba(255,179,71,.8)); }
-  #courseout .co-num { position:absolute; left:50%; top:50%; height:24px; transform:translate(-50%,-50%); }
-  #courseout.tick .co-num { animation:coTick .5s cubic-bezier(.2,1.9,.4,1); }
-  @keyframes coTick { 0% { transform:translate(-50%,-50%) scale(1.9); } 100% { transform:translate(-50%,-50%) scale(1); } }
+  #courseout .co-cv { position:absolute; inset:0; width:100%; height:100%; display:block; }
   #courseout .co-txt { display:flex; flex-direction:column; line-height:1.05; }
   #courseout .co-txt b { font-weight:400; font-size:19px; letter-spacing:.06em; color:#ffc2d9; text-shadow:0 0 10px rgba(255,79,154,.6); }
   #courseout .co-txt span { font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.28em; color:var(--ink); margin-top:4px; }
   #courseout .co-txt i { font-style:normal; font-family:"Share Tech Mono",monospace; font-size:9px; letter-spacing:.2em; color:var(--dim); margin-top:2px; }
-  #courseout .co-mag { width:30px; height:30px; flex:none; opacity:.45; transition:opacity .2s, transform .3s; }
+  #courseout .co-mag { width:30px; height:30px; flex:none; opacity:.8; }
   #courseout .co-mag svg { width:100%; height:100%; display:block; }
-  #courseout.hot { border-color:#ff3b30; box-shadow:0 0 26px rgba(255,59,48,.55), inset 0 0 14px rgba(255,59,48,.2); animation:coHot .45s ease-in-out infinite alternate; }
-  #courseout.hot .co-fg { stroke:#ff4a3a; filter:drop-shadow(0 0 5px rgba(255,59,48,.9)); }
-  #courseout.hot .co-mag { opacity:1; }
-  @keyframes coHot { from { filter:brightness(1); } to { filter:brightness(1.4); } }
-  #courseout.mag { border-color:#6ff0ff; box-shadow:0 0 32px rgba(111,240,255,.55), inset 0 0 16px rgba(111,240,255,.2); }
-  #courseout.mag .co-ring { opacity:.25; }
-  #courseout.mag .co-mag { opacity:1; animation:coMag .1s linear infinite alternate; }
-  #courseout.mag .co-txt b { color:#b9f8ff; text-shadow:0 0 12px rgba(111,240,255,.8); }
-  @keyframes coMag { from { transform:scale(1.4) rotate(-15deg); } to { transform:scale(1.4) rotate(-7deg); } }
 
   #toasts { position:absolute; left:0; right:0; top:36%; text-align:center; pointer-events:none; }
   .toast { position:absolute; left:0; right:0; font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(22px,4.6vw,38px);
@@ -378,6 +364,6 @@
   <div class="stats" id="pstats"></div>
 </div>
 
-<script type="module" src="./src/main.js?v=202609230440"></script>
+<script type="module" src="./src/main.js?v=202609230706"></script>
 </body>
 </html>

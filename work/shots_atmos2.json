@@ -1,0 +1,77 @@
+[
+ {
+  "click": "#startb"
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.teleport(3000, 0); D.atmos.mistY = null; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); })()"
+ },
+ {
+  "wait": 2500
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__, c = D.car, U = D.track.field.U; const y = D.G.carY; window.__CAM__ = { pos: [c.x, y + 45, c.z], look: [c.x - U[0] * 600, y - 60, c.z - U[1] * 600], fov: 62 }; return [D.atmos.mistY, y]; })()"
+ },
+ {
+  "wait": 2500
+ },
+ {
+  "shot": "B1_unkai"
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__, c = D.car, U = D.track.field.U; const y = D.G.carY; window.__CAM__ = { pos: [c.x, y + 45, c.z], look: [c.x + U[1] * 600, y - 40, c.z - U[0] * 600], fov: 62 }; })()"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "B2_unkai_side"
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; const m = [0.36, 0.38, -0.85]; window.__CAM__ = { pos: [c.x, y + 2.2, c.z], look: [c.x + m[0] * 100, y + 2.2 + m[1] * 60, c.z + m[2] * 100], fov: 62 }; })()"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "B3_moon"
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__; D.teleport(1500, 0); })()"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; const m = [0.36, 0.38, -0.85]; window.__CAM__ = { pos: [c.x, y + 2.2, c.z], look: [c.x + m[0] * 100, y + 2.2 + m[1] * 60, c.z + m[2] * 100], fov: 62 }; })()"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "B4_moon2"
+ },
+ {
+  "js": "(() => { window.__CAM__ = null; const D = window.__DEBUG__; D.rainNow(0.95); })()"
+ },
+ {
+  "wait": 4000
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__; D.atmos.bolt.next = 0; })()"
+ },
+ {
+  "wait": 90
+ },
+ {
+  "shot": "B5_lightning"
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "shot": "B6_storm"
+ }
+]

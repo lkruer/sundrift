@@ -7,7 +7,7 @@
  * Everything is DOM and SVG, written only when a value changes (the needle, which moves every frame, is one
  * attribute), so a phone is not re-laying out text sixty times a second.
  */
-import { SCORE, clamp, damp } from './config.js?v=202609230440';
+import { SCORE, clamp, damp } from './config.js?v=202609230706';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -123,9 +123,11 @@ export class Hud {
     if (on) {
       el.driftpts.textContent = '+1,234'; el.mult.textContent = '×2.0'; el.tier.textContent = 'GREAT'; el.tier.className = 't3';
       this.toast('WARM', 'good', true); this.toast('WARM', 'bad'); this.toast('WARM');
+      this.smash('SMASH!', 1234, 2);                  // (the smash popup and its glow, drawn once here too)
       this.leds.forEach((l) => l.classList.add('on'));
     } else {
       el.driftpts.textContent = ''; el.tier.textContent = '';
+      if (el.smash) { clearTimeout(this._smashT); el.smash.classList.remove('on', 'pop'); }
       this.leds.forEach((l) => l.classList.remove('on'));
       this._drifting = this._clip = this._boosting = this._slide = false; this.lastLeds = 0; this.lastTier = -1;
     }

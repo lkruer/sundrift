@@ -1,0 +1,22 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 6000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.teleport(1500, 0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); })()" },
+  { "wait": 6000 },
+  { "js": "(() => { const D = window.__DEBUG__, k = D.atmos.koi, c = k.center; const cam = D.car; const y = D.G.carY; window.__CAM__ = { pos: [cam.x, y + 3, cam.z], look: [c.x, c.y + 60, c.z], fov: 62 }; return { koi: [c.x, c.y, c.z].map(Math.round), car: [cam.x, y, cam.z].map(Math.round), vis: k.mesh.visible, I: k.u.uI.value, lights: D.atmos.lights.mesh.visible, deck: D.atmos.deckY, op: D.atmos.clouds.u.uOpacity.value }; })()" },
+  { "wait": 800 }, { "shot": "E1_koi" },
+  { "js": "(() => { const D = window.__DEBUG__, cam = D.car; const y = D.G.carY; const k = D.atmos.koi.center; window.__CAM__ = { pos: [k.x + 60, k.y + 44, k.z + 60], look: [k.x, k.y + 40, k.z], fov: 55 }; })()" },
+  { "wait": 800 }, { "shot": "E2_koi_close" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; window.__CAM__ = { pos: [c.x, y + 140, c.z], look: [c.x + 600, y + 120, c.z + 300], fov: 62 }; })()" },
+  { "wait": 800 }, { "shot": "E3_sky" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; window.__CAM__ = { pos: [c.x, y + 2, c.z], look: [c.x + 200, y + 150, c.z - 100], fov: 70 }; })()" },
+  { "wait": 800 }, { "shot": "E4_up" },
+  { "js": "(() => { window.__CAM__ = null; window.__DEBUG__.rainNow(0.95); })()" },
+  { "wait": 4000 },
+  { "js": "(() => { const D = window.__DEBUG__; D.atmos.bolt.next = 0; })()" },
+  { "wait": 90 }, { "shot": "E5_lightning" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; window.__CAM__ = { pos: [c.x, y + 140, c.z], look: [c.x + 600, y + 100, c.z + 300], fov: 62 }; })()" },
+  { "wait": 800 }, { "shot": "E6_sky_rain" }
+]

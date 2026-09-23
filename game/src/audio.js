@@ -6,32 +6,66 @@
  *
  * The engine is four detuned voices at the four-cylinder firing frequency (rpm / 30 Hz) through a low-pass
  * whose cutoff follows the throttle, with a noise rasp on top and a turbo whistle that climbs with load and
- * blows off when the throttle lifts. Tyres are band-passed noise whose centre wanders with slip. The music
- * is a scheduled 128 bpm loop in A minor pentatonic: kick, hat, snare, a filtered saw bass, a chord pad, a koto
- * playing an eight-bar tune in the hirajoshi scale over it, and a delayed arpeggio that only joins while a drift
- * is held.
+ * blows off when the throttle lifts. Tyres are band-passed noise whose centre wanders with slip.
+ *
+ * The music is two slow songs in the manner of an open-world game's soundtrack: lots of air, no drums, a soft
+ * piano (on the pass, in D, with a koto figure now and then) or an FM electric piano (in the city, in A flat) over
+ * warm analog pads, all of it played through a little old tape: a slow wow, a low-pass and a long reverb. The one
+ * piece of 8-bit in it, a pulse-wave arpeggio, comes up under the tune while a drift is held. Each song is a
+ * sixteen-bar form (A A B A) of four-bar phrases, and every phrase picks one of its section's tunes or leaves the
+ * chords to themselves for a while, so it never plays the same way twice.
  */
-import { clamp } from './config.js?v=202609230440';
+import { clamp } from './config.js?v=202609230706';
 
-const NOTES = { A2: 110, C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880 };
-// the koto's tune: eight bars in A hirajoshi (A B C E F), which sits on the Am-F-C-G loop; one note per 16th, 0 a rest
-const KOTO = (() => {
-  const N = { A4: NOTES.A4, B4: NOTES.B4, C5: NOTES.C5, E5: NOTES.E5, F5: NOTES.F5, A5: NOTES.A5, E4: NOTES.E4 };
-  const bars = [
-    'E5 . . . C5 . B4 . A4 . . . . . . .', 'F5 . E5 . C5 . . . A4 . C5 . . . . .',
-    'E5 . . . C5 . E5 . F5 . E5 . C5 . . .', 'B4 . . . C5 . B4 . A4 . . . . . . .',
-    'A5 . . . F5 . E5 . C5 . . . E5 . . .', 'F5 . . . E5 . C5 . A4 . . . . . . .',
-    'C5 . E5 . F5 . E5 . C5 . B4 . C5 . . .', 'B4 . . . . . . . E4 . . . . . . .',
-  ];
-  return bars.flatMap((b) => b.split(' ').map((n) => N[n] || 0));
-})();
-// four bars: Am, F, C, G, as bass roots and pad triads
-const PROG = [
-  { root: NOTES.A2, pad: [NOTES.A3, NOTES.C4, NOTES.E4], arp: [NOTES.A4, NOTES.C5, NOTES.E5, NOTES.A5] },
-  { root: NOTES.F3 / 2, pad: [NOTES.F3, NOTES.A3, NOTES.C4], arp: [NOTES.A4, NOTES.C5, NOTES.F3 * 4, NOTES.A5] },
-  { root: NOTES.C3, pad: [NOTES.G3, NOTES.C4, NOTES.E4], arp: [NOTES.G4, NOTES.C5, NOTES.E5, NOTES.G5] },
-  { root: NOTES.G3 / 2, pad: [NOTES.G3, NOTES.D4, NOTES.G4 / 2 * 2], arp: [NOTES.G4, NOTES.D5, NOTES.G5, NOTES.D5] },
-];
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const midi = (n) => { const r = /^([A-G])([#b]?)(\d)$/.exec(n); return 12 * (+r[3] + 1) + NOTE_I[r[1]] + (r[2] === '#' ? 1 : r[2] === 'b' ? -1 : 0); };
+// a tune: bars split by '|', each note 'name step length' in sixteenths from the start of its bar
+const tune = (str) => str.split('|').flatMap((bar, b) => bar.split(',').map((x) => x.trim()).filter(Boolean)
+  .map((x) => { const [n, at, len] = x.split(/\s+/); return { at: b * 16 + +at, m: midi(n), len: +len }; }));
+const chord = (bass, pad, arp) => ({ bass, pad, arp });
+const SONGS = {
+  // Yozakura Pass, in D: Gmaj7, D/F#, Em7, Asus4 | Bm7(11), Gmaj9, Dmaj9, A6sus
+  pass: {
+    tempo: 80, voice: 'piano', koto: true,
+    A: [chord(43, [55, 59, 62, 66], [67, 71, 74, 78]), chord(42, [57, 62, 66, 69], [66, 69, 74, 76]),
+      chord(40, [55, 59, 62, 64], [64, 67, 71, 74]), chord(45, [57, 62, 64, 67], [69, 74, 76, 79])],
+    B: [chord(47, [54, 57, 62, 64], [66, 69, 71, 76]), chord(43, [57, 59, 62, 66], [67, 71, 74, 78]),
+      chord(38, [54, 57, 61, 64], [66, 69, 73, 76]), chord(45, [57, 62, 64, 66], [69, 71, 74, 78])],
+    tunesA: [
+      tune('F#5 0 6, E5 6 2, D5 8 8 | E5 0 4, D5 4 4, A4 8 8 | B4 0 6, D5 6 2, E5 8 8 | D5 0 12'),
+      tune('B5 0 4, A5 4 4, F#5 8 8 | A5 0 6, F#5 6 2, E5 8 8 | G5 0 4, F#5 4 4, E5 8 4, D5 12 4 | E5 0 8, A4 8 8'),
+      tune('D5 4 4, E5 8 4, F#5 12 4 | A5 0 16 | G5 4 4, F#5 8 4, E5 12 4 | E5 0 16'),
+      tune('D6 0 2, B5 2 2, A5 4 4, D6 8 2, B5 10 2, A5 12 4 | A5 0 8, F#5 8 8 | B5 0 2, A5 2 2, G5 4 4, F#5 8 8 | E5 0 16'),
+    ],
+    tunesB: [
+      tune('F#5 0 8, E5 8 4, D5 12 4 | B4 0 8, D5 8 8 | C#5 0 8, E5 8 4, F#5 12 4 | E5 0 16'),
+      tune('D5 0 4, E5 4 4, F#5 8 8 | B5 0 12, A5 12 4 | A5 0 8, F#5 8 8 | E5 0 8, D5 8 8'),
+      tune('B5 0 16 | A5 4 4, G5 8 4, F#5 12 4 | F#5 0 12, E5 12 4 | E5 0 16'),
+    ],
+    pent: [74, 76, 78, 81, 83, 86], tonic: [62, 66, 69],
+  },
+  // NEO TOKYO, in A flat: Dbmaj9, Cm9, Bbm9, Eb9sus | Fm9, Dbmaj7, Abmaj7/C, Eb9sus
+  city: {
+    tempo: 76, voice: 'ep', koto: false,
+    A: [chord(37, [53, 56, 60, 63], [65, 68, 72, 75]), chord(36, [51, 55, 58, 62], [67, 70, 74, 75]),
+      chord(34, [53, 56, 60, 61], [65, 68, 72, 73]), chord(39, [53, 56, 58, 61], [65, 70, 73, 77])],
+    B: [chord(41, [56, 60, 63, 67], [68, 72, 75, 79]), chord(37, [53, 56, 60, 65], [65, 68, 72, 77]),
+      chord(36, [55, 60, 63, 68], [67, 72, 75, 80]), chord(39, [53, 56, 58, 61], [65, 70, 73, 77])],
+    tunesA: [
+      tune('F5 0 4, Eb5 4 4, C5 8 8 | Eb5 0 6, D5 6 2, Bb4 8 8 | Ab4 0 4, Bb4 4 4, C5 8 8 | Bb4 0 16'),
+      tune('C5 2 2, Eb5 4 4, Ab5 8 6, G5 14 2 | G5 0 8, Eb5 8 8 | F5 0 4, Eb5 4 4, Db5 8 4, C5 12 4 | Eb5 0 12'),
+      tune('C6 0 12 | Bb5 0 4, G5 4 4, Eb5 8 8 | F5 0 16 | Eb5 0 8, C5 8 8'),
+    ],
+    tunesB: [
+      tune('Ab5 0 8, G5 8 4, Eb5 12 4 | F5 0 8, C5 8 8 | Eb5 0 6, C5 6 2, Bb4 8 8 | Db5 0 8, Bb4 8 8'),
+      tune('C5 0 4, Eb5 4 4, F5 8 4, G5 12 4 | Ab5 0 16 | G5 0 8, Eb5 8 8 | F5 0 16'),
+    ],
+    pent: [72, 75, 77, 80, 82, 84], tonic: [68, 72, 75],
+  },
+};
+// the left hand breaks the chord in quarters: the bass, then three of the pad's notes
+const LH = { 0: -1, 4: 1, 8: 2, 12: 3 };
 
 export class Audio {
   constructor() {
@@ -141,8 +175,12 @@ export class Audio {
     this.rainGain.connect(this.master);
   }
 
-  /** Which map: the city drops the koto for the synth arpeggio. */
-  setMap(city) { this.city = !!city; }
+  /** Which map: each has its own song (a new one starts from its first phrase). */
+  setMap(city) {
+    if (this.city === !!city) return;
+    this.city = !!city;
+    Object.assign(this.music, { step: 0, phrase: 0, chords: null, tune: null });
+  }
 
   /** How hard it rains, 0..1 (and 0 inside a tunnel). */
   setRain(x) {
@@ -153,19 +191,53 @@ export class Audio {
 
   _musicBus() {
     const c = this.ctx;
-    this.musicGain = this._gain(0.55); this.musicGain.connect(this.master);
-    this.padFilter = c.createBiquadFilter(); this.padFilter.type = 'lowpass'; this.padFilter.frequency.value = 900; this.padFilter.Q.value = 0.8;
-    this.padFilter.connect(this.musicGain);
-    this.bassFilter = c.createBiquadFilter(); this.bassFilter.type = 'lowpass'; this.bassFilter.frequency.value = 700; this.bassFilter.Q.value = 2;
-    this.bassFilter.connect(this.musicGain);
+    this.musicGain = this._gain(0.95); this.musicGain.connect(this.master);
+    // everything in the music goes in here, and through a little old tape: a slow wow and a faster flutter on a
+    // short modulated delay, a gentle low-pass, then dry and into a long dark reverb
+    this.musicIn = this._gain(1);
+    const wow = c.createDelay(0.1); wow.delayTime.value = 0.02;
+    const w1 = this._osc('sine', 0.43), w1g = this._gain(0.0017); w1.connect(w1g); w1g.connect(wow.delayTime);
+    const w2 = this._osc('sine', 5.1), w2g = this._gain(0.00007); w2.connect(w2g); w2g.connect(wow.delayTime);
+    const tone = c.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 5200; tone.Q.value = 0.4;
+    this.musicIn.connect(wow); wow.connect(tone);
+    const dry = this._gain(0.78); tone.connect(dry); dry.connect(this.musicGain);
+    this.verb = c.createConvolver(); this.verb.buffer = this._impulse(3.4);
+    const send = this._gain(0.5), ret = this._gain(0.85);
+    tone.connect(send); send.connect(this.verb); this.verb.connect(ret); ret.connect(this.musicGain);
+    // the pads, through a low-pass that breathes on a slow LFO and opens while a drift is held
+    this.padFilter = c.createBiquadFilter(); this.padFilter.type = 'lowpass'; this.padFilter.frequency.value = 650; this.padFilter.Q.value = 0.9;
+    const pl = this._osc('sine', 0.07), plg = this._gain(450); pl.connect(plg); plg.connect(this.padFilter.detune);
+    this.padFilter.connect(this.musicIn);
+    // the 8-bit arpeggio: a 25% pulse wave, filtered, with a dotted-eighth echo
+    const N = 24, re = new Float32Array(N + 1), im = new Float32Array(N + 1);
+    for (let n = 1; n <= N; n++) re[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * 0.25);
+    this.pulse = c.createPeriodicWave(re, im);
     this.arpGain = this._gain(0);
-    this.delay = c.createDelay(1.0); this.delay.delayTime.value = (60 / this.music.tempo) * 0.75;
-    this.delayFb = this._gain(0.38); this.delay.connect(this.delayFb); this.delayFb.connect(this.delay);
-    const df = c.createBiquadFilter(); df.type = 'lowpass'; df.frequency.value = 2400;
-    this.arpGain.connect(this.musicGain); this.arpGain.connect(this.delay); this.delay.connect(df); df.connect(this.musicGain);
-    this.drumGain = this._gain(0.9); this.drumGain.connect(this.musicGain);
-    this.kotoGain = this._gain(0.7); this.kotoGain.connect(this.musicGain); this.kotoGain.connect(this.delay);
-    this.music.next = c.currentTime + 0.1;
+    const alp = c.createBiquadFilter(); alp.type = 'lowpass'; alp.frequency.value = 2600;
+    this.arpGain.connect(alp); alp.connect(this.musicIn);
+    this.delay = c.createDelay(1.5); this.delay.delayTime.value = (60 / 80) * 0.75;
+    this.delayFb = this._gain(0.36); this.delay.connect(this.delayFb); this.delayFb.connect(this.delay);
+    const df = c.createBiquadFilter(); df.type = 'lowpass'; df.frequency.value = 1900;
+    alp.connect(this.delay); this.delay.connect(df); df.connect(this.musicIn);
+    this.kotoGain = this._gain(0.4); this.kotoGain.connect(this.musicIn); this.kotoGain.connect(this.delay);
+    Object.assign(this.music, { next: c.currentTime + 0.15, step: 0, phrase: 0, chords: null, tune: null, oct: 0, orn: false });
+  }
+
+  /** A room for the music: stereo noise dying away, the highs faster than the lows, with a soft onset. */
+  _impulse(sec) {
+    const c = this.ctx, sr = c.sampleRate, n = Math.floor(sr * sec), b = c.createBuffer(2, n, sr);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = b.getChannelData(ch);
+      let s = ch ? 91 : 17, lo = 0;
+      for (let i = 0; i < n; i++) {
+        s = (s * 1664525 + 1013904223) >>> 0;
+        const w = (s / 4294967296) * 2 - 1;
+        lo += (w - lo) * 0.18;
+        const t = i / sr;
+        d[i] = (lo * 2.2 * Math.exp(-t * 2.1) + (w - lo) * Math.exp(-t * 5.5)) * Math.min(1, t / 0.03);
+      }
+    }
+    return b;
   }
 
   /** Pause: the whole audio clock stops, so the engine, the tyres and the music all hold where they are. */
@@ -208,33 +280,156 @@ export class Audio {
     this.windGain.gain.setTargetAtTime(clamp(car.speed / 60, 0, 1) ** 2 * 0.35 + boost01 * 0.15, t, 0.1);
     // music
     this.music.intensity += ((drifting ? 1 : 0) + boost01 * 0.5 - this.music.intensity) * Math.min(1, dt * 2);
-    this.padFilter.frequency.setTargetAtTime(700 + 2200 * this.music.intensity, t, 0.2);
-    // in the city the arpeggio always runs under the loop (a synth night, not a koto one); drifting lifts it
-    this.arpGain.gain.setTargetAtTime(0.18 * clamp(this.music.intensity + (this.city ? 0.4 : 0), 0, 1), t, 0.2);
+    this.padFilter.frequency.setTargetAtTime(650 + 1500 * this.music.intensity, t, 0.3);
+    // the arpeggio comes up while a drift is held (and in the city it murmurs under the tune all the time)
+    const arp = 0.11 * clamp(this.music.intensity + (this.city ? 0.28 : 0), 0, 1);
+    this.arpGain.gain.setTargetAtTime(arp, t, 0.25);
+    this._arpOn = arp > 0.004;
     this._schedule();
   }
 
-  /** Lookahead scheduler: keep notes queued 0.25 s ahead of the audio clock. */
+  /** Lookahead scheduler: keep notes queued 0.3 s ahead of the audio clock. */
   _schedule() {
-    const c = this.ctx, m = this.music;
-    const spb = 60 / m.tempo, s16 = spb / 4;
-    while (m.next < c.currentTime + 0.25) {
-      const step = m.step;
-      const bar = Math.floor(step / 16) % 4, beat = step % 16;
-      const ch = PROG[bar];
-      const t = m.next;
-      if (beat % 4 === 0) this._kick(t);
-      if (beat % 4 === 2 && beat !== 14) this._hat(t, 0.5); else if (beat % 2 === 1) this._hat(t, 0.22);
-      if (beat === 4 || beat === 12) this._snare(t);
-      if (beat % 2 === 0) this._bass(t, ch.root * (beat === 14 ? 1.5 : 1), s16 * 1.7);
-      if (beat === 0) this._pad(t, ch.pad, spb * 4);
-      // arpeggio, sixteenths, only audible while drifting through arpGain
-      this._arp(t, ch.arp[(beat + (bar % 2)) % 4] * (beat % 8 >= 4 ? 1 : 0.5), s16 * 0.9);
-      // the koto, always, over the top: a pluck that bends in from a touch sharp, and now and then a pressed bend
-      const kf = KOTO[step % KOTO.length];
-      if (kf && !this.city) this._koto(t, kf, step % 32 === 16);
+    const c = this.ctx, m = this.music, song = SONGS[this.city ? 'city' : 'pass'];
+    const spb = 60 / song.tempo, s16 = spb / 4;
+    // (back from a hidden tab or a stall: start again from now rather than play everything missed at once)
+    if (m.next < c.currentTime - 0.3) m.next = c.currentTime + 0.05;
+    const hum = (t) => Math.max(c.currentTime, t + (Math.random() - 0.5) * 0.014);
+    const vj = () => 0.85 + Math.random() * 0.3;
+    while (m.next < c.currentTime + 0.3) {
+      const t = m.next, ps = m.step % 64;
+      if (ps === 0 || !m.chords) this._phrase(song);
+      const bar = ps >> 4, b16 = ps & 15, ch = m.chords[bar];
+      if (b16 === 0) { this._pad(t, ch.pad, spb * 4); this._sub(t, ch.bass - 12, spb * 4); }
+      // the left hand, a note now and then left out
+      const lh = LH[b16];
+      if (lh !== undefined && (b16 === 0 || Math.random() < 0.85)) {
+        this._voice(song, hum(t), lh < 0 ? ch.bass : ch.pad[lh], (lh < 0 ? 0.5 : 0.3) * vj(), spb * (lh < 0 ? 3.5 : 2), -0.25 + 0.12 * (lh < 0 ? 0 : lh));
+      }
+      // the tune
+      if (m.tune) for (const n of m.tune) if (n.at === ps) this._voice(song, hum(t), n.m + m.oct, 0.6 * vj(), n.len * s16, 0.18);
+      // the 8-bit arpeggio, only while it can be heard: up the chord, then again an octave higher
+      if (this._arpOn) this._arp(t, ch.arp[b16 & 3] - (b16 & 4 ? 0 : 12), s16 * 0.85);
+      // the end of some phrases: a music-box twinkle, or on the pass a koto figure
+      if (ps === 50 && m.orn) {
+        if (song.koto && Math.random() < 0.6) {
+          const p = song.pent; [p[4], p[3], p[2], p[3]].forEach((q, i) => this._koto(t + i * s16 * 1.5, mtof(q), i === 3));
+        } else { const p = song.pent; [p[5] + 12, p[3] + 12, p[4] + 12].forEach((q, i) => this._bell(t + i * s16 * 2, q, 0.05)); }
+      }
       m.next += s16; m.step++;
     }
+  }
+
+  /** A new four-bar phrase: its chords, and a tune three times in four (never the same one twice running). */
+  _phrase(song) {
+    const m = this.music;
+    const sec = 'AABA'[m.phrase % 4]; m.phrase++;
+    m.chords = song[sec];
+    const tunes = song['tunes' + sec];
+    let tn = Math.random() < 0.75 ? tunes[Math.floor(Math.random() * tunes.length)] : null;
+    if (tn && tn === m.lastTune && tunes.length > 1) tn = tunes[(tunes.indexOf(tn) + 1) % tunes.length];
+    m.tune = tn; if (tn) m.lastTune = tn;
+    m.oct = tn && Math.random() < 0.2 && Math.max(...tn.map((n) => n.m)) <= 81 ? 12 : 0;   // now and then up an octave
+    m.orn = Math.random() < 0.4;
+  }
+
+  _voice(song, t, m, vel, len, pan) { if (song.voice === 'ep') this._ep(t, m, vel, len, pan); else this._piano(t, m, vel, len, pan); }
+
+  _out(pan) {
+    const c = this.ctx, g = this._gain(0);
+    if (c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); p.connect(this.musicIn); } else g.connect(this.musicIn);
+    return g;
+  }
+
+  /**
+   * A soft felt piano: four partials, the upper ones a little out of tune and dying first, a low note ringing
+   * longer than a high one, a felt thump at the strike, and the damper coming down at the end of the note.
+   */
+  _piano(t, m, vel, len, pan = 0) {
+    const c = this.ctx, f = mtof(m);
+    const out = this._out(pan);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = Math.min(7000, 900 + f * 4); lp.Q.value = 0.2;
+    lp.connect(out);
+    const tau = clamp(1.5 * Math.pow(440 / f, 0.35), 0.7, 2.6);
+    const ring = Math.max(len, 0.25) + 1.4;
+    for (const [mul, v, k, det] of [[1, 1, 1, 0], [2, 0.3, 0.45, 3], [3, 0.1, 0.25, -4], [4.03, 0.04, 0.14, 0]]) {
+      const o = c.createOscillator(); o.frequency.value = f * mul; o.detune.value = det;
+      const g = this._gain(0); o.connect(g); g.connect(lp);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.006); g.gain.setTargetAtTime(0, t + 0.006, tau * k);
+      o.start(t); o.stop(t + ring + 0.05);
+    }
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf;
+    const nf = c.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 600;
+    const ng = this._gain(0); s.connect(nf); nf.connect(ng); ng.connect(out);
+    ng.gain.setValueAtTime(0.35, t); ng.gain.setTargetAtTime(0, t, 0.012); s.start(t, Math.random()); s.stop(t + 0.1);
+    const pk = 0.2 * vel;
+    out.gain.setValueAtTime(pk, t); out.gain.setValueAtTime(pk, t + len); out.gain.setTargetAtTime(0, t + len, 0.3);
+  }
+
+  /** An FM electric piano, the 80s kind: a sine bent by another at the same pitch, and a bright tine at the strike. */
+  _ep(t, m, vel, len, pan = 0) {
+    const c = this.ctx, f = mtof(m);
+    const out = this._out(pan);
+    const car = c.createOscillator(); car.frequency.value = f;
+    const mod = c.createOscillator(); mod.frequency.value = f;
+    const mg = this._gain(0); mod.connect(mg); mg.connect(car.frequency);
+    mg.gain.setValueAtTime(f * (0.9 + 1.1 * vel), t); mg.gain.setTargetAtTime(f * 0.18, t, 0.3);
+    const tine = c.createOscillator(); tine.frequency.value = f * 14;
+    const tg = this._gain(0); tine.connect(tg); tg.connect(car.frequency);
+    tg.gain.setValueAtTime(f * 8 * vel, t); tg.gain.setTargetAtTime(0, t, 0.025);
+    const g = this._gain(0); car.connect(g); g.connect(out);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.004); g.gain.setTargetAtTime(0, t + 0.004, clamp(1.4 * Math.pow(440 / f, 0.3), 0.6, 2.2));
+    const ring = Math.max(len, 0.25) + 1.3;
+    for (const o of [car, mod, tine]) { o.start(t); o.stop(t + ring + 0.05); }
+    const pk = 0.2 * vel;
+    out.gain.setValueAtTime(pk, t); out.gain.setValueAtTime(pk, t + len); out.gain.setTargetAtTime(0, t + len, 0.28);
+  }
+
+  /** The pad: two detuned saws a note, swelling in slowly and dying away slowly into the next chord. */
+  _pad(t, notes, len) {
+    for (const m of notes) for (const det of [-6, 7]) {
+      const o = this.ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = det;
+      const g = this._gain(0); o.connect(g); g.connect(this.padFilter);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.026, t + Math.min(1.2, len * 0.4));
+      g.gain.setValueAtTime(0.026, t + len * 0.85); g.gain.linearRampToValueAtTime(0, t + len + 1.1);
+      o.start(t); o.stop(t + len + 1.2);
+    }
+  }
+
+  /** A sine under the bass, felt more than heard. */
+  _sub(t, m, len) {
+    const o = this._osc('sine', mtof(m)), g = this._gain(0);
+    o.stop(t + len + 0.9);
+    o.connect(g); g.connect(this.musicIn);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.07, t + 0.5); g.gain.setValueAtTime(0.07, t + len * 0.8); g.gain.linearRampToValueAtTime(0, t + len + 0.8);
+  }
+
+  /** A music-box bell: a sine with two inharmonic partials that die quickly. */
+  _bell(t, m, vol) {
+    const c = this.ctx, f = mtof(m), out = this._out((Math.random() - 0.5) * 0.8);
+    for (const [mul, v, tau] of [[1, 1, 0.7], [2.76, 0.35, 0.22], [5.4, 0.15, 0.09]]) {
+      const o = c.createOscillator(); o.frequency.value = f * mul;
+      const g = this._gain(0); o.connect(g); g.connect(out);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.003); g.gain.setTargetAtTime(0, t + 0.003, tau);
+      o.start(t); o.stop(t + 3);
+    }
+    out.gain.value = vol;
+  }
+
+  /** A plucked koto string: a bright attack falling away over a second, pitch settling from a touch sharp. */
+  _koto(t, f, press) {
+    const c = this.ctx, out = this._gain(0);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
+    lp.frequency.setValueAtTime(4200, t); lp.frequency.exponentialRampToValueAtTime(1200, t + 0.6);
+    out.connect(lp); lp.connect(this.kotoGain);
+    for (const [type, mul, vol] of [['triangle', 1, 1], ['sawtooth', 1, 0.22], ['sine', 2, 0.3]]) {
+      const o = c.createOscillator(); o.type = type;
+      o.frequency.setValueAtTime(f * mul * 1.012, t); o.frequency.exponentialRampToValueAtTime(f * mul, t + 0.05);
+      if (press) { o.frequency.setValueAtTime(f * mul, t + 0.22); o.frequency.exponentialRampToValueAtTime(f * mul * 1.0595, t + 0.36); }
+      const g = this._gain(vol); o.connect(g); g.connect(out);
+      o.start(t); o.stop(t + 1.6);
+    }
+    this._env(out, t, 0.002, 1.2, 0.2, 0, 0.2);
   }
 
   _env(node, t, a, d, peak, sus = 0, r = 0.05, hold = 0) {
@@ -245,59 +440,17 @@ export class Audio {
     if (hold) g.setValueAtTime(Math.max(0.0001, sus * peak || 0.0001), t + a + d + hold);
     g.exponentialRampToValueAtTime(0.0001, t + a + d + hold + r);
   }
-  _kick(t) {
-    const o = this.ctx.createOscillator(), g = this._gain(0);
-    o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
-    o.connect(g); g.connect(this.drumGain); this._env(g, t, 0.002, 0.2, 0.9, 0, 0.05);
-    o.start(t); o.stop(t + 0.32);
-  }
-  _hat(t, v) {
-    const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf;
-    const f = this.ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7500;
-    const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.drumGain);
-    this._env(g, t, 0.001, 0.035, 0.22 * v, 0, 0.02); s.start(t); s.stop(t + 0.08);
-  }
-  _snare(t) {
-    const s = this.ctx.createBufferSource(); s.buffer = this.noiseBuf;
-    const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 0.9;
-    const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.drumGain);
-    this._env(g, t, 0.001, 0.11, 0.5, 0, 0.06); s.start(t); s.stop(t + 0.2);
-    const o = this.ctx.createOscillator(); o.frequency.value = 190; const g2 = this._gain(0);
-    o.connect(g2); g2.connect(this.drumGain); this._env(g2, t, 0.001, 0.06, 0.35); o.start(t); o.stop(t + 0.1);
-  }
-  _bass(t, f, len) {
-    const o = this.ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
-    const g = this._gain(0); o.connect(g); g.connect(this.bassFilter);
-    this._env(g, t, 0.004, len, 0.34, 0.5, 0.05); o.start(t); o.stop(t + len + 0.1);
-  }
-  _pad(t, notes, len) {
-    for (const f of notes) for (const det of [-7, 6]) {
-      const o = this.ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det;
-      const g = this._gain(0); o.connect(g); g.connect(this.padFilter);
-      this._env(g, t, 0.08, len * 0.7, 0.045, 0.8, 0.25); o.start(t); o.stop(t + len + 0.3);
-    }
-  }
-  /** A plucked koto string: a bright attack falling away over a second, pitch settling from a touch sharp. */
-  _koto(t, f, press) {
-    const c = this.ctx, out = this._gain(0);
-    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
-    lp.frequency.setValueAtTime(5200, t); lp.frequency.exponentialRampToValueAtTime(1400, t + 0.6);
-    out.connect(lp); lp.connect(this.kotoGain);
-    for (const [type, mul, vol] of [['triangle', 1, 1], ['sawtooth', 1, 0.28], ['sine', 2, 0.35]]) {
-      const o = c.createOscillator(); o.type = type;
-      o.frequency.setValueAtTime(f * mul * 1.012, t); o.frequency.exponentialRampToValueAtTime(f * mul, t + 0.05);
-      if (press) { o.frequency.setValueAtTime(f * mul, t + 0.22); o.frequency.exponentialRampToValueAtTime(f * mul * 1.0595, t + 0.36); }
-      const g = this._gain(vol); o.connect(g); g.connect(out);
-      o.start(t); o.stop(t + 1.6);
-    }
-    this._env(out, t, 0.002, 1.2, 0.2, 0, 0.2);
-  }
-  _arp(t, f, len) {
-    if (f < 30) return;
-    const o = this.ctx.createOscillator(); o.type = 'square'; o.frequency.value = f;
+
+  /** One note of the 8-bit arpeggio. */
+  _arp(t, m, len) {
+    const o = this.ctx.createOscillator(); o.setPeriodicWave(this.pulse); o.frequency.value = mtof(m);
     const g = this._gain(0); o.connect(g); g.connect(this.arpGain);
-    this._env(g, t, 0.003, len, 0.5, 0.2, 0.03); o.start(t); o.stop(t + len + 0.05);
+    this._env(g, t, 0.003, len, 0.5, 0.25, 0.04); o.start(t); o.stop(t + len + 0.1);
   }
+
+  /** The current song's notes for the chimes, so a fanfare is always in the music's key. */
+  _key(i, oct = 0) { const p = SONGS[this.city ? 'city' : 'pass'].pent; return mtof(p[i % p.length] + 12 * (oct + Math.floor(i / p.length))); }
+  _tonic(oct = 0) { return SONGS[this.city ? 'city' : 'pass'].tonic.map((m) => mtof(m + 12 * oct)); }
 
   // ------------------------------------------------------------------ one-shots
   bov(strength = 1) {
@@ -357,9 +510,27 @@ export class Audio {
         noise(0.04, 'highpass', 3000, 0.7, 0.55); for (const [f, p, d] of [[622, 0.32, 0.7], [1488, 0.18, 0.5], [2317, 0.1, 0.34]]) tone('sine', f, f * 0.99, d, p); break;
       case 'fly': noise(0.9, 'bandpass', 300, 1.1, 0.34, 0.25, 1600); break;
       case 'drop': noise(0.3, 'bandpass', 1400, 1.0, 0.18, 0.02, 300); break;
-      case 'done': this.chime([1047, 1319, 1568, 2093], t + 0.02, 0.07, 0.32, 0.14); break;
+      case 'done': { const [a, b2, c2] = this._tonic(2); this.chime([a, b2, c2, a * 2], t + 0.02, 0.07, 0.32, 0.14); break; }
       default: break;
     }
+  }
+
+  /** Thunder, after the light: a crack for a near strike, then a long rumble that rolls a few times off the hills. */
+  thunder(delay = 1, k = 1) {
+    if (!this.ready) return;
+    const c = this.ctx, t = c.currentTime + delay;
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(260 + 1100 * k, t); lp.frequency.exponentialRampToValueAtTime(80, t + 3.4);
+    const g = this._gain(0); s.connect(lp); lp.connect(g); g.connect(this.master);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.55 * k, t + 0.06 + (1 - k) * 0.3);
+    for (let i = 1; i <= 3; i++) g.gain.linearRampToValueAtTime((0.5 - i * 0.1) * k * (0.7 + Math.random() * 0.6), t + 0.4 * i + Math.random() * 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.8);
+    s.start(t, Math.random()); s.stop(t + 4);
+    const o = c.createOscillator(); o.frequency.setValueAtTime(58, t); o.frequency.exponentialRampToValueAtTime(27, t + 2.2);
+    const og = this._gain(0); o.connect(og); og.connect(this.master);
+    og.gain.setValueAtTime(0, t); og.gain.linearRampToValueAtTime(0.4 * k, t + 0.12); og.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+    o.start(t); o.stop(t + 2.7);
   }
 
   chime(freqs, t0, gap, len, vol = 0.18, type = 'triangle') {
@@ -397,7 +568,7 @@ export class Audio {
       const g3 = this._gain(0); r.connect(g3); g3.connect(this.master); this._env(g3, t, 0.002, 0.5 * k, vol * k, 0.05, 0.3); r.start(t); r.stop(t + 1);
     }
   }
-  tick() { if (this.ready) this.chime([NOTES.E5, NOTES.A5], this.ctx.currentTime, 0.05, 0.12, 0.12, 'sine'); }
+  tick() { if (this.ready) this.chime([this._key(1), this._key(3)], this.ctx.currentTime, 0.05, 0.12, 0.12, 'sine'); }
 
   /** React to scoring events. */
   onEvent(e) {
@@ -405,18 +576,18 @@ export class Audio {
     const t = this.ctx.currentTime;
     switch (e.type) {
       case 'bank': {
-        const up = [NOTES.A4, NOTES.C5, NOTES.E5, NOTES.A5, NOTES.C5 * 2];
+        const up = [this._key(0), this._key(2), this._key(3), this._key(5), this._key(7)];
         const n = 2 + Math.min(3, e.tier + (e.chain > 1 ? 1 : 0));
         this.chime(up.slice(0, n), t, 0.07, 0.3, 0.16 + 0.03 * e.tier);
         this.whoosh(0.7 + Math.min(1.6, e.boost) * 0.5);
         break;
       }
-      case 'tier': this.chime([NOTES.E5, NOTES.G5, NOTES.A5].slice(0, e.value + 1), t, 0.06, 0.2, 0.13); break;
-      case 'switch': this.chime([NOTES.D5, NOTES.G5], t, 0.06, 0.15, 0.12, 'square'); break;
+      case 'tier': this.chime([this._key(1), this._key(2), this._key(3)].slice(0, e.value + 1), t, 0.06, 0.2, 0.13); break;
+      case 'switch': this.chime([this._key(0), this._key(3)], t, 0.06, 0.15, 0.12, 'square'); break;
       case 'clip': this.tick(); break;
-      case 'crash': this.impact(12); this.chime([NOTES.E3, NOTES.C3], t, 0.12, 0.35, 0.14, 'sawtooth'); break;
+      case 'crash': this.impact(12); { const [a] = this._tonic(-2); this.chime([a * 1.5, a], t, 0.12, 0.35, 0.14, 'sawtooth'); } break;
       case 'bump': this.impact(e.value); break;
-      case 'sun': this.chime([NOTES.A3, NOTES.E4, NOTES.A4], t, 0.16, 0.6, 0.1, 'sine'); break;
+      case 'sun': { const [a, , c2] = this._tonic(-1); this.chime([a, c2, a * 2], t, 0.16, 0.6, 0.1, 'sine'); break; }
     }
   }
 }

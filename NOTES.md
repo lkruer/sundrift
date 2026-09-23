@@ -228,7 +228,7 @@ triangles, median 60 fps. The car is 34,176 triangles in 431 meshes, baked per j
   viewport runs on a desktop GPU.
 - Tyre smoke near the camera still reads as discs in stills. It should be sprites that stretch with velocity.
 - The far ridges are one silhouette strip per ring; a real range has layers that slide past each other.
-- The music is a loop that opens up while drifting; it is not the eurobeat the subject deserves.
+- The music is ambient, not the eurobeat the subject deserves (by the owner's choice: more like an open-world game's).
 - No traffic, no ghosts, no leaderboards beyond a local best score.
 
 
@@ -395,6 +395,52 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   the square corners in both. Ready rose from 5.5 s with the city's atlas and materials (both maps load both).
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
+
+## 23 September, night: the skid marks, the bump, the music, the air
+
+- **Skid marks.** The ring buffer draws a quad between every pair of neighbouring points, and two of those quads
+  were never meant to be seen: the one from the newest point to the slot about to be written (stale data, or the
+  world's origin before the ring first wrapped) and the one joining the end of one slide to the start of the next.
+  Both faded from the mark's alpha to nothing across whatever distance lay between: long faint streaks across the
+  road and off into the landscape. Every stroke is now fenced by invisible points at both ends and the ring's
+  seam is fenced too. The marks also sat at the height of the car's centre, so on a grade, the crown or the
+  Shuto's camber one wheel's mark floated and the other's was buried and flickered; each is now laid on the road's
+  own surface under that wheel (grade, crown and bank). The width is laid across the stroke's direction, not
+  across the car (at a big drift angle the car's own axis runs along the mark and pinched it to a sliver), and
+  nothing is drawn while the car flies or hangs from the magnet (the stale wheel state had been throwing dust off
+  the car all the way through the magnet's flight).
+- **The bump.** Off the road the car took its vertical speed from how far the floor moved between two frames, so a
+  step (the verge sits 6 cm under the asphalt, the lip of a bank is sharp) handed it its whole height as speed, and
+  the next frame's launch test threw it into the air: 5 to 6 m high off a small bank. It now moves as a thrown
+  body that the floor holds up, and on the ground it rises with the floor at the rate the floor's slope gives
+  along its travel (capped at 5 m/s, the springs taking a little). It is airborne only where the floor falls away
+  faster than gravity can follow and more than a hand's width. Driving off the free edges at 60 and 100 km/h at
+  16 places: 33 take-offs, 7.5 s in the air and a highest of 6.0 m before; 6, 2.7 s and 1.5 m after (the remaining
+  ones are real crests and steep banks taken fast).
+- **The deep-night sky and the rain.** Deep in the night (the sun more than 12 degrees down, the whole start of a
+  run) the sky was not updated at all, so a storm came and went under a clear starry sky. The rain and the map now
+  always update it.
+- **The music**, rewritten to be more like an open-world game's (slow, airy, no drums) and still retro: see the
+  README. Measured in the browser: no clicks, the pass all in D major, the city in A flat major with its one
+  borrowed D natural, about 3 dB under the old loop's level.
+- **The air** (atmos.js, and the cel pass). The sea of cloud began as three flat sheets of mist lying below the
+  road: where they cut the hillsides they drew hard contour lines, and from above it read as lakes or snow. It is
+  now a height fog in the cel pass: each pixel's world position comes back from the depth buffer, and the cloud
+  below a billowing top (following the car's height slowly, never over it) is integrated along its ray, a ramp and
+  then solid. The valleys fill softly and the ridges fade into it. Light shafts are the same pass marching 22
+  steps toward the moon or a low sun on the screen and counting open sky. The city's light pollution is a glow
+  added to the rig's lower sky stops, so the far towers stand against it and the haze takes its colour; the koi
+  are one instanced draw, their swimming a wave down the body in the vertex shader, and they face the way they
+  really move. A lightning flash is a term in the rig's atmosphere itself (the dome, the haze on every far thing
+  and the environment all flare with it) and a lift of the fill light; the environment is never rebuilt mid-flash.
+- **A stall found and fixed.** A 83-117 ms frame once a run, one run in two, just as the off-road countdown went
+  red. A trace put it in the browser's compositor (a 55 ms Skia/Dawn render pass on the GPU process), not in the
+  game. Disabling the panel removed it (four runs of four); the countdown's SVG filters, its blur sizes, an
+  animated filter and the ring were each ruled out in turn; freezing every change of the panel's style after it
+  first shows did it (three of three). The ring, the number and all three moods (normal, red, the magnet) are
+  now drawn by script into a canvas, and the panel never changes once shown. The smash popup and the countdown
+  are drawn once at the title, with the rest of the HUD.
+- **Measured.** Gates (600 m): pass EASY desktop 603 draws, 1.08 M triangles, 3 drifts banked; phone 476-484 draws, 0.72-0.74 M (1, then 8 drifts: the bot's luck with the slope walls); NEO TOKYO desktop 527-603 draws, 0.80-0.88 M (1, then 6 drifts, as many as the commit before on the same gate); phone 458 draws, 0.73 M, 2 drifts; ready 7.1-8.4 s; no slow frame in any gate (worst 17 ms). The 45 s autopilot run on HARD, three times after the fix: worst 16.9-18.1 ms.
 
 ## 23 September, later: off the road, things to smash, the Shuto, and fixes
 

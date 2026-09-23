@@ -1,0 +1,14 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 6000 }, { "shot": "S4_title_city" },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.teleport(1500, 60); const G = D.G, t = D.track; window.__AUTOPILOT__ = (dt) => { const c = D.car, n = t.nearest(c.x, c.z, G.idx), ahead = t.sample(G.s + 10 + c.speed * 0.6); let e = ahead.h - c.yaw; e = Math.atan2(Math.sin(e), Math.cos(e)); const steer = Math.max(-1, Math.min(1, e * 2.4 - n.u * 0.12)); return { throttle: c.speed < 16 ? 1 : 0, brake: 0, steer, hand: 0, reverse: false, touch: false }; }; })()" },
+  { "wait": 5000 }, { "shot": "S5_city_koi" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; const k = D.atmos.koi.center; window.__CAM__ = { pos: [c.x, y + 6, c.z], look: [k.x, k.y + 38, k.z], fov: 64 }; })()" },
+  { "wait": 700 }, { "shot": "S6_city_koi_up" },
+  { "js": "(() => { window.__CAM__ = null; window.__DEBUG__.rainNow(0.95); })()" },
+  { "wait": 5000 },
+  { "js": "(() => { const D = window.__DEBUG__; D.atmos.bolt.next = 0; })()" },
+  { "wait": 60 }, { "shot": "S7_city_storm" }
+]

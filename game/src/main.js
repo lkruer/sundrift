@@ -6,21 +6,22 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609230440';
-import { createRig, detectTier } from '../rig.js?v=202609230440';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609230440';
-import { Car, gearbox } from './car.js?v=202609230440';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609230440';
-import { World, drawsGlyphs } from './world.js?v=202609230440';
-import { ChaseCam } from './camera.js?v=202609230440';
-import { Input } from './input.js?v=202609230440';
-import { Scoring } from './scoring.js?v=202609230440';
-import { Hud } from './hud.js?v=202609230440';
-import { Audio } from './audio.js?v=202609230440';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain } from './fx.js?v=202609230440';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609230440';
-import { Debris } from './debris.js?v=202609230440';
-import { makePost } from './post.js?v=202609230440';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609230706';
+import { createRig, detectTier } from '../rig.js?v=202609230706';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609230706';
+import { Car, gearbox } from './car.js?v=202609230706';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609230706';
+import { World, drawsGlyphs } from './world.js?v=202609230706';
+import { ChaseCam } from './camera.js?v=202609230706';
+import { Input } from './input.js?v=202609230706';
+import { Scoring } from './scoring.js?v=202609230706';
+import { Hud } from './hud.js?v=202609230706';
+import { Audio } from './audio.js?v=202609230706';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain } from './fx.js?v=202609230706';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609230706';
+import { Atmosphere } from './atmos.js?v=202609230706';
+import { Debris } from './debris.js?v=202609230706';
+import { makePost } from './post.js?v=202609230706';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -63,7 +64,7 @@ const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier
 const post = makePost(renderer, scene, camera, { bloom: tier !== 'phone', fringe: tier !== 'phone', width: innerWidth, height: innerHeight });
 renderer.info.autoReset = false;
 
-let track, world, car, carRoot, bodyPivot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, paintMat, petals, rain, courseOut, magnet, debris;
+let track, world, car, carRoot, bodyPivot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, paintMat, petals, rain, courseOut, magnet, debris, atmos;
 const lampLights = [];
 const pops = { list: [], t: 0, open: -1.13, lamp: null };
 // weather: spells of clear and of rain, each coming on and clearing over seconds; the road stays wet a while after
@@ -212,6 +213,7 @@ async function boot() {
   prog(0.62, 'the car');
   await buildCar();
   buildNight();
+  atmos = new Atmosphere(scene, { phone: tier === 'phone' });
   applyMapLook(); resetWeather();
   car = new Car();
   const start = track.sample(START_S);
@@ -261,7 +263,9 @@ async function boot() {
     magnet.g.position.set(car.x + wfx * 9, carRoot.position.y + 3, car.z + wfz * 9);
     magnet.beam.material.opacity = 0.2; for (const r of magnet.rings) r.material.opacity = 0.5; magnet.dust.material.opacity = 0.5;
     rain.mesh.visible = true; rain.u.uAmount.value = 1; rain.u.uCenter.value.copy(camera.position);
+    atmos.warm(true, camera.position);
     post.render(0.016);
+    atmos.warm(false);
     for (const t of skids.tracks) t.geo.setDrawRange(0, 0);
     flame.cones.visible = false;
     magnet.g.position.set(0, -600, 0); magnet.beam.material.opacity = 0; for (const r of magnet.rings) r.material.opacity = 0; magnet.dust.material.opacity = 0;
@@ -270,7 +274,7 @@ async function boot() {
   const [fx0, fz0] = car.forward();
   await world.precompile(renderer, camera, (root) => rig.refresh(root), post.sceneRT, { x: car.x + fx0 * 6, y: start.y, z: car.z + fz0 * 6, render: warmRender });
   warmRender();
-  window.__DEBUG__ = { world, get track() { return track; }, car, rig, scene, renderer, G, chase, audio, post, get scoring() { return scoring; }, prof, W, get debris() { return debris; }, get magnet() { return magnet; },
+  window.__DEBUG__ = { world, get track() { return track; }, car, rig, scene, renderer, G, chase, audio, post, get scoring() { return scoring; }, prof, W, get debris() { return debris; }, get magnet() { return magnet; }, get atmos() { return atmos; }, get courseOut() { return courseOut; }, get hud() { return hud; },
     // hold the weather at x (0 clear .. 1 downpour) for testing
     rainNow(x) { W.raining = x > 0; W.target = x; W.rain = x; W.wet = x > 0 ? 1 : 0; W.t = 0; W.next = 1e9; },
     teleport(s, kmh = 0) {
@@ -481,6 +485,7 @@ function applyMapLook() {
     c.needsUpdate = true;
   }
   night.starK = city ? 0.3 : 1;
+  if (atmos) atmos.setMap(city);
 }
 
 async function setMap(m) {
@@ -528,6 +533,7 @@ function resetCarToStart() {
   if (magnet) magnet.run = null;
   if (chase) chase.cine = null;
   if (debris) debris.clear();
+  if (skids) skids.clear();
   if (courseOut) courseOut.update(null);
   susp.roll = susp.rollV = susp.pitch = susp.pitchV = susp.accL = susp.accF = susp.heave = susp.heaveV = 0;
   chase.snap(car, p.y);
@@ -538,7 +544,24 @@ function showTitle() {
   G.mode = 'title';
   $('title').classList.add('on');
   hud.show(false);
-  if (!G.hudWarmed) { G.hudWarmed = true; hud.warm(true); setTimeout(() => { if (G.mode === 'title') hud.warm(false); }, 700); }
+  if (!G.hudWarmed) {
+    // (the off-road countdown in all three of its moods, drawn once nearly invisibly with the rest of the HUD: its glows cost a
+    // 100 ms stall the first time a run left the road)
+    // (the ring has to be seen counting down while hot: a ring redrawn under the hot glow's animated filter is its
+    // own raster pipeline, and a still one is never redrawn)
+    G.hudWarmed = true; hud.warm(true);
+    const w0 = performance.now();
+    const warmStep = () => {
+      if (G.mode !== 'title') return;
+      const e = (performance.now() - w0) / 1000;
+      if (e < 0.3) courseOut.update(3.6 - e * 3);
+      else if (e < 0.85) courseOut.update(1.95 - (e - 0.3) * 2.6);
+      else if (e < 1.05) courseOut.update(null, true);
+      else { courseOut.update(null); hud.warm(false); return; }
+      requestAnimationFrame(warmStep);
+    };
+    requestAnimationFrame(warmStep);
+  }
   document.body.classList.remove('playing');
 }
 
@@ -547,7 +570,7 @@ function startGame() {
   $('title').classList.remove('on');
   document.body.classList.add('playing');
   if (night.hero) night.hero.intensity = 0;
-  hud.warm(false);
+  hud.warm(false); courseOut.update(null);
   scoring.reset(); hud.reset();
   G.hour = 20.6; G.dist = 0; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
   resetWeather();
@@ -617,6 +640,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const real = Math.max(1e-4, (now - last) / 1000);
   last = now;
+  G.prevJs = G.jsMs;
   G.frameAvg = G.frameAvg * 0.9 + real * 0.1;
   G.fps = Math.round(1 / G.frameAvg);
   let dt = Math.min(real, MAX_DT);
@@ -641,6 +665,7 @@ function frame(now) {
     _carAt.x = car.x; _carAt.y = carRoot ? carRoot.position.y + 0.4 : 0; _carAt.z = car.z; _carAt.fx = cfx; _carAt.fz = cfz;
     rain.update(dt, W.rain * (1 - (G.tunnelK || 0)), camera.position, _fwd.x / hh, _fwd.z / hh, _carAt, G.night, lampLights, 0.05 + 0.3 * (1 - G.night));
   }
+  if (atmos && car && track && G.mode !== 'paused' && G.mode !== 'loading') airFollow(dt);
   // cherry petals on the air, round the camera wherever it is (not while paused, and not inside a tunnel)
   if (petals && car && G.mode !== 'paused') {
     camera.getWorldDirection(_fwd);
@@ -656,6 +681,7 @@ function frame(now) {
   post.cel.uniforms.uSpeed.value = car && G.mode === 'playing' ? clamp((car.speed - 8) / 32, 0, 1) * (1 + 0.6 * clamp(car.boost / 1.2, 0, 1)) : 0;
   post.cel.uniforms.uVig.value = hud && G.mode === 'playing' ? hud.vignette : 0;
   post.cel.uniforms.uHit.value = hud && G.mode === 'playing' ? hud.hitFlash : 0;
+  shafts();
   post.render(dt);
   const t2 = performance.now();
   G.renderMs = damp(G.renderMs || 4, t2 - t1, 6, dt);
@@ -676,13 +702,14 @@ function frame(now) {
     if (ms > 28 && G.mode === 'playing') { prof.long++; prof.log.push({ at: Math.round(G.s), ms: Math.round(ms), sim: +(G.simMs || 0).toFixed(1), world: +(G.worldMs || 0).toFixed(1), render: +(t2 - t1).toFixed(1) }); if (prof.log.length > 40) prof.log.shift(); }
     prof.worst = Math.max(prof.worst * 0.999, ms);
   }
+  G.jsMs = performance.now() - t0;
   if (window.__ONFRAME__) window.__ONFRAME__(dt, real);
   // every run keeps count of its slow frames, for the gate (the first second of a run is the start itself)
   if (G.mode === 'playing') {
     G.playT = (G.playT || 0) + real;
     const shot = window.__SHOT__ && Math.abs(now - window.__SHOT__) < 2000;   // the test harness was taking a screenshot
     if (G.playT > 1.2 && !shot) {
-      if (real > 0.034) { G.longFrames = (G.longFrames || 0) + 1; (G.slowLog = G.slowLog || []).push([Math.round(G.playT * 10) / 10, Math.round(G.s), Math.round(real * 1000), +(G.simMs || 0).toFixed(1), +(G.worldMs || 0).toFixed(1), +(G.renderMs || 0).toFixed(1)]); if (G.slowLog.length > 30) G.slowLog.shift(); }
+      if (real > 0.034) { G.longFrames = (G.longFrames || 0) + 1; (G.slowLog = G.slowLog || []).push([Math.round(G.playT * 10) / 10, Math.round(G.s), Math.round(real * 1000), +(G.simMs || 0).toFixed(1), +(G.worldMs || 0).toFixed(1), +(G.renderMs || 0).toFixed(1), +(G.prevJs || 0).toFixed(1)]); if (G.slowLog.length > 30) G.slowLog.shift(); }
       G.worstFrame = Math.max(G.worstFrame || 0, real * 1000);
     }
     g.longFrames = G.longFrames || 0; g.worstFrame = Math.round(G.worstFrame || 0); g.slowLog = G.slowLog || [];
@@ -924,14 +951,19 @@ function applySun(dt, force = false) {
   const elOf = (h) => Math.max(-12, 62 * Math.sin(Math.PI * (h - 6) / 12));
   sunTimer += dt; envTimer += dt;
   if (!force && G.sunApplied) {
-    const still = Math.abs(shown - G.lastApplied) < 0.0025 && Math.abs(W.rain - (G.lastRain ?? 0)) < 0.01;
-    if ((elOf(shown) <= -12 && elOf(G.lastApplied) <= -12) || still) { G.hourShown = shown; return; }
+    // (deep in the night the sky stops changing with the hour, but never with the rain or the map: it used to
+    // stay starry and clear through a whole storm)
+    const hourStill = Math.abs(shown - G.lastApplied) < 0.0025 || (elOf(shown) <= -12 && elOf(G.lastApplied) <= -12);
+    const rainStill = Math.abs(W.rain - (G.lastRain ?? 0)) < 0.01 && G.lastMap === G.map;
+    if (hourStill && rainStill) { G.hourShown = shown; return; }
   }
   G.hourShown = shown; sunTimer = 0;
   const full = force || envTimer > 2.5;
   if (full) envTimer = 0;
-  G.lastApplied = shown; G.sunApplied = true; G.lastRain = W.rain;
+  G.lastApplied = shown; G.sunApplied = true; G.lastRain = W.rain; G.lastMap = G.map;
   rig.setOvercast(W.rain * 0.9);
+  // the city's own light, thrown back by the haze and the cloud: magenta and sodium over the skyline at night
+  rig.setGlow(G.map === 'city' ? CITY_GLOW : null, smoothstep(4, -3, elOf(shown)) * (0.75 + 0.3 * W.rain));
   const t = rig.setTime({ hour: shown }, { env: full });
   const el = t.elevation;
   const nightAmt = smoothstep(4, -3, el);
@@ -940,7 +972,7 @@ function applySun(dt, force = false) {
   if (night.moon) night.moon.intensity = 0.85 * nightAmt;
   if (night.glow) night.glow.material.opacity = 0.42 * smoothstep(-0.5, -5, el);
   if (night.tailGlow) night.tailGlow.intensity = 0.9 * nightAmt;
-  if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.66 * nightAmt);
+  if (rig.hemi && night.hemiDay) { G.hemiNow = night.hemiDay * (1 - 0.66 * nightAmt); rig.hemi.intensity = G.hemiNow + (G.flash || 0) * 1.8; }
   // cloud takes the stars and most of the moon
   const clear = 1 - W.rain;
   if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el) * clear * clear * (night.starK ?? 1);
@@ -951,6 +983,79 @@ function applySun(dt, force = false) {
   world.setNight(nightAmt);
   sunColor.copy(rig.sun.color).lerp(new THREE.Color(0.55, 0.65, 0.95), nightAmt);
   if (rig.fog) world.skylineTint(rig.fog.color, nightAmt);
+}
+
+// ---------------------------------------------------------------- the air
+const CITY_GLOW = [0.34, 0.11, 0.2];
+const _ahead = new THREE.Vector3(), _air = { cam: null, car: null, sun: sunColor, haze: null, ahead: _ahead }, _look = new THREE.Vector3();
+/** A place for a firefly: over the verge beside the road somewhere ahead (never in a tunnel). */
+function fireflySpot() {
+  const s = G.s + Math.random() * 190 - 30;
+  if (s < 5) return null;
+  const p = track.sample(s);
+  if (p.tunnel) return null;
+  const side = Math.random() < 0.5 ? 1 : -1, w = side > 0 ? p.wl : p.wr;
+  const u = (w + 1.5 + Math.random() * 15) * side, x = p.x + Math.cos(p.h) * u, z = p.z - Math.sin(p.h) * u;
+  return [x, world.ground.height(x, z) + 0.4 + Math.random() * 2.4, z];
+}
+function airFollow(dt) {
+  camera.getWorldDirection(_look);
+  const pa = track.sample(G.s + 88 + Math.min(40, car.speed));
+  _ahead.set(pa.x, pa.y, pa.z);
+  _air.cam = camera.position; _air.car = car; _air.haze = rig.fog.color; _air.hazeLin = rig.atmos.uAtmHaze.value;
+  _air.viewYaw = Math.atan2(_look.x, _look.z);
+  _air.groundY = G.carY ?? pa.y; _air.carY = G.carY ?? pa.y;
+  _air.night = G.night ?? 1; _air.rain = W.rain; _air.tunnel = G.tunnelK || 0; _air.spot = fireflySpot;
+  atmos.flies.u.uScale.value = renderer.domElement.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
+  const th = atmos.update(dt, _air);
+  if (th && audio && G.mode === 'playing') audio.thunder && audio.thunder(th.delay, th.k);
+  // the flash lights the sky, the haze on every far thing, and the world
+  const f = atmos.bolt.flash * (1 - (G.tunnelK || 0));
+  if (Math.abs(f - (G.flash || 0)) > 1e-3 || f > 0) {
+    G.flash = f;
+    rig.setFlash(f);
+    if (rig.hemi && G.hemiNow !== undefined) rig.hemi.intensity = G.hemiNow + f * 1.8;
+  }
+}
+
+/** The sea of cloud's state and the camera, for the cel pass's height fog. */
+const _m4 = new THREE.Matrix4();
+function mistToPass() {
+  const U = post.cel.uniforms, M = atmos ? atmos.mist : null;
+  const on = M && M.on && G.mode !== 'loading' ? 1 : 0;
+  U.uMist.value.set(M ? M.top : -1e4, M ? M.density : 0, M ? M.soft : 14, on);
+  if (!on) return;
+  U.uMistCol.value.copy(M.col).addScalar(M.flash * 0.25);
+  U.uMistGlow.value.copy(M.glow); U.uMistFar.value.copy(M.far);
+  U.uCamPos.value.copy(camera.position);
+  U.uCamRot.value.setFromMatrix4(camera.matrixWorld);
+  const ty = Math.tan((camera.fov * Math.PI) / 360);
+  U.uTanFov.value.set(ty * camera.aspect, ty);
+  U.uMoonDir.value.copy(night.dir);
+  U.uNoise.value = atmos.noise;
+  U.uMistT.value = atmos.t;
+}
+
+/** Light shafts: the sun low in the sky, or the moon on a clear night, found on the screen for the cel pass. */
+const _sv = new THREE.Vector3();
+function shafts() {
+  camera.updateMatrixWorld();
+  mistToPass();
+  const u = post.cel.uniforms.uShaft.value;
+  u.z = 0;
+  if (tier === 'phone' || !car || G.mode === 'loading') return;
+  const clear = (1 - W.rain) * (1 - (G.tunnelK || 0));
+  const nightAmt = G.night ?? 1;
+  const el = rig.elevation;
+  const sunK = (1 - nightAmt) * (0.12 + 0.5 * (1 - smoothstep(8, 32, el))) * clear;
+  const moonK = nightAmt * 0.3 * clear * (G.map === 'city' ? 0.55 : 1);
+  if (Math.max(sunK, moonK) < 0.01) return;
+  const sun = sunK > moonK;
+  _sv.copy(sun ? rig.sunDir : night.dir).multiplyScalar(1000).add(camera.position).project(camera);
+  if (_sv.z > 1 || Math.abs(_sv.x) > 1.8 || Math.abs(_sv.y) > 1.8) return;
+  u.set(_sv.x * 0.5 + 0.5, _sv.y * 0.5 + 0.5, (sun ? sunK : moonK) * (1 - smoothstep(1.1, 1.8, Math.max(Math.abs(_sv.x), Math.abs(_sv.y)))));
+  if (sun) post.cel.uniforms.uShaftCol.value.copy(rig.sun.color).multiplyScalar(0.9);
+  else post.cel.uniforms.uShaftCol.value.setRGB(0.42, 0.52, 0.85);
 }
 
 // ---------------------------------------------------------------- off the road
@@ -986,20 +1091,35 @@ function floorUnderCar(n, beyond) {
   return { y: Math.max(h0, (hF + hB) / 2, (hL + hR) / 2), grade: gF, roll: Math.atan(gL), onRoad: false, gx: gF * s + gL * c, gz: gF * c - gL * s };
 }
 
-/** The car's height: on the floor, or, where the floor fell away under it at speed, flying until it lands. */
+/**
+ * The car's height. It moves as a thrown body does and the floor holds it up. On the ground it rises and falls with
+ * the floor at the rate the floor's slope gives along its travel, never at the rate the floor's height changed from
+ * one frame to the next: a step or a kink in the ground (the verge's few centimetres, the lip of a bank) used to
+ * hand the car its whole height as speed, and a small bump threw it into the air. Where the floor falls away faster
+ * than gravity can follow (over a crest at speed, off a drop) the car floats clear of it; more than a hand's width
+ * clear it is flying, with no grip until it lands. On the road it keeps to the asphalt.
+ */
+const AIR_GAP = 0.18;
 function vertical(dt, fl) {
-  if (G.carY === undefined) G.carY = fl.y;
-  if (!car.air) {
-    const vyFloor = (fl.y - G.carY) / dt;
-    if (!fl.onRoad && car.speed > 7 && vyFloor < G.vy - 16 * dt - 0.6) { car.air = true; G.airT = 0; }
-    else { G.vy = clamp(vyFloor, -25, 25); G.carY = fl.y; }
-  }
-  if (car.air) {
-    G.airT += dt;
-    G.vy -= 16 * dt; G.carY += G.vy * dt;
-    if (G.carY <= fl.y) {
-      const v = -G.vy;
-      G.carY = fl.y; G.vy = 0; car.air = false;
+  if (!Number.isFinite(G.carY)) { G.carY = fl.y; G.vy = 0; }
+  if (!Number.isFinite(G.vy)) G.vy = 0;
+  const [vx, vz] = car.pointVelocity(0, 0);
+  let rate;
+  if (fl.onRoad) {
+    const sh = Math.sin(G.roadH || 0), ch = Math.cos(G.roadH || 0);
+    rate = fl.grade * (vx * sh + vz * ch) - Math.tan(fl.bank || 0) * (vx * ch - vz * sh);
+  } else rate = fl.gx * vx + fl.gz * vz;
+  // (the springs soak up a little of a climb, and a steep face lifts the car only so fast)
+  rate = clamp(rate * (rate > 0 ? 0.85 : 1), -25, 5);
+  if (fl.onRoad && !car.air) { G.carY = fl.y; G.vy = rate; return; }
+  G.vy -= 16 * dt;
+  G.carY += G.vy * dt;
+  if (car.air) G.airT += dt;
+  if (G.carY <= fl.y) {
+    const v = rate - G.vy;                                  // how hard it meets the ground
+    G.carY = fl.y; G.vy = Math.max(G.vy, rate);
+    if (car.air) {
+      car.air = false;
       if (v > 2.2 && G.airT > 0.12) {
         chase.kick(clamp(v / 14, 0.12, 0.8));
         susp.heaveV -= clamp(v * 0.09, 0.2, 1.4);
@@ -1007,7 +1127,7 @@ function vertical(dt, fl) {
         for (const [l, f] of REAR.concat(FRONT)) { const [wx, wz] = car.point(l, f); for (let i = 0; i < 3; i++) particles.dust(wx, G.carY, wz, 0, 0, clamp(v / 8, 0.4, 1), sunColor); }
       }
     }
-  }
+  } else if (!car.air && G.carY - fl.y > AIR_GAP) { car.air = true; G.airT = 0; }
 }
 
 /** The car against the things beside the road; returns the hardest hit on something solid. */
@@ -1241,11 +1361,23 @@ function effects(dt, y, boost01) {
   const [lx, lz] = car.left();
   const [fx, fz] = car.forward();
   const vx = fx * car.vF + lx * car.vL, vz = fz * car.vF + lz * car.vL;
+  // across the car's travel: a mark starts at the width of the tyre's path (the car's own left when it is barely moving)
+  const vl = Math.hypot(vx, vz), ax = vl > 0.5 ? vz / vl : lx, az = vl > 0.5 ? -vx / vl : lz;
+  // nothing is laid on the ground while the car flies or hangs from the magnet
+  const lifted = car.air || magnet.active;
+  const mark = (i, wx, wz, a) => {
+    let wy = y;
+    if (a > 0.03) {
+      const q = track.nearest(wx, wz, G.idx), au = Math.abs(q.u);
+      wy = q.y - q.u * Math.tan(q.bank || 0) + (au < track.half ? 0.012 * (1 - au / track.half) : 0);
+    }
+    skids.add(i, wx, wy + 0.025, wz, ax, az, a, 0.19);
+  };
   REAR.forEach(([l, f], i) => {
     const [wx, wz] = car.point(l, f);
-    if (car.air) { skids.add(i, wx, y + 0.02, wz, lx, lz, 0, 0.19); return; }       // (nothing on the ground while flying)
+    if (lifted) { skids.add(i, wx, y, wz, ax, az, 0, 0.19); return; }
     const a = onRoad ? clamp(slip * 1.2 + (car.hand ? 0.5 : 0) * clamp(car.speed / 8, 0, 1), 0, 1) : 0;
-    skids.add(i, wx, y + 0.02, wz, lx, lz, a, 0.19);
+    mark(i, wx, wz, a);
     if (a > 0.25 && car.speed > 6 && Math.random() < a * 0.9) particles.smoke(wx, y, wz, vx, vz, a, sunColor);
     // on a wet road the tyres throw spray
     if (W.wet > 0.3 && onRoad && car.speed > 8 && Math.random() < W.wet * 0.55) particles.spray(wx, y, wz, vx, vz, W.wet * clamp(car.speed / 30, 0, 1), sunColor);
@@ -1253,8 +1385,8 @@ function effects(dt, y, boost01) {
   });
   FRONT.forEach(([l, f], i) => {
     const [wx, wz] = car.point(l, f);
-    const a = onRoad && car.hand ? clamp(car.speed / 10, 0, 0.8) : (onRoad ? car.slipFront * 0.7 : 0);
-    skids.add(2 + i, wx, y + 0.02, wz, lx, lz, a, 0.19);
+    const a = lifted ? 0 : onRoad && car.hand ? clamp(car.speed / 10, 0, 0.8) : (onRoad ? car.slipFront * 0.7 : 0);
+    mark(2 + i, wx, wz, a);
   });
   flame.update(dt, boost01);
   if (boost01 > 0.05 && Math.random() < 0.7) {

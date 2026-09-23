@@ -11,13 +11,24 @@ five seconds, or a giant magnet comes down and carries you back.
   lie on the asphalt. Red paper lanterns are strung along the cherry avenues. A great vermilion torii spans the
   road at every shrine, with jizo in red bibs beside the path. Blue guide signs carry kanji. Fuji stands under
   the moon across the valley. The pass also has sodium lamps, slope lattices and tunnels through the spurs.
+  Below the road the valleys lie under a sea of cloud (unkai), silver under the moon and rose at dawn, with the
+  ridges and the treetops standing out of it. Fireflies pulse over the verges, thin cloud drifts across the stars,
+  now and then a shooting star falls, and the moon (or a low sun) throws shafts of light through the trees.
 - **The city.** Grimy street fronts line the road, with rain streaks, roller shutters, air conditioners, fire
   escapes, laundry and roof tanks. Stacked neon signs hang over the street, and their light lies on the pavement
   and streaks across the wet asphalt. The corners are square, with crossings and signals. Now and then the road
   climbs onto an elevated expressway (the Shuto) and weaves between the towers on banked bends, and Tokyo Tower
-  glows orange on the skyline.
+  glows orange on the skyline. The sky over it all is the city's own light thrown back by the haze, magenta and
+  sodium, under a low cloud deck lit from beneath; searchlights sweep it from the rooftops, and two holographic koi,
+  a red-and-white and a gold, swim slow circles over the street ahead.
 - **Weather and time.** Rain comes and goes: the sky clouds over, the road turns glossy, and the lamps and signs
-  streak across it. The time of day moves smoothly from night through dawn and day to dusk and back.
+  streak across it. In a heavy storm lightning strikes on the horizon ahead, the sky and the haze flare, and the
+  thunder rolls in after it. The time of day moves smoothly from night through dawn and day to dusk and back.
+- **The music** is in the manner of an open-world game's soundtrack, slow and airy with no drums: a soft felt
+  piano in D over warm analog pads on the pass (a koto figure now and then), an 80s FM electric piano in A flat
+  in the city, all of it through a little old tape (a slow wow, a low-pass, a long reverb). A pulse-wave 8-bit
+  arpeggio comes up under it while a drift is held. Each song is a sixteen-bar form of four-bar phrases, and each
+  phrase picks one of its tunes or leaves the chords alone, so it never plays the same way twice.
 - **The frame.** It is drawn as cel bands with ink outlines, halftone shade and scanlines, then shown on a curved
   CRT whose picture bends at the edges and rounds into the corners, in a 90s console's dithered colour.
 - **The dash** is a 90s tuner's: a tach with a redline, amber seven-segment mph and score.
@@ -105,6 +116,9 @@ you reverse and swings round with the car. A clean one scores 500.
   far skyline and Tokyo Tower (`landmarks.js`); `buildings.js` draws every building's windows from world
   position, so a floor is a floor at any size.
 - `game/src/offroad.js`: the countdown panel and the magnet (its swoop, the flight, the drop, every beat of it).
+- `game/src/atmos.js`: the air: the cloud deck (moonlit wisps on the pass, lit from beneath over the city), the
+  searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of
+  cloud and the light shafts are drawn by the cel pass in `post.js`, from the depth buffer.
 - `game/src/debris.js`: what the car knocks over, as rigid bodies for a few seconds: the prop's own model and
   materials, a box of corners bouncing and sliding on the ground with restitution and friction, spun from where
   it was struck; bushes are flattened in place instead.
