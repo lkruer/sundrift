@@ -15,7 +15,7 @@
  * sixteen-bar form (A A B A) of four-bar phrases, and every phrase picks one of its section's tunes or leaves the
  * chords to themselves for a while, so it never plays the same way twice.
  */
-import { clamp } from './config.js?v=202609230706';
+import { clamp } from './config.js?v=202609231752';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -64,6 +64,9 @@ const SONGS = {
     pent: [72, 75, 77, 80, 82, 84], tonic: [68, 72, 75],
   },
 };
+// the engine's own processor (see _engine): loaded from a blob, so there is no file to ship
+const ENGINE_WORKLET = "\n/**\n * The engine, sample by sample: an inline four firing every half turn of the crank, each firing a sharp pressure\n * pulse (harder under load, softer off it, never two alike, the four cylinders never quite equal) with the noise of\n * the burn riding on it, ringing through the exhaust's fixed resonances, then a DC blocker and a little saturation.\n * A pop (the 'pop' parameter rising): unburnt fuel lighting off in the hot pipe on the overrun, a crack and a boom.\n */\nclass MinidriftEngine extends AudioWorkletProcessor {\n  static get parameterDescriptors() {\n    return [\n      { name: 'rpm', defaultValue: 900, minValue: 200, maxValue: 12000, automationRate: 'k-rate' },\n      { name: 'load', defaultValue: 0.2, minValue: 0, maxValue: 1, automationRate: 'k-rate' },\n      { name: 'cut', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },\n      { name: 'pop', defaultValue: 0, minValue: 0, maxValue: 2, automationRate: 'k-rate' },\n    ];\n  }\n  constructor() {\n    super();\n    this.ph = 0; this.cyl = 0; this.t = 1; this.amp = 0; this.pop = 0; this.popT = 1; this.popIn = 0;\n    this.bias = [1.0, 0.9, 1.07, 0.95];\n    this.s = 22222; this.dc = 0;\n    // the exhaust's and the body's resonances: frequency, Q, gain (two-pole band-passes, unity at the peak)\n    const R = [[92, 3.0, 1.0], [205, 4.5, 0.85], [430, 6.0, 0.6], [860, 5.5, 0.38], [1620, 4.5, 0.22], [3100, 3.0, 0.1]];\n    this.r = R.map(([f, q, g]) => {\n      const w = 2 * Math.PI * f / sampleRate, al = Math.sin(w) / (2 * q), a0 = 1 + al;\n      return { b0: al / a0, b2: -al / a0, a1: -2 * Math.cos(w) / a0, a2: (1 - al) / a0, g, x1: 0, x2: 0, y1: 0, y2: 0 };\n    });\n  }\n  rnd() { this.s = (this.s * 1664525 + 1013904223) >>> 0; return this.s / 4294967296; }\n  process(inputs, outputs, P) {\n    const out = outputs[0] && outputs[0][0];\n    if (!out) return true;\n    const rpm = P.rpm[0], load = P.load[0], cut = P.cut[0];\n    const sr = sampleRate, dph = rpm / 60 / sr, dt = 1 / sr;\n    const tau = 0.0008 + 0.0024 * (1 - load);\n    const popIn = P.pop[0];\n    if (popIn > 0.05 && this.popIn <= 0.05) { this.pop = popIn * (0.8 + 0.4 * this.rnd()); this.popT = 0; }\n    this.popIn = popIn;\n    for (let i = 0; i < out.length; i++) {\n      this.ph += dph;\n      if (this.ph >= 0.5) {\n        this.ph -= 0.5;\n        const c = this.cyl; this.cyl = (c + 1) & 3;\n        const fired = cut > 0 && this.rnd() < cut ? 0 : 1;\n        this.amp = fired * (0.22 + 0.78 * load) * this.bias[c] * (0.86 + 0.28 * this.rnd());\n        this.t = 0;\n      }\n      this.t += dt; this.popT += dt;\n      const env = Math.exp(-this.t / tau) * (1 - Math.exp(-this.t / 0.00016));\n      const nz = this.rnd() * 2 - 1;\n      let x = this.amp * env * (1 + 0.5 * nz);\n      if (this.popT < 0.07) { const pe = Math.exp(-this.popT / 0.011); x += this.pop * pe * (nz * 0.95 + Math.sin(this.popT * 440) * 0.7); }\n      let y = x * 0.22;\n      for (let k = 0; k < this.r.length; k++) {\n        const r = this.r[k];\n        const v = r.b0 * x + r.b2 * r.x2 - r.a1 * r.y1 - r.a2 * r.y2;\n        r.x2 = r.x1; r.x1 = x; r.y2 = r.y1; r.y1 = v;\n        y += v * r.g;\n      }\n      this.dc += (y - this.dc) * 0.0015;\n      out[i] = Math.tanh((y - this.dc) * 2.4) * 0.6;\n    }\n    return true;\n  }\n}\nregisterProcessor('minidrift-engine', MinidriftEngine);\n";
+
 // the left hand breaks the chord in quarters: the bass, then three of the pad's notes
 const LH = { 0: -1, 4: 1, 8: 2, 12: 3 };
 
@@ -119,37 +122,75 @@ export class Audio {
   _gain(v = 0) { const g = this.ctx.createGain(); g.gain.value = v; return g; }
   _osc(type, f) { const o = this.ctx.createOscillator(); o.type = type; o.frequency.value = f; o.start(); return o; }
 
+  /**
+   * The engine. Its note comes from an AudioWorklet that fires an inline four's pulses into the exhaust's resonances
+   * (ENGINE_WORKLET, above): the harmonics sweep through fixed formants as the revs rise, which is what an engine
+   * sounds like and a bank of oscillators does not. Round it: the induction roar (noise the throttle opens), the
+   * straight-cut gears' whine under load, and the turbo's whistle. Where there is no AudioWorklet, the oscillators.
+   */
   _engine() {
     const c = this.ctx;
     this.engGain = this._gain(0);
-    this.engFilter = c.createBiquadFilter(); this.engFilter.type = 'lowpass'; this.engFilter.frequency.value = 600; this.engFilter.Q.value = 1.2;
+    this.engFilter = c.createBiquadFilter(); this.engFilter.type = 'lowpass'; this.engFilter.frequency.value = 2400; this.engFilter.Q.value = 0.6;
     this.engFilter.connect(this.engGain); this.engGain.connect(this.master);
-    this.voices = [];
+    // the induction roar
+    this.rasp = this._noiseSource();
+    this.intakeF = c.createBiquadFilter(); this.intakeF.type = 'bandpass'; this.intakeF.frequency.value = 480; this.intakeF.Q.value = 1.1;
+    this.raspGain = this._gain(0); this.rasp.connect(this.intakeF); this.intakeF.connect(this.raspGain); this.raspGain.connect(this.master);
+    // the gears' whine, with the road speed
+    this.whine = this._osc('triangle', 300); this.whineGain = this._gain(0);
+    const wf = c.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 900; wf.Q.value = 0.8;
+    this.whine.connect(wf); wf.connect(this.whineGain); this.whineGain.connect(this.master);
+    // the turbo's whistle
+    this.turbo = this._osc('sine', 1400); this.turboGain = this._gain(0);
+    const tf = c.createBiquadFilter(); tf.type = 'highpass'; tf.frequency.value = 900;
+    this.turbo.connect(tf); tf.connect(this.turboGain); this.turboGain.connect(this.master);
+    this.engNode = null; this.voices = [];
+    this.gearShown = -1; this.cutUntil = 0;
+    if (c.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
+      const url = URL.createObjectURL(new Blob([ENGINE_WORKLET], { type: 'application/javascript' }));
+      c.audioWorklet.addModule(url).then(() => {
+        this.engNode = new AudioWorkletNode(c, 'minidrift-engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+        this.engNode.connect(this.engFilter);
+      }).catch(() => this._engineOsc());
+    } else this._engineOsc();
+  }
+
+  /** A pop from the exhaust on the overrun, k its size (0.5 to 1.5); the game shows the flame. */
+  pop(k = 1) {
+    if (!this.ready || !this.engNode) return;
+    const P = this.engNode.parameters.get('pop'), t = this.ctx.currentTime;
+    P.setValueAtTime(k, t); P.setValueAtTime(0, t + 0.03);
+  }
+
+  /** The old engine, for a browser with no AudioWorklet: detuned voices at the firing frequency. */
+  _engineOsc() {
     const mk = (type, mul, gain, detune) => {
       const o = this._osc(type, 30 * mul); o.detune.value = detune;
       const g = this._gain(gain); o.connect(g); g.connect(this.engFilter);
       this.voices.push({ o, mul });
     };
     mk('sawtooth', 1, 0.22, 0); mk('sawtooth', 1, 0.18, 9); mk('square', 0.5, 0.16, -4); mk('sine', 0.5, 0.35, 0); mk('sawtooth', 2, 0.06, 5);
-    // exhaust rasp
-    this.rasp = this._noiseSource();
-    const rf = c.createBiquadFilter(); rf.type = 'bandpass'; rf.frequency.value = 900; rf.Q.value = 1.4;
-    this.raspGain = this._gain(0); this.rasp.connect(rf); rf.connect(this.raspGain); this.raspGain.connect(this.master);
-    // turbo whistle
-    this.turbo = this._osc('sine', 1400); this.turboGain = this._gain(0);
-    const tf = c.createBiquadFilter(); tf.type = 'highpass'; tf.frequency.value = 900;
-    this.turbo.connect(tf); tf.connect(this.turboGain); this.turboGain.connect(this.master);
   }
 
+  /**
+   * The tyres: a slide's squeal is rubber stick-slipping on the asphalt, and it sings in narrow bands that wander as
+   * the load and the angle change: three narrow band-passes on noise, each drifting on its own, over the broad scrub of
+   * the tread across the surface.
+   */
   _tyres() {
     const c = this.ctx;
     this.screech = this._noiseSource();
-    this.screechF = c.createBiquadFilter(); this.screechF.type = 'bandpass'; this.screechF.frequency.value = 1500; this.screechF.Q.value = 6;
-    const f2 = c.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 2600; f2.Q.value = 5;
     this.screechGain = this._gain(0);
-    this.screech.connect(this.screechF); this.screechF.connect(this.screechGain);
-    this.screech.connect(f2); f2.connect(this.screechGain);
+    this.squeal = [[760, 15, 3.2], [1180, 18, 2.4], [1940, 13, 1.4]].map(([f, q, g]) => {
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+      const gg = this._gain(g); this.screech.connect(bp); bp.connect(gg); gg.connect(this.screechGain);
+      return { bp, f, w: 0 };
+    });
+    this.screechF = this.squeal[0].bp;
     this.screechGain.connect(this.master);
+    const sc = c.createBiquadFilter(); sc.type = 'bandpass'; sc.frequency.value = 560; sc.Q.value = 0.6;
+    this.scrubGain = this._gain(0); this.screech.connect(sc); sc.connect(this.scrubGain); this.scrubGain.connect(this.master);
     // gravel: low rumble when off the asphalt
     this.gravel = this._noiseSource();
     const gf = c.createBiquadFilter(); gf.type = 'lowpass'; gf.frequency.value = 380;
@@ -253,17 +294,40 @@ export class Audio {
   }
 
   /** Per frame. */
-  update(dt, car, rpm, drifting, boost01, surface) {
+  update(dt, car, rpm, drifting, boost01, surface, gear = -1) {
     if (!this.ready) return;
     const c = this.ctx, t = c.currentTime;
     const thr = car.throttle;
-    // engine
-    const f = rpm / 30;
-    for (const v of this.voices) v.o.frequency.setTargetAtTime(f * v.mul, t, 0.03);
-    const load = 0.35 + 0.65 * thr + boost01 * 0.4;
-    this.engFilter.frequency.setTargetAtTime(380 + 2600 * load * (0.4 + 0.6 * rpm / 8000), t, 0.05);
-    this.engGain.gain.setTargetAtTime(0.30 + 0.22 * load, t, 0.05);
-    this.raspGain.gain.setTargetAtTime(0.02 + 0.10 * thr * (rpm / 8000), t, 0.05);
+    // an upshift: the ignition cut for a moment (the revs fall on their own, into the next gear) and the box's clunk
+    if (gear >= 0 && this.gearShown >= 0 && gear !== this.gearShown) {
+      if (gear > this.gearShown && thr > 0.3) { this.cutUntil = t + 0.075; this.sfx('shift', 0.8); }
+      else if (gear < this.gearShown) this.sfx('shift', 0.45);
+    }
+    if (gear >= 0) this.gearShown = gear;
+    // at the limiter, the fuel cut bounces off it
+    const limiter = rpm > 8150 && thr > 0.7 ? (Math.floor(t * 15) % 2 ? 0.8 : 0) : 0;
+    const cut = t < this.cutUntil ? 1 : limiter;
+    const load = clamp(0.12 + 0.88 * thr + boost01 * 0.25, 0, 1) * (1 - cut * 0.6);
+    if (this.engNode) {
+      const P = this.engNode.parameters;
+      P.get('rpm').setTargetAtTime(rpm, t, 0.028);
+      P.get('load').setTargetAtTime(thr < 0.05 ? 0.02 : load, t, 0.03);
+      P.get('cut').setTargetAtTime(cut, t, 0.004);
+      this.engFilter.frequency.setTargetAtTime(1500 + 3800 * (0.3 + 0.7 * load) * (0.35 + 0.65 * rpm / 8000), t, 0.05);
+      this.engGain.gain.setTargetAtTime(0.8 + 0.36 * load, t, 0.05);
+    } else {
+      const f = rpm / 30;
+      for (const v of this.voices) v.o.frequency.setTargetAtTime(f * v.mul, t, 0.03);
+      this.engFilter.frequency.setTargetAtTime(380 + 2600 * load * (0.4 + 0.6 * rpm / 8000), t, 0.05);
+      this.engGain.gain.setTargetAtTime(0.30 + 0.22 * load, t, 0.05);
+    }
+    // the intake roars as the throttle opens, higher with the revs
+    this.intakeF.frequency.setTargetAtTime(320 + 420 * rpm / 8000, t, 0.05);
+    this.raspGain.gain.setTargetAtTime(thr * (0.03 + 0.11 * rpm / 8000) * (1 - cut * 0.8), t, 0.04);
+    // the gears whine with the road speed, under load
+    const sp = Math.abs(car.vF);
+    this.whine.frequency.setTargetAtTime(Math.max(40, sp * 21), t, 0.05);
+    this.whineGain.gain.setTargetAtTime(clamp((sp - 6) / 20, 0, 1) * (0.006 + 0.014 * thr), t, 0.08);
     // turbo: spools with rpm and throttle, whistles at high pitch
     const spool = clamp((rpm - 2500) / 5000, 0, 1) * (0.3 + 0.7 * thr);
     this.turbo.frequency.setTargetAtTime(1500 + spool * 3200, t, 0.12);
@@ -271,10 +335,15 @@ export class Audio {
     // blow-off on a lift at load
     if (this.lastThrottle > 0.6 && thr < 0.2 && rpm > 3500) this.bov(spool);
     this.lastThrottle = thr; this.rpm = rpm;
-    // tyres
+    // tyres: the squeal with the slip, its bands wandering; the scrub under it
     const slip = Math.max(car.slipRear, car.slipFront * 0.7) * clamp((car.speed - 3) / 8, 0, 1) * surface;
-    this.screechGain.gain.setTargetAtTime(slip * 0.26, t, 0.04);
-    this.screechF.frequency.setTargetAtTime(1200 + 700 * Math.abs(car.beta) + 300 * Math.sin(t * 9), t, 0.06);
+    this.screechGain.gain.setTargetAtTime(slip * 0.2 * (0.8 + 0.4 * Math.random()), t, 0.03);
+    this.scrubGain.gain.setTargetAtTime(slip * 0.1 * (0.6 + 0.4 * clamp(car.speed / 20, 0, 1)), t, 0.05);
+    const ang = Math.abs(car.beta);
+    for (const s of this.squeal) {
+      s.w = s.w * 0.94 + (Math.random() - 0.5) * 0.05;
+      s.bp.frequency.setTargetAtTime(s.f * (0.9 + 0.35 * clamp(ang, 0, 0.8) + s.w), t, 0.035);
+    }
     this.gravelGain.gain.setTargetAtTime((1 - surface) * clamp(car.speed / 12, 0, 1) * 0.5, t, 0.05);
     // wind
     this.windGain.gain.setTargetAtTime(clamp(car.speed / 60, 0, 1) ** 2 * 0.35 + boost01 * 0.15, t, 0.1);
@@ -456,11 +525,23 @@ export class Audio {
   bov(strength = 1) {
     if (!this.ready) return;
     const c = this.ctx, t = c.currentTime;
+    // the valve's sigh, softer than it was
     const s = c.createBufferSource(); s.buffer = this.noiseBuf;
     const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.5;
-    f.frequency.setValueAtTime(3800, t); f.frequency.exponentialRampToValueAtTime(700, t + 0.32);
+    f.frequency.setValueAtTime(3400, t); f.frequency.exponentialRampToValueAtTime(800, t + 0.3);
     const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.master);
-    this._env(g, t, 0.005, 0.3, 0.16 * strength, 0, 0.05); s.start(t); s.stop(t + 0.4);
+    this._env(g, t, 0.005, 0.26, 0.07 * strength, 0, 0.05); s.start(t, Math.random()); s.stop(t + 0.4);
+    // the flutter: the compressor surging against the shut throttle, chu-tu-tu-tu, slowing as it dies
+    const s2 = c.createBufferSource(); s2.buffer = this.noiseBuf;
+    const f2 = c.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 1500; f2.Q.value = 1.6;
+    const g2 = this._gain(0); s2.connect(f2); f2.connect(g2); g2.connect(this.master);
+    let tt = t + 0.015;
+    for (let k = 0; k < 9; k++) {
+      const a = 0.17 * strength * Math.exp(-k / 3.4);
+      g2.gain.setValueAtTime(0, tt); g2.gain.linearRampToValueAtTime(a, tt + 0.004); g2.gain.setTargetAtTime(0, tt + 0.006, 0.009);
+      tt += 0.042 + k * 0.004;
+    }
+    s2.start(t, Math.random()); s2.stop(tt + 0.1);
   }
   /** One-shots for smashing things, landing, the countdown and the magnet; k scales the loudness. */
   sfx(name, k = 1) {
@@ -494,6 +575,23 @@ export class Audio {
         for (let i = 0; i < 7; i++) setTimeout(() => this.sfx('can', 0.6), 70 + i * 60);
         break;
       case 'can': tone('sine', 1700 + Math.random() * 1100, 1400, 0.11, 0.09); break;
+      case 'shift':                           // the gearbox: a dull clunk and a click of the linkage
+        tone('sine', 150, 80, 0.06, 0.2); noise(0.025, 'bandpass', 2600, 1.4, 0.14); break;
+      case 'bag': case 'box':                 // a soft thump, and paper and plastic rustling
+        noise(0.16, 'lowpass', 600, 0.7, 0.5); noise(0.34, 'bandpass', 2800, 0.8, 0.2, 0.015); tone('sine', 150, 70, 0.14, 0.3); break;
+      case 'crate': case 'crates':            // hollow plastic clattering over
+        noise(0.1, 'bandpass', 1500, 1.6, 0.4); tone('square', 520, 280, 0.07, 0.12);
+        for (let i = 0; i < (name === 'crates' ? 3 : 2); i++) setTimeout(() => this.sfx('clack', 0.7), 60 + i * 75);
+        break;
+      case 'clack': noise(0.05, 'bandpass', 1900 + Math.random() * 700, 2, 0.28); tone('triangle', 420 + Math.random() * 160, 260, 0.05, 0.12); break;
+      case 'cone':                            // a hollow bonk of soft plastic
+        tone('triangle', 340, 170, 0.13, 0.42); noise(0.05, 'bandpass', 2100, 1.2, 0.28); break;
+      case 'aboard':                          // a wooden board clapping down
+        noise(0.07, 'bandpass', 1100, 1.1, 0.45); tone('square', 230, 130, 0.08, 0.2); setTimeout(() => this.sfx('clack', 0.6), 110); break;
+      case 'bike':                            // a bicycle going over: steel rattling and its bell
+        noise(0.18, 'highpass', 2400, 0.7, 0.36); tone('square', 170, 90, 0.12, 0.12);
+        for (const [f, p, d] of [[2780, 0.12, 0.55], [3350, 0.06, 0.4]]) tone('sine', f, f * 0.995, d, p);
+        setTimeout(() => this.sfx('clack', 0.8), 90); break;
       case 'tree':                            // a trunk: a woody thunk and the canopy shaking
         tone('sine', 125, 60, 0.26, 0.65); noise(0.3, 'lowpass', 420, 0.8, 0.45); noise(0.55, 'bandpass', 3000, 0.7, 0.16, 0.04); break;
       case 'land': tone('sine', 98, 46, 0.3, 0.75); noise(0.26, 'lowpass', 520, 0.7, 0.5); break;
@@ -562,6 +660,14 @@ export class Audio {
     this._env(g, t, 0.002, 0.18 * k + 0.05, 0.6 * k, 0, 0.08); s.start(t); s.stop(t + 0.4);
     const o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(35, t + 0.25);
     const g2 = this._gain(0); o.connect(g2); g2.connect(this.master); this._env(g2, t, 0.002, 0.25, 0.7 * k); o.start(t); o.stop(t + 0.35);
+    // the crunch: panels and plastic giving, a few small breaks after the first
+    for (let i = 1; i <= 3; i++) {
+      const tt = t + 0.025 * i + Math.random() * 0.02;
+      const sN = c.createBufferSource(); sN.buffer = this.noiseBuf;
+      const fN = c.createBiquadFilter(); fN.type = 'bandpass'; fN.frequency.value = 1400 + Math.random() * 1800; fN.Q.value = 1.3;
+      const gN = this._gain(0); sN.connect(fN); fN.connect(gN); gN.connect(this.master);
+      this._env(gN, tt, 0.001, 0.035, 0.3 * k / i, 0, 0.02); sN.start(tt, Math.random()); sN.stop(tt + 0.1);
+    }
     // a metallic ring for the guardrail
     for (const [fr, vol] of [[2200, 0.08], [3100, 0.05], [4700, 0.03]]) {
       const r = c.createOscillator(); r.type = 'sine'; r.frequency.value = fr * (0.95 + Math.random() * 0.1);

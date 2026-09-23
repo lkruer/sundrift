@@ -11,19 +11,27 @@ five seconds, or a giant magnet comes down and carries you back.
   lie on the asphalt. Red paper lanterns are strung along the cherry avenues. A great vermilion torii spans the
   road at every shrine, with jizo in red bibs beside the path. Blue guide signs carry kanji. Fuji stands under
   the moon across the valley. The pass also has sodium lamps, slope lattices and tunnels through the spurs.
-  Below the road the valleys lie under a sea of cloud (unkai), silver under the moon and rose at dawn, with the
+  Grass and spring flowers tuft the verges, and a five-storey pagoda stands at every shrine, lanterns glowing
+  under its eaves. Below the road the valleys lie under a sea of cloud (unkai), silver under the moon and rose at dawn, with the
   ridges and the treetops standing out of it. Fireflies pulse over the verges, thin cloud drifts across the stars,
   now and then a shooting star falls, and the moon (or a low sun) throws shafts of light through the trees.
 - **The city.** Grimy street fronts line the road, with rain streaks, roller shutters, air conditioners, fire
-  escapes, laundry and roof tanks. Stacked neon signs hang over the street, and their light lies on the pavement
+  escapes, laundry and roof tanks. Behind every lit window there is a room: shelves in the convenience stores,
+  counters and stools in the eateries, arcades, bars, offices, flats and tatami rooms, some dark but for the flicker
+  of a TV. Animated LED screens and tickers hang on the fronts and stand on the roofs, concrete poles carry sagging
+  power and telecom lines across the streets, a lit arch and strings of red lanterns mark a shopping street, glass
+  skybridges cross between towers, a commuter train rolls along an elevated line with shops in its arches, coin
+  parkings sit between the buildings, and Tokyo Skytree stands lit on the skyline beside Tokyo Tower. Stacked neon signs hang over the street, and their light lies on the pavement
   and streaks across the wet asphalt. The corners are square, with crossings and signals. Now and then the road
   climbs onto an elevated expressway (the Shuto) and weaves between the towers on banked bends, and Tokyo Tower
   glows orange on the skyline. The sky over it all is the city's own light thrown back by the haze, magenta and
   sodium, under a low cloud deck lit from beneath; searchlights sweep it from the rooftops, and two holographic koi,
   a red-and-white and a gold, swim slow circles over the street ahead.
 - **Weather and time.** Rain comes and goes: the sky clouds over, the road turns glossy, and the lamps and signs
-  streak across it. In a heavy storm lightning strikes on the horizon ahead, the sky and the haze flare, and the
-  thunder rolls in after it. The time of day moves smoothly from night through dawn and day to dusk and back.
+  streak across it. Drops ring the asphalt ahead of the car, the rain rakes back past the camera at speed, a
+  curtain of it falls further off, the headlights' beams show in it, beads gather and run down the tube's glass,
+  and the car's paint goes glossy. In a heavy storm lightning strikes on the horizon ahead, the sky and the haze
+  flare, and the thunder rolls in after it. The time of day moves smoothly from night through dawn and day to dusk and back.
 - **The music** is in the manner of an open-world game's soundtrack, slow and airy with no drums: a soft felt
   piano in D over warm analog pads on the pass (a koto figure now and then), an 80s FM electric piano in A flat
   in the city, all of it through a little old tape (a slow wow, a low-pass, a long reverb). A pulse-wave 8-bit
@@ -32,6 +40,10 @@ five seconds, or a giant magnet comes down and carries you back.
 - **The frame.** It is drawn as cel bands with ink outlines, halftone shade and scanlines, then shown on a curved
   CRT whose picture bends at the edges and rounds into the corners, in a 90s console's dithered colour.
 - **The dash** is a 90s tuner's: a tach with a redline, amber seven-segment mph and score.
+- **The car.** Held in a drift, its tail lamps leave thin red light trails hanging in the air behind it, the way a
+  drift anime draws a slide at night; the lamps burn brighter on the brakes. The engine is an inline four built
+  from its firing pulses (see below), the revs flare as the rear tyres spin up in a slide, it cuts for a moment on
+  every upshift and bounces off the limiter, and on a lift from high revs the exhaust pops and spits flame.
 
 **Play:** https://lkruer.github.io/sundrift/game/ (phone or laptop; one finger on a phone, WASD and Space on a
 keyboard). Pick a course and a paint on the title screen, or just press START.
@@ -85,12 +97,17 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 
 Drift: tap the handbrake into a corner (or lift and turn), steer into the slide, hold it with the throttle.
 The car does part of the counter-steer for you (more on a phone), holds a slide at a comfortable angle, and
-A and D ask for as much lock as the corner ahead needs. Nothing steers the car when no key is held.
+A and D ask for as much lock as the corner ahead needs. Nothing steers the car when no key is held. In a tight
+bend (a hairpin, a square corner) a slide that is held gets a hand on the line: where the sliding tyres fall
+short of the bend, the car is helped round the rest of the way and a slide too fast for the bend sheds a little
+speed, so a held drift makes the corner. Tight corners are also wider on their outside.
 
 Off the road: a countdown comes up under the score. Get back on the road before it runs out; at zero a big red
 horseshoe magnet swoops down, the car clanks onto it, and it is carried back to where it left the road and set
 down facing the right way. Knocking things over scores (a bollard 50, a sign 90, a lamp post 150, a vending machine
-300, chained within two seconds for up to five times as much). A lamp you knock down goes out.
+300, chained within two seconds for up to five times as much). A lamp you knock down goes out. In the city the
+pavement's clutter goes flying too: trash bags and boxes (TRASH!), beer crates, traffic cones, menu boards and
+parked bicycles, each with its own burst and sound.
 
 J-turn: back up past about 10 mph, throw the wheel to full lock and get on the gas. The nose swings out, the
 car comes round to face the way it is travelling and pulls away; the camera looks where you are going while
@@ -113,8 +130,12 @@ you reverse and swings round with the car. A clean one scores 500.
   one shared instanced pool.
 - `game/src/city.js`: NEO TOKYO beside the road: street-front buildings on their lots, neon signs from one atlas
   (`neon.js`), the light they throw on the pavement and the wet road, crossings and signals at the corners, the
-  far skyline and Tokyo Tower (`landmarks.js`); `buildings.js` draws every building's windows from world
-  position, so a floor is a floor at any size.
+  far skyline with Tokyo Tower and the Skytree (`landmarks.js`); `buildings.js` draws every building's windows
+  from world position, so a floor is a floor at any size, and behind each lit one a room from `rooms.js` (an atlas
+  of interiors drawn at load, looked into with a parallax so the room has depth). `citydetail.js`: the LED screens
+  (one ad atlas, animated in the shader), the overhead wires and their poles, the shopping arches and lantern
+  strings, the skybridges, the pavement's paving. `citytrain.js`: the elevated line, its stations and its train.
+  `citycars.js`: the coin parkings' cars.
 - `game/src/offroad.js`: the countdown panel and the magnet (its swoop, the flight, the drop, every beat of it).
 - `game/src/atmos.js`: the air: the cloud deck (moonlit wisps on the pass, lit from beneath over the city), the
   searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of
@@ -124,7 +145,14 @@ you reverse and swings round with the car. A clean one scores 500.
   it was struck; bushes are flattened in place instead.
 - `game/src/fx.js`: skid marks, smoke, spray and sparks, and two GPU showers placed entirely by the vertex shader
   in a box that travels with the camera: cherry petals (pushed aside by the car's wind) and rain (lit where the
-  headlights and lamps catch it).
+  headlights and lamps catch it); the rain's splashes on the road, its curtain further off, and the headlights'
+  beams in it. The drops on the lens are drawn by the tube pass in `post.js`.
+- `game/src/audio.js`: every sound, synthesised. The engine is an AudioWorklet (its code a string, loaded from a
+  blob) that fires an inline four's pressure pulses, each a little different and the four cylinders never quite
+  equal, into the exhaust's fixed resonances, so the harmonics sweep through the formants as the revs climb, the
+  way a real engine sounds and a bank of oscillators does not; around it the intake roar, the straight-cut gears'
+  whine, the turbo's whistle and its flutter on a lift, tyres that squeal in narrow wandering bands over the
+  tread's scrub; and the music.
 
 ## What is in the repo
 

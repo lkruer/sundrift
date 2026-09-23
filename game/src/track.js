@@ -13,8 +13,8 @@
  *
  * Pure maths, no Three.js: the game, the physics sim and the gate share it.
  */
-import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609230706';
-import { Field } from './field.js?v=202609230706';
+import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609231752';
+import { Field } from './field.js?v=202609231752';
 
 const TAU = Math.PI * 2;
 const wrap = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
@@ -271,13 +271,19 @@ export class Track {
     return { type: tag || 'straight', dir: 0, segs: [{ len, k0: 0, k1: 0 }] };
   }
 
-  _arc(segs, dir, R, ang, widen = false) {
+  /**
+   * An arc between two straights, eased in and out. widen (metres) makes the road that much wider on the arc's
+   * outside, swelling in and out over it, the way a hairpin is cut: each arc its own outside, so a dog-leg that
+   * turns one way and then the other widens each corner on the right side.
+   */
+  _arc(segs, dir, R, ang, widen = 0) {
     const k = dir / R;
     const r1 = Math.min(this._ramp(), R * ang * 0.45), r2 = Math.min(this._ramp(), R * ang * 0.45);
     const arcLen = Math.max(2, (ang - (r1 + r2) / (2 * R)) * R);
-    segs.push({ len: r1, k0: 0, k1: k, widen });
-    segs.push({ len: arcLen, k0: k, k1: k, widen });
-    segs.push({ len: r2, k0: k, k1: 0, widen });
+    const wg = widen ? { by: widen, side: -dir, len: r1 + arcLen + r2 } : null;
+    segs.push({ len: r1, k0: 0, k1: k, widen: wg });
+    segs.push({ len: arcLen, k0: k, k1: k, widen: wg });
+    segs.push({ len: r2, k0: k, k1: 0, widen: wg });
   }
 
   _planKink(dir, R, ang) {
@@ -301,9 +307,9 @@ export class Track {
       const R1 = within(r, D.essR), R2 = within(r, D.essR), a1 = within(r, D.essAng);
       const a2 = clamp(a1 + dir * e * 0.5, 1.2, 1.75);
       const segs = [];
-      this._arc(segs, dir, R1, a1);
+      this._arc(segs, dir, R1, a1, 2.2);
       segs.push({ len: within(r, D.jog), k0: 0, k1: 0 });
-      this._arc(segs, -dir, R2, a2);
+      this._arc(segs, -dir, R2, a2, 2.2);
       segs.push({ len: within(r, [14, 30]), k0: 0, k1: 0 });
       return { type: 'ess', dir, R: Math.min(R1, R2), segs };
     }
@@ -355,14 +361,14 @@ export class Track {
     if (D.city) {
       // in the city a switchback is the way round a block: a square corner, the block, a square corner
       const segs = [{ len: within(r, D.approach), k0: 0, k1: 0 }];
-      this._arc(segs, dir, R, A / 2);
+      this._arc(segs, dir, R, A / 2, 2.2);
       segs.push({ len: within(r, D.block), k0: 0, k1: 0 });
-      this._arc(segs, dir, R, A / 2);
+      this._arc(segs, dir, R, A / 2, 2.2);
       segs.push({ len: within(r, D.approach), k0: 0, k1: 0 });
       return { type: 'hairpin', dir, R, segs };
     }
     const segs = [{ len: within(r, D.approach), k0: 0, k1: 0 }];
-    this._arc(segs, dir, R, A, true);
+    this._arc(segs, dir, R, A, 3.0);
     segs.push({ len: within(r, D.approach), k0: 0, k1: 0 });
     return { type: 'hairpin', dir, R, segs };
   }
@@ -414,10 +420,8 @@ export class Track {
       x: this._x, z: this._z, h: this._h, k: this._k, s: this._s, y: this._y, grade: this._grade, prevB: this._prevB,
       leg: this._leg, legLeft: this._legLeft, legStart: this._legStart, floorFrom: this._floorFrom,
       sinceSet: this._sinceSet, setIdx: this._setIdx, pendingTunnel: this._pendingTunnel, pendingExpress: this._pendingExpress, below: null };
-    // hairpins are wider on the outside through the turn, the way a real pass is cut
-    let widenLen = 0; for (const seg of plan.segs) if (seg.widen) widenLen += seg.len;
-    let widenAt = 0;
-    const outer = -plan.dir;
+    // tight arcs are wider on their outside through the turn, the way a real pass is cut (each arc its own swell)
+    const widenAt = new Map();
     for (const seg of plan.segs) {
       const n = Math.max(1, Math.round(seg.len / this.step)), ds = seg.len / n;
       for (let i = 0; i < n; i++) {
@@ -439,13 +443,13 @@ export class Track {
           // banked into the bend, up to 12 degrees, once the road is up off the street
           p.bank = clamp(k * 18, -0.21, 0.21) * smoothstep(3, 7, p.elev);
         }
-        if (seg.widen && widenLen > 0) {
-          const w = this.wall + 2.4 * Math.sin(Math.PI * clamp((widenAt + t * seg.len) / widenLen, 0, 1));
-          if (outer > 0) p.wl = w; else p.wr = w;
+        if (seg.widen) {
+          const wg = seg.widen, w = this.wall + wg.by * Math.sin(Math.PI * clamp(((widenAt.get(wg) || 0) + t * seg.len) / wg.len, 0, 1));
+          if (wg.side > 0) p.wl = Math.max(p.wl, w); else p.wr = Math.max(p.wr, w);
         }
         this._push(p);
       }
-      if (seg.widen) widenAt += seg.len;
+      if (seg.widen) widenAt.set(seg.widen, (widenAt.get(seg.widen) || 0) + seg.len);
     }
     const i1 = this.pts.length - 1;
     const feat = { type: plan.type === 'tunnel' ? 'straight' : plan.type, dir: plan.dir, R: plan.R || 0, s0, s1: this._s, i0, i1 };

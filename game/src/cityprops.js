@@ -13,7 +13,9 @@
  * futons over the rail, rooftop water tanks on stands, antenna masts, billboard frames, roof railings; over the
  * shop fronts striped awnings or noren, and red paper lanterns at the izakaya doors.
  * On the pavement: garbage bags (blue and black) and crates in clumps, cardboard, parked bicycles, traffic cones,
- * A-frame boards, manhole covers, drain grates along the kerb and puddles.
+ * A-frame boards, manhole covers, drain grates along the kerb and puddles. The loose things (bags, crates, boxes,
+ * cones, boards, bicycles) are not built into the chunk: their places go to out.__items for instanced pools the car
+ * can knock them out of (streetItems() gives each one's geometry), and nothing is put where a road runs.
  *
  * Every piece is written straight into arrays, one BufferGeometry per material per call, with position, normal
  * and uv, indexed. Colours come from one small shared canvas (a palette of flat swatches plus a few patterns);
@@ -278,8 +280,11 @@ const pick = (rng, arr) => arr[Math.min(arr.length - 1, Math.floor(rng() * arr.l
 const F0 = 3.7, FH = 3.4;         // the first upper floor, above the pavement (the game sinks each box 0.3 m), and floor to floor
 
 /**
- * The clutter of one building. lot = { x, z, y, fx, fz, lx, lz, width, depth, height, shop }: (x, y, z) the middle
- * of its front at the pavement, (fx, fz) along the road, (lx, lz) from the front into the building.
+ * The clutter of one building. lot = { x, z, y, fx, fz, lx, lz, width, depth, height, shop, clear }: (x, y, z) the
+ * middle of its front at the pavement, (fx, fz) along the road, (lx, lz) from the front into the building. clear
+ * (optional, from citydetail.js) is what must stay free: boxes on the front [x0, x1, h0, h1] in the lot's own metres
+ * (a screen, an LED tower, an arch's post, the end of a string of lanterns) and roof: true when a billboard stands on
+ * the roof.
  */
 export function lotProps(T, lot, rng, out) {
   const M = new Mesher();
@@ -290,6 +295,9 @@ export function lotProps(T, lot, rng, out) {
   const fl = (k) => F0 + (k - 1) * FH;                                   // floor k's level (k = 1 is the first upper floor)
   const halfW = W / 2;
   const residential = rng() < 0.55;
+  const keep = (lot.clear && lot.clear.boxes) || [];
+  const free = (x0, x1, h0, h1) => { for (const b of keep) if (x1 > b[0] && x0 < b[1] && h1 > b[2] && h0 < b[3]) return false; return true; };
+  const roofFree = !(lot.clear && lot.clear.roof);
 
   // ---- air conditioners, stacked in columns up the front, each on its bracket with its pipe into the wall
   const cols = floors >= 2 ? 1 + Math.floor(rng() * Math.min(4, W / 3.5)) : 0;
@@ -300,6 +308,7 @@ export function lotProps(T, lot, rng, out) {
     const pipeX = x + (rng() < 0.5 ? -0.55 : 0.55);
     for (let k = k0; k <= k1; k++) {
       if (rng() < 0.12) continue;
+      if (!free(x - 0.55, x + 0.55, fl(k) - 0.1, fl(k) + 0.8)) continue;
       const h = fl(k) + 0.08;
       const c = F.P(x, 0.2, h + 0.3);
       const g = PAT.acFront;
@@ -309,7 +318,8 @@ export function lotProps(T, lot, rng, out) {
       M.box('props', F.P(pipeX > x ? x + 0.46 : x - 0.46, 0.08, h + 0.35), F.A(0.06), F.U(0.05), F.B(0.08), sw(C.offwhite), null, [5]);
     }
     // the pipe run down the wall beside the column
-    if (k1 >= k0) M.box('props', F.P(pipeX > x ? x + 0.52 : x - 0.52, 0.06, (fl(k0) + fl(k1) + 0.7) / 2), F.A(0.035), F.U((fl(k1) - fl(k0) + 0.7) / 2), F.B(0.035), sw(C.offwhite), null, [5]);
+    const prx = pipeX > x ? x + 0.52 : x - 0.52;
+    if (k1 >= k0 && free(prx - 0.1, prx + 0.1, fl(k0), fl(k1) + 0.7)) M.box('props', F.P(prx, 0.06, (fl(k0) + fl(k1) + 0.7) / 2), F.A(0.035), F.U((fl(k1) - fl(k0) + 0.7) / 2), F.B(0.035), sw(C.offwhite), null, [5]);
   }
 
   // ---- downpipes at the ends, cable runs, the yellow gas pipe, the meter boxes
@@ -323,31 +333,36 @@ export function lotProps(T, lot, rng, out) {
     // cable runs climb the piers near the ends of the front, not across the shop glass
     const x = (run ? -1 : 1) * (rng() < 0.5 ? 1 : -1) * (halfW - 0.45 - rng() * 0.5);
     const top = Math.min(H - 0.5, fl(Math.max(1, floors)) + 2.5 - run * rng() * FH * 2);
-    for (let j = 0; j < 2 + Math.floor(rng() * 2); j++) M.box('props', F.P(x + j * 0.07, 0.05, (0.4 + top) / 2), F.A(0.018), F.U((top - 0.4) / 2), F.B(0.018), sw(C.black), null, [5]);
+    const nRun = 2 + Math.floor(rng() * 2);
+    if (free(x - 0.1, x + 0.3, 0.4, top)) for (let j = 0; j < nRun; j++) M.box('props', F.P(x + j * 0.07, 0.05, (0.4 + top) / 2), F.A(0.018), F.U((top - 0.4) / 2), F.B(0.018), sw(C.black), null, [5]);
   }
   {
     // the gas pipe: up a pier at one end of the front to the first floor, and a short run along the foot
     const gs = rng() < 0.5 ? -1 : 1, gx = gs * (halfW - 0.36);
+    if (free(gx - 2.4, gx + 2.4, 0, 3.1)) {
     M.box('metal', F.P(gx, 0.08, 1.6), F.A(0.035), F.U(1.4), F.B(0.035), sw(C.gas), null, [5]);
     const run = 0.6 + rng() * 1.6;
     M.box('metal', F.P(gx - gs * run / 2, 0.08, 0.28), F.A(run / 2 + 0.035), F.U(0.035), F.B(0.035), sw(C.gas), null, [5]);
     // meter boxes on the same pier
     M.box('props', F.P(gx - gs * 0.12, 0.13, 1.55), F.A(0.18), F.U(0.24), F.B(0.08), sw(C.lightgrey), null, [5]);
     if (rng() < 0.6) M.box('props', F.P(gx - gs * 0.1, 0.11, 0.95), F.A(0.14), F.U(0.16), F.B(0.06), sw(C.midgrey), null, [5]);
+    }
   }
 
   // ---- a kitchen duct climbing from a shop to the roof
   if (lot.shop && rng() < 0.28 && floors >= 1) {
     const x = (rng() < 0.5 ? -1 : 1) * (halfW - 1.1 - rng() * 1.2);
-    M.box('metal', F.P(x, 0.26, (4.1 + H + 0.6) / 2), F.A(0.2), F.U((H + 0.6 - 4.1) / 2), F.B(0.2), sw(C.silver), null, [5]);
-    M.box('metal', F.P(x, 0.3, H + 0.75), F.A(0.3), F.U(0.12), F.B(0.3), sw(C.steel));
-    for (let h = 5.5; h < H; h += 3.4) M.box('metal', F.P(x, 0.26, h), F.A(0.24), F.U(0.04), F.B(0.24), sw(C.steelDark));
+    if (free(x - 0.35, x + 0.35, 4.0, H + 1)) {
+      M.box('metal', F.P(x, 0.26, (4.1 + H + 0.6) / 2), F.A(0.2), F.U((H + 0.6 - 4.1) / 2), F.B(0.2), sw(C.silver), null, [5]);
+      M.box('metal', F.P(x, 0.3, H + 0.75), F.A(0.3), F.U(0.12), F.B(0.3), sw(C.steel));
+      for (let h = 5.5; h < H; h += 3.4) M.box('metal', F.P(x, 0.26, h), F.A(0.24), F.U(0.04), F.B(0.24), sw(C.steelDark));
+    }
   }
 
   // ---- an old sign nobody took down: an empty steel frame, or a dead board, out from an upper floor
   if (floors >= 3 && W > 7 && rng() < 0.4) {
     const x = (rng() - 0.5) * (W - 4.5), k = 3 + Math.floor(rng() * Math.max(1, floors - 2));
-    if (k <= floors) {
+    if (k <= floors && free(x - 0.3, x + 0.3, fl(k), fl(k) + 3.7)) {
       const h0 = fl(k) + 0.4, sh = 1.6 + rng() * 1.6, sw2 = 0.35 + rng() * 0.25, reach = 0.8 + rng() * 0.5;
       const col = sw(pick(rng, [C.rustDark, C.rust, C.steelDark]));
       for (const h of [h0, h0 + sh]) M.beam('metal', F.P(x, 0.0, h), F.P(x, reach, h), 0.05, col);
@@ -368,6 +383,7 @@ export function lotProps(T, lot, rng, out) {
       for (let k = 2; k <= Math.min(floors, 12); k++) {                   // (above twelve floors nobody sees them)
         if (rng() < 0.25) continue;
         const h = fl(k);
+        if (!free(x - bw / 2 - 0.1, x + bw / 2 + 0.1, h - 0.1, h + 2.2)) continue;
         M.box('props', F.P(x, 0.45, h + 0.05), F.A(bw / 2), F.U(0.07), F.B(0.45), sw(C.concrete), null, [5]);
         // the flat's air conditioner, on the balcony floor behind the rail
         if (rng() < 0.7) { const g = PAT.acFront; M.box('props', F.P(x + (rng() < 0.5 ? -1 : 1) * (bw / 2 - 0.5), 0.36, h + 0.42), F.A(0.38), F.U(0.3), F.B(0.14), sw(acBody), { 4: [[g[0], g[1]], [g[2], g[1]], [g[2], g[3]], [g[0], g[3]]] }, [5]); }
@@ -395,7 +411,8 @@ export function lotProps(T, lot, rng, out) {
     const s = rng() < 0.5 ? -1 : 1;
     const xa = s * (halfW - 1.3), xb = s * (halfW - 4.3);
     const col = pick(rng, [C.steel, C.rust, C.darkgreen, C.midgrey]);
-    for (let k = 2; k <= floors; k++) {
+    const fireOK = free(Math.min(xa, xb) - 0.8, Math.max(xa, xb) + 0.8, 5.4, fl(floors) + 1.6);
+    for (let k = 2; fireOK && k <= floors; k++) {
       const h = fl(k), end = k % 2 ? xa : xb, other = k % 2 ? xb : xa;
       M.box('metal', F.P(end, 0.55, h), F.A(0.6), F.U(0.04), F.B(0.5), sw(col), null, [5]);
       M.box('metal', F.P(end, 1.05, h + 0.55), F.A(0.6), F.U(0.02), F.B(0.02), sw(col));          // the landing's rail
@@ -411,15 +428,18 @@ export function lotProps(T, lot, rng, out) {
       }
     }
     // the ladder that drops toward the street
-    M.beam('metal', F.P(xa, 0.85, fl(2)), F.P(xa, 0.85, 5.6), 0.04, sw(col));
-    M.beam('metal', F.P(xa + s * 0.35, 0.85, fl(2)), F.P(xa + s * 0.35, 0.85, 5.6), 0.04, sw(col));
+    if (fireOK) {
+      M.beam('metal', F.P(xa, 0.85, fl(2)), F.P(xa, 0.85, 5.6), 0.04, sw(col));
+      M.beam('metal', F.P(xa + s * 0.35, 0.85, fl(2)), F.P(xa + s * 0.35, 0.85, 5.6), 0.04, sw(col));
+    }
   }
 
   // ---- over the shop front: a striped awning or noren, and red lanterns at an izakaya door
   if (lot.shop) {
     const r = rng();
     const door = (rng() - 0.5) * Math.max(0, W - 3.5);
-    if (r < 0.45) {
+    const doorFree = free(door - 2.9, door + 2.9, 0, 3.4);
+    if (!doorFree) { /* (an arch post stands here) */ } else if (r < 0.45) {
       const aw = Math.min(W - 1.4, 2.4 + rng() * 3.2), x0 = door - aw / 2, x1 = door + aw / 2;
       const hi = 3.0, lo = 2.5, out = 1.1 + rng() * 0.4;
       const pat = pick(rng, PAT.awning);
@@ -440,7 +460,7 @@ export function lotProps(T, lot, rng, out) {
       M.quadN('fabric', [F.P(door - nw / 2, 0.14, 1.85), F.P(door + nw / 2, 0.14, 1.85), F.P(door + nw / 2, 0.14, 2.6), F.P(door - nw / 2, 0.14, 2.6)], F.B(1),
         [[pat[0], pat[1]], [pat[2], pat[1]], [pat[2], pat[3]], [pat[0], pat[3]]]);
     }
-    if (r > 0.3 && r < 0.72 && rng() < 0.55) {
+    if (doorFree && r > 0.3 && r < 0.72 && rng() < 0.55) {
       // a pair of red paper lanterns flanking the door, on short brackets
       for (const s of [-1, 1]) {
         const x = door + s * (0.95 + rng() * 0.2), cy = 2.35;
@@ -456,7 +476,7 @@ export function lotProps(T, lot, rng, out) {
 
   // ---- the roof: a water tank on its stand, masts, a billboard frame, a railing
   const roofZ = (t) => -Math.min(D - 1.5, 1.5 + t * (D - 3));                       // set back from the front
-  if (rng() < 0.65) {
+  if (rng() < 0.65 && roofFree) {
     const x = (rng() - 0.5) * Math.max(0, W - 3.5), z = roofZ(0.3 + rng() * 0.5);
     const tw = 1.1 + rng() * 0.6, th = 0.9 + rng() * 0.5, stand = 0.8;
     const blue = rng() < 0.35;
@@ -466,13 +486,13 @@ export function lotProps(T, lot, rng, out) {
     M.box('metal', F.P(x, z, H + stand - 0.04), F.A(tw), F.U(0.04), F.B(tw * 0.8), sw(C.steelDark));
     M.cyl('metal', F.P(x + tw, z, H + stand + 0.3), F.P(x + tw + 0.3, z, H + stand + 0.3), 0.05, 0.05, 6, sw(C.midgrey));
   }
-  if (rng() < 0.5) {
+  if (rng() < 0.5 && roofFree) {
     const x = (rng() - 0.5) * (W - 2), z = roofZ(0.1 + rng() * 0.6), mh = 3 + rng() * 6;
     M.cyl('metal', F.P(x, z, H), F.P(x, z, H + mh), 0.04, 0.03, 5, sw(C.silver));
     for (let j = 0; j < 3; j++) M.box('metal', F.P(x, z, H + mh - 0.3 - j * 0.55), F.A(0.02), F.U(0.02), F.B(0.5 - j * 0.1), sw(C.silver));
     for (let j = 0; j < 2; j++) M.box('metal', F.P(x, z + (j - 0.5) * 0.5, H + mh - 0.3), F.A(0.25), F.U(0.012), F.B(0.012), sw(C.silver));
   }
-  if (H > 14 && rng() < 0.22) {
+  if (H > 14 && rng() < 0.22 && roofFree) {
     // a billboard frame on the roof, facing the road: a lattice of steel behind a dark board (or none)
     const bw = Math.min(W - 1, 5 + rng() * 5), bh = 2.5 + rng() * 2.5, z = -0.9, base = H + 1.2;
     const board = rng() < 0.6;
@@ -487,18 +507,18 @@ export function lotProps(T, lot, rng, out) {
     }
     for (const h of [base, base + bh]) M.beam('metal', F.P(-bw / 2, z - 0.2, h), F.P(bw / 2, z - 0.2, h), 0.07, col);
   }
-  if (rng() < 0.45) {
+  if (rng() < 0.45 && roofFree) {
     // a railing along the roof's front edge
     const col = sw(pick(rng, [C.silver, C.steel, C.offwhite]));
     M.beam('metal', F.P(-halfW + 0.2, -0.25, H + 1.05), F.P(halfW - 0.2, -0.25, H + 1.05), 0.04, col);
     for (let x = -halfW + 0.2; x <= halfW - 0.1; x += 1.8) M.box('metal', F.P(x, -0.25, H + 0.52), F.A(0.02), F.U(0.52), F.B(0.02), col, null, [3]);
   }
-  if (rng() < 0.5) {
+  if (rng() < 0.5 && roofFree) {
     // a stair house or lift machine room on the roof
     const x = (rng() - 0.5) * Math.max(0, W - 4), z = roofZ(0.4 + rng() * 0.5);
     M.box('props', F.P(x, z, H + 1.4), F.A(1.4), F.U(1.4), F.B(1.2), sw(pick(rng, [C.concrete, C.lightgrey, C.beige])), null, [3]);
   }
-  {
+  if (roofFree) {
     // a row of condensers on the roof, fans up
     const n = 2 + Math.floor(rng() * Math.min(7, W / 1.6));
     const z = roofZ(rng() * 0.6), x0 = -halfW + 0.9 + rng() * Math.max(0, W - 1.8 - n * 1.05);
@@ -509,14 +529,14 @@ export function lotProps(T, lot, rng, out) {
       M.box('props', F.P(x, z, H + 0.42), F.A(0.45), F.U(0.4), F.B(0.38), sw(pick(rng, [C.ivory, C.offwhite, C.lightgrey])), { 2: top }, [3]);
     }
   }
-  if (H > 24 && rng() < 0.45) {
+  if (H > 24 && rng() < 0.45 && roofFree) {
     // a cooling tower: a round casing on legs with its fan housing
     const x = (rng() - 0.5) * Math.max(0, W - 5), z = roofZ(0.5 + rng() * 0.4), r = 1.0 + rng() * 0.5;
     M.cyl('props', F.P(x, z, H + 0.6), F.P(x, z, H + 2.6), r, r * 0.92, 10, sw(pick(rng, [C.paleblue, C.offwhite, C.lightgrey])), true, true);
     M.cyl('metal', F.P(x, z, H + 2.6), F.P(x, z, H + 3.0), r * 0.6, r * 0.6, 10, sw(C.midgrey), true);
     for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) M.box('metal', F.P(x + sx * r * 0.6, z + sz * r * 0.6, H + 0.3), F.A(0.05), F.U(0.3), F.B(0.05), sw(C.steelDark), null, [3]);
   }
-  if (rng() < 0.3) {
+  if (rng() < 0.3 && roofFree) {
     // a satellite dish on the roof's edge
     const x = (rng() - 0.5) * (W - 1.5), z = roofZ(0.05);
     M.cyl('metal', F.P(x, z, H), F.P(x, z, H + 0.9), 0.03, 0.03, 5, sw(C.midgrey));
@@ -529,12 +549,14 @@ export function lotProps(T, lot, rng, out) {
     const k = 2 + Math.floor(rng() * Math.max(1, floors - 1));
     if (k > floors) continue;
     const x = -halfW + 1.2 + rng() * Math.max(0.1, W - 2.4), h = fl(k) + 2.7 + rng() * 0.3;
+    if (!free(x - 0.2, x + 0.2, h - 0.2, h + 0.2)) continue;
     M.box('metal', F.P(x, 0.1, h), F.A(0.14), F.U(0.1), F.B(0.1), sw(pick(rng, [C.silver, C.lightgrey, C.offwhite])), null, [5]);
   }
   if (lot.shop) {
     const n = rng() < 0.55 ? 1 + Math.floor(rng() * 3) : 0;
     for (let j = 0; j < n; j++) {
       const x = -halfW + 0.8 + rng() * Math.max(0.1, W - 1.6), z = 0.35 + rng() * 0.15, s = 0.8 + rng() * 0.5;
+      if (!free(x - 0.4, x + 0.4, 0, 1.2)) continue;
       M.cyl('props', F.P(x, z, 0), F.P(x, z, 0.38 * s), 0.16 * s, 0.2 * s, 7, sw(pick(rng, [C.brick, C.charcoal, C.concrete, C.offwhite])), true);
       M.lathe('props', F.P(x, z, 0.3 * s), [[0.05, 0], [0.26 * s, 0.12 * s], [0.3 * s, 0.4 * s], [0.18 * s, 0.7 * s], [0, 0.82 * s]], 6, sw(pick(rng, [C.leaf, C.moss, C.darkgreen])));
     }
@@ -542,6 +564,52 @@ export function lotProps(T, lot, rng, out) {
 
   M.flush(T, out);
   return M.tris;
+}
+
+/**
+ * A coin parking (a lot with no building): the bays painted in white across it, a concrete wheel stop in each, the
+ * yellow pay machine at the front, a block wall along the back, the lock plates in the bays, and a lamp on a pole.
+ * lot as lotProps, plus bays: the number of bays across the lot (each 2.5 m). Returns the bays' centres in the lot's
+ * own metres (x along the front, z into the lot to the bay's middle) for the cars.
+ */
+export function parkingProps(T, lot, rng, out) {
+  const M = new Mesher();
+  const W = lot.width, D = lot.depth;
+  const F = frame([lot.x, lot.y, lot.z], [lot.fx, 0, lot.fz], [-lot.lx, 0, -lot.lz]);
+  const n = Math.max(1, Math.floor((W - 0.6) / 2.5)), bw = 2.5, x0 = -n * bw / 2;
+  const bayD = Math.min(5.6, D - 1.0), z0 = -0.6;                                   // the bays start 0.6 m in from the front
+  const white = sw(C.white), y = 0.022;
+  const line = (xa, za, xb, zb, t) => {
+    const d = [xb - xa, zb - za], L = Math.hypot(d[0], d[1]) || 1, nx = -d[1] / L * t / 2, nz = d[0] / L * t / 2;
+    M.quadN('decal', [F.P(xa + nx, za + nz, y), F.P(xb + nx, zb + nz, y), F.P(xb - nx, zb - nz, y), F.P(xa - nx, za - nz, y)], [0, 1, 0], white);
+  };
+  // the bays: a line between each and at both ends, and a line along their heads
+  for (let i = 0; i <= n; i++) line(x0 + i * bw, z0, x0 + i * bw, z0 - bayD, 0.12);
+  line(x0, z0 - bayD, x0 + n * bw, z0 - bayD, 0.12);
+  const bays = [];
+  for (let i = 0; i < n; i++) {
+    const cx = x0 + (i + 0.5) * bw;
+    bays.push([cx, z0 - bayD / 2]);
+    // the wheel stop near the head of the bay, and the lock plate that rises under a parked car
+    M.box('props', F.P(cx, z0 - bayD + 0.55, 0.06), F.A(0.62), F.U(0.06), F.B(0.1), sw(C.concrete), null, [3]);
+    M.box('metal', F.P(cx, z0 - bayD * 0.52, 0.03), F.A(0.34), F.U(0.03), F.B(0.3), sw(C.steelDark), null, [3]);
+  }
+  // the block wall along the back, a little lower than a car's roof, with its concrete cap
+  const back = z0 - bayD - 0.25;
+  M.box('props', F.P(0, back, 0.8), F.A(W / 2 - 0.05), F.U(0.8), F.B(0.08), sw(C.lightgrey), null, [3]);
+  M.box('props', F.P(0, back, 1.63), F.A(W / 2), F.U(0.03), F.B(0.11), sw(C.concrete));
+  // the pay machine: a yellow cabinet on the front corner, facing the road, a lit slot and a sign on top
+  const s = rng() < 0.5 ? -1 : 1, px = s * (W / 2 - 0.45);
+  M.box('props', F.P(px, -0.35, 0.72), F.A(0.3), F.U(0.72), F.B(0.24), sw(C.yellow), { 4: sw(C.charcoal) }, [3]);
+  M.box('props', F.P(px, -0.1, 1.05), F.A(0.2), F.U(0.14), F.B(0.02), sw(C.paleblue), null, [5]);
+  M.box('props', F.P(px, -0.35, 1.6), F.A(0.34), F.U(0.12), F.B(0.26), sw(C.blue));
+  // the lamp: a slim pole at the back corner with a head reaching over the bays
+  const lx = -s * (W / 2 - 0.3);
+  M.cyl('metal', F.P(lx, back + 0.3, 0), F.P(lx, back + 0.3, 4.6), 0.06, 0.05, 6, sw(C.steel));
+  M.beam('metal', F.P(lx, back + 0.3, 4.55), F.P(lx + s * 1.3, back + 0.3, 4.55), 0.06, sw(C.steel));
+  M.box('metal', F.P(lx + s * 1.3, back + 0.3, 4.5), F.A(0.26), F.U(0.06), F.B(0.16), sw(C.steelDark));
+  M.flush(T, out);
+  return { bays, bayD, lamp: F.P(lx + s * 1.3, back + 0.3, 4.3), sign: F.P(px, -0.35, 0), back };
 }
 
 // ---------------------------------------------------------------- the pavement's clutter
@@ -554,11 +622,11 @@ function bag(M, P, x, z, s, h0, rng, colour) {
 }
 
 /** A parked bicycle (a mamachari: step-through frame, front basket), in the frame (a, b) at (x, z), turned by t. */
-function bicycle(M, F, x, z, t, rng) {
+function bicycle(M, F, x, z, t, rng, paintIdx = null) {
   const [ax, bx] = F.turn(t);
   const base = F.P(x, z, 0);
   const Q = (u, h, w = 0) => [base[0] + ax[0] * u + bx[0] * w, base[1] + h, base[2] + ax[2] * u + bx[2] * w];
-  const paint = sw(pick(rng, [C.bSilver, C.bBlack, C.bRed, C.bBlue, C.bWhite, C.bPink, C.bGreen, C.bSilver]));
+  const paint = sw(paintIdx ?? pick(rng, [C.bSilver, C.bBlack, C.bRed, C.bBlue, C.bWhite, C.bPink, C.bGreen, C.bSilver]));
   // the wheels: flat rings, drawn from both sides
   for (const u of [-0.52, 0.52]) {
     const cxz = Q(u, 0.33), n = 12;
@@ -599,7 +667,9 @@ function cone(M, F, x, z) {
  * The clutter of a stretch of pavement. seg = { x, z, y, fx, fz, lx, lz, length }: (x, y, z) its start at the
  * kerb line, running `length` metres along (fx, fz); (lx, lz) points from the road toward the buildings, and the
  * pavement is about 2.8 m deep. If the pavement climbs, give seg.y1 (the height at its end) or seg.heightAt(x, z).
- * Bollards are not built: their positions go to out.__bollards as [x, y, z].
+ * Bollards are not built: their positions go to out.__bollards as [x, y, z]; nor are the loose things, which go to
+ * out.__items as [name, x, y, z, ry, scale, stretch, colour]. seg.clear(x, z), if given, says a place is off every
+ * road: at a square corner a stretch runs on straight past the turn, into the street across.
  */
 export function streetProps(T, seg, rng, out) {
   const M = new Mesher();
@@ -612,63 +682,76 @@ export function streetProps(T, seg, rng, out) {
     return frame([o[0] - seg.fx * s, o[1], o[2] - seg.fz * s], [seg.fx, 0, seg.fz], [seg.lx, 0, seg.lz]);
   };
   const bollards = out.__bollards || (out.__bollards = []);
+  const items = out.__items || (out.__items = []);
   const k = L / 30;
   const spot = (lo, hi) => lo + rng() * (hi - lo);
+  const clear = (p, r = 0) => !seg.clear || seg.clear(p[0], p[2], r);
+  // an item on the pavement: turned to run along it (local x along, z across), back against the fronts, and only
+  // where it keeps clear of every road and its kerb zone (1.3 m of pavement a drift can use)
+  const heading = Math.atan2(-seg.fz, seg.fx);
+  const item = (name, F, s, z, turn = 0, sc = 1, sx = 1, colour = null, h = 0) => {
+    const p = F.P(s, z, h);
+    if (!clear(p, 0.35 + 1.15)) return;
+    items.push([name, p[0], p[1], p[2], heading + turn, sc, sx, colour]);
+  };
 
   // drain grates along the kerb, manholes, puddles
   for (let s = spot(1, 5); s < L - 0.5; s += 5 + rng() * 4) {
     const F = at(s), g = PAT.grate;
+    if (!clear(F.P(s, 0.2, 0), 0.4)) continue;
     M.quadN('decal', [F.P(s - 0.32, 0.05, 0.02), F.P(s + 0.32, 0.05, 0.02), F.P(s + 0.32, 0.37, 0.02), F.P(s - 0.32, 0.37, 0.02)], [0, 1, 0],
       [[g[0], g[1]], [g[2], g[1]], [g[2], g[3]], [g[0], g[3]]]);
   }
   for (let s = spot(3, 12); s < L - 1; s += 11 + rng() * 10) {
     const F = at(s), c = F.P(s, spot(0.9, 2.0), 0.02);
+    if (!clear(c, 0.4)) continue;
     M.flat('decal', c[0], c[1], c[2], () => 0.32, 12, PAT.manhole, F.a, F.b);
   }
   for (let n = Math.round((1 + rng() * 2.5) * k), i = 0; i < n; i++) {
     const s = spot(0.5, L - 0.5), F = at(s), c = F.P(s, spot(0.25, 1.6), 0.018);
     const R = 0.35 + rng() * 0.8, p1 = rng() * 6, p2 = rng() * 6, st = 1.3 + rng() * 0.8;
+    if (!clear(c, R * st)) continue;
     M.flat('puddle', c[0], c[1], c[2], (a) => R * (1 + 0.22 * Math.sin(2 * a + p1) + 0.12 * Math.sin(3 * a + p2)), 12, [0.5, 0.5], mul(F.a, st), F.b);
   }
 
   // bollards: a run of them at the kerb on some stretches
   if (rng() < 0.45) {
     const s0 = spot(1, Math.max(1.5, L - 8)), n = 3 + Math.floor(rng() * 5);
-    for (let i = 0; i < n; i++) { const s = s0 + i * 1.6; if (s > L - 0.3) break; const F = at(s); bollards.push(F.P(s, 0.4, 0)); }
+    for (let i = 0; i < n; i++) { const s = s0 + i * 1.6; if (s > L - 0.3) break; const F = at(s), p = F.P(s, 0.4, 0); if (clear(p, 0.3)) bollards.push(p); }
   }
 
-  // garbage: clumps of blue and black bags, crates and cardboard against the buildings or at the kerb
+  // garbage: clumps of blue and black bags, crates and cardboard against the buildings
   for (let n = Math.round((0.8 + rng() * 1.6) * k), i = 0; i < n; i++) {
     const s = spot(1, L - 1), F = at(s), wallSide = rng() < 0.7;
-    const z0 = wallSide ? spot(2.0, 2.4) : spot(0.5, 0.8);
-    const P = (x, z, h) => F.P(x, z, h);
+    const z0 = spot(1.95, 2.35);
     const bags = 2 + Math.floor(rng() * 6);
     const blue = rng() < 0.6;
     for (let j = 0; j < bags; j++) {
-      const x = s + (rng() - 0.5) * 1.6, z = z0 + (rng() - 0.5) * 0.5;
-      bag(M, P, x, z, 0.8 + rng() * 0.45, j > 3 ? 0.25 : 0, rng, blue ? (rng() < 0.8 ? C.bagBlue : C.bagBlack) : (rng() < 0.7 ? C.bagBlack : C.paleblue));
+      const x = s + (rng() - 0.5) * 1.6, z = z0 + (rng() - 0.5) * 0.3;
+      const colour = blue ? (rng() < 0.8 ? PALETTE[C.bagBlue] : PALETTE[C.bagBlack]) : (rng() < 0.7 ? PALETTE[C.bagBlack] : PALETTE[C.paleblue]);
+      item('bag', F, x, z, rng() * 6.28, 0.8 + rng() * 0.45, 0.9 + rng() * 0.4, colour);
     }
     if (rng() < 0.5) {
-      // beer crates, stacked
-      const col = pick(rng, [C.yellow, C.red, C.blue, C.green]);
-      const x = s + (rng() < 0.5 ? -1.3 : 1.3), z = z0, stack = 1 + Math.floor(rng() * 3);
-      for (let j = 0; j < stack; j++) M.box('glossy', P(x, z, 0.15 + j * 0.3), F.A(0.22), F.U(0.15), F.B(0.18), sw(col), { 2: sw(C.charcoal) });
+      // beer crates, one or a stack of two
+      const col = PALETTE[pick(rng, [C.yellow, C.red, C.blue, C.green])];
+      const x = s + (rng() < 0.5 ? -1.3 : 1.3);
+      item(rng() < 0.5 ? 'crate' : 'crates', F, x, z0, (rng() - 0.5) * 0.3, 1, 1, col);
     }
     if (rng() < 0.45) {
-      // flattened cardboard leaning on the wall, or a box
+      // flattened cardboard leaning on the wall (part of the building's clutter), or a box
       const x = s + (rng() - 0.5) * 2;
-      if (wallSide) M.box('props', P(x, 2.62, 0.45), F.A(0.4 + rng() * 0.2), F.U(0.45), F.B(0.03), sw(C.cardboard));
-      else M.box('props', P(x, z0, 0.2), F.A(0.25), F.U(0.2), F.B(0.2), sw(C.cardboard));
+      if (wallSide) { if (clear(F.P(x, 2.62, 0), 0.5)) M.box('props', F.P(x, 2.62, 0.45), F.A(0.4 + rng() * 0.2), F.U(0.45), F.B(0.03), sw(C.cardboard)); }
+      else item('box', F, x, z0, (rng() - 0.5) * 0.6, 0.9 + rng() * 0.3);
     }
   }
 
   // parked bicycles, a row of them at an angle against the buildings
+  const BIKES = [C.bSilver, C.bBlack, C.bRed, C.bBlue, C.bWhite, C.bPink, C.bGreen, C.bSilver];
   for (let n = Math.round((0.6 + rng() * 0.8) * k), i = 0; i < n; i++) {
     const s = spot(1.5, L - 3), bikes = 2 + Math.floor(rng() * 4), t = -(1.1 + rng() * 0.3);
     for (let j = 0; j < bikes; j++) {
       const ss = s + j * 0.6; if (ss > L - 0.5) break;
-      const F = at(ss);
-      bicycle(M, F, ss, 1.9 + (rng() - 0.5) * 0.1, t + (rng() - 0.5) * 0.12, rng);
+      item('bike', at(ss), ss, 1.9 + (rng() - 0.5) * 0.1, t + (rng() - 0.5) * 0.12, 1, 1, PALETTE[pick(rng, BIKES)]);
     }
   }
 
@@ -676,23 +759,51 @@ export function streetProps(T, seg, rng, out) {
   for (let n = Math.round(rng() * 1.6 * k), i = 0; i < n; i++) {
     const s = spot(1, L - 1), F = at(s);
     const pair = 1 + Math.floor(rng() * 3);
-    for (let j = 0; j < pair; j++) cone(M, F, s + j * 0.9, spot(0.35, 0.6));
+    for (let j = 0; j < pair; j++) item('cone', F, s + j * 0.9, spot(1.95, 2.3), rng() * 6.28);
   }
   for (let n = Math.round((0.5 + rng()) * k), i = 0; i < n; i++) {
-    const s = spot(1, L - 1), F = at(s), z = spot(1.9, 2.3);
-    const pat = rng() < 0.5 ? PAT.chalk : PAT.menu;
-    const face = [[pat[0], pat[1]], [pat[2], pat[1]], [pat[2], pat[3]], [pat[0], pat[3]]];
-    const tilt = 0.2;
-    for (const d of [-1, 1]) {
-      // each board leans toward the other: a thin box along the pavement, tilted about the along axis
-      const c = F.P(s, z + d * 0.14, 0.42), up = add([0, Math.cos(tilt), 0], F.B(-d * Math.sin(tilt)));
-      const outN = add(F.B(d * Math.cos(tilt)), [0, Math.sin(tilt), 0]);
-      M.box('props', c, F.A(0.27), mul(up, 0.43), mul(outN, 0.015), sw(C.brown), { [d > 0 ? 4 : 4]: face });
-    }
+    const s = spot(1, L - 1);
+    item('aboard', at(s), s, spot(1.9, 2.3), rng() < 0.5 ? 0 : Math.PI);
   }
 
   M.flush(T, out);
   return M.tris;
+}
+
+/**
+ * The pavement's loose things, each built once at the origin on the ground (x along the pavement, z across it) for
+ * the pools the car knocks them out of: { name: [{ geometry, material }] }, material a key into cityPropMaterials().
+ * Bags, crates and bicycle frames are drawn white in the sheet, so each instance's colour tints them.
+ */
+export function streetItems(T = THREE) {
+  const F = frame([0, 0, 0], [1, 0, 0], [0, 0, 1]);
+  const P = (x, z, h) => F.P(x, z, h);
+  let s = 4242;
+  const rng = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  const one = (fn) => {
+    const M = new Mesher(); fn(M);
+    const out = {}; M.flush(T, out);
+    return Object.keys(out).filter((k) => !k.startsWith('__') && out[k].length).map((k) => ({ geometry: out[k][0], material: k }));
+  };
+  const crate = (M, h) => M.box('glossy', P(0, 0, h), F.A(0.22), F.U(0.15), F.B(0.18), sw(C.white), { 2: sw(C.charcoal) });
+  const board = (M) => {
+    const tilt = 0.2;
+    [PAT.chalk, PAT.menu].forEach((pat, i) => {
+      const d = i ? 1 : -1, face = [[pat[0], pat[1]], [pat[2], pat[1]], [pat[2], pat[3]], [pat[0], pat[3]]];
+      const c = F.P(0, d * 0.14, 0.42), up = add([0, Math.cos(tilt), 0], F.B(-d * Math.sin(tilt)));
+      const outN = add(F.B(d * Math.cos(tilt)), [0, Math.sin(tilt), 0]);
+      M.box('props', c, F.A(0.27), mul(up, 0.43), mul(outN, 0.015), sw(C.brown), { 4: face });
+    });
+  };
+  return {
+    bag: one((M) => bag(M, P, 0, 0, 1, 0, rng, C.white)),
+    crate: one((M) => crate(M, 0.15)),
+    crates: one((M) => { crate(M, 0.15); crate(M, 0.45); }),
+    box: one((M) => M.box('props', P(0, 0, 0.2), F.A(0.25), F.U(0.2), F.B(0.2), sw(C.cardboard))),
+    cone: one((M) => cone(M, F, 0, 0)),
+    aboard: one((M) => board(M)),
+    bike: one((M) => bicycle(M, F, 0, 0, 0, rng, C.white)),
+  };
 }
 
 /**

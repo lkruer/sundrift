@@ -1,0 +1,12 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 6000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.teleport(620, 0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); const P = D.world.pools; return Object.fromEntries(['bag','crate','crates','box','cone','aboard','bike','bollard'].map((k) => [k, P[k] ? P[k].n : -1])); })()" },
+  { "wait": 2500 },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; const s = Math.sin(c.yaw), co = Math.cos(c.yaw); window.__CAM__ = { pos: [c.x - s * 4 + co * 4, y + 3.2, c.z - co * 4 - s * 4], look: [c.x + s * 18 + co * 6, y, c.z + co * 18 - s * 6], fov: 60 }; })()" },
+  { "wait": 700 }, { "shot": "T1_pavement" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const f = t.features.find((f) => (f.type === 'hairpin' || f.type === 'square' || f.type === 'switchback') && t.pts[f.i0].s > 300) || t.features[3]; const p = t.pts[f.i0]; const q = t.sample(p.s + 12); window.__CAM__ = { pos: [q.x, q.y + 38, q.z + 0.01], look: [q.x, q.y, q.z], fov: 60 }; return [f.type, Math.round(p.s)]; })()" },
+  { "wait": 1200 }, { "shot": "T2_corner_top" }
+]

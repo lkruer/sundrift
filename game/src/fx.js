@@ -8,7 +8,7 @@
  * points; it is tinted by the sun so it reads warm at golden hour and cool in shade.
  */
 import * as THREE from 'three';
-import { clamp } from './config.js?v=202609230706';
+import { clamp } from './config.js?v=202609231752';
 
 function spriteTexture() {
   const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
@@ -385,6 +385,290 @@ vec3 transformed;
  * car for the headlights, and the few real lamp lights near the car, with a faint sky light by day. Additive, no
  * depth written, so the cel pass never inks it.
  */
+/**
+ * Rain landing on the road: rings spreading on the asphalt round the car, each a thin circle that grows and fades
+ * in under half a second, lit as the falling rain is (the sky, the headlights' cone, the lamps; the Rain's own
+ * uniforms are shared). The caller places them (spot() gives a place on the road ahead), a few every frame.
+ */
+export class RainSplashes {
+  constructor(scene, rainU, n = 260) {
+    this.n = n; this.life = 0.42; this.next = 0; this.t = 0;
+    const g = new THREE.InstancedBufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([-1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1], 3));
+    g.setIndex([0, 2, 1, 0, 3, 2]);
+    this.at = new Float32Array(n * 4).fill(0);
+    for (let i = 0; i < n; i++) this.at[i * 4 + 1] = -1e5;
+    g.setAttribute('aAt', new THREE.InstancedBufferAttribute(this.at, 4).setUsage(THREE.DynamicDrawUsage));
+    g.instanceCount = n;
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+    this.u = { ...rainU, uNow: { value: 0 }, uLife: { value: this.life }, uAmount: { value: 0 } };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      vertexShader: `
+        uniform float uNow, uLife, uHead; uniform vec3 uCar, uSky; uniform vec2 uCarFwd; uniform vec3 uLamps[5]; uniform vec3 uLampCol[5];
+        attribute vec4 aAt; varying vec2 vP; varying float vK; varying vec3 vC;
+        void main() {
+          float age = (uNow - aAt.w) / uLife;
+          float live = step(0.0, age) * step(age, 1.0);
+          float r = 0.05 + 0.2 * sqrt(clamp(age, 0.0, 1.0));
+          vec3 wp = aAt.xyz + vec3(position.x * r, 0.0, position.z * r) * live;
+          vP = position.xz; vK = age;
+          vec3 lc = uSky * 1.6;
+          vec2 dc = wp.xz - uCar.xz; float dl = length(dc);
+          lc += vec3(0.85, 0.9, 1.0) * smoothstep(0.84, 0.97, dot(dc / max(dl, 0.01), uCarFwd)) * smoothstep(40.0, 4.0, dl) * uHead * 1.4;
+          for (int i = 0; i < 5; i++) { vec3 d = wp - uLamps[i]; lc += uLampCol[i] * 1.3 / (1.0 + dot(d, d) * 0.05); }
+          vC = lc * live;
+          gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+        }`,
+      fragmentShader: `
+        uniform float uAmount; varying vec2 vP; varying float vK; varying vec3 vC;
+        void main() {
+          float d = length(vP);
+          float ring = smoothstep(0.62, 0.86, d) * (1.0 - smoothstep(0.86, 1.0, d));
+          float dot0 = (1.0 - smoothstep(0.0, 0.35, d)) * (1.0 - smoothstep(0.0, 0.18, vK));
+          float fade = (1.0 - vK) * (1.0 - vK);
+          gl_FragColor = vec4(vC * (ring * fade * 0.55 + dot0 * 0.8) * uAmount, 1.0);
+        }`,
+    });
+    this.mesh = new THREE.Mesh(g, mat);
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = 3; this.mesh.name = 'rain splashes';
+    scene.add(this.mesh);
+  }
+
+  /** spot() returns [x, y, z] on the road (y the surface) or null. */
+  update(dt, amount, spot) {
+    this.t += dt;
+    this.u.uNow.value = this.t; this.u.uAmount.value = amount;
+    this.mesh.visible = amount > 0.02;
+    if (!this.mesh.visible) return;
+    this.next += (this.n / this.life) * dt * Math.min(1, amount * 1.2);
+    let changed = false;
+    while (this.next >= 1) {
+      this.next -= 1;
+      const i = this.k = ((this.k || 0) + 1) % this.n;
+      const p = spot();
+      if (!p) continue;
+      this.at[i * 4] = p[0]; this.at[i * 4 + 1] = p[1] + 0.03; this.at[i * 4 + 2] = p[2]; this.at[i * 4 + 3] = this.t + Math.random() * 0.05;
+      changed = true;
+    }
+    if (changed) this.mesh.geometry.attributes.aAt.needsUpdate = true;
+  }
+}
+
+/**
+ * The rain further off: a ring of falling streaks round the camera some forty metres out, in front of the far
+ * streets and slopes and behind anything nearer, so a downpour reads to the end of the road and not only round the
+ * car. The streaks are made in the shader (columns of dashes falling at their own speeds), lit by the sky and the
+ * city's glow.
+ */
+export class RainCurtain {
+  constructor(scene) {
+    const g = new THREE.CylinderGeometry(42, 42, 60, 64, 1, true);
+    this.u = { uTime: { value: 0 }, uAmount: { value: 0 }, uCol: { value: new THREE.Color(0.2, 0.22, 0.28) } };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide, fog: false,
+      vertexShader: 'varying vec3 vL; void main(){ vL = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `
+        uniform float uTime, uAmount; uniform vec3 uCol; varying vec3 vL;
+        float h1(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+        void main() {
+          float a = atan(vL.z, vL.x) / 6.2831853 + 0.5;
+          float col = floor(a * 900.0), f = fract(a * 900.0);
+          float sp = 0.9 + 0.8 * h1(col), ph = h1(col + 17.0);
+          float y = vL.y / 60.0 + 0.5;
+          float d = fract(y * (5.0 + 4.0 * h1(col + 3.0)) + uTime * sp + ph);
+          float streak = smoothstep(0.0, 0.05, d) * (1.0 - smoothstep(0.05, 0.4, d)) * (1.0 - smoothstep(0.2, 0.5, abs(f - 0.5)));
+          float on = step(0.45, h1(col + 41.0));
+          float band = smoothstep(0.0, 0.2, y) * (1.0 - smoothstep(0.55, 1.0, y));
+          gl_FragColor = vec4(uCol * streak * on * band * uAmount, 1.0);
+        }`,
+    });
+    this.mesh = new THREE.Mesh(g, mat);
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = 2; this.mesh.name = 'rain curtain';
+    scene.add(this.mesh);
+  }
+
+  update(dt, amount, eye, colour) {
+    this.u.uTime.value += dt; this.u.uAmount.value = amount;
+    this.mesh.visible = amount > 0.02;
+    if (!this.mesh.visible) return;
+    this.mesh.position.set(eye.x, eye.y + 12, eye.z);
+    this.u.uCol.value.copy(colour);
+  }
+}
+
+/**
+ * The headlights' beams, seen in the rain: two soft shafts of lit air ahead of the car, worked out per pixel from how
+ * close the eye's ray passes to each beam's axis (the searchlights' way), so they have no hard edge to read as cones.
+ * Only as much as there is rain in the air, at night.
+ */
+export class HeadBeams {
+  constructor(scene) {
+    const geo = new THREE.InstancedBufferGeometry().copy(new THREE.CylinderGeometry(1, 1, 1, 14, 1, true).translate(0, 0.5, 0));
+    this.base = new Float32Array(6); this.dir = new Float32Array(6);
+    geo.setAttribute('aBase', new THREE.InstancedBufferAttribute(this.base, 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aDir', new THREE.InstancedBufferAttribute(this.dir, 3).setUsage(THREE.DynamicDrawUsage));
+    geo.instanceCount = 2;
+    this.u = { uI: { value: 0 }, uLen: { value: 26 }, uR0: { value: 0.1 }, uR1: { value: 3.4 } };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      vertexShader: `
+        attribute vec3 aBase, aDir; uniform float uLen, uR0, uR1; varying vec3 vW, vB, vA;
+        void main() {
+          vec3 A = normalize(aDir);
+          vec3 T = normalize(abs(A.y) < 0.99 ? cross(A, vec3(0.0, 1.0, 0.0)) : vec3(1.0, 0.0, 0.0));
+          vec3 N = cross(T, A);
+          float r = mix(uR0, uR1, position.y);
+          vec3 w = aBase + A * position.y * uLen + (T * position.x + N * position.z) * r;
+          vW = w; vB = aBase; vA = A;
+          gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+        }`,
+      fragmentShader: `
+        uniform float uI, uLen, uR0, uR1; varying vec3 vW, vB, vA;
+        void main() {
+          vec3 rd = normalize(vW - cameraPosition), w0 = cameraPosition - vB;
+          float b = dot(rd, vA), d = dot(rd, w0), e = dot(vA, w0), den = max(1.0 - b * b, 1e-4);
+          float t = (b * e - d) / den, s = (e - b * d) / den;
+          float along = clamp(s / uLen, 0.0, 1.0);
+          float dist = length((cameraPosition + rd * t) - (vB + vA * s));
+          float x = clamp(dist / mix(uR0, uR1, along), 0.0, 1.0);
+          float core = pow(1.0 - x, 1.4) * (1.0 - x);
+          float fade = smoothstep(0.03, 0.4, along) * (1.0 - smoothstep(0.4, 1.0, along));
+          gl_FragColor = vec4(vec3(0.9, 0.94, 1.0) * core * fade * uI, 1.0);
+        }`,
+    });
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = 3; this.mesh.name = 'head beams';
+    scene.add(this.mesh);
+    this._a = new THREE.Vector3(); this._b = new THREE.Vector3();
+  }
+
+  /** lights: the two headlight SpotLights (their world positions and targets aim the beams). */
+  update(intensity, lights) {
+    this.mesh.visible = intensity > 0.005;
+    this.u.uI.value = intensity;
+    if (!this.mesh.visible) return;
+    lights.forEach((l, i) => {
+      l.getWorldPosition(this._a); l.target.getWorldPosition(this._b);
+      this._b.sub(this._a).normalize();
+      this.base.set([this._a.x, this._a.y, this._a.z], i * 3); this.dir.set([this._b.x, this._b.y, this._b.z], i * 3);
+    });
+    const g = this.mesh.geometry.attributes;
+    g.aBase.needsUpdate = true; g.aDir.needsUpdate = true;
+  }
+}
+
+/**
+ * Light trails off the tail lamps while a drift is held, the way a drift anime draws a slide at night: a thin streak
+ * of red light left hanging in the air behind each lamp, curving with the car's path and dying in under half a
+ * second, and a faint horizontal flare on the lamp itself. Kept low-key: fine, short-lived, and only as bright as the
+ * slide is deep. Each streak is a ribbon turned to face the lens, rebuilt on the CPU every frame (a few dozen points).
+ */
+export class LightTrails {
+  constructor(scene, n = 2, max = 40) {
+    this.n = n; this.max = max; this.life = 0.42; this.t = 0;
+    this.trails = Array.from({ length: n }, () => ({ pts: [], on: false }));
+    const nv = n * max * 2 + n * 4;                       // ribbons, then a flare quad a lamp
+    this.pos = new Float32Array(nv * 3); this.al = new Float32Array(nv); const across = new Float32Array(nv), kind = new Float32Array(nv);
+    const idx = [];
+    for (let j = 0; j < n; j++) {
+      const b = j * max * 2;
+      for (let i = 0; i < max; i++) { across[b + i * 2] = -1; across[b + i * 2 + 1] = 1; }
+      for (let i = 0; i < max - 1; i++) { const a = b + i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    }
+    this.flare0 = n * max * 2;
+    for (let j = 0; j < n; j++) {
+      const b = this.flare0 + j * 4;
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([x, y], k) => { across[b + k] = y; kind[b + k] = x; });
+      idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('alpha', new THREE.BufferAttribute(this.al, 1).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aAcross', new THREE.BufferAttribute(across, 1));
+    g.setAttribute('aKind', new THREE.BufferAttribute(kind, 1));
+    g.setIndex(idx);
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+    this.u = { uCol: { value: new THREE.Color(1.0, 0.13, 0.08) }, uI: { value: 1 } };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
+      vertexShader: `attribute float alpha, aAcross, aKind; varying float vA, vX, vK;
+        void main(){ vA = alpha; vX = aAcross; vK = aKind; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `uniform vec3 uCol; uniform float uI; varying float vA, vX, vK;
+        void main(){
+          // a ribbon: a white-hot core in red; a flare (vK set): a soft horizontal streak
+          float core = 1.0 - vX * vX;
+          float flare = abs(vK) > 0.0 ? (1.0 - smoothstep(0.0, 1.0, abs(vK))) * (1.0 - smoothstep(0.0, 1.0, abs(vX))) : 0.0;
+          float a = abs(vK) > 0.0 ? flare * flare : core * core;
+          vec3 c = mix(uCol, vec3(1.0, 0.85, 0.8), 0.35 * a * a);
+          gl_FragColor = vec4(c * a * vA * uI, 1.0);
+        }`,
+    });
+    this.mesh = new THREE.Mesh(g, mat);
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = 4; this.mesh.name = 'light trails';
+    scene.add(this.mesh);
+    this._e = new THREE.Vector3(); this._tn = new THREE.Vector3(); this._sd = new THREE.Vector3(); this._r = new THREE.Vector3(); this._u = new THREE.Vector3();
+  }
+
+  /** Clear every trail (a reset, the magnet). */
+  clear() { for (const tr of this.trails) { tr.pts.length = 0; tr.on = false; } }
+
+  /**
+   * sources: the lamps' world positions (Vector3s); k: how much of a slide there is, 0..1; eye: the camera position;
+   * camera: for the flares' orientation.
+   */
+  update(dt, sources, k, eye, camera) {
+    this.t += dt;
+    const t = this.t, life = this.life;
+    this.trails.forEach((tr, j) => {
+      const src = sources[j];
+      if (k > 0.03 && src) {
+        if (!tr.on) tr.pts.length = 0;                   // a new slide starts a new streak
+        tr.on = true;
+        const last = tr.pts[tr.pts.length - 1];
+        if (!last || Math.hypot(src.x - last.x, src.y - last.y, src.z - last.z) > 0.05) tr.pts.push({ x: src.x, y: src.y, z: src.z, t, k });
+        else { last.t = t; last.k = k; }
+        if (tr.pts.length > this.max) tr.pts.shift();
+      } else tr.on = false;
+      while (tr.pts.length && t - tr.pts[0].t > life) tr.pts.shift();
+      // the ribbon, oldest to newest, turned to face the lens
+      const b = j * this.max * 2, P = tr.pts, n = P.length;
+      for (let i = 0; i < this.max; i++) {
+        const v = b + i * 2;
+        if (i >= n) {
+          // unused: folded onto the last point, invisible
+          const q = P[n - 1] || { x: 0, y: -1e5, z: 0 };
+          for (const o of [v, v + 1]) { this.pos[o * 3] = q.x; this.pos[o * 3 + 1] = q.y; this.pos[o * 3 + 2] = q.z; this.al[o] = 0; }
+          continue;
+        }
+        const p = P[i], a = P[Math.max(0, i - 1)], c = P[Math.min(n - 1, i + 1)];
+        this._tn.set(c.x - a.x, c.y - a.y, c.z - a.z);
+        this._e.set(eye.x - p.x, eye.y - p.y, eye.z - p.z);
+        this._sd.crossVectors(this._tn, this._e);
+        const l = this._sd.length();
+        if (l > 1e-6) this._sd.multiplyScalar(1 / l); else this._sd.set(0, 1, 0);
+        const age = (t - p.t) / life, f = Math.max(0, 1 - age);
+        const hw = 0.022 * (0.6 + 0.4 * p.k) * Math.sqrt(f) * (i === n - 1 ? 0.6 : 1);
+        this.pos.set([p.x + this._sd.x * hw, p.y + this._sd.y * hw, p.z + this._sd.z * hw], v * 3);
+        this.pos.set([p.x - this._sd.x * hw, p.y - this._sd.y * hw, p.z - this._sd.z * hw], (v + 1) * 3);
+        const al = 0.8 * p.k * f * f * Math.min(1, (n - 1 - i) * 0.5 + 0.25);
+        this.al[v] = al; this.al[v + 1] = al;
+      }
+      // the flare on the lamp: a soft horizontal streak across the lens's view
+      const fb = this.flare0 + j * 4;
+      camera.matrixWorld.extractBasis(this._r, this._u, this._e);
+      const w = 0.34 * k, h = 0.05 * k;
+      const s = src || { x: 0, y: -1e5, z: 0 };
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([x, y], q) => {
+        this.pos.set([s.x + this._r.x * w * x + this._u.x * h * y, s.y + this._r.y * w * x + this._u.y * h * y, s.z + this._r.z * w * x + this._u.z * h * y], (fb + q) * 3);
+        this.al[fb + q] = 0.8 * k;
+      });
+    });
+    const g = this.mesh.geometry;
+    g.attributes.position.needsUpdate = true; g.attributes.alpha.needsUpdate = true;
+  }
+}
+
 export class Rain {
   constructor(scene, count = 2400) {
     this.count = count;
@@ -410,12 +694,12 @@ export class Rain {
       uTime: { value: 0 }, uAmount: { value: 0 }, uBox: { value: new THREE.Vector3(26, 16, 26) }, uCenter: { value: new THREE.Vector3() },
       uEye: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector2(1.2, 0.4) }, uCar: { value: new THREE.Vector3(0, -1e4, 0) },
       uCarFwd: { value: new THREE.Vector2(0, 1) }, uHead: { value: 1 }, uSky: { value: new THREE.Vector3(0.1, 0.12, 0.16) },
-      uLamps: { value: lamps }, uLampCol: { value: lampCol },
+      uLamps: { value: lamps }, uLampCol: { value: lampCol }, uCamVel: { value: new THREE.Vector3() },
     };
     this.mat = new THREE.ShaderMaterial({
       uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
       vertexShader: `
-        uniform float uTime, uAmount, uHead; uniform vec3 uBox, uCenter, uEye, uCar, uSky; uniform vec2 uWind, uCarFwd;
+        uniform float uTime, uAmount, uHead; uniform vec3 uBox, uCenter, uEye, uCar, uSky, uCamVel; uniform vec2 uWind, uCarFwd;
         uniform vec3 uLamps[5]; uniform vec3 uLampCol[5];
         attribute vec4 aSeed; attribute vec2 aCorner;
         varying vec3 vC; varying float vA; varying float vX;
@@ -425,11 +709,14 @@ export class Rain {
           vec3 p = aSeed.xyz * uBox + vel * uTime;
           vec3 rel = mod(p - uCenter + 0.5 * uBox, uBox) - 0.5 * uBox;
           vec3 wp = uCenter + rel;
-          vec3 dir = normalize(vel);
+          // the streak lies along the drop's motion as the lens sees it: at speed the rain rakes back past the camera
+          vec3 rv = vel - uCamVel * 0.75;
+          vec3 dir = normalize(rv);
           vec3 toEye = normalize(uEye - wp);
           vec3 side = normalize(cross(dir, toEye) + vec3(1e-4, 0.0, 0.0));
-          float len = 0.45 + 0.35 * fract(aSeed.w * 3.7);
-          vec3 pos = wp + dir * (aCorner.y * len) + side * (aCorner.x * 0.014);
+          float heavy = step(0.82, fract(aSeed.w * 5.3));
+          float len = (0.45 + 0.35 * fract(aSeed.w * 3.7)) * (0.7 + length(rv) * 0.045);
+          vec3 pos = wp + dir * (aCorner.y * len) + side * (aCorner.x * (0.013 + 0.012 * heavy));
           vec3 e = 1.0 - smoothstep(0.36 * uBox, 0.5 * uBox, abs(rel));
           float near = smoothstep(0.35, 1.6, length(wp - uEye));
           float on = step(fract(aSeed.w * 91.7), uAmount);
@@ -444,7 +731,7 @@ export class Rain {
         }`,
       fragmentShader: `
         varying vec3 vC; varying float vA; varying float vX;
-        void main() { float a = vA * (1.0 - vX * vX); gl_FragColor = vec4(vC, a * 0.55); }`,
+        void main() { float a = vA * (1.0 - vX * vX); gl_FragColor = vec4(vC, a * 0.6); }`,
     });
     this.mesh = new THREE.Mesh(geo, this.mat);
     this.mesh.frustumCulled = false; this.mesh.name = 'rain'; this.mesh.renderOrder = 4;
@@ -456,10 +743,11 @@ export class Rain {
    * @param amount 0..1 how hard it rains; eye the camera position; fx, fz the view's forward on the ground;
    * car { x, y, z, fx, fz } and head (0..1, headlights); lights: the real lamp lights near the car; sky: day light
    */
-  update(dt, amount, eye, fx, fz, car, head, lights, sky) {
+  update(dt, amount, eye, fx, fz, car, head, lights, sky, camVel = null) {
     this.t += dt;
     const U = this.u;
     U.uTime.value = this.t;
+    if (camVel) U.uCamVel.value.copy(camVel);
     U.uAmount.value = amount;
     this.mesh.visible = amount > 0.005;
     if (!this.mesh.visible) return;

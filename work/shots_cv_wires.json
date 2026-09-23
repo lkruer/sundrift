@@ -1,0 +1,13 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 5000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); window.__GO__ = (s) => { const p = D.teleport(s, 0); return [Math.round(p.x), Math.round(p.z)]; }; window.__UPV__ = (s, h, ahead, lift) => { const t = D.track, p = t.sample(s), q = t.sample(s + ahead); window.__CAM__ = { pos: [p.x, p.y + h, p.z], look: [q.x, q.y + lift, q.z], fov: 60 }; }; })()" },
+  { "js": "window.__GO__(2000)" }, { "wait": 2500 },
+  { "js": "window.__UPV__(1990, 1.6, 40, 12)" }, { "wait": 500 }, { "shot": "W1_up_2000" },
+  { "js": "window.__GO__(1700)" }, { "wait": 2500 },
+  { "js": "window.__UPV__(1690, 1.6, 40, 12)" }, { "wait": 500 }, { "shot": "W2_up_1700" },
+  { "js": "window.__GO__(2450)" }, { "wait": 2500 },
+  { "js": "window.__UPV__(2440, 1.6, 40, 12)" }, { "wait": 500 }, { "shot": "W3_up_2450" }
+]

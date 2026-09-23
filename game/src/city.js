@@ -11,10 +11,13 @@
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202609230706';
-import { buildingMaterial } from './buildings.js?v=202609230706';
-import { neonAtlas } from './neon.js?v=202609230706';
-import { cityPropMaterials, lotProps, streetProps, bollardGeometry } from './cityprops.js?v=202609230706';
+import { clamp, lerp, mulberry32 } from './config.js?v=202609231752';
+import { buildingMaterial } from './buildings.js?v=202609231752';
+import { neonAtlas } from './neon.js?v=202609231752';
+import { cityPropMaterials, lotProps, parkingProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609231752';
+import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet } from './citydetail.js?v=202609231752';
+import { railSkip } from './citytrain.js?v=202609231752';
+import { carsLoad, parkCar } from './citycars.js?v=202609231752';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
@@ -44,6 +47,8 @@ export function cityRoadTexture(half, wall) {
     if (au > wall - 0.32) { c = [0x74 + grain, 0x72 + grain, 0x6d + grain]; rough = 0.8; }                    // the concrete gutter
     else if (Math.abs(au - (wall - 0.55)) < 0.07) { c = [0xe4, 0xe2, 0xda].map((v) => v + grain * 0.4); rough = 0.5; }  // edge line
     else if (au > 0.08 && au < 0.22) { c = [0xe8, 0xa4, 0x2a].map((v) => v * (0.92 + 0.08 * rnd())); rough = 0.5; }   // the orange pair
+    // an avenue wide enough for two lanes a side: the white dashes between them, 4 m on and 4 m off
+    else if (half > 5.4 && Math.abs(au - half * 0.5) < 0.075 && (vm % 8) < 4) { c = [0xde, 0xdc, 0xd4].map((v) => v * (0.9 + 0.1 * rnd())); rough = 0.52; }
     const i = (y * W + x) * 4;
     img.data[i] = clamp(c[0], 0, 255); img.data[i + 1] = clamp(c[1], 0, 255); img.data[i + 2] = clamp(c[2], 0, 255); img.data[i + 3] = 255;
     const r = clamp(rough * 255, 0, 255);
@@ -126,14 +131,39 @@ export function cityLoad(w, Pool, fontFamily) {
     b.geometry.computeBoundingBox(); const bb = b.geometry.boundingBox;
     w.foot.bollard = [(bb.max.x - bb.min.x) / 2, (bb.max.z - bb.min.z) / 2, bb.max.y - bb.min.y];
   }
+  // the pavement's loose things, each a pool the car can knock them out of: bags, crates, boxes, cones, boards, bikes
+  // (bags, crates and bicycle frames take their instance's colour through a tinted copy of their material)
+  {
+    const tint = {};
+    for (const k of ['glossy', 'props']) { const m = w.propMats[k].clone(); m.name = w.propMats[k].name + ' tinted'; m.userData.tinted = true; tint[k] = m; }
+    w.propMats.glossyTint = tint.glossy; w.propMats.propsTint = tint.props;
+    const TINTED = new Set(['bag', 'crate', 'crates', 'bike']);
+    const CAP = { bag: 1600, crate: 300, crates: 300, box: 300, cone: 400, aboard: 300, bike: 700 };
+    for (const [name, parts0] of Object.entries(streetItems(THREE))) {
+      const parts = parts0.map((p) => ({ geometry: p.geometry, local: new THREE.Matrix4(),
+        material: TINTED.has(name) && tint[p.material] ? tint[p.material] : (w.propMats[p.material] || w.propMats.props) }));
+      w.pools[name] = new Pool(parts, CAP[name] || 300, { tint: TINTED.has(name) });
+      w.root.add(w.pools[name].group);
+      w.parts[name] = parts;
+      const bb = new THREE.Box3();
+      for (const p of parts) { p.geometry.computeBoundingBox(); bb.union(p.geometry.boundingBox); }
+      w.foot[name] = [(bb.max.x - bb.min.x) / 2, (bb.max.z - bb.min.z) / 2, bb.max.y - bb.min.y];
+    }
+  }
   // the expressway: concrete deck and piers, Jersey barriers, a lit strip along them, the gantry's steel and its sign
   w.deckMat = new THREE.MeshStandardMaterial({ color: 0x77746f, roughness: 0.93, metalness: 0 });
   w.barrierMat = new THREE.MeshStandardMaterial({ color: 0xa9a59d, roughness: 0.88, metalness: 0 });
   w.stripMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe2b8).multiplyScalar(1.9) });
   w.gantryMat = new THREE.MeshStandardMaterial({ color: 0x565a62, roughness: 0.5, metalness: 0.55 });
   w.shutoMat = shutoSignMaterial(w);
-  return [w.bldgMat, w.neonMat, w.neonHousingMat, w.neonGlowMat, w.streakMat, w.signalPoleMat, w.signalBoxMat, ...w.signalLit, w.signalDim, w.zebraMat,
-    ...Object.values(w.propMats), w.deckMat, w.barrierMat, w.stripMat, w.gantryMat, w.shutoMat];
+  // the detail over and along the street (citydetail.js): screens, wires, the pavement
+  const detailMats = detailLoad(w, Pool);
+  carsLoad(w, Pool);                                              // the parked cars' pool (citycars.js)
+  // (the building material is drawn only instanced, by the buildings' pool and the terrain's blocks: the pool's own
+  // instanced program is compiled at load with every pool, so it is not handed over for a plain mesh's program too,
+  // which nothing draws and which cost a second compile of the city's biggest shader)
+  return [...detailMats, w.neonMat, w.neonHousingMat, w.neonGlowMat, w.streakMat, w.signalPoleMat, w.signalBoxMat, ...w.signalLit, w.signalDim, w.zebraMat,
+    ...new Set(Object.values(w.propMats)), w.deckMat, w.barrierMat, w.stripMat, w.gantryMat, w.shutoMat];
 }
 
 /** How wet the street is: the neon streaks come up with it. */
@@ -142,6 +172,7 @@ export function cityWet(w, wet, night) {
   if (w.neonGlowMat) w.neonGlowMat.opacity = 0.9 * (0.35 + 0.65 * night);
   if (w.bldgMat && w.bldgMat.userData.uNight) w.bldgMat.userData.uNight.value = night;
   if (w.bldgMat && w.bldgMat.userData.uWet) w.bldgMat.userData.uWet.value = wet;
+  detailWet(w, wet);
 }
 
 /**
@@ -222,8 +253,11 @@ export function* cityChunk(w, ch) {
   const rng = mulberry32((w.seed * 911 + ch.c * 7331) >>> 0);
   const probe = {};
   const signs = [], housings = [], glows = [], streaks = [], poles = [], boxes = [], lampsOn = [[], [], []], lampsOff = [], zebras = [];
+  const parkSign = w.neon.signs.find((q) => q.name === 'parking');
   const clutter = {};
   let nLots = 0;
+  // the screens, wires, shopping street and pavement (citydetail.js) share the chunk's housings and its light
+  const D = detailBegin(w, ch, { housings, glows, streaks });
   const vSigns = w.neon.signs.filter((s) => s.vertical), hSigns = w.neon.signs.filter((s) => !s.vertical);
   const s0 = pts[ch.i0].s, s1 = pts[ch.i1].s;
   const at = (s, u) => { const p = t.sample(s); const lx = Math.cos(p.h), lz = -Math.sin(p.h); return [p.x + lx * u, p.z + lz * u, p]; };
@@ -237,6 +271,8 @@ export function* cityChunk(w, ch) {
       s += lotW + (rng() < 0.14 ? 2.5 + rng() * 5 : 0.35);             // an alley now and then
       const p = t.sample(sm);
       if (p.tunnel || t.nearTunnel(p.s, 12) || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
+      // (an elevated railway runs along some avenues: its viaduct and stations stand where these lots would)
+      if (railSkip(w, sm, side, lotW / 2)) continue;
       // the inside of a square corner has no room for a lot
       if (Math.abs(p.k) > 1 / 70 && Math.sign(p.k) === side) continue;
       const wall = side > 0 ? p.wl : p.wr;
@@ -252,6 +288,13 @@ export function* cityChunk(w, ch) {
         return true;
       };
       if (!fits(depth)) { depth = 7; if (!fits(depth)) continue; }
+      // now and then a coin parking instead of a building: the bays and their cars, the lit P sign, a low block
+      // behind (a hash of the lot's place decides, so the rest of the street is as it was)
+      const hp = Math.sin(sm * 12.9898 + side * 78.233 + (w.seed % 1000) * 0.113) * 43758.5453;
+      if (!up && w.pools.parked && parkSign && lotW >= 8 && lotW <= 16 && depth >= 12.5 && hp - Math.floor(hp) < 0.075) {
+        coinParking(w, ch, { sm, side, lotW, depth, u0, p, at, rng, clutter, signs, housings, glows, D, parkSign });
+        continue;
+      }
       const r = rng();
       let H = r < 0.55 ? 9 + rng() * 14 : r < 0.88 ? 22 + rng() * 22 : 44 + rng() * 40;
       if (up) H = Math.max(H, p.elev + 10 + rng() * 26);
@@ -268,11 +311,13 @@ export function* cityChunk(w, ch) {
       const [frontX, frontZ] = at(sm, side * u0);
       const fy = g.height(frontX, frontZ);
       // a vertical sign standing out from the front at one end of the lot, faces along the street
+      let vEdge = 0;
       if (rng() < 0.72 && H > 8) {
         const cell = vSigns[Math.floor(rng() * vSigns.length)];
         const scale = Math.min(1, (H - 4.2) / cell.h);
         const sw = cell.w * scale, sh = cell.h * scale;
         const edge = (rng() < 0.5 ? -1 : 1) * (lotW * 0.5 - 0.7);
+        vEdge = Math.sign(edge);
         const bx = frontX + fx * edge, bz = frontZ + fz * edge;
         const yb = Math.max(fy + 3.4 + rng() * Math.max(0, H - 4.2 - sh - 3.4) * 0.5, up ? p.y - 1 + rng() * 3 : -1e9), yt = yb + sh;
         const out0 = -0.15, out1 = -0.15 - sw;                           // from the facade out over the pavement
@@ -292,10 +337,12 @@ export function* cityChunk(w, ch) {
         if (rng() < 0.5) w.lamps.push({ x: gx, y: yb + 1.2, z: gz, c: ch.c, color: cell.colour, power: 110 });
       }
       // a lit sign over the shop front, facing the road
+      let hTop = 0;
       if (rng() < 0.55) {
         const cell = hSigns[Math.floor(rng() * hSigns.length)];
         const sw = Math.min(lotW - 1.2, cell.w), sh = cell.h * (sw / cell.w);
         const yb = fy + 3.1 + rng() * 0.8, yt = yb + sh;
+        hTop = yt - fy;
         const P = (d, y) => [frontX - lx * 0.06 + fx * d, y, frontZ - lz * 0.06 + fz * d];
         // seen from the road: left to right is against the road's direction on the left side
         if (side > 0) signQuad(signs, P(-sw / 2, yb), P(sw / 2, yb), P(sw / 2, yt), P(-sw / 2, yt), cell, false);
@@ -304,7 +351,10 @@ export function* cityChunk(w, ch) {
         glows.push([gx, gz, fx, fz, 6, Math.max(6, sw + 3), cell.colour]);
       }
       // the building's clutter: air conditioners, pipes, fire escapes, balconies, roof tanks, awnings, lanterns
-      if (w.propMats) lotProps(THREE, { x: frontX, z: frontZ, y: fy, fx, fz, lx, lz, width: lotW * 0.985, depth, height: H, shop: !up }, rng, clutter);
+      // its screens (a big one on the upper floors, a vertical LED tower, a billboard on the roof) come first: the
+      // clutter keeps clear of them
+      const clear = detailLot(w, D, { s: sm, side, W: lotW * 0.985, D: depth, H, up, x: frontX, z: frontZ, y: fy, fx, fz, lx, lz, wall, vEdge, hTop });
+      if (w.propMats) lotProps(THREE, { x: frontX, z: frontZ, y: fy, fx, fz, lx, lz, width: lotW * 0.985, depth, height: H, shop: !up, clear }, rng, clutter);
       // (a lot's clutter is half a millisecond: the chunk is built across frames, a few lots at a time)
       if (++nLots % 4 === 0) yield;
       // vending machines on the pavement now and then
@@ -314,6 +364,8 @@ export function* cityChunk(w, ch) {
       }
     }
   }
+  // the wires and their poles, the shopping street, the pavement, the screens
+  yield* detailChunk(w, ch, D);
 
   // the pavement's clutter, in 30 m stretches on both sides (not under the viaduct, not in a corner's inside)
   yield;
@@ -323,9 +375,12 @@ export function* cityChunk(w, ch) {
     const wall = side > 0 ? p.wl : p.wr;
     const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, fx = Math.sin(p.h), fz = Math.cos(p.h);
     const x = p.x + lx * (wall + 0.15), z = p.z + lz * (wall + 0.15);
-    streetProps(THREE, { x, z, y: g.height(x, z), fx, fz, lx, lz, length: Math.min(30, s1 - s), heightAt: (qx, qz) => g.height(qx, qz) }, rng, clutter);
+    // (off every road by the thing's own size: at a square corner the stretch runs on straight into the street across)
+    const clear = (qx, qz, r) => { g.sample(qx, qz, 2.2, probe); return probe.edge > 0.15 + r && !probe.tunnel; };
+    streetProps(THREE, { x, z, y: g.height(x, z), fx, fz, lx, lz, length: Math.min(30, s1 - s), heightAt: (qx, qz) => g.height(qx, qz), clear }, rng, clutter);
   }
   for (const [bx, by, bz] of clutter.__bollards || []) w._put('bollard', own, bx, by, bz, rng() * 6.28);
+  for (const [name, x, y, z, ry, sc, sx, colour] of clutter.__items || []) w._put(name, own, x, y, z, ry, sc, sx, colour);
   // the expressway: deck, piers, barriers and their lit strips, and a gantry at the top of the ramp
   yield;
   viaduct(w, ch);
@@ -418,6 +473,69 @@ export function* cityChunk(w, ch) {
 void lerp;
 
 /**
+ * A coin parking on a lot: its bays painted across it with their wheel stops (cityprops.js parkingProps), cars in
+ * most of them (reversed in, as most are in Japan, now and then nose in), the blue P sign on a pole at the front
+ * corner facing along the street, a lamp over the bays, and a low block of shops and flats behind the back wall.
+ */
+function coinParking(w, ch, o) {
+  const { sm, side, lotW, depth, u0, p, at, rng, clutter, signs, housings, glows, D, parkSign } = o;
+  const g = w.ground, own = ch.c * 2;
+  const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, fx = Math.sin(p.h), fz = Math.cos(p.h);
+  const [frontX, frontZ] = at(sm, side * u0);
+  const fy = g.height(frontX, frontZ);
+  const W = lotW * 0.985;
+  const res = parkingProps(THREE, { x: frontX, z: frontZ, y: fy, fx, fz, lx, lz, width: W, depth }, rng, clutter);
+  // the cars: lot metres (x along the front, z negative into the lot) to the world
+  const L = (x, z) => [frontX + fx * x - lx * z, frontZ + fz * x - lz * z];
+  for (const [bx, bz] of res.bays) {
+    if (rng() < 0.18) continue;
+    const [x, z] = L(bx + (rng() - 0.5) * 0.25, bz + (rng() - 0.5) * 0.3);
+    const toRoad = rng() < 0.72;
+    parkCar(w, own, x, g.height(x, z) + 0.01, z, p.h + (toRoad ? -side : side) * Math.PI / 2 + (rng() - 0.5) * 0.06, rng);
+  }
+  // the P sign: a pole at the front corner, the sign along the street over the lot's edge, both faces lit
+  {
+    const s = res.sign ? Math.sign((res.sign[0] - frontX) * fx + (res.sign[2] - frontZ) * fz) || 1 : 1;
+    const ex = s * (W / 2 - 0.25);
+    const [px, pz] = L(ex, -0.15);
+    const pole = new THREE.CylinderGeometry(0.07, 0.08, 4.4, 8); pole.translate(px, fy + 2.2, pz); housings.push(pole);
+    const sw = parkSign.w * 0.95, sh = parkSign.h * 0.95, yb = fy + 3.0, yt = yb + sh;
+    const Q = (u, y, d) => [px + lx * u + fx * d, y, pz + lz * u + fz * d];
+    const u1 = 0.1, u2 = 0.1 + sw;
+    signQuad(signs, Q(u2, yb, -0.09), Q(u1, yb, -0.09), Q(u1, yt, -0.09), Q(u2, yt, -0.09), parkSign, side < 0);
+    signQuad(signs, Q(u1, yb, 0.09), Q(u2, yb, 0.09), Q(u2, yt, 0.09), Q(u1, yt, 0.09), parkSign, side < 0);
+    const hb = new THREE.BoxGeometry(sw + 0.1, sh + 0.12, 0.14); hb.rotateY(p.h); hb.translate(px + lx * (u1 + u2) / 2, (yb + yt) / 2, pz + lz * (u1 + u2) / 2); housings.push(hb);
+    glows.push([px + lx * 1.2, pz + lz * 1.2, fx, fz, 5, 5, parkSign.colour]);
+  }
+  // the lamp over the bays: its head lit, its light on the bays
+  if (res.lamp) {
+    D.lamp([res.lamp[0], res.lamp[1] + 0.13, res.lamp[2]], fx, fz, 0.44, 0.24);
+    const [gx, gz] = L(0, -res.bayD / 2 - 0.6);
+    glows.push([gx, gz, fx, fz, Math.min(W, 9), 6, 0xdfe8ff]);
+    w.lamps.push({ x: res.lamp[0], y: res.lamp[1], z: res.lamp[2], c: ch.c, color: 0xe2ecff, power: 70 });
+  }
+  // a vending machine at the other front corner, now and then
+  if (rng() < 0.5 && w.pools.vending) {
+    const s = res.sign ? -Math.sign((res.sign[0] - frontX) * fx + (res.sign[2] - frontZ) * fz) || 1 : 1;
+    const [vx, vz] = L(s * (W / 2 - 0.7), 0.45);
+    w._put('vending', own, vx, g.height(vx, vz), vz, p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2));
+  }
+  // the low block behind the back wall
+  const back = -res.back + 0.45, dep = depth - back;
+  if (dep >= 4.5) {
+    const H = 8 + rng() * 9;
+    const [cx, cz] = at(sm, side * (u0 + back + dep / 2));
+    _q.setFromAxisAngle(_up, p.h + Math.PI / 2);
+    _s.set(W, H + 0.3, dep);
+    _m4.compose(_v.set(cx, g.height(cx, cz) - 0.3 + (H + 0.3) / 2, cz), _q, _s);
+    w.pools.bldg.add(own, _m4, FACADES[Math.floor(rng() * FACADES.length)]);
+    const [bx, bz] = at(sm, side * (u0 + back));
+    if (w.propMats) lotProps(THREE, { x: bx, z: bz, y: g.height(bx, bz), fx, fz, lx, lz, width: W, depth: dep, height: H, shop: true }, rng, clutter);
+  }
+  w.detail.stats.parkings = (w.detail.stats.parkings || 0) + 1;
+}
+
+/**
  * The far city: a ring of towers round the camera with red lights blinking on the tallest roofs, and Tokyo Tower
  * three kilometres off in a fixed direction, lit orange. The group travels with the camera like the mountain's
  * skyline does.
@@ -432,8 +550,17 @@ export function citySkyBuild(w, L) {
   tower.position.set(Math.sin(az) * 3000, -6, Math.cos(az) * 3000);
   tower.scale.setScalar(1.35);                                   // a little larger than life, so it reads from the street
   g.add(tower);
+  // Tokyo Skytree, further off the other way, its lattice lit pale blue
+  let skytree = null;
+  if (L.tokyoSkytree) {
+    skytree = L.tokyoSkytree(THREE);
+    const az2 = -0.75;
+    skytree.position.set(Math.sin(az2) * 3300, -10, Math.cos(az2) * 3300);
+    skytree.scale.setScalar(1.3);                                // (larger than life too: it stands over the far towers)
+    g.add(skytree);
+  }
   g.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isLineSegments) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; } });
-  g.userData = { aviation: ring.userData && ring.userData.aviation, tower };
+  g.userData = { aviation: ring.userData && ring.userData.aviation, tower, skytree };
   return g;
 }
 
@@ -560,4 +687,10 @@ function viaduct(w, ch) {
 export function citySkyUpdate(w, t) {
   const a = w.citySky && w.citySky.userData.aviation;
   if (a && a.material) a.material.opacity = 0.35 + 0.65 * Math.max(0, Math.sin(t * 2.1)) ** 2;
+  const sk = w.citySky && w.citySky.userData.skytree;
+  if (sk && sk.userData.aviation) sk.userData.aviation.material.opacity = 0.3 + 0.7 * Math.max(0, Math.sin(t * 1.7 + 1.1)) ** 2;
+  // the clock the televisions, the arcade screens and the street's animated signs run on (kept small for precision)
+  const tt = t % 3600;
+  if (w.bldgMat && w.bldgMat.userData.uTime) w.bldgMat.userData.uTime.value = tt;
+  detailUpdate(w, tt);
 }

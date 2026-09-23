@@ -15,12 +15,13 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609230706';
-import { surface } from '../surfaces.js?v=202609230706';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230706';
-import { Ground } from './ground.js?v=202609230706';
-import { Terrain, LODS } from './terrain.js?v=202609230706';
-import { partsOf, Pool } from './instancing.js?v=202609230706';
+import { ASSET } from '../assetlib.js?v=202609231752';
+import { surface } from '../surfaces.js?v=202609231752';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609231752';
+import { Ground } from './ground.js?v=202609231752';
+import { Terrain, LODS } from './terrain.js?v=202609231752';
+import { partsOf, Pool } from './instancing.js?v=202609231752';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const ASSETS = {
   cedar: './assets/cedar_tree.js', maple: './assets/maple_tree.js', boulder: './assets/boulder.js',
@@ -31,13 +32,15 @@ const ASSETS = {
   catseye: './assets/cats_eye.js', upole: './assets/power_pole.js', bamboo: './assets/bamboo_clump.js', bare: './assets/bare_tree.js',
   conbini: './assets/conbini.js', busstop: './assets/bus_shelter.js', chochin: './assets/chochin.js', jizo: './assets/jizo.js',
   sakura: './assets/sakura_tree.js', weeping: './assets/weeping_cherry.js',
+  grass: './assets/grass_tuft.js', flowers: './assets/wildflowers.js', pagoda: './assets/pagoda.js',
 };
-const SURFACED = new Set(['boulder', 'post', 'pole', 'lamp', 'mirror', 'chevron', 'torii', 'lantern', 'portal', 'hut', 'vending', 'upole', 'conbini', 'busstop', 'jizo']);
+const SURFACED = new Set(['boulder', 'post', 'pole', 'lamp', 'mirror', 'chevron', 'torii', 'lantern', 'portal', 'hut', 'vending', 'upole', 'conbini', 'busstop', 'jizo', 'pagoda']);
 // pool capacities: what the whole visible road can hold at once
 const CAPS = {
   lamp: 320, post: 1400, pole: 500, chevron: 120, mirror: 40, boulder: 300, upole: 160,
   maple: 300, broadleaf: 500, shrub: 1600, bamboo: 160, bare: 120, sakura: 700, weeping: 24,
   torii: 8, lantern: 24, hut: 12, vending: 90, conbini: 6, busstop: 8, portal: 8, chochin: 700, jizo: 40,
+  grass: 3600, flowers: 1000, pagoda: 6,
 };
 /**
  * What the car can hit, by template: 'solid' things stop it (a hit, like a wall), 'knock' things are sent flying,
@@ -47,16 +50,18 @@ const CAPS = {
 const COLL = {
   pole: { kind: 'knock', r: 0.13, m: 4 }, chevron: { kind: 'knock', r: 0.16, m: 9 }, mirror: { kind: 'knock', r: 0.14, m: 11 },
   lamp: { kind: 'knock', r: 0.17, m: 60 }, vending: { kind: 'knock', box: true, m: 220 }, bollard: { kind: 'knock', r: 0.13, m: 7 },
+  bag: { kind: 'knock', r: 0.3, m: 3 }, crate: { kind: 'knock', r: 0.24, m: 5 }, crates: { kind: 'knock', r: 0.26, m: 9 },
+  box: { kind: 'knock', r: 0.24, m: 2 }, cone: { kind: 'knock', r: 0.18, m: 2 }, aboard: { kind: 'knock', r: 0.3, m: 6 }, bike: { kind: 'knock', r: 0.42, m: 16 },
   shrub: { kind: 'flat', r: 0.55, m: 2 },
   sakura: { kind: 'solid', r: 0.42 }, weeping: { kind: 'solid', r: 0.45 }, maple: { kind: 'solid', r: 0.3 }, broadleaf: { kind: 'solid', r: 0.3 },
   bare: { kind: 'solid', r: 0.28 }, cedar: { kind: 'solid', r: 0.4 }, bamboo: { kind: 'solid', r: 0.85 }, boulder: { kind: 'solid', r: 0.7 },
   upole: { kind: 'solid', r: 0.2 }, lantern: { kind: 'solid', r: 0.42 }, jizo: { kind: 'solid', r: 0.24 }, torii: { kind: 'solid', legs: true, r: 0.26 },
-  hut: { kind: 'solid', box: true }, conbini: { kind: 'solid', box: true }, busstop: { kind: 'solid', box: true },
+  hut: { kind: 'solid', box: true }, conbini: { kind: 'solid', box: true }, busstop: { kind: 'solid', box: true }, pagoda: { kind: 'solid', box: true },
 };
 const COL_CELL = 8;
 const colKey = (cx, cz) => (cx + 50000) * 100000 + (cz + 50000);
 
-const TINTED = new Set(['maple', 'broadleaf', 'shrub', 'sakura', 'weeping']);
+const TINTED = new Set(['maple', 'broadleaf', 'shrub', 'sakura', 'weeping', 'grass', 'flowers']);
 // a cherry's colour, by a number in 0..1: mostly the pale Somei-Yoshino, some pinker, a few nearly white
 const cherryColour = (r) => (r < 0.6 ? PAL.sakuraPale : r < 0.86 ? PAL.sakuraPink : PAL.sakuraWhite);
 const CHUNK = 60;
@@ -237,7 +242,7 @@ export class World {
       n++; if (progress) progress(n / names.length, k);
     }));
     // foliage materials turn white so the instance colour is the leaf colour
-    for (const name of ['maple', 'shrub', 'broadleaf', 'sakura', 'weeping']) {
+    for (const name of ['maple', 'shrub', 'broadleaf', 'sakura', 'weeping', 'grass', 'flowers']) {
       const tpl = this.templates[name]; if (!tpl) continue;
       tpl.traverse((o) => {
         const hex = o.isMesh && o.material ? o.material.color.getHex() : -1;
@@ -415,14 +420,20 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       if (!this.parts[k]) continue;
       this.pools[k] = new Pool(this.parts[k], CAPS[k], { tint: TINTED.has(k) });
     }
+    // the grass and the flowers are drawn after everything solid and write no depth: blades a few pixels across
+    // that write depth are inked by the cel pass into black scribble
+    for (const k of ['grass', 'flowers']) {
+      const pool = this.pools[k]; if (!pool) continue;
+      for (const p of pool.parts) { p.im.material.depthWrite = false; p.im.renderOrder = 2; p.im.receiveShadow = false; }
+    }
     for (const p of Object.values(this.pools)) this.root.add(p.group);
     this.buildSky();
     // the city (NEO TOKYO): its module is loaded here, and its materials made now so they compile with the rest
     try {
       this.glyphs = drawsGlyphs;
-      this.City = await import('./city.js?v=202609230706');
+      this.City = await import('./city.js?v=202609231752');
       this._cityMats = this.City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
-      const L = await import('./landmarks.js?v=202609230706').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+      const L = await import('./landmarks.js?v=202609231752').catch((e) => { console.warn('landmarks', e && e.message); return null; });
       this.citySky = this.City.citySkyBuild(this, L);
       this.citySky.visible = false;
       this.scene.add(this.citySky);
@@ -1010,7 +1021,29 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       g.add(wing);
     }
     g.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = true; } });
-    return g;
+    // one mesh per material: built of twenty-odd boxes, a portal was that many draws, and twice that again in the
+    // sun's shadow cascades by day
+    g.updateMatrixWorld(true);
+    const byMat = new Map(), keep = [];
+    g.traverse((o) => {
+      if (!o.isMesh) return;
+      if (Array.isArray(o.material) || o.material === this.tunnelLampMat) { keep.push(o); return; }
+      let a = byMat.get(o.material); if (!a) byMat.set(o.material, a = []);
+      const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld);
+      for (const k of Object.keys(geo.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') geo.deleteAttribute(k);
+      a.push(geo);
+    });
+    const out = new THREE.Group(); out.name = 'portal';
+    for (const [mat, list] of byMat) {
+      const merged = mergeGeometries(list, false);
+      for (const geo of list) geo.dispose();
+      if (!merged) continue;
+      own(merged);
+      const m = new THREE.Mesh(merged, mat); m.receiveShadow = true; m.castShadow = true;
+      out.add(m);
+    }
+    for (const o of keep) { o.matrix.copy(o.matrixWorld); o.matrix.decompose(o.position, o.quaternion, o.scale); out.add(o); }
+    return out;
   }
 
   /** The name plate's face: the tunnel's name in kanji over its reading, white on dark enamel. */
@@ -1114,13 +1147,14 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         // a row of jizo in their red bibs by the path, facing the road
         for (const ds of [6.2, 7.3, 8.4]) { const a = at(m.s + ds, u0 + 0.9); this._put('jizo', own, a.x, a.y, a.z, face(a.p) + (rng() - 0.5) * 0.15, 0.95 + rng() * 0.12); }
         { const a = at(m.s + 11, u0 + 9.5); this._put('hut', own, a.x, a.y, a.z, face(a.p)); }
-        // a weeping cherry behind the gate, a Somei-Yoshino either side
-        for (let k = 0; k < 3; k++) {
+        // a weeping cherry behind the gate, a Somei-Yoshino before it; further along, the shrine's five-storey pagoda
+        { const a = at(m.s + 23, u0 + 8.6); this._put('pagoda', own, a.x, a.y - 0.35, a.z, face(a.p)); }
+        for (let k = 0; k < 2; k++) {
           const a = at(m.s - 2 + k * 12, u0 + 5 + rng() * 3);
           if (k === 1) this._cherry('weeping', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.95 + rng() * 0.2, PAL.sakuraDeep);
           else this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.85 + rng() * 0.3, cherryColour(rng()));
         }
-        for (let k = 0; k < 4; k++) { const a = at(m.s + 2 + k * 7, u0 + 12 + rng() * 1.5); this._put('bamboo', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.85 + rng() * 0.35); }
+        for (let k = 0; k < 3; k++) { const a = at(m.s + 2 + k * 7, u0 + 12 + rng() * 1.5); this._put('bamboo', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.85 + rng() * 0.35); }
         const l = at(m.s + 24, u0 + 2.4); this._lampAt(ch, l.x, l.y, l.z, face(l.p) + Math.PI, this._put('lamp', own, l.x, l.y, l.z, face(l.p) + Math.PI));
         continue;
       }
@@ -1620,7 +1654,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       return { p, x, y, z, side: up, ins: [-0.36, 0.36].map((d) => [x + fx * d, y + 8.55, z + fz * d]) };
     };
     const s0 = pts[ch.i0].s, s1 = pts[ch.i1].s;
-    for (let sp = Math.ceil((s0 - 14) / 44) * 44 + 14; sp < s1; sp += 44) {
+    for (let sp = Math.ceil((s0 - 14) / 44) * 44 + 14; sp < s1 && !this.city; sp += 44) {     // (the city hangs its own: citydetail.js)
       if (sp < s0) continue;
       const P = poleAt(sp); if (!P) continue;
       this._put('upole', own, P.x, P.y, P.z, P.p.h - Math.PI / 2);
@@ -1647,6 +1681,33 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     const dens = this.q.trees || 1;
     const probe = {};
     const verge = !this.city;
+    // grass along the verges, thick near the edge and thinning out, with a clump of spring flowers now and then
+    if (verge && this.pools.grass) {
+      const GRASS = [PAL.youngLeaf, PAL.moss, PAL.leafDeep, PAL.dryGrass, PAL.youngLeaf];
+      const FLOWER = [0xf6f3e6, 0xf6f3e6, 0xf2d35c, 0xc9b6f2, 0xf3b6cf];
+      for (let i = ch.i0; i < ch.i1; i++) {
+        const p = pts[i];
+        if (p.tunnel || t.nearTunnel(p.s, 8)) continue;
+        for (const side of [1, -1]) {
+          if (t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
+          const w = side > 0 ? p.wl : p.wr;
+          for (let k = 0; k < 2; k++) {
+            if (rng() > (k ? 0.8 : 0.95) * dens) continue;
+            const u = w + 0.35 + (k ? 1.2 + rng() * 7 : rng() * 1.6);
+            const [x, z] = this._at(p, u * side + (rng() - 0.5) * 1.6);
+            g.sample(x, z, 2.2, probe);
+            if (probe.edge < 0.25 || probe.tunnel) continue;
+            this._put('grass', own, x, probe.h - 0.03, z, rng() * 6.28, 0.95 + rng() * 0.8, 1, GRASS[Math.floor(rng() * GRASS.length)], false);
+          }
+          if (this.pools.flowers && rng() < 0.3 * dens) {
+            const [x, z] = this._at(p, (w + 0.5 + rng() * 4.5) * side);
+            g.sample(x, z, 2.2, probe);
+            if (probe.edge < 0.3 || probe.tunnel) continue;
+            this._put('flowers', own, x, probe.h - 0.02, z, rng() * 6.28, 0.8 + rng() * 0.5, 1, FLOWER[Math.floor(rng() * FLOWER.length)], false);
+          }
+        }
+      }
+    }
     for (let i = ch.i0; verge && i < ch.i1; i += 4) {
       const p = pts[i];
       if (p.tunnel || t.nearTunnel(p.s, 14) || this.avenueAt(p.s)) continue;
@@ -1830,7 +1891,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   setWet(w) {
     this._wet = w;
     // (a wet road is glossy enough that a lamp draws a streak on it, not a broad blob)
-    if (this.roadMat) this.roadMat.roughness = 1 - 0.8 * w;
+    // (not quite a mirror: at 0.2 each street lamp burned a white blob into the wet asphalt; at 0.34 it is a soft
+    // glow drawn out toward the lens)
+    if (this.roadMat) this.roadMat.roughness = 1 - 0.66 * w;
     if (this.groundMat) this.groundMat.roughness = 1 - 0.4 * w;
     this.setNight(this._n ?? 1);
   }

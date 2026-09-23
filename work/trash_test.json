@@ -1,0 +1,8 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 6000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(async () => { const D = window.__DEBUG__, G = D.G, car = D.car, W = D.world, t = D.track; const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); const log = []; const h = D.hud, f = h.smash.bind(h); h.smash = (label, total, n) => { log.push([Math.round(G.s), label, total, n]); return f(label, total, n); }; const want = ['bag', 'cone', 'bike', 'crates', 'aboard', 'box']; const done = []; for (const name of want) { let rec = null; for (const [k, a] of W.cols) { for (const r of a) if (r.alive && r.name === name) { const q = t.nearest(r.x, r.z, 0); if (q.s > 400 && q.s < 2200) { rec = r; rec.q = q; break; } } if (rec) break; } if (!rec) { done.push([name, 'none']); continue; } const q = rec.q, p = t.sample(q.s - 16); const lx = Math.cos(p.h), lz = -Math.sin(p.h); D.teleport(q.s - 16, 0); car.x = p.x + lx * q.u; car.z = p.z + lz * q.u; car.vF = 11; G.carY = rec.y; window.__AUTOPILOT__ = () => ({ throttle: 0.3, brake: 0, steer: 0, hand: 0, reverse: false, touch: false }); await sleep(2200); done.push([name, Math.round(q.s), +q.u.toFixed(1), rec.alive ? 'standing' : 'knocked']); } window.__AUTOPILOT__ = null; return { done, smashes: log, debris: D.debris.list.length }; })()" },
+  { "shot": "T3_after" }
+]

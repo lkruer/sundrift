@@ -1,0 +1,7 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 6000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(async () => { const D = window.__DEBUG__, t = D.track, W = D.world, g = W.ground; const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); const probe = {}; const bad = []; let n = 0; const names = new Set(['bag', 'crate', 'crates', 'box', 'cone', 'aboard', 'bike', 'bollard', 'vending']); for (const s of [300, 700, 1100, 1500, 1900, 2300]) { D.teleport(s, 0); await sleep(1800); for (const [k, a] of W.cols) for (const r of a) { if (!r.alive || !names.has(r.name) || r._chk) continue; r._chk = 1; n++; g.sample(r.x, r.z, 2.2, probe); if (probe.edge < 0.15) bad.push([r.name, Math.round(r.x), Math.round(r.z), +probe.edge.toFixed(2)]); } } return { checked: n, inRoad: bad.length, bad: bad.slice(0, 12) }; })()" }
+]

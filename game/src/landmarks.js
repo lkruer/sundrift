@@ -70,6 +70,23 @@ class Builder {
   }
 }
 
+/** Several builders' triangles as one geometry, each part in its own colour (a colour attribute): one draw. */
+function mergeLit(T, parts) {
+  const p = [], uv = [], c = [];
+  for (const [b, hex, k] of parts) {
+    const col = new T.Color(hex).multiplyScalar(k);
+    for (let i = 0; i < b.p.length; i++) p.push(b.p[i]);
+    for (let i = 0; i < b.uv.length; i++) uv.push(b.uv[i]);
+    for (let i = 0; i < b.p.length / 3; i++) c.push(col.r, col.g, col.b);
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.Float32BufferAttribute(p, 3));
+  g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new T.Float32BufferAttribute(c, 3));
+  g.computeBoundingSphere();
+  return g;
+}
+
 /** A red aircraft-light layer the game can blink through material.opacity. */
 function aviationPoints(T, pts, size = 3.2) {
   const g = new T.BufferGeometry();
@@ -180,17 +197,16 @@ export function tokyoTower(T = THREE) {
   orange.beam([0, 332, 0], [0, 333.5, 0], 0.5, true);
 
   const K = 3.0;                                              // bright enough to bloom
+  // (the orange and white members and the lit windows are one mesh in their own colours: one draw, not three)
   const mats = {
-    orange: new T.MeshBasicMaterial({ color: new T.Color(0xff8a2a).multiplyScalar(K), fog: false }),
-    white: new T.MeshBasicMaterial({ color: new T.Color(0xffe0b0).multiplyScalar(K * 0.85), fog: false }),
+    lit: new T.MeshBasicMaterial({ vertexColors: true, fog: false }),
     lattice: new T.MeshBasicMaterial({ color: new T.Color(0xff8a2a).multiplyScalar(K * 0.9), alphaMap: latticeAlpha(T), transparent: true, depthWrite: false, side: T.DoubleSide, fog: false }),
-    windows: new T.MeshBasicMaterial({ color: new T.Color(0xfff6e6).multiplyScalar(K * 1.1), fog: false }),
   };
-  for (const [name, b] of [['orange', orange], ['white', white], ['windows', windows], ['lattice', lattice]]) {
-    const m = new T.Mesh(b.geometry(), mats[name]);
-    m.name = 'tower ' + name; m.castShadow = false; m.receiveShadow = false;
-    if (name === 'lattice') m.renderOrder = 1;
-    g.add(m);
+  {
+    const m = new T.Mesh(mergeLit(T, [[orange, 0xff8a2a, K], [white, 0xffe0b0, K * 0.85], [windows, 0xfff6e6, K * 1.1]]), mats.lit);
+    m.name = 'tower lit'; m.castShadow = false; m.receiveShadow = false; g.add(m);
+    const l = new T.Mesh(lattice.geometry(), mats.lattice);
+    l.name = 'tower lattice'; l.castShadow = false; l.receiveShadow = false; l.renderOrder = 1; g.add(l);
   }
   // the red aviation lights: the top, the antenna, the decks' corners
   const av = [0, 333.8, 0];
@@ -205,6 +221,98 @@ export function tokyoTower(T = THREE) {
   g.userData.aviation = aviation;
   g.userData.materials = mats;
   g.userData.triangles = orange.tris + white.tris + lattice.tris + windows.tris;
+  return g;
+}
+
+// ---------------------------------------------------------------- Tokyo Skytree
+
+/**
+ * Tokyo Skytree at night, 634 m, lit the way it is on most nights ("Iki"): a pale blue lattice with a white core.
+ * The shaft starts on a triangle 68 m a side and becomes round by 300 m, narrowing to the two observation decks (the
+ * Tembo Deck at 350 m, the Galleria at 450 m, their glass lit white, a band of purple under each), then the gain
+ * tower, a slim mast, to the top; a lit ring every 50 m up the shaft, white lights running up its three edges.
+ * Base at y = 0, centred. About 3,000 triangles.
+ */
+export function tokyoSkytree(T = THREE) {
+  const g = new T.Group(); g.name = 'tokyo skytree';
+  const lattice = new Builder(), core = new Builder(), glass = new Builder(), trim = new Builder();
+  const N = 18;
+  // the shaft's section at height y: a rounded triangle (y = 0) morphing into a circle (y >= 300)
+  const R = (y) => y < 350 ? 39 - 22 * Math.pow(y / 350, 0.8) : 17 - 4 * Math.min(1, (y - 350) / 150);
+  const tri = (y) => Math.max(0, 1 - y / 300);
+  const P = (a, y, grow = 0) => {
+    const r = R(y) + grow;
+    // a triangle's radius at angle a (its corners at 90, 210 and 330 degrees), blended toward the circle
+    const k = Math.cos(Math.PI / 3) / Math.cos(((((a - Math.PI / 2) % (2 * Math.PI / 3)) + 2 * Math.PI / 3) % (2 * Math.PI / 3)) - Math.PI / 3);
+    const rr = r * (1 + (k * 1.25 - 1) * tri(y));
+    return [Math.cos(a) * rr, y, Math.sin(a) * rr];
+  };
+  const levels = []; for (let y = 0; y <= 340; y += 20) levels.push(y);
+  for (let i = 0; i < levels.length - 1; i++) {
+    const y0 = levels[i], y1 = levels[i + 1];
+    for (let k = 0; k < N; k++) {
+      const a0 = (k / N) * Math.PI * 2, a1 = ((k + 1) / N) * Math.PI * 2;
+      lattice.quad(P(a1, y0), P(a0, y0), P(a0, y1), P(a1, y1), [[0, 0], [1, 0], [1, 1], [0, 1]]);
+      // the core inside the lattice, dimmer and solid
+      core.quad(P(a1, y0, -6), P(a0, y0, -6), P(a0, y1, -6), P(a1, y1, -6));
+    }
+  }
+  // the three edges lit white all the way up to the first deck, and a lit ring every 50 m
+  for (const a of [Math.PI / 2, Math.PI / 2 + 2.094, Math.PI / 2 + 4.189]) {
+    for (let i = 0; i < levels.length - 1; i++) trim.beam(P(a, levels[i], 0.6), P(a, levels[i + 1], 0.6), 1.6);
+  }
+  for (let y = 50; y < 340; y += 50) for (let k = 0; k < N; k++) {
+    const a0 = (k / N) * Math.PI * 2, a1 = ((k + 1) / N) * Math.PI * 2;
+    trim.beam(P(a0, y, 0.8), P(a1, y, 0.8), 1.4);
+  }
+  // the decks: the Tembo Deck (340 to 358 m, three storeys of glass) and the Galleria (440 to 452 m), each a
+  // wider drum of glass between dark rims, with a purple band under
+  const drum = (y0, y1, r, rim) => {
+    for (let k = 0; k < N; k++) {
+      const a0 = (k / N) * Math.PI * 2, a1 = ((k + 1) / N) * Math.PI * 2;
+      const Q = (a, y, rr) => [Math.cos(a) * rr, y, Math.sin(a) * rr];
+      glass.quad(Q(a1, y0, r), Q(a0, y0, r), Q(a0, y1, r), Q(a1, y1, r));
+      core.quad(Q(a1, y0 - rim, r * 0.8), Q(a0, y0 - rim, r * 0.8), Q(a0, y0, r), Q(a1, y0, r));
+      core.quad(Q(a1, y1, r), Q(a0, y1, r), Q(a0, y1 + rim, r * 0.85), Q(a1, y1 + rim, r * 0.85));
+      trim.quad(Q(a1, y0 - rim - 3, r * 0.78), Q(a0, y0 - rim - 3, r * 0.78), Q(a0, y0 - rim, r * 0.8), Q(a1, y0 - rim, r * 0.8));
+    }
+  };
+  drum(342, 358, 22, 4);
+  // the shaft between the decks, then the Galleria
+  for (let k = 0; k < N; k++) {
+    const a0 = (k / N) * Math.PI * 2, a1 = ((k + 1) / N) * Math.PI * 2;
+    const Q = (a, y, rr) => [Math.cos(a) * rr, y, Math.sin(a) * rr];
+    lattice.quad(Q(a1, 362, 15), Q(a0, 362, 15), Q(a0, 438, 13.5), Q(a1, 438, 13.5), [[0, 0], [1, 0], [1, 4], [0, 4]]);
+    core.quad(Q(a1, 362, 10), Q(a0, 362, 10), Q(a0, 438, 9), Q(a1, 438, 9));
+  }
+  drum(442, 452, 16, 3);
+  // the gain tower: a lattice mast narrowing to the top, a white light strip up it, and the antenna
+  for (let k = 0; k < 8; k++) {
+    const a0 = (k / 8) * Math.PI * 2, a1 = ((k + 1) / 8) * Math.PI * 2;
+    const Q = (a, y, rr) => [Math.cos(a) * rr, y, Math.sin(a) * rr];
+    lattice.quad(Q(a1, 455, 7), Q(a0, 455, 7), Q(a0, 590, 4.2), Q(a1, 590, 4.2), [[0, 0], [1, 0], [1, 8], [0, 8]]);
+    core.quad(Q(a1, 455, 4), Q(a0, 455, 4), Q(a0, 610, 2.4), Q(a1, 610, 2.4));
+  }
+  trim.beam([0, 590, 0], [0, 634, 0], 1.8, true, 0.7);
+  for (let y = 470; y < 590; y += 24) trim.prism(0, 0, y, y + 2, 6.8 - (y - 455) * 0.02, 6.8 - (y - 455) * 0.02, 8, 0, false);
+  const K = 2.6;
+  const mats = {
+    lit: new T.MeshBasicMaterial({ vertexColors: true, fog: false }),
+    lattice: new T.MeshBasicMaterial({ color: new T.Color(0x7cc4ff).multiplyScalar(K), alphaMap: latticeAlpha(T), transparent: true, depthWrite: false, side: T.DoubleSide, fog: false }),
+  };
+  {
+    const m = new T.Mesh(mergeLit(T, [[core, 0x2a4a7a, 1.2], [glass, 0xf4f8ff, K * 1.1], [trim, 0xe8f4ff, K * 1.15]]), mats.lit);
+    m.name = 'skytree lit'; m.castShadow = false; m.receiveShadow = false; g.add(m);
+    const l = new T.Mesh(lattice.geometry(), mats.lattice);
+    l.name = 'skytree lattice'; l.castShadow = false; l.receiveShadow = false; l.renderOrder = 1; g.add(l);
+  }
+  const av = [0, 635, 0, 0, 598, 0];
+  for (let k = 0; k < 3; k++) { const a = Math.PI / 2 + k * 2.094; av.push(Math.cos(a) * 23, 461, Math.sin(a) * 23, Math.cos(a) * 27, 362, Math.sin(a) * 27); }
+  const aviation = aviationPoints(T, av, 3.2);
+  g.add(aviation);
+  g.userData.aviation = aviation;
+  g.userData.materials = mats;
+  g.userData.triangles = lattice.tris + core.tris + glass.tris + trim.tris;
   return g;
 }
 

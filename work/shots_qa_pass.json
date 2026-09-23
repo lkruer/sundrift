@@ -1,0 +1,17 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); })()" },
+  { "js": "window.__DEBUG__.teleport(520, 0)" }, { "wait": 2500 }, { "shot": "Q01" },
+  { "js": "window.__DEBUG__.teleport(1180, 0)" }, { "wait": 2500 }, { "shot": "Q02" },
+  { "js": "window.__DEBUG__.teleport(1760, 0)" }, { "wait": 2500 }, { "shot": "Q03" },
+  { "js": "window.__DEBUG__.teleport(2350, 0)" }, { "wait": 2500 }, { "shot": "Q04" },
+  { "js": "window.__DEBUG__.teleport(2980, 0)" }, { "wait": 2500 }, { "shot": "Q05" },
+  { "js": "window.__DEBUG__.teleport(3620, 0)" }, { "wait": 2500 }, { "shot": "Q06" },
+  { "js": "window.__DEBUG__.teleport(4300, 0)" }, { "wait": 2500 }, { "shot": "Q07" },
+  { "js": "window.__DEBUG__.teleport(4950, 0)" }, { "wait": 2500 }, { "shot": "Q08" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 16.8; D.G.hourShown = 16.8; D.G.lastApplied = -9; D.teleport(5600, 0); })()" }, { "wait": 3500 }, { "shot": "Q09_dusk" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 11; D.G.hourShown = 11; D.G.lastApplied = -9; D.teleport(6300, 0); })()" }, { "wait": 3500 }, { "shot": "Q10_day" },
+  { "js": "window.__DEBUG__.teleport(7000, 0)" }, { "wait": 2500 }, { "shot": "Q11_day" },
+  { "js": "window.__DEBUG__.teleport(7700, 0)" }, { "wait": 2500 }, { "shot": "Q12_day" }
+]

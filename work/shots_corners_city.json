@@ -1,0 +1,44 @@
+[
+ {
+  "click": ".map[data-m=city]"
+ },
+ {
+  "wait": 6000
+ },
+ {
+  "click": ".diff[data-d=hard]"
+ },
+ {
+  "wait": 3000
+ },
+ {
+  "click": "#startb"
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__, t = D.track; D.rainNow(0); D.G.hour = 11; D.G.hourShown = 11; D.G.lastApplied = -9; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); const f = t.features.filter((q) => (q.type === 'hairpin' || q.type === 'ess') && t.pts[q.i0].s > 250)[1]; const mid = t.pts[Math.floor((f.i0 + f.i1) / 2)]; D.teleport(mid.s - 30, 0); window.__MID__ = mid; return Math.round(mid.s); })()"
+ },
+ {
+  "wait": 3500
+ },
+ {
+  "js": "(() => { const m = window.__MID__; window.__CAM__ = { pos: [m.x + 0.01, m.y + 55, m.z + 22], look: [m.x, m.y, m.z], fov: 55 }; })()"
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "shot": "K3_city_top"
+ },
+ {
+  "js": "(() => { const m = window.__MID__, D = window.__DEBUG__; const p = D.track.sample(m.s - 22); window.__CAM__ = { pos: [p.x, p.y + 3, p.z], look: [m.x, m.y, m.z], fov: 62 }; })()"
+ },
+ {
+  "wait": 900
+ },
+ {
+  "shot": "K4_city_low"
+ }
+]

@@ -36,6 +36,7 @@ export const CAR = {
   assistTouch: 0.78,
   steerGainMin: 0.72,             // A/D on a straight give this share of the lock a tight corner gets
   holdAngle: 0.62,                // rad: past this the rear finds grip again, so a held slide does not spin
+  lineAssist: 0.75,               // tight bends taken sideways: share of the missing turn the path and nose are helped round by
   yawDamp: 0.5,                   // per second, always: a calmer car between slides
   reverseForce: 1.0, reverseTop: 20,    // reverse gear pull (share of the engine) and top speed, m/s (45 mph)
   wallSpin: 0.55,                 // share of a wall hit's yaw kick that is kept: a hit shoves, it rarely spins
@@ -75,6 +76,7 @@ export class Car {
     this._assist = 0; this._gain = 1; this._dAB = 0; this._prevAB = 0;
     this.jturn = 0;                 // seconds left in which a fast reverse may still swing round
     this.air = false;               // off the ground (a crest taken fast off the road): no tyre does anything
+    this._psi = 0;                  // the direction of travel last substep (the line assist's measure of the turn)
     this.extF = 0; this.extL = 0;   // an outside acceleration in the car's frame, m/s^2: a slope's gravity, a banked road's
     this.jt = 0; this.jtT = 0; this.jtTravel = 0; this.jtRem = 0; this.jturnDone = false;   // a J-turn in progress (its turning sign)
   }
@@ -271,6 +273,36 @@ export class Car {
       const omegaKin = clamp(this.vF * Math.tan(d) / L, -wMax, wMax);
       this.omega += (omegaKin - this.omega) * lowT * Math.min(1, h * 30);
       this.vL *= 1 - lowT * Math.min(1, h * 25);
+    }
+    // ---- tight corners, taken sideways: a hand on the line. Held in a slide through a bend tighter than about 50 m,
+    // sliding the bend's way round (the tail out to the outside), the direction of travel is helped round toward the
+    // bend's own rate where the sliding tyres fall short, and the nose with it, so the slide keeps its angle. Only
+    // what is missing, and only part of it: a hairpin still wants a slide set up and held, but a held one makes it.
+    {
+      const LN = inp.line, v = Math.hypot(this.vF, this.vL);
+      const psi = this.yaw + Math.atan2(this.vL, Math.max(0.5, this.vF));
+      let rate = (psi - this._psi) / h; this._psi = psi;
+      rate = Math.atan2(Math.sin(rate * h), Math.cos(rate * h)) / h;
+      if (LN && LN.here !== undefined && this.vF > 4 && !this.jt && !this.air) {
+        const kh = LN.here, sg = Math.sign(kh);
+        // (a slide the bend's way round: travelling outside of where the nose points, so beta is against the bend;
+        // whatever the wheel is doing, since counter-steer is how a slide is held)
+        const w = P.lineAssist * sstep(1 / 55, 1 / 16, Math.abs(kh)) * sstep(0.1, 0.3, -this.beta * sg);
+        if (w > 0.002) {
+          const need = v * kh;
+          // the path: turn the velocity (not its size) by part of what it lacks
+          const lack = clamp((need - rate) * sg, 0, 1.4);
+          const dp = sg * lack * w * h;
+          const cr = Math.cos(dp), sr = Math.sin(dp), vF0 = this.vF;
+          this.vF = vF0 * cr - this.vL * sr; this.vL = this.vL * cr + vF0 * sr;
+          // the nose: brought round with it where it lags the bend
+          const lagY = clamp((need - this.omega) * sg, 0, 1.5);
+          this.omega += sg * lagY * w * 1.1 * h;
+          // and a slide into a bend too tight for its speed sheds some of it, the way tyres dragged sideways do
+          const excess = v * v * Math.abs(kh) - 12;
+          if (excess > 0) { const f = Math.max(0, 1 - Math.min(4, excess * 0.3) * w * h / Math.max(1, v)); this.vF *= f; this.vL *= f; }
+        }
+      }
     }
     // stop the last centimetres per second so the car actually stops
     if (Math.abs(this.vF) < 0.05 && this.throttle === 0 && !inp.reverse) this.vF = 0;

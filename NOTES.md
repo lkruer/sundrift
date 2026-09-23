@@ -396,6 +396,65 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 24 September: tight corners, the city's trash, rain, detail
+
+- **NEO TOKYO, in detail** (a sub-agent, on the city's files). Rooms behind every lit window: buildings.js looks
+  into an interior atlas made at load (rooms.js) with a parallax, walls, floor, ceiling and furniture shifting with
+  the camera; eateries, boutiques, konbini, arcades and bars at street level, offices, flats and tatami rooms above,
+  a TV flickering in some dark flats; shops stay lit by day. A first version drew the rooms in the shader and added
+  3.7 s to the shader compile at load; from an atlas it is about 0.4 s. LED screens from one ad atlas (twelve wide
+  ads, seven tall, two tickers), animated in the shader, on fronts, towers and low roofs, their light on the wet road
+  changing with the ad. Concrete poles with sagging power and telecom lines, drops to the fronts, lines across the
+  street. Shopping-street arches with chasing bulbs, red lantern strings across the road. Glass skybridges with
+  people crossing (rare: they need tall fronts on both sides). Kerb stones, two-colour pavers and the yellow tactile
+  strip. An elevated railway along some long avenues, shops in its arches, masts, stations, and a six-car lit train.
+  Coin parkings with parked cars. Tokyo Skytree. White lane dashes on the wide EASY avenues. Nothing it added stands
+  within 1.3 m of a road's edge (the poles at 1.35 m, solid; parked cars 2.3 m and beyond the fronts' hard edge).
+
+- **Tight corners.** Measured first: a scripted handbrake drifter through ten HARD hairpins (R 11.5-15 m) already
+  made every one at a sensible speed with no wall hits; entered 40% too fast with keyboard-style full-lock
+  steering it made them all too, but hit the outside wall twice in each. Two changes. Every tight arc is now wider
+  on its own outside (the pass's hairpins 3.0 m, up from 2.4; the city's square corners and dog-legs 2.2 m, where
+  before they had nothing). And a hand on the line (car.js): held in a slide the bend's way round through a bend
+  tighter than about 55 m, the car's direction of travel and its nose are helped round toward the bend's own rate
+  where the sliding tyres fall short (75% of what is missing), and a slide too fast for the bend sheds a little
+  speed. Too fast into the same ten: wall hits 14 to 7, the corner made 0.6 s sooner; at a sensible speed the same
+  ten with no hits and 0.25 s sooner. J-turns and reversing measure exactly as before.
+- **The city's trash** is no longer built into the chunk: bags, boxes, beer crates (one or two high), cones, menu
+  boards and bicycles are instanced pools (tinted per instance) the car knocks out like the bollards, each with
+  points (TRASH! 15, CRATE! 25, CONE! 25, MENU BOARD! 40, BIKE! 80), a burst of scraps and its own sound. Nothing on
+  the pavement is placed where a road runs: at a square corner a stretch of pavement ran on straight past the turn
+  into the street across, and its bags and cones ended up in the road.
+- **Rain**: splashes ringing the road ahead (instanced, placed on the road a few a frame), streaks that rake back
+  past the camera with the car's speed, a curtain of rain further off (a cylinder round the camera with its streaks
+  in the shader), the headlights' beams in the rain (the searchlights' ray-distance shader), drops beading and
+  running on the tube's glass (the retro pass; at speed they rake sideways), and the car's paint going glossier in
+  the wet. Measured: a 45 s run in a downpour, worst frame 17 ms.
+- **The pass**: grass tufts and spring flowers along the verges (two new code assets, drawn after the solid world
+  and writing no depth, so the cel pass does not ink them into scribble); a five-storey pagoda at every shrine,
+  lanterns under its eaves. The tunnel portals, twenty-odd boxes each, are merged into one mesh per material: that
+  took back 38 draws at night and 65 by day at the busiest place measured (the sun's shadow cascades drew each box
+  again).
+- **Small things**: the tube's colour fringe is a little less (it gave everything a rainbow edge).
+- **The pavement**, after the owner still saw "bikes and stuff on the street": every loose item now stands back
+  against the fronts, and none within 1.3 m of any road's edge (the kerb zone a drift uses); only the bollards
+  stand at the kerb, as they did. Checked over 6,500 items on both city courses: none in a road.
+- **Light trails** (fx.js LightTrails): while a slide is held, a thin red streak of light hangs in the air behind
+  each tail lamp, curving with the car's path and dying in 0.42 s, with a faint horizontal flare on the lamp; the
+  lamps' positions come from the lamp geometry itself. Low-key on purpose: 4.4 cm wide, as bright as the slide is
+  deep, fainter by day.
+- **The engine**, rewritten because the owner found it "AI-like": the detuned sawtooth stack is now a fallback, and
+  the note comes from an AudioWorklet that fires an inline four's pulses (sharper under load, per-cylinder bias,
+  per-firing jitter, burn noise riding each pulse) into six fixed exhaust resonances (92 Hz to 3.1 kHz), DC-blocked
+  and saturated. Around it: induction roar that opens with the throttle, straight-cut gear whine with the road
+  speed, the turbo whistle, a flutter (compressor surge, nine decaying chirps) and a softer valve sigh on a lift, a
+  75 ms ignition cut and a clunk on each upshift, a bouncing limiter, and pops with a flame from the exhaust for a
+  moment after a lift from high revs (the game decides the pops, so each has its flame). The revs flare with the
+  rear tyres' slip in a slide (the tach shows it). Tyres squeal in three narrow wandering bands over a broad scrub,
+  and a wall hit crunches. Measured in the browser: the firing pitch tracks the revs (about 230 Hz at 7,400 rpm),
+  the pops land in the lift, the level is within a couple of dB of the old engine.
+- **Brake lights**: the tail lamps burn brighter on the brake and the handbrake.
+
 ## 23 September, night: the skid marks, the bump, the music, the air
 
 - **Skid marks.** The ring buffer draws a quad between every pair of neighbouring points, and two of those quads

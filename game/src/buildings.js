@@ -7,29 +7,35 @@
  *     mesh.setMatrixAt(i, m); mesh.setColorAt(i, new THREE.Color(facadeColour(rng())));
  *     mat.userData.uNight.value = 0..1;   // window glow, any time, no recompile
  *     mat.userData.uWet.value = 0..1;     // rain on the walls
+ *     mat.userData.uTime.value = seconds; // the televisions and the arcade screens flicker with it
  *
  * The facade is drawn in the shader, in metres, from the unit box's own coordinates times the instance scale, so
  * a window keeps its real size however the box is scaled, and the grid starts at each face's corner so every
  * face has whole bays and a pier at each end:
  *   - the ground floor (the bottom 4 m) is shop fronts: pilasters between shops, big glass in panes with dark
- *     mullions, a door, a fascia band over each shop; behind the glass a few large flat blocks per pane (shelf
- *     bands, a counter, an open floor, a poster), lit warm white, cool white or tinted. A quarter of the shops
- *     are shut behind grey ribbed roller shutters (rust runs, tags and grime near the foot), a few open ones
- *     have the shutter half down, some are dark with the green exit sign lit. The brightest pane reaches about
- *     1.5 linear, most sit well below;
+ *     mullions, a door, a fascia band over each shop. A quarter of the shops are shut behind grey ribbed roller
+ *     shutters (rust runs, tags and grime near the foot), a few open ones have the shutter half down, some are
+ *     dark with the green exit sign lit;
  *   - above it, floors every 3.4 m and bays of about 2.6 m (fitted to the face), in one of four facade types
  *     per building: punched windows, office ribbon windows, paired windows, a glass curtain wall; piers between
  *     the bays and a darker slab band at every floor, a parapet on top and a louvred plant level where a floor
  *     does not fit;
  *   - roofs (world normal mostly up) have no windows: a coping round a dark, stained deck.
+ * Behind the glass there are rooms (interior mapping): the view ray is followed from the glass into a box room
+ * and whatever it meets first (a wall, the floor, the ceiling, or a row of furniture across the room) is drawn from
+ * the room atlas (rooms.js), so a shop or a flat has depth that shifts with the camera like the real thing. A shop
+ * is an eatery, a boutique, a convenience store, an arcade or a bar; above them offices, flats and tatami rooms;
+ * now and then a dark flat lit only by its television, flickering. The room is traced once per pixel, after the
+ * branches that set it up (one call site keeps the program small: it compiles at load).
  * Grime: rain streaks run down from every sill, drips from every slab and from the coping, low-frequency blotches
  * cover each face (different on every building), and the foot of every wall is a dark, wet band with an uneven
  * top. One building in five is older: mosaic tile, more dirt, fewer and dimmer lights.
  * Each window's lit or dark, its colour (warm, cool, fluorescent, now and then a coloured one), its brightness
  * and its blinds or curtains come from a hash of its integer cell and the instance's position; office floors come
  * on and go off together. Lit windows are EMISSIVE, scaled by `uNight`, so they glow with no light on them and the
- * brightest bloom a little. By day they are dark glass that reflects the sky. Every hash is fed integers and
- * flat (not interpolated) values, and every fine line is filtered by the pixel's footprint, so nothing shimmers.
+ * brightest bloom a little. By day they are dark glass that reflects the sky (the shops stay lit). Every hash is fed
+ * integers and flat (not interpolated) values, and every fine line is filtered by the pixel's footprint (inside a
+ * room, the footprint where the ray lands), so nothing shimmers.
  *
  * The facade colour is the instance colour (InstancedMesh.setColorAt): three multiplies it into the diffuse
  * colour as it does for any instanced material, and the shader builds the facade from that. Do not set
@@ -39,6 +45,7 @@
  * and every replacement here keeps the chunk it replaces, so the rig's own patches still find theirs.
  */
 import * as THREE from 'three';
+import { roomAtlas, ROOM_KINDS } from './rooms.js?v=202609231752';
 
 export const FLOOR_H = 3.4;    // metres floor to floor
 export const BAY_W = 2.6;      // target bay width (fitted per face)
@@ -63,6 +70,7 @@ const lin = (hex) => { const c = new THREE.Color(hex); return `vec3(${c.r.toFixe
 
 const VS_PARS = /* glsl */`
 varying vec4 vBPos;          // metres along the face from its left corner, metres above the base; roof x, z
+varying vec3 vBView;         // from the camera to this point, in the face's own axes: along, up, in
 flat varying vec4 vBDim;     // face width, building height, box size in x and z
 flat varying vec4 vBSeed;    // the instance's position (its identity), face index`;
 
@@ -85,13 +93,22 @@ const VS_MAIN = /* glsl */`
   vBPos = vec4(bAlong, bP.y, bP.x, bP.z);
   vBDim = vec4(bW, bS.y, bS.x, bS.z);
   vBSeed = vec4(floor(bSeed * 4.0 + 0.5) * 0.25, bFace);
+  // the view ray in the face's axes (along, up, into the building): it is linear across the face, so the
+  // interpolated value is exact, and the rooms behind the glass are traced from it
+  vec3 bX = bM[0].xyz / bS.x, bY = bM[1].xyz / bS.y, bZ = bM[2].xyz / bS.z;
+  vec3 bA = bFace == 0.0 ? -bZ : bFace == 2.0 ? bZ : bFace == 1.0 ? bX : bFace == 3.0 ? -bX : bX;
+  vec3 bI = bFace == 0.0 ? -bX : bFace == 2.0 ? bX : bFace == 1.0 ? -bZ : bFace == 3.0 ? bZ : -bY;
+  vec3 bV = (bM * vec4(position, 1.0)).xyz - cameraPosition;
+  vBView = vec3(dot(bV, bA), dot(bV, bY), dot(bV, bI));
 }`;
 
 function fsPars() {
   return /* glsl */`
 uniform float uNight;
 uniform float uWet;
+uniform float uTime;
 varying vec4 vBPos;
+varying vec3 vBView;
 flat varying vec4 vBDim;
 flat varying vec4 vBSeed;
 float bH1(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
@@ -123,12 +140,83 @@ float bStripe(float x, float period, float duty, float w) {
   float s = bStep(0.5 - duty * 0.5, f, fw) - bStep(0.5 + duty * 0.5, f, fw);
   return mix(s, duty, smoothstep(0.2, 0.5, fw));
 }
+// a round spot of radius r, filtered
+float bDisc(vec2 q, float r, float w) { return 1.0 - smoothstep(r - w, r + w, length(q)); }
 vec3 bAccent(float r) {
   return r < 0.2 ? ${lin(0xff6ec7)} : r < 0.4 ? ${lin(0xa878ff)} : r < 0.6 ? ${lin(0xff5a4a)} : r < 0.8 ? ${lin(0x7affb0)} : ${lin(0x6fe8ff)};
 }
 vec3 bSignCol(float r) {
   return r < 0.22 ? ${lin(0xfff4e6)} : r < 0.36 ? ${lin(0xff3a2a)} : r < 0.5 ? ${lin(0xffc21a)} : r < 0.62 ? ${lin(0x2f7bff)} :
          r < 0.74 ? ${lin(0x22d07a)} : r < 0.86 ? ${lin(0xff4fb0)} : ${lin(0xff8a24)};
+}
+// ---------------------------------------------------------------- rooms behind the glass
+uniform sampler2D uRooms;
+uniform vec4 uRoomA[8];
+uniform vec4 uRoomB[8];
+float bT;                    // the ray's length to what bHit found
+float bTV;                   // 1 where the ray met a television's screen
+// The first surface a ray from the glass meets inside a box room. p is the point on the glass (x from the room's
+// left wall, y above its floor), d the unit ray (d.z > 0 goes in), R the room (width, height, depth). Returns the
+// hit point in room metres, and in w: 0 the back wall, 1 a side wall, 2 the floor, 3 the ceiling.
+vec4 bHit(vec2 p, vec3 d, vec3 R) {
+  vec3 q = vec3(abs(d.x) < 1e-4 ? 1e-4 : d.x, abs(d.y) < 1e-4 ? 1e-4 : d.y, max(d.z, 0.02));
+  float tx = ((q.x > 0.0 ? R.x : 0.0) - p.x) / q.x;
+  float ty = ((q.y > 0.0 ? R.y : 0.0) - p.y) / q.y;
+  float tz = R.z / q.z;
+  bT = min(min(tx, ty), tz);
+  return vec4(p + q.xy * bT, q.z * bT, bT == tz ? 0.0 : bT == tx ? 1.0 : (q.y > 0.0 ? 3.0 : 2.0));
+}
+// where the ray crosses the plane z metres in: (x, y) there, and the ray's length to it
+vec3 bPlane(vec2 p, vec3 d, float z) { float t = z / max(d.z, 0.02); return vec3(p + d.xy * t, t); }
+// one cell of the room atlas (8 x 8 cells of 128 px, 124 drawn), q over the cell (its fraction taken), w the pixel's
+// footprint in cells: the gradient is given, so nothing here takes a derivative inside the branches that call it
+vec4 bRoomTex(float cell, vec2 q, float w) {
+  vec2 cc = vec2(mod(cell, 8.0), floor(cell / 8.0));
+  vec2 f = fract(q);
+  vec2 uv = vec2((cc.x * 128.0 + 2.0 + f.x * 124.0) / 1024.0, 1.0 - (cc.y * 128.0 + 2.0 + (1.0 - f.y) * 124.0) / 1024.0);
+  float g = clamp(w, 1e-4, 0.5) * 0.1211;
+  return textureGrad(uRooms, uv, vec2(g, 0.0), vec2(0.0, g));
+}
+// A room behind the glass (interior mapping): the view ray from p on the glass followed in along d; R the room's size;
+// kind its furnishing (rooms.js). The colour of what the ray meets first, a wall, the floor, the ceiling or the row of
+// furniture across the room, with what is drawn at full white (the lamps) glowing, and deeper in a little dimmer.
+vec3 bRoom(vec2 p, vec3 d, float dist0, float fw0, vec3 R, float kind) {
+  int k = int(kind + 0.5);
+  vec4 A = uRoomA[k], B = uRoomB[k];
+  vec4 H = bHit(p, d, R);
+  float t = bT;
+  float cosI = H.w == 0.0 ? d.z : H.w == 1.0 ? abs(d.x) : abs(d.y);
+  float foot = fw0 * (dist0 + t) / dist0 / max(cosI, 0.15);
+  vec2 s = H.w == 0.0 ? H.xy : H.w == 1.0 ? H.zy : H.xz;
+  vec2 span = H.w == 0.0 ? vec2(A.x > 0.0 ? A.x : R.x, R.y) : H.w == 1.0 ? vec2(A.y > 0.0 ? A.y : R.z, R.y) : H.w == 2.0 ? vec2(A.z) : (A.w > 0.0 ? vec2(A.w) : R.xz);
+  vec2 q = s / span;
+  // (a wall's height always fits the room; a surface with no tile of its own is stretched to fit)
+  q.y = H.w < 1.5 ? clamp(q.y, 0.002, 0.998) : q.y;
+  if ((H.w == 0.0 && A.x == 0.0) || (H.w == 1.0 && A.y == 0.0) || (H.w == 3.0 && A.w == 0.0)) q = clamp(q, 0.002, 0.998);
+  vec4 c = bRoomTex(kind * 5.0 + H.w, q, foot / min(span.x, span.y));
+  // the row of furniture across the room: a counter, gondolas, a rail of clothes, machines, desks
+  if (B.w > 0.5) {
+    float zo = R.z * B.x;
+    vec3 op = bPlane(p, d, zo);
+    float ow = B.z > 0.0 ? B.z : R.x;
+    float ox = B.z > 0.0 ? op.x / B.z : clamp(op.x / R.x, 0.002, 0.998);
+    float of = fw0 * (dist0 + op.z) / dist0 / max(d.z, 0.15) / min(B.y, ow);
+    if (op.z < t && op.y > 0.0 && op.y < B.y) {
+      vec4 o = bRoomTex(kind * 5.0 + 4.0, vec2(ox, op.y / B.y), of);
+      if (o.a > 0.5) c = o;
+    } else if (op.z < t && op.y >= B.y && d.y < 0.0) {
+      // its top, where the ray comes down onto it
+      float dz = (op.y - B.y) * max(d.z, 0.02) / -d.y;
+      if (dz < 0.5 && (zo + dz) / max(d.z, 0.02) < t) {
+        vec4 o = bRoomTex(kind * 5.0 + 4.0, vec2(ox, 0.97), of);
+        if (o.a > 0.5) c = vec4(o.rgb * 0.75, 1.0);
+      }
+    }
+  }
+  bTV = step(0.8, c.b) * step(c.r + c.g, 0.15);
+  vec3 col = mix(c.rgb, vec3(0.04, 0.045, 0.06), bTV);
+  col += c.rgb * smoothstep(0.9, 1.0, min(min(c.r, c.g), c.b)) * 1.7;
+  return col * (1.0 - 0.3 * clamp(H.z / R.z, 0.0, 1.0));
 }`;
 }
 
@@ -149,10 +237,20 @@ function fsMain() {
   vec2 fw = max(fwidth(vec2(along, hgt)), vec2(1e-4));
   float fine = 1.0 - smoothstep(0.015, 0.05, max(fw.x, fw.y));      // 1 up close, 0 once a pixel is over 5 cm
   vec3 wN = (vec4(normal, 0.0) * viewMatrix).xyz;
-  vec3 col = bBase, em = vec3(0.0);
+  vec3 col = bBase, em = vec3(0.0), emS = vec3(0.0);        // em: lit at night; emS: a shop's light, by day too
   float rough = roughnessFactor;
   vec3 glass = vec3(0.016, 0.02, 0.028);
   float glassMask = 0.0;
+  // the view ray into the face (for the rooms behind the glass), and the glass's own footprint
+  float bDist = max(length(vBView), 0.05);
+  vec3 bDir = vBView / bDist;
+  float fw0 = max(fw.x, fw.y);
+  // the room behind this pixel's glass, traced once after the branches below (they only set it up): where on the
+  // glass, its size, its furnishing, and what its light is multiplied by (rMul lit at night, rMulS a shop's, lit by
+  // day too, rTV a television's screen)
+  float rOn = 0.0, rKind = 0.0;
+  vec2 rP = vec2(0.0);
+  vec3 rR = vec3(1.0), rMul = vec3(0.0), rMulS = vec3(0.0), rTV = vec3(0.0);
   // ---- the building's age and dirt: one in five is older, tiled and stained, with fewer lights on
   float wet = clamp(uWet, 0.0, 1.0);
   float old = step(0.8, bk.x);
@@ -210,31 +308,25 @@ function fsMain() {
     float halfDown = open * step(fract(sq.x * 7.3), 0.12);
     float shutTop = 2.9, shutFoot = mix(0.55, 1.75, halfDown);
     float shutter = max(shut, halfDown * bBox(shutFoot, shutTop, hgt, fw.y));
-    // the shop's light: warm or cool white, now and then tinted; most well under the bloom line, a few just over
-    vec3 tintC = sr.z < 0.5 ? ${SHOP_WARM} : sr.z < 0.78 ? ${SHOP_COOL} : mix(${SHOP_WARM}, bAccent(sq.x), 0.5);
-    float bright = sq.y < 0.8 ? mix(0.36, 0.78, sq.y / 0.8) : mix(1.1, 1.35, (sq.y - 0.8) / 0.2);
-    bright *= mix(1.0, 0.75, old);
-    // behind each pane (a cell over a metre wide): shelf bands, a counter, an open floor or a poster, all flat
+    // the shop's kind (rooms.js) and its light: an eatery, a boutique, a convenience store, an arcade or a bar;
+    // eateries and boutiques warm, a convenience store cool and bright, an arcade or a bar in coloured light
+    float kind = sr.z < 0.28 ? 0.0 : sr.z < 0.42 ? 1.0 : sr.z < 0.72 ? 2.0 : sr.z < 0.86 ? 3.0 : 7.0;
+    vec3 tintC = kind < 0.5 ? ${SHOP_WARM} : kind < 1.5 ? mix(${SHOP_WARM}, vec3(1.0), 0.45) : kind < 2.5 ? ${SHOP_COOL} : kind < 3.5 ? mix(vec3(1.0), bAccent(sq.x), 0.35) : mix(${SHOP_WARM}, bAccent(sq.x), 0.5);
+    float bright = sq.y < 0.8 ? mix(0.6, 1.05, sq.y / 0.8) : mix(1.2, 1.45, (sq.y - 0.8) / 0.2);
+    bright *= mix(1.0, 0.75, old) * (kind > 1.5 && kind < 2.5 ? 1.2 : 1.0);
+    // far away the panes are finer than the pixels: their average
+    float farS = 1.0 - smoothstep(1.5, 4.0, min(pw / fw.x, 0.8 / fw.y));
+    // behind the glass, the shop itself: a room across the whole shop, the view ray followed into it (after the
+    // branches); a poster pasted inside the glass now and then
     vec3 pr = bH3(vec3(pane + 3.0, sid, 7.0) + seed * 0.61);
-    float k = 0.8;
-    vec3 goods = vec3(1.0);
-    if (isDoor > 0.5) k = 0.55;                                    // the doorway: the floor deeper in
-    else if (pr.x < 0.45) {
-      // shelves: three bands of goods, each one flat tone and a muted colour of its own
-      float band = floor(clamp((hgt - 0.55) / 0.52, 0.0, 2.99));
-      vec3 gh = bH3(vec3(pane + 1.0, band + 1.0, sid) + seed * 0.71);
-      k = hgt > 2.11 ? 0.85 : mix(0.4, 0.78, gh.x);
-      goods = hgt > 2.11 ? vec3(1.0) : mix(vec3(1.0), bAccent(gh.y), 0.32);
-      float shelf = bBox(0.55, 0.61, hgt, fw.y) + bBox(1.07, 1.13, hgt, fw.y) + bBox(1.59, 1.65, hgt, fw.y) + bBox(2.11, 2.17, hgt, fw.y);
-      k *= 1.0 - 0.6 * shelf * fine;
-    } else if (pr.x < 0.7) {
-      k = hgt < 1.3 ? 0.22 : 0.8;                                  // a counter's dark front, the room above
-    }
-    k *= mix(0.6, 1.0, smoothstep(0.55, 2.4, hgt));                // lit from the ceiling, the floor darker
-    if (hgt > 2.5) k = 1.1;                                        // the lit ceiling above the transom
-    vec3 inner = tintC * goods * bright * k;
     float poster = step(0.85, pr.x) * (1.0 - isDoor) * bBox(0.2 * pw, 0.8 * pw, px, fw.x) * bBox(1.2, 2.3, hgt, fw.y);
-    inner = mix(inner, bAccent(pr.y) * (0.25 + 0.3 * bright), poster);
+    if (inShop * glassZ > 0.001 && farS < 0.999 && open > 0.5) {
+      rOn = 1.0; rKind = kind;
+      rP = vec2(clamp(lx, 0.0, usable), hgt - 0.38);
+      rR = vec3(usable, 2.62, mix(3.6, 7.5, fract(sq.x * 3.7)));
+    }
+    vec3 inner = mix(tintC * bright * 0.7 * (1.0 - rOn), bAccent(pr.y) * (0.25 + 0.3 * bright), poster);
+    float lookIn = open * inShop * glassZ * (1.0 - frameAll) * (1.0 - shutter);
     // the shutter: grey ribbed steel, a darker bottom rail, rust and rain run down it, tags and grime near the foot
     float sgrey = mix(0.2, 0.36, fract(sq.y * 5.1));
     float ribs = bStripe(hgt, 0.085, 0.5, fw.y);
@@ -254,10 +346,11 @@ function fsMain() {
     col = mix(pilCol, mix(front, sh, shutter), inShop * glassZ);
     glassMask = inShop * glassZ * (1.0 - shutter) * (1.0 - frameAll);
     rough = mix(rough, mix(0.12, 0.55, shutter), inShop * glassZ);
-    em += inner * open * inShop * glassZ * (1.0 - frameAll) * (1.0 - shutter);
+    emS += inner * lookIn;
     // closed shops: dark, a faint light far inside, and the green exit sign over the door
     em += ${SHOP_COOL} * 0.05 * closed * inShop * glassZ * (1.0 - frameAll);
     float exitSign = isDoor * bBox(0.5 * pw - 0.2, 0.5 * pw + 0.2, px, fw.x) * bBox(2.56, 2.72, hgt, fw.y) * max(closed, open * (1.0 - halfDown) * step(sq.z, 0.4));
+    emS *= 1.0 - exitSign * inShop;
     em = mix(em, ${lin(0x2aff7a)} * 1.1, exitSign * inShop);
     // a shutter's box above the opening
     col = mix(col, vec3(0.1, 0.1, 0.11), max(shut, halfDown) * inShop * bBox(2.9, 3.02, hgt, fw.y));
@@ -271,9 +364,9 @@ function fsMain() {
     col = mix(col, bBase * 0.5, bBox(3.82, 4.1, hgt, fw.y));
     col = mix(col, bBase * 1.15, bBox(3.84, 3.88, hgt, fw.y));
     col = mix(col, vec3(0.045, 0.045, 0.05), 1.0 - bStep(0.55, hgt, fw.y));
-    // far away the panes are finer than the pixels: their average
-    float farS = 1.0 - smoothstep(1.5, 4.0, min(pw / fw.x, 0.8 / fw.y));
-    em = mix(em, (tintC * bright * 0.7 * open * (1.0 - halfDown * 0.5) * glassZ + fc * fLit * 0.8 * fasciaZ) * inShop, farS);
+    em = mix(em, fc * fLit * 0.8 * fasciaZ * inShop, farS);
+    emS = mix(emS, tintC * bright * 0.7 * open * (1.0 - halfDown * 0.5) * glassZ * inShop, farS);
+    rMulS = tintC * bright * (1.0 - poster) * lookIn * (1.0 - exitSign * inShop) * (1.0 - farS);
   } else {
     // ---------------------------------------------------------------- the floors above
     float fh = hgt - GF;
@@ -333,30 +426,54 @@ function fsMain() {
     float lit;
     if (office > 0.5) lit = fr3.x < (litF - 0.08) / 0.78 ? step(wr.x, 0.86) : step(wr.x, 0.08);
     else lit = step(wr.x, clamp(litF + (fr3.y - 0.5) * 0.3, 0.05, 0.95));
+    // a dark flat now and then has only its television on
+    float tv = (1.0 - lit) * (1.0 - office) * step(fract(wq * 17.3), 0.13);
     vec3 wc;
     if (office > 0.5) wc = wr.y < 0.45 ? ${FLUO} : wr.y < 0.8 ? ${COOL} : wr.y < 0.97 ? ${WARM} : bAccent(wr.z);
     else wc = wr.y < 0.6 ? ${WARM} : wr.y < 0.74 ? ${COOL} : wr.y < 0.93 ? ${FLUO} : bAccent(wr.z);
     float br = mix(0.5, 1.2, wr.z) * (wq > 0.93 ? 1.9 : 1.0) * mix(1.0, 0.8, old);
     float wy = clamp((fy - sill) / wh, 0.0, 1.0);
     float wxr = clamp((fxw - wx0) / ww, 0.0, 1.0);
-    float det = mix(0.72, 1.12, wy);
-    float kind = fract(wq * 7.31);
-    if (office > 0.5) {
-      if (kind < 0.35) det *= 0.6 + 0.4 * bStripe(fy, 0.07, 0.55, fw.y);               // venetian blinds
-    } else if (kind < 0.5 + 0.2 * old) {
-      float cw = mix(0.18, 0.42, fract(kind * 13.7));
-      float cur = max(1.0 - bStep(cw, wxr, fw.x / ww), bStep(1.0 - cw * 0.6, wxr, fw.x / ww));
-      det *= mix(1.0, 0.5, cur);
-      wc *= mix(vec3(1.0), vec3(1.0, 0.72, 0.5), cur);                                 // curtains, lit through
-    }
-    float reveal = mix(0.6, 1.0, smoothstep(0.0, 0.16, sill + wh - fr - fy) * smoothstep(0.0, 0.08, fxw - wx0 - fr));
-    em = wc * br * det * reveal * lit * glassA;
     // far away the cells are finer than the pixels: their average instead of a shimmer
     float cellPx = min(bwc / fw.x, FLOOR / fw.y);
     float farW = 1.0 - smoothstep(1.4, 3.5, cellPx);
-    float area = (ww * wh) / (bwc * FLOOR) * upper;
-    col = mix(col, mix(wall, glass, area), farW);
-    em = mix(em, litF * (office > 0.5 ? ${FLUO} : ${WARM}) * 0.8 * area, farW);
+    float kindW = fract(wq * 7.31);
+    if (glassA > 0.001 && farW < 0.999 && lit + tv > 0.5) {
+      // the room behind (traced after the branches): as wide as the bay, floor to ceiling, three to five and a half
+      // metres deep; an office, a flat or a tatami room, or a dark flat with only its television on
+      vec3 hr = bH3(vec3(cellX * 2.1 + 0.5, fl * 1.9 + 0.3, face) + seed * 0.43);
+      rOn = 1.0;
+      rP = vec2(fxw, fy - 0.3);
+      rR = vec3(bwc, 3.1, mix(3.0, 5.5, fract(wq * 3.1)));
+      rKind = office > 0.5 ? 6.0 : (fract(wq * 13.7) < 0.28 && tv < 0.5 ? 5.0 : 4.0);
+      // what hangs at the glass: blinds in an office, curtains drawn part way in a home, lit through
+      float ov = 0.0;
+      vec3 ovc = vec3(0.0);
+      if (office > 0.5) {
+        if (kindW < 0.35) { ov = 0.55 * bStripe(fy, 0.07, 0.55, fw.y) * smoothstep(0.0, 0.1, 1.0 - wy * 0.3); ovc = vec3(0.8) * (0.6 + 0.4 * wy); }
+      } else if (kindW < 0.5 + 0.2 * old && tv < 0.5) {
+        float cw = mix(0.18, 0.42, fract(kindW * 13.7));
+        ov = max(1.0 - bStep(cw, wxr, fw.x / ww), bStep(1.0 - cw * 0.6, wxr, fw.x / ww));
+        ovc = vec3(1.0, 0.72, 0.5) * mix(0.55, 0.8, wy);
+      }
+      vec3 lightC = wc * br;
+      if (tv > 0.5) {
+        float fl2 = bH1(vec3(floor(uTime * 1.3 + hr.x * 7.0), hr.y * 13.0, 3.0));
+        vec3 tvc = mix(vec3(0.3, 0.55, 1.0), mix(vec3(1.0, 0.6, 0.8), vec3(0.6, 1.0, 0.7), step(0.5, fract(fl2 * 5.0))), 0.35);
+        lightC = tvc * (0.16 + 0.1 * fl2);
+        rTV = tvc * 1.8 * (0.7 + 0.3 * fl2) * glassA * (1.0 - farW);
+      }
+      rMul = lightC * (1.0 - ov) * glassA * (1.0 - farW);
+      em = lightC * ovc * ov * glassA;
+    }
+    em = mix(em, litF * (office > 0.5 ? ${FLUO} : ${WARM}) * 0.8 * (ww * wh) / (bwc * FLOOR) * upper, farW);
+    col = mix(col, mix(wall, glass, (ww * wh) / (bwc * FLOOR) * upper), farW);
+  }
+  // the room behind the glass, traced once for whichever branch asked for it
+  if (rOn > 0.5) {
+    vec3 room = bRoom(rP, bDir, bDist, fw0, rR, rKind);
+    em += room * rMul + bTV * rTV;
+    emS += room * rMulS;
   }
   // the foot of every wall: darker, dirtier, wetter; rain darkens and glosses what is not glass
   if (abs(wN.y) <= 0.7) {
@@ -368,25 +485,36 @@ function fsMain() {
   rough = mix(rough, rough * 0.6, wet * (1.0 - glassMask));
   diffuseColor.rgb = col;
   roughnessFactor = rough;
-  totalEmissiveRadiance += em * uNight;
+  // (a shop is lit by day too: its light never quite goes)
+  totalEmissiveRadiance += em * uNight + emS * max(uNight, 0.4);
 }`;
 }
 
 /**
  * The building material. `night` (0..1) is the initial window glow, `wet` (0..1) how rain-soaked the walls are
  * (darker, glossier, the dirty foot of the walls wetter still); change either later, with no recompile, through
- * material.userData.uNight.value and material.userData.uWet.value.
+ * material.userData.uNight.value and material.userData.uWet.value; uTime.value (seconds) drives the flicker.
  */
 export function buildingMaterial(T = THREE, { night = 1, wet = 0.5 } = {}) {
   const mat = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.86, metalness: 0.0 });
   mat.name = 'building';
   mat.userData.uNight = { value: night };
   mat.userData.uWet = { value: wet };
+  mat.userData.uTime = { value: 0 };
+  // the rooms behind the glass: one atlas, and each furnishing's tiles and row of furniture (rooms.js)
+  const rooms = roomAtlas(T);
+  mat.userData.uRooms = { value: rooms.texture };
+  mat.userData.uRoomA = { value: ROOM_KINDS.map((k) => new T.Vector4(...k.a)) };
+  mat.userData.uRoomB = { value: ROOM_KINDS.map((k) => new T.Vector4(...k.b)) };
   const fsP = fsPars(), fsM = fsMain();
   mat.onBeforeCompile = function (shader) {
     const ud = (this && this.userData && this.userData.uNight) ? this.userData : mat.userData;
     shader.uniforms.uNight = ud.uNight;
     shader.uniforms.uWet = ud.uWet || (ud.uWet = { value: 0.5 });
+    shader.uniforms.uTime = ud.uTime || (ud.uTime = { value: 0 });
+    shader.uniforms.uRooms = mat.userData.uRooms;
+    shader.uniforms.uRoomA = mat.userData.uRoomA;
+    shader.uniforms.uRoomB = mat.userData.uRoomB;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\n' + VS_PARS)
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n' + VS_MAIN);
@@ -394,6 +522,6 @@ export function buildingMaterial(T = THREE, { night = 1, wet = 0.5 } = {}) {
       .replace('#include <common>', '#include <common>\n' + fsP)
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + fsM);
   };
-  mat.customProgramCacheKey = () => 'bldg';
+  mat.customProgramCacheKey = () => 'bldg3';
   return mat;
 }

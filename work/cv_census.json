@@ -1,0 +1,11 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 5000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); window.__CENSUS__ = () => new Promise((res) => { const cnt = {}; const hooked = []; D.scene.traverse((o) => { if (!(o.isMesh || o.isPoints || o.isLine)) return; const k = o.name || (o.material && o.material.name) || (o.parent && o.parent.name) || '?'; const prev = o.onBeforeRender; hooked.push([o, prev]); o.onBeforeRender = function (...a) { cnt[k] = (cnt[k] || 0) + 1; return prev.apply(this, a); }; }); requestAnimationFrame(() => requestAnimationFrame(() => { for (const [o, prev] of hooked) o.onBeforeRender = prev; const total = Object.values(cnt).reduce((a, b) => a + b, 0); res({ total, calls: D.renderer.info.render.calls, top: Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 45) }); })); }); })()" },
+  { "js": "(() => { window.__DEBUG__.teleport(1500, 0); })()" }, { "wait": 3000 },
+  { "js": "window.__CENSUS__()" },
+  { "js": "(() => { window.__DEBUG__.teleport(4170, 0); })()" }, { "wait": 3000 },
+  { "js": "window.__CENSUS__()" }
+]

@@ -1,0 +1,10 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; D.rainNow(0); const m = t.markers.find((q) => q.kind === 'shrine' && q.s > 200); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); D.teleport(m.s - 25, 0); window.__M__ = m; return [m.s, m.side]; })()" },
+  { "wait": 2500 }, { "shot": "P1_approach" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track, m = window.__M__; const p = t.sample(m.s + 23); const lx = Math.cos(p.h) * m.side, lz = -Math.sin(p.h) * m.side; const w = m.side > 0 ? p.wl : p.wr; const px = p.x + lx * (w + 13), pz = p.z + lz * (w + 13); window.__CAM__ = { pos: [p.x - lx * 6 + Math.sin(p.h) * -14, p.y + 4, p.z - lz * 6 + Math.cos(p.h) * -14], look: [px, p.y + 8, pz], fov: 60 }; })()" },
+  { "wait": 1200 }, { "shot": "P2_pagoda" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 11; D.G.hourShown = 11; D.G.lastApplied = -9; })()" },
+  { "wait": 3500 }, { "shot": "P3_pagoda_day" }
+]

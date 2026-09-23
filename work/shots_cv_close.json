@@ -1,0 +1,13 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 5000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); window.__GO__ = (s) => { const p = D.teleport(s, 0); return [Math.round(p.x), Math.round(p.z)]; }; window.__LOOK__ = (s, side, u, h, fov, back = 6, camH = 1.6) => { const t = D.track, p = t.sample(s), lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, fx = Math.sin(p.h), fz = Math.cos(p.h); const w = side > 0 ? p.wl : p.wr; window.__CAM__ = { pos: [p.x - lx * 3 - fx * back, p.y + camH, p.z - lz * 3 - fz * back], look: [p.x + lx * (w + u), p.y + h, p.z + lz * (w + u)], fov }; }; })()" },
+  { "js": "window.__GO__(1500)" }, { "wait": 3000 },
+  { "js": "window.__LOOK__(1500, 1, 3, 2, 34, 4)" }, { "wait": 500 }, { "shot": "C1_shops_L" },
+  { "js": "window.__LOOK__(1500, -1, 3, 2, 34, 4)" }, { "wait": 500 }, { "shot": "C2_shops_R" },
+  { "js": "window.__LOOK__(1500, 1, 3, 9, 30, 2)" }, { "wait": 500 }, { "shot": "C3_windows_L" },
+  { "js": "window.__LOOK__(1500, -1, 3, 9, 30, 2)" }, { "wait": 500 }, { "shot": "C4_windows_R" },
+  { "js": "window.__LOOK__(1530, 1, 3, 14, 40, 10, 1.4)" }, { "wait": 500 }, { "shot": "C5_windows_far" }
+]

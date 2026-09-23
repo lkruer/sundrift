@@ -1,0 +1,12 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.teleport(1180, 0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); })()" },
+  { "wait": 2500 },
+  { "js": "(() => ({ nightDraws: window.__GAME__.draws, nightTris: window.__GAME__.tris }))()" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 11; D.G.hourShown = 11; D.G.lastApplied = -9; })()" },
+  { "wait": 3500 },
+  { "js": "(() => ({ dayDraws: window.__GAME__.draws, dayTris: window.__GAME__.tris }))()" },
+  { "js": "window.__DEBUG__.teleport(2980, 0)" }, { "wait": 2500 },
+  { "js": "(() => ({ day2Draws: window.__GAME__.draws, day2Tris: window.__GAME__.tris }))()" }
+]

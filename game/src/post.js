@@ -146,12 +146,43 @@ const Retro = {
   uniforms: {
     tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uCurve: { value: 0.022 }, uEdge: { value: 0.055 }, uCorner: { value: 0.045 },
-    uLevels: { value: 32 }, uMask: { value: 0.06 },
+    uLevels: { value: 32 }, uMask: { value: 0.06 }, uLens: { value: 0 }, uTime: { value: 0 }, uFlow: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uLevels, uMask;
+    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uLevels, uMask, uLens, uTime, uFlow;
     varying vec2 vUv;
+    float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    // rain on the glass: beads that gather and dry on a grid of cells, and drops that run down their own tracks (raked
+    // sideways at speed). Returns where to look through the drop (an offset) in xy, and how much drop there is in z.
+    vec3 lensRain(vec2 uv) {
+      vec2 q = uv * vec2(uRes.x / uRes.y, 1.0);
+      vec3 acc = vec3(0.0);
+      {
+        vec2 g = q / 0.055, id = floor(g), f = fract(g) - 0.5;
+        float h = hs(id), per = 7.0 + 9.0 * hs(id + 3.1), ph = fract(uTime / per + h);
+        float on = step(1.0 - uLens * 0.32, hs(id + floor(uTime / per + h) * 13.7));
+        vec2 c = (vec2(hs(id + 1.7), hs(id + 5.3)) - 0.5) * 0.5;
+        float r = (0.08 + 0.3 * pow(hs(id + 9.1), 2.0)) * smoothstep(0.0, 0.06, ph) * (1.0 - smoothstep(0.55, 1.0, ph));
+        vec2 d = f - c; float l = length(d) / max(r, 1e-4);
+        float m = on * (1.0 - smoothstep(0.8, 1.0, l)) * step(0.001, r);
+        acc += vec3(-d * 0.05 * m, m);
+      }
+      {
+        float cw = 0.045, col = floor(q.x / cw), h = hs(vec2(col, 11.0));
+        float on = step(1.0 - uLens * 0.35, h);
+        float sp = 0.1 + 0.25 * hs(vec2(col, 3.0));
+        float y = 1.15 - fract(uTime * sp + h) * 1.3;
+        float x = (fract(q.x / cw) - 0.5) * cw + sin(q.y * 23.0 + h * 9.0) * 0.004 + (q.y - y) * uFlow * 0.25;
+        vec2 d = vec2(x, (q.y - y) * 0.7);
+        float l = length(d) / 0.011;
+        float m = on * (1.0 - smoothstep(0.7, 1.0, l));
+        float trail = on * (1.0 - smoothstep(0.0, 0.004, abs(x))) * step(y, q.y) * (1.0 - smoothstep(0.0, 0.12, q.y - y)) * 0.5;
+        acc += vec3(-d / 0.011 * 0.008 * m + vec2(x * 0.4 * trail, 0.0), max(m, trail));
+      }
+      acc.x *= uRes.y / uRes.x;                    // (back from the square-celled lens space to the picture)
+      return acc;
+    }
     float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
     float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
     // signed distance to a rounded rectangle of half-size b and corner radius r
@@ -166,7 +197,15 @@ const Retro = {
       float d = rbox(px, 0.5 * uRes, rad);
       float inside = 1.0 - smoothstep(-1.5, 0.0, d);
       if (inside <= 0.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
-      vec3 col = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
+      vec3 col;
+      if (uLens > 0.001) {
+        vec3 lr = lensRain(uv);
+        float m = clamp(lr.z, 0.0, 1.0);
+        col = texture2D(tDiffuse, clamp(uv + lr.xy, 0.0, 1.0)).rgb;
+        // a drop darkens a little at its rim and catches a glint up on its left
+        col *= 1.0 - 0.14 * m * (1.0 - m);
+        col += vec3(0.16) * m * smoothstep(0.6, 1.0, dot(normalize(lr.xy + 1e-5), vec2(0.55, -0.83)));
+      } else col = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
       col = floor(col * uLevels + bayer4(gl_FragCoord.xy)) / uLevels;
       float m = mod(gl_FragCoord.x, 3.0);
       vec3 mask = vec3(m < 1.0 ? 1.0 : 1.0 - uMask, (m >= 1.0 && m < 2.0) ? 1.0 : 1.0 - uMask, m >= 2.0 ? 1.0 : 1.0 - uMask);
@@ -189,7 +228,7 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height,
   const cel = new ShaderPass(Cel);
   cel.uniforms.tDepth.value = sceneRT.depthTexture;
   cel.uniforms.uRes.value.set(w, h);
-  cel.uniforms.uCA.value = fringe ? 0.006 : 0;
+  cel.uniforms.uCA.value = fringe ? 0.0042 : 0;
   cel.uniforms.uNear.value = camera.near; cel.uniforms.uFar.value = camera.far;
   composer.addPass(cel);
   // bloom after the bands, so a lamp's halo stays a soft round glow over the inked frame instead of being cut
@@ -206,6 +245,7 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height,
       renderer.render(scene, camera);
       renderer.setRenderTarget(null);
       cel.uniforms.uTime.value += dt;
+      if (retro) retro.uniforms.uTime.value += dt;
       composer.render(dt);
     },
     resize(width2, height2) {

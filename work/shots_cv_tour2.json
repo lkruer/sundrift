@@ -1,0 +1,16 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 5000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); window.__GO__ = (s) => { const p = D.teleport(s, 0); return [Math.round(p.x), Math.round(p.z)]; }; })()" },
+  { "js": "window.__GO__(262)" }, { "wait": 2500 }, { "shot": "U1_arch" },
+  { "js": "window.__GO__(1500)" }, { "wait": 2500 }, { "shot": "U2_1500" },
+  { "js": "window.__GO__(1700)" }, { "wait": 2500 }, { "shot": "U3_1700" },
+  { "js": "window.__GO__(1990)" }, { "wait": 2500 }, { "shot": "U4_rail" },
+  { "js": "window.__GO__(2450)" }, { "wait": 2500 }, { "shot": "U5_2450" },
+  { "js": "window.__GO__(4150)" }, { "wait": 2500 }, { "shot": "U6_bridge" },
+  { "js": "(() => { window.__DEBUG__.rainNow(1); window.__GO__(1700); })()" }, { "wait": 4000 }, { "shot": "U7_rain_1700" },
+  { "js": "window.__GO__(4150)" }, { "wait": 3000 }, { "shot": "U8_rain_bridge" },
+  { "js": "window.__GO__(2450)" }, { "wait": 3000 }, { "shot": "U9_rain_2450" }
+]

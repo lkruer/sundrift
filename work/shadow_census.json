@@ -1,0 +1,7 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.teleport(1180, 0); D.G.hour = 11; D.G.hourShown = 11; D.G.lastApplied = -9; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); })()" },
+  { "wait": 3500 },
+  { "js": "(() => { const D = window.__DEBUG__; const scene = D.scene; const cast = {}; let nCast = 0, nNoCull = 0; const nm = (o) => o.name || (o.material && o.material.name) || (o.parent && o.parent.name) || 'unnamed'; scene.traverseVisible((o) => { if (!(o.isMesh) || !o.castShadow) return; if (o.isInstancedMesh && o.count === 0) return; nCast++; if (!o.frustumCulled) nNoCull++; const n = nm(o) + (o.frustumCulled ? '' : ' [nocull]'); cast[n] = (cast[n] || 0) + 1; }); const csm = D.rig.csm; return { draws: window.__GAME__.draws, casters: nCast, noCull: nNoCull, cascades: csm ? csm.lights.length : 0, top: Object.entries(cast).sort((a, b) => b[1] - a[1]).slice(0, 25) }; })()" }
+]

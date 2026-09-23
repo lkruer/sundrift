@@ -1,0 +1,12 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 5000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); window.__GO__ = (s) => { const p = D.teleport(s, 0); return [Math.round(p.x), Math.round(p.z)]; }; window.__SIDE__ = (s, side, back, up = 1.7, ahead = 6) => { const t = D.track, p = t.sample(s), lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, fx = Math.sin(p.h), fz = Math.cos(p.h); const w = side > 0 ? p.wl : p.wr; window.__CAM__ = { pos: [p.x - lx * 2 - fx * back, p.y + up, p.z - lz * 2 - fz * back], look: [p.x + lx * (w + 6) + fx * ahead, p.y + 3.2, p.z + lz * (w + 6) + fz * ahead], fov: 60 }; }; window.__UP__ = (s) => { const t = D.track, p = t.sample(s), q = t.sample(s + 70); window.__CAM__ = { pos: [p.x, p.y + 5.5, p.z], look: [q.x, q.y + 9, q.z], fov: 62 }; }; })()" },
+  { "js": "window.__GO__(1500)" }, { "wait": 3000 }, { "shot": "Q1_chase" },
+  { "js": "window.__SIDE__(1500, 1, 0)" }, { "wait": 500 }, { "shot": "Q2_side" },
+  { "js": "window.__SIDE__(1500, -1, 0, 1.4, 3)" }, { "wait": 500 }, { "shot": "Q3_side_r" },
+  { "js": "window.__UP__(1500)" }, { "wait": 500 }, { "shot": "Q4_up" },
+  { "js": "window.__CAM__ = null; window.__GO__(3100)" }, { "wait": 3000 }, { "shot": "Q5_chase_3100" }
+]

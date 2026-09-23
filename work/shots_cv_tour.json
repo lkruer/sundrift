@@ -1,0 +1,15 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 5000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); window.__GO__ = (s) => { const p = D.teleport(s, 0); return [Math.round(p.x), Math.round(p.z), +p.k.toFixed(3)]; }; })()" },
+  { "js": "window.__GO__(700)" }, { "wait": 2500 }, { "shot": "T1_700" },
+  { "js": "window.__GO__(1000)" }, { "wait": 2500 }, { "shot": "T2_1000" },
+  { "js": "window.__GO__(1250)" }, { "wait": 2500 }, { "shot": "T3_1250" },
+  { "js": "window.__GO__(1700)" }, { "wait": 2500 }, { "shot": "T4_1700" },
+  { "js": "window.__GO__(2000)" }, { "wait": 2500 }, { "shot": "T5_2000" },
+  { "js": "window.__GO__(2450)" }, { "wait": 2500 }, { "shot": "T6_2450" },
+  { "js": "window.__GO__(2800)" }, { "wait": 2500 }, { "shot": "T7_2800" },
+  { "js": "window.__GO__(3300)" }, { "wait": 2500 }, { "shot": "T8_3300" }
+]
