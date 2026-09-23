@@ -1,6 +1,7 @@
 // Screenshots of the game under a script, at full frame rate, headless.
 //   node work/shot.mjs <script.json|inline-json> [--phone] [--out=work/shots]
 // A script is a list of steps: { wait: ms } | { js: "code run in the page" } | { shot: "name" } | { click: "#sel" }
+//   | { mouse: ['down' | 'move' | 'up', x, y, 'left' | 'right'] }
 //   | { keys: ["KeyW"], ms: 800 } (hold keys for ms)
 import fs from 'fs';
 import path from 'path';
@@ -45,6 +46,7 @@ for (const s of steps) {
   if (s.wait) await sleep(s.wait);
   if (s.js) { const r = await page.evaluate(s.js); if (r !== undefined) console.log(JSON.stringify(r)); }
   if (s.click) await page.click(s.click);
+  if (s.mouse) { const [act, x, y, button] = s.mouse; if (act === 'down') { await page.mouse.move(x, y); await page.mouse.down({ button: button || 'left' }); } else if (act === 'move') await page.mouse.move(x, y, { steps: 12 }); else await page.mouse.up({ button: button || 'left' }); }
   if (s.keys) { for (const k of s.keys) await page.keyboard.down(k); await sleep(s.ms || 500); for (const k of s.keys) await page.keyboard.up(k); }
   if (s.shot) { await page.screenshot({ path: path.join(OUT, s.shot + '.png') }); console.log('shot', s.shot); }
 }

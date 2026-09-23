@@ -1,0 +1,17 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 4000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.G.hour = 13; D.G.hourShown = 13; const f = D.track.features.find((f) => f.type === 'express'); window.__EX__ = [f.s0, f.s1]; D.teleport(f.s0 + 200, 0); return [Math.round(f.s0), Math.round(f.s1)]; })()" },
+  { "wait": 3000 },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const [a] = window.__EX__; const p = t.sample(a + 200); const lx = Math.cos(p.h), lz = -Math.sin(p.h); window.__CAM__ = { pos: [p.x - Math.sin(p.h) * 34 + lx * 16, p.y + 16, p.z - Math.cos(p.h) * 34 + lz * 16], look: [p.x + Math.sin(p.h) * 10, p.y - 4, p.z + Math.cos(p.h) * 10], fov: 62 }; return [+p.elev.toFixed(1), +(p.bank * 57.3).toFixed(1)]; })()" },
+  { "wait": 1000 },
+  { "shot": "E6_aerial_day" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const [a] = window.__EX__; const p = t.sample(a + 90); const lx = Math.cos(p.h), lz = -Math.sin(p.h); window.__CAM__ = { pos: [p.x + lx * 14 + Math.sin(p.h) * 20, p.y + 1, p.z + lz * 14 + Math.cos(p.h) * 20], look: [p.x, p.y, p.z], fov: 70 }; return [+p.elev.toFixed(1)]; })()" },
+  { "wait": 1000 },
+  { "shot": "E7_ramp_side_day" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 21; D.G.hourShown = 21; })()" },
+  { "wait": 3500 },
+  { "shot": "E8_ramp_side_night" }
+]

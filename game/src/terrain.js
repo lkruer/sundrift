@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230328';
-import { REACH } from './ground.js?v=202609230328';
-import { instanceGroup } from './instancing.js?v=202609230328';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230440';
+import { REACH } from './ground.js?v=202609230440';
+import { instanceGroup } from './instancing.js?v=202609230440';
 
 export const TILE = 96;
 export const LODS = [
@@ -155,6 +155,7 @@ export class Terrain {
 
   _dispose(t) {
     if (t.mesh) { this.root.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh = null; }
+    if (t.trunks && this.o.colliders) { this.o.colliders.drop('tile' + t.i + ',' + t.j); t.trunks = null; }
     if (t.trees) { this.root.remove(t.trees); t.trees.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); t.trees = null; }
   }
 
@@ -186,6 +187,9 @@ export class Terrain {
     this.root.add(mesh);
     tile.mesh = mesh;
     if (trees) { this.root.add(trees); tile.trees = trees; }
+    // the trunks the car can hit (the near ring only: the car is never out in the far one)
+    if (this._trunks && this._trunks.length && this.o.colliders && lod === 0) { this.o.colliders.add('tile' + tile.i + ',' + tile.j, this._trunks); tile.trunks = true; }
+    this._trunks = null;
     tile.lod = lod;
     this.stats.built++; this.stats.ms += performance.now() - t0;
   }
@@ -310,7 +314,7 @@ export class Terrain {
     const n = seg + 3, sp = TILE / seg;
     const rng = mulberry32(((tile.i * 73856093) ^ (tile.j * 19349663) ^ (this.o.seed || 0)) >>> 0);
     const spacing = (lod === 0 ? 8.8 : 11.5) / (this.o.density || 1);
-    const cedars = [], sakura = [], broad = [], bare = [];
+    const cedars = [], sakura = [], broad = [], bare = [], trunks = (this._trunks = []);
     const cells = Math.floor(TILE / spacing);
     const step = TILE / cells;
     for (let gz = 0; gz < cells; gz++) for (let gx = 0; gx < cells; gx++) {
@@ -329,6 +333,7 @@ export class Terrain {
       const ry = rng() * Math.PI * 2, sc = 0.72 + rng() * 0.6;
       _q.setFromAxisAngle(_up, ry); _s.set(sc, sc, sc);
       const m = _m4.compose(_v.set(x, y, z), _q, _s).clone();
+      trunks.push([x, z, 0.36 * sc, y]);
       const patch = f.vnoise(x / 70, z / 70, 11);
       const pick = rng();
       // a grove: mostly cherry in blossom with fresh broadleaf through it (the far ring keeps only the cherry,

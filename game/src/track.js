@@ -13,8 +13,8 @@
  *
  * Pure maths, no Three.js: the game, the physics sim and the gate share it.
  */
-import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609230328';
-import { Field } from './field.js?v=202609230328';
+import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609230440';
+import { Field } from './field.js?v=202609230440';
 
 const TAU = Math.PI * 2;
 const wrap = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
@@ -66,7 +66,7 @@ export const CITY_DIFFS = {
     sweeperR: [70, 140], sweeperAng: [0.3, 0.6], essR: [18, 24], essAng: [1.5, 1.6], jog: [36, 64],
     kinkR: [150, 280], kinkAng: [0.12, 0.3], straight: [80, 160], ramp: [8, 12],
     weights: [['straight', 0.3], ['ess', 0.3], ['kink', 0.25], ['sweeper', 0.15]], maxOff: 0.45, setEvery: 3,
-    sets: ['busstop', 'conbini', 'shrine', 'conbini', 'busstop', 'shrine'],
+    sets: ['express', 'conbini', 'busstop', 'shrine', 'conbini', 'express', 'busstop', 'shrine'],
   },
   medium: {
     key: 'medium', label: 'MEDIUM', blurb: 'Square corners and dog-legs', salt: 606, city: true, startSet: 'conbini',
@@ -75,7 +75,7 @@ export const CITY_DIFFS = {
     sweeperR: [50, 110], sweeperAng: [0.35, 0.7], essR: [14, 18], essAng: [1.5, 1.6], jog: [28, 52],
     kinkR: [110, 220], kinkAng: [0.15, 0.35], straight: [60, 130], ramp: [7, 10],
     weights: [['straight', 0.26], ['ess', 0.38], ['kink', 0.22], ['sweeper', 0.14]], maxOff: 0.5, setEvery: 3,
-    sets: ['busstop', 'conbini', 'shrine', 'conbini', 'busstop', 'shrine'],
+    sets: ['express', 'conbini', 'busstop', 'shrine', 'conbini', 'express', 'busstop', 'shrine'],
   },
   hard: {
     key: 'hard', label: 'HARD', blurb: 'Tight back streets', salt: 707, city: true, startSet: 'conbini',
@@ -84,7 +84,7 @@ export const CITY_DIFFS = {
     sweeperR: [36, 80], sweeperAng: [0.4, 0.8], essR: [11, 14], essAng: [1.5, 1.6], jog: [22, 42],
     kinkR: [80, 160], kinkAng: [0.2, 0.4], straight: [40, 100], ramp: [6, 9],
     weights: [['straight', 0.2], ['ess', 0.44], ['kink', 0.22], ['sweeper', 0.14]], maxOff: 0.55, setEvery: 3,
-    sets: ['busstop', 'conbini', 'shrine', 'conbini', 'busstop', 'shrine'],
+    sets: ['express', 'conbini', 'busstop', 'shrine', 'conbini', 'express', 'busstop', 'shrine'],
   },
 };
 
@@ -115,7 +115,7 @@ export class Track {
     // road only ever climbs away from the road it has already laid
     this._below = new Map();                    // along-contour bin (4 m) -> highest uphill coordinate of the road below
     this._legStart = 0;                         // first sample of the current leg
-    this._sinceSet = 0; this._setIdx = 0; this._pendingTunnel = false;
+    this._sinceSet = 0; this._setIdx = 0; this._pendingTunnel = false; this._pendingExpress = false;
     this._floorFrom = 0;                        // first sample not yet part of the floor
     // the last few features stay provisional: when the road runs itself into a corner, the generator backs up and
     // lays them again differently. Only final road is published to the world (listeners, queries).
@@ -185,6 +185,9 @@ export class Track {
       plans.push(this._planStraight(100));
     } else if (this._pendingTunnel) {
       plans.push(this._planStraight(within(r, [96, 124]), 'tunnel'));
+    } else if (this._pendingExpress && this._legLeft > 200) {
+      plans.push(this._planExpress(e));
+      plans.push(this._planExpress(e, true));
     } else if (this._legLeft <= 0 && climbAng > -0.06) {
       plans.push(this._planHairpin(upSide, e));
       plans.push(this._planKink(upSide, within(r, D.kinkR), within(r, D.kinkAng) * 0.5));
@@ -320,6 +323,27 @@ export class Track {
     return { type: 'ess', dir, R: Math.min(R1, R2), segs };
   }
 
+  /**
+   * The expressway (NEO TOKYO): a ramp up onto a viaduct some thirteen metres over the streets, sweeping S-bends
+   * weaving between the towers (banked into every bend), and a ramp back down. The S-bends come in pairs that net
+   * no turn, so the road leaves heading the way it came.
+   */
+  _planExpress(e, short = false) {
+    const r = this.rng, lift = within(r, [11.5, 14.5]), G = 0.085;
+    const mark = (from, to) => { for (let k = from; k < to; k++) Object.assign(segs[k], { lift, gmax: G, express: true }); };
+    const segs = [{ len: 150, k0: 0, k1: 0 }];
+    mark(0, 1);
+    let dir = e > 0 ? -1 : 1;                              // the first bend turns back toward the contour
+    for (let n = 0; n < (short ? 1 : 2); n++) {
+      const R = within(r, [70, 115]), a = within(r, [0.42, 0.62]);
+      let k0 = segs.length; this._arc(segs, dir, R, a); segs.push({ len: within(r, [24, 44]), k0: 0, k1: 0 }); mark(k0, segs.length);
+      k0 = segs.length; this._arc(segs, -dir, R, a); segs.push({ len: within(r, [30, 60]), k0: 0, k1: 0 }); mark(k0, segs.length);
+      dir = -dir;
+    }
+    segs.push({ len: 160, k0: 0, k1: 0, lift: 0, gmax: G, express: true });
+    return { type: 'express', dir: 0, R: 70, segs };
+  }
+
   /** A switchback: an approach, a turn that brings the heading round to the far side of the contour, an exit. */
   _planHairpin(dir, e) {
     const D = this.D, r = this.rng;
@@ -389,7 +413,7 @@ export class Track {
     const rec = { n: i0, nf: this.features.length, nm: this.markers.length, nt: this.tunnels.length, np: this.pads.length,
       x: this._x, z: this._z, h: this._h, k: this._k, s: this._s, y: this._y, grade: this._grade, prevB: this._prevB,
       leg: this._leg, legLeft: this._legLeft, legStart: this._legStart, floorFrom: this._floorFrom,
-      sinceSet: this._sinceSet, setIdx: this._setIdx, pendingTunnel: this._pendingTunnel, below: null };
+      sinceSet: this._sinceSet, setIdx: this._setIdx, pendingTunnel: this._pendingTunnel, pendingExpress: this._pendingExpress, below: null };
     // hairpins are wider on the outside through the turn, the way a real pass is cut
     let widenLen = 0; for (const seg of plan.segs) if (seg.widen) widenLen += seg.len;
     let widenAt = 0;
@@ -405,10 +429,16 @@ export class Track {
         // elevation: converge on the mountain over ~26 m, move with its slope, never steeper than the grade limit
         const B = F.base(this._x, this._z);
         const dB = (B - this._prevB) / ds; this._prevB = B;
-        const want = clamp((B - this._y) / 26 + dB, -D.gmax, D.gmax);
-        this._grade += (want - this._grade) * Math.min(1, ds / 12);
+        const lift = seg.lift || 0, gm = seg.gmax || D.gmax;
+        const want = clamp((B + lift - this._y) / (seg.express ? 16 : 26) + dB, -gm, gm);
+        this._grade += (want - this._grade) * Math.min(1, ds / (seg.express ? 9 : 12));
         this._y += this._grade * ds;
         const p = this._sampleHere(plan.type === 'tunnel' ? 'straight' : plan.type, fi);
+        if (seg.express) {
+          p.express = true; p.elev = this._y - B;
+          // banked into the bend, up to 12 degrees, once the road is up off the street
+          p.bank = clamp(k * 18, -0.21, 0.21) * smoothstep(3, 7, p.elev);
+        }
         if (seg.widen && widenLen > 0) {
           const w = this.wall + 2.4 * Math.sin(Math.PI * clamp((widenAt + t * seg.len) / widenLen, 0, 1));
           if (outer > 0) p.wl = w; else p.wr = w;
@@ -441,6 +471,7 @@ export class Track {
     }
 
     // set pieces
+    if (plan.type === 'express') this._pendingExpress = false;
     if (plan.type === 'tunnel') {
       this._pendingTunnel = false;
       const ts0 = s0 + 12, ts1 = this._s - 12;
@@ -458,6 +489,7 @@ export class Track {
         const rot = D.sets || SET_ROTATION;
         const kind = rot[this._setIdx % rot.length];
         if (kind === 'tunnel') { this._pendingTunnel = true; this._setIdx++; this._sinceSet = 0; }
+        else if (kind === 'express') { this._pendingExpress = true; this._setIdx++; this._sinceSet = 0; }
         else if ((plan.type === 'straight' || plan.type === 'kink' || (plan.type === 'sweeper' && plan.R >= 45)) && len >= 86) {
           this._placeSet(kind, s0 + 20, i0, i1);
           this._setIdx++; this._sinceSet = 0;
@@ -499,7 +531,7 @@ export class Track {
     this._x = rec.x; this._z = rec.z; this._h = rec.h; this._k = rec.k; this._s = rec.s; this._y = rec.y;
     this._grade = rec.grade; this._prevB = rec.prevB; this._leg = rec.leg; this._legLeft = rec.legLeft;
     this._legStart = rec.legStart; this._floorFrom = rec.floorFrom;
-    this._sinceSet = rec.sinceSet; this._setIdx = rec.setIdx; this._pendingTunnel = rec.pendingTunnel;
+    this._sinceSet = rec.sinceSet; this._setIdx = rec.setIdx; this._pendingTunnel = rec.pendingTunnel; this._pendingExpress = rec.pendingExpress;
   }
 
   /** A set piece at distance s: a raised terrace cut into the uphill side, or a lay-by on the downhill side. */
@@ -549,7 +581,8 @@ export class Track {
     const t = clamp((s - a.s) / Math.max(1e-6, b.s - a.s), 0, 1);
     return { x: lerp(a.x, b.x, t), z: lerp(a.z, b.z, t), y: lerp(a.y, b.y, t), h: lerpAngle(a.h, b.h, t),
              k: lerp(a.k, b.k, t), s, wl: lerp(a.wl, b.wl, t), wr: lerp(a.wr, b.wr, t), i,
-             tunnel: a.tunnel && b.tunnel, nl: lerp(a.nl, b.nl, t), nr: lerp(a.nr, b.nr, t) };
+             tunnel: a.tunnel && b.tunnel, nl: lerp(a.nl, b.nl, t), nr: lerp(a.nr, b.nr, t),
+             express: !!(a.express && b.express), elev: lerp(a.elev || 0, b.elev || 0, t), bank: lerp(a.bank || 0, b.bank || 0, t) };
   }
 
   /**
@@ -577,7 +610,8 @@ export class Track {
     const L = Math.sqrt(L2);
     const u = ((x - a.x) * ez - (z - a.z) * ex) / L;      // left positive
     return { i, j, t, s: a.s + (b.s - a.s) * t, u, p: pts[i],
-             h: lerpAngle(a.h, b.h, t), y: lerp(a.y, b.y, t), wl: lerp(a.wl, b.wl, t), wr: lerp(a.wr, b.wr, t) };
+             h: lerpAngle(a.h, b.h, t), y: lerp(a.y, b.y, t), wl: lerp(a.wl, b.wl, t), wr: lerp(a.wr, b.wr, t),
+             bank: lerp(a.bank || 0, b.bank || 0, t) };
   }
 
   /** Sample indices i of segments (i, i+1) whose start lies in cells overlapping a box. */

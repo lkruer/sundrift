@@ -23,6 +23,9 @@ export class Input {
     this.onAny = null;            // called on the first real input, to unlock audio
     this.onPause = null;          // Escape or P
     this.onMute = null;           // M
+    // the orbit camera: hold either mouse button on the scene and drag; let go and the chase view comes back
+    this.orbit = { held: false, dx: 0, dy: 0 };
+    this._bindOrbit();
     this._bindKeys();
     this._bindTouch();
     this.setTouchMode(this.detectTouch());
@@ -62,6 +65,30 @@ export class Input {
     addEventListener('keydown', down, { passive: false });
     addEventListener('keyup', up);
     addEventListener('blur', () => this.keys.clear());
+  }
+
+  _bindOrbit() {
+    const ui = (t) => !!(t && t.closest && t.closest('button, a, input, #title .menu, #pause, #touch'));
+    const o = this.orbit;
+    addEventListener('mousedown', (e) => {
+      if ((e.button !== 0 && e.button !== 2) || ui(e.target)) return;
+      o.held = true; o.dx = 0; o.dy = 0;
+      document.body.classList.add('orbiting');
+      e.preventDefault();
+    });
+    addEventListener('mousemove', (e) => { if (o.held) { o.dx += e.movementX || 0; o.dy += e.movementY || 0; } });
+    const release = (e) => { if (!e || (e.buttons & 3) === 0) { o.held = false; document.body.classList.remove('orbiting'); } };
+    addEventListener('mouseup', release);
+    addEventListener('blur', () => release(null));
+    // the right button orbits, so it must not open the browser's menu over the game
+    addEventListener('contextmenu', (e) => { if (!ui(e.target)) e.preventDefault(); });
+  }
+
+  /** The drag since the last call, in pixels, and whether a button is held. */
+  takeOrbit() {
+    const o = this.orbit, r = { held: o.held, dx: o.dx, dy: o.dy };
+    o.dx = 0; o.dy = 0;
+    return r;
   }
 
   _bindTouch() {

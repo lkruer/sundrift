@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609230328';
-import { surface } from '../surfaces.js?v=202609230328';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230328';
-import { Ground } from './ground.js?v=202609230328';
-import { Terrain, LODS } from './terrain.js?v=202609230328';
-import { partsOf, Pool } from './instancing.js?v=202609230328';
+import { ASSET } from '../assetlib.js?v=202609230440';
+import { surface } from '../surfaces.js?v=202609230440';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230440';
+import { Ground } from './ground.js?v=202609230440';
+import { Terrain, LODS } from './terrain.js?v=202609230440';
+import { partsOf, Pool } from './instancing.js?v=202609230440';
 
 const ASSETS = {
   cedar: './assets/cedar_tree.js', maple: './assets/maple_tree.js', boulder: './assets/boulder.js',
@@ -35,10 +35,27 @@ const ASSETS = {
 const SURFACED = new Set(['boulder', 'post', 'pole', 'lamp', 'mirror', 'chevron', 'torii', 'lantern', 'portal', 'hut', 'vending', 'upole', 'conbini', 'busstop', 'jizo']);
 // pool capacities: what the whole visible road can hold at once
 const CAPS = {
-  lamp: 320, post: 1400, pole: 500, catseye: 900, chevron: 120, mirror: 40, boulder: 300, upole: 160,
+  lamp: 320, post: 1400, pole: 500, chevron: 120, mirror: 40, boulder: 300, upole: 160,
   maple: 300, broadleaf: 500, shrub: 1600, bamboo: 160, bare: 120, sakura: 700, weeping: 24,
   torii: 8, lantern: 24, hut: 12, vending: 90, conbini: 6, busstop: 8, portal: 8, chochin: 700, jizo: 40,
 };
+/**
+ * What the car can hit, by template: 'solid' things stop it (a hit, like a wall), 'knock' things are sent flying,
+ * 'flat' things are flattened. r is the collision radius at scale 1 (a tree's trunk, a post's pole), m the mass in
+ * kg (how far it flies, how much the car feels it); box takes the template's own footprint.
+ */
+const COLL = {
+  pole: { kind: 'knock', r: 0.13, m: 4 }, chevron: { kind: 'knock', r: 0.16, m: 9 }, mirror: { kind: 'knock', r: 0.14, m: 11 },
+  lamp: { kind: 'knock', r: 0.17, m: 60 }, vending: { kind: 'knock', box: true, m: 220 }, bollard: { kind: 'knock', r: 0.13, m: 7 },
+  shrub: { kind: 'flat', r: 0.55, m: 2 },
+  sakura: { kind: 'solid', r: 0.42 }, weeping: { kind: 'solid', r: 0.45 }, maple: { kind: 'solid', r: 0.3 }, broadleaf: { kind: 'solid', r: 0.3 },
+  bare: { kind: 'solid', r: 0.28 }, cedar: { kind: 'solid', r: 0.4 }, bamboo: { kind: 'solid', r: 0.85 }, boulder: { kind: 'solid', r: 0.7 },
+  upole: { kind: 'solid', r: 0.2 }, lantern: { kind: 'solid', r: 0.42 }, jizo: { kind: 'solid', r: 0.24 }, torii: { kind: 'solid', legs: true, r: 0.26 },
+  hut: { kind: 'solid', box: true }, conbini: { kind: 'solid', box: true }, busstop: { kind: 'solid', box: true },
+};
+const COL_CELL = 8;
+const colKey = (cx, cz) => (cx + 50000) * 100000 + (cz + 50000);
+
 const TINTED = new Set(['maple', 'broadleaf', 'shrub', 'sakura', 'weeping']);
 // a cherry's colour, by a number in 0..1: mostly the pale Somei-Yoshino, some pinker, a few nearly white
 const cherryColour = (r) => (r < 0.6 ? PAL.sakuraPale : r < 0.86 ? PAL.sakuraPink : PAL.sakuraWhite);
@@ -201,6 +218,8 @@ export class World {
     this.chunks = new Map();
     this.boxes = [];            // chunk index -> [minx, minz, maxx, maxz] once final
     this.lamps = [];            // { x, y, z, c, tunnel } lamp heads, for the night lights
+    this.cols = new Map();      // collider cell -> records of things the car can hit
+    this.colsBy = new Map();    // owner (a chunk's build or dress level, a terrain tile) -> its records
     this.root = new THREE.Group(); this.root.name = 'road'; scene.add(this.root);
     this.job = null;
     this.stats = { chunks: 0, near: 0 };
@@ -244,6 +263,8 @@ export class World {
       tpl.traverse((o) => { if (o.isMesh && o.material && o.material.emissive && o.material.emissiveIntensity > 0.5) { o.material = o.material.clone(); o.material.emissiveIntensity = 2.6; } });
     }
     for (const k of names) this.parts[k] = partsOf(this.templates[k]);
+    this.foot = {};
+    for (const k of names) { const b = new THREE.Box3().setFromObject(this.templates[k]); this.foot[k] = [(b.max.x - b.min.x) / 2, (b.max.z - b.min.z) / 2, b.max.y - b.min.y]; }
     // the far forest's cherry: the same blossom and bark materials on a hundred-odd triangles (five flattened
     // clouds in an umbrella over a trunk), for the ring of tiles past 200 m where the full tree's 1,200 would be
     // spent on a pink dot
@@ -345,6 +366,39 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       this.glowCoolMat = this.glowMat.clone(); this.glowCoolMat.color.set(0xd8ecff);
       this.glowLanternMat = this.glowMat.clone(); this.glowLanternMat.color.set(0xff7050);
       this.glowCityMat = this.glowMat.clone(); this.glowCityMat.color.set(0xc6d8ff);
+      // road studs: retroreflectors drawn as points of light, a fixed few pixels across however far, bright where
+      // the headlights point (a retroreflector sends the beam straight back, so it shines from far beyond the
+      // beam's own reach) and dim elsewhere; additive and depth-tested but not depth-written, so never inked
+      this.studMat = new THREE.ShaderMaterial({
+        uniforms: { uCar: { value: new THREE.Vector3(0, -1e4, 0) }, uFwd: { value: new THREE.Vector2(0, 1) }, uNight: { value: 1 }, uScale: { value: 720 } },
+        vertexShader: `
+          uniform vec3 uCar; uniform vec2 uFwd; uniform float uNight, uScale;
+          attribute vec3 aCol;
+          varying vec3 vC; varying float vA;
+          void main() {
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            float d = max(0.5, -mv.z);
+            vec2 to = position.xz - uCar.xz; float dl = length(to);
+            float ahead = smoothstep(0.5, 0.93, dot(to / max(dl, 0.01), uFwd)) * step(2.5, dl);
+            float near = smoothstep(60.0, 6.0, dl);
+            float lit = 0.34 + 0.66 * max(ahead, near * 0.8);
+            vA = lit * (0.2 + 0.8 * uNight) * smoothstep(640.0, 420.0, d);
+            vC = aCol;
+            float k = uScale / 720.0;
+            gl_PointSize = clamp(uScale * 0.24 / d, 2.3 * k, 8.0 * k) * (0.8 + 0.4 * lit);
+            gl_Position = projectionMatrix * mv;
+          }`,
+        fragmentShader: `
+          varying vec3 vC; varying float vA;
+          void main() {
+            vec2 c = gl_PointCoord - 0.5; float r = dot(c, c);
+            if (r > 0.25) discard;
+            float a = smoothstep(0.25, 0.02, r);
+            gl_FragColor = vec4(vC * (1.6 + 2.8 * a * a), vA * a);
+          }`,
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      this.studMat.name = 'studs';
     }
     // the shared pools
     if (this.parts.sakuraFar) this.pools.sakuraFar = new Pool(this.parts.sakuraFar, 700, { tint: true });
@@ -365,9 +419,10 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this.buildSky();
     // the city (NEO TOKYO): its module is loaded here, and its materials made now so they compile with the rest
     try {
-      this.City = await import('./city.js?v=202609230328');
+      this.glyphs = drawsGlyphs;
+      this.City = await import('./city.js?v=202609230440');
       this._cityMats = this.City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
-      const L = await import('./landmarks.js?v=202609230328').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+      const L = await import('./landmarks.js?v=202609230440').catch((e) => { console.warn('landmarks', e && e.message); return null; });
       this.citySky = this.City.citySkyBuild(this, L);
       this.citySky.visible = false;
       this.scene.add(this.citySky);
@@ -395,7 +450,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this.texLen = rt.len;
     const tp = { cedar: this.parts.cedar, maple: this.parts.maple, broadleaf: this.parts.broadleaf, bare: this.parts.bare, sakura: this.parts.sakura || null, sakuraFar: this.parts.sakuraFar || null };
     const building = this.city ? { geometry: this.pools.bldg.parts[0].im.geometry, material: this.bldgMat } : null;
-    if (!this.terrain) this.terrain = new Terrain({ scene: this.scene, ground: this.ground, mat: this.groundMat, farMat: this.farMat, parts: tp, density: this.q.trees, seed: track.seed, city: this.city, building });
+    const colliders = { add: (o, list) => this.addTrees(o, list), drop: (o) => this.dropTrees(o) };
+    if (!this.terrain) this.terrain = new Terrain({ scene: this.scene, ground: this.ground, mat: this.groundMat, farMat: this.farMat, parts: tp, density: this.q.trees, seed: track.seed, city: this.city, building, colliders });
     else { this.terrain.o.seed = track.seed; this.terrain.o.city = this.city; this.terrain.o.building = building; this.terrain.reset(this.ground); }
     // new final road dirties the terrain beside it
     track.onAdd((i0, i1) => {
@@ -489,6 +545,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   _drop(ch) {
     this._undress(ch);
     for (const p of Object.values(this.pools)) p.removeOwner(ch.c * 2);
+    this._unregOwner(ch.c * 2);
     this.root.remove(ch.group);
     ch.group.traverse((o) => { if ((o.isMesh || o.isLineSegments) && ch.own.has(o.geometry)) o.geometry.dispose(); });
     this.lamps = this.lamps.filter((l) => l.c !== ch.c);
@@ -497,6 +554,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   _undress(ch) {
     if (!ch.near) return;
     for (const p of Object.values(this.pools)) p.removeOwner(ch.c * 2 + 1);
+    this._unregOwner(ch.c * 2 + 1);
     this._lodSwap(ch, false);
     if (ch.nearGroup) {
       ch.group.remove(ch.nearGroup);
@@ -507,11 +565,109 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   }
 
   /** Put one of a template into a pool under owner, at (x, y, z) turned ry, scaled. */
-  _put(name, owner, x, y, z, ry, sc = 1, sx = 1, colour = null) {
-    const pool = this.pools[name]; if (!pool) return;
+  _put(name, owner, x, y, z, ry, sc = 1, sx = 1, colour = null, reg = true) {
+    const pool = this.pools[name]; if (!pool) return null;
     _q.setFromAxisAngle(_up, ry); _s.set(sc * sx, sc, sc);
     _m4.compose(_v.set(x, y, z), _q, _s);
-    pool.add(owner, _m4, colour);
+    const id = pool.add(owner, _m4, colour);
+    const C = COLL[name];
+    if (!reg || !C || !id) return null;
+    const rec = { name, pool: name, id, owner, x, y, z, ry, sc, colour, kind: C.kind, r: (C.r || 0) * sc, m: C.m || 0, alive: true };
+    if (C.box) { const f = this.foot[name] || [1, 1, 2]; rec.hx = f[0] * sc * 0.96; rec.hz = f[1] * sc * 0.96; rec.r = Math.hypot(rec.hx, rec.hz); rec.box = true; }
+    if (C.legs) {
+      // a torii: its two legs, across the gate
+      const half = (this.foot[name] ? this.foot[name][0] : 2.7) * sc - 0.45, lx = Math.cos(ry), lz = -Math.sin(ry);
+      for (const s of [-1, 1]) this._reg(owner, { ...rec, x: x + lx * half * s, z: z + lz * half * s, r: C.r * sc });
+      return rec;
+    }
+    this._reg(owner, rec);
+    return rec;
+  }
+
+  // ------------------------------------------------------------------ what the car can hit
+
+  _reg(owner, rec) {
+    rec.owner = owner;
+    const R = rec.r || 0.5, c0x = Math.floor((rec.x - R) / COL_CELL), c1x = Math.floor((rec.x + R) / COL_CELL);
+    const c0z = Math.floor((rec.z - R) / COL_CELL), c1z = Math.floor((rec.z + R) / COL_CELL);
+    rec.cells = [];
+    for (let cx = c0x; cx <= c1x; cx++) for (let cz = c0z; cz <= c1z; cz++) {
+      const k = colKey(cx, cz); let a = this.cols.get(k); if (!a) this.cols.set(k, a = []);
+      a.push(rec); rec.cells.push(k);
+    }
+    let o = this.colsBy.get(owner); if (!o) this.colsBy.set(owner, o = []);
+    o.push(rec);
+  }
+
+  _unreg1(rec) {
+    for (const k of rec.cells || []) { const a = this.cols.get(k); if (!a) continue; const i = a.indexOf(rec); if (i >= 0) { a[i] = a[a.length - 1]; a.pop(); } if (!a.length) this.cols.delete(k); }
+    rec.cells = null;
+  }
+
+  _unregOwner(owner) {
+    const o = this.colsBy.get(owner); if (!o) return;
+    for (const rec of o) if (rec.cells) this._unreg1(rec);
+    this.colsBy.delete(owner);
+  }
+
+  /** Every live record whose cell is within reach of (x, z); calls fn(rec) for each (a record may repeat). */
+  near(x, z, reach, fn) {
+    const c0x = Math.floor((x - reach) / COL_CELL), c1x = Math.floor((x + reach) / COL_CELL);
+    const c0z = Math.floor((z - reach) / COL_CELL), c1z = Math.floor((z + reach) / COL_CELL);
+    for (let cx = c0x; cx <= c1x; cx++) for (let cz = c0z; cz <= c1z; cz++) {
+      const a = this.cols.get(colKey(cx, cz)); if (!a) continue;
+      for (let i = 0; i < a.length; i++) if (a[i].alive) fn(a[i]);
+    }
+  }
+
+  /** Terrain tiles register their forest's trunks here (and take them away with the tile). */
+  addTrees(owner, list) { for (const [x, z, r, y] of list) this._reg(owner, { name: 'tree', kind: 'solid', x, y: y ?? 0, z, r, alive: true }); }
+  dropTrees(owner) { this._unregOwner(owner); }
+
+  /**
+   * Knock one thing over: it leaves its pool (and, a lamp, its light, its bulb and its pool of light go out) and
+   * the caller throws a copy of it into the air. False if it was already gone.
+   */
+  knock(rec) {
+    if (!rec.alive) return false;
+    rec.alive = false;
+    const pool = this.pools[rec.pool]; if (pool && rec.id) pool.removeId(rec.id);
+    if (rec.cells) this._unreg1(rec);
+    if (rec.light) { const i = this.lamps.indexOf(rec.light); if (i >= 0) this.lamps.splice(i, 1); }
+    if (rec.bulbId) this.pools.bulb.removeId(rec.bulbId);
+    if (rec.glowMesh) rec.glowMesh.visible = false;
+    if (rec.glowList && rec.ch) {
+      const i = rec.glowList.indexOf(rec.glow); if (i >= 0) rec.glowList.splice(i, 1);
+      this._lampGlowMesh(rec.ch);
+    }
+    return true;
+  }
+
+  /**
+   * Where the car meets a hard edge on each side of each sample, as a distance beyond the road's edge: 0 at a rail
+   * or a tunnel's lining (and near a portal), 2.75 at a city's street fronts, Infinity where there is nothing:
+   * there the car can leave the road.
+   */
+  _hardLines(ch) {
+    const t = this.track, pts = t.pts;
+    for (let i = ch.i0; i <= ch.i1; i++) {
+      const p = pts[i], k = i - ch.i0, tun = p.tunnel || t.nearTunnel(p.s, 12);
+      for (const side of [1, -1]) {
+        const off = tun || p.express || ch.rails[side][k] ? 0 : this.city ? 2.75 : Infinity;
+        if (side > 0) p.hardL = off; else p.hardR = off;
+      }
+    }
+  }
+
+  /** Out of the reckoning, but left standing (a bush, flattened where it grew). */
+  retire(rec) { rec.alive = false; if (rec.cells) this._unreg1(rec); }
+
+  /** The chunk's street lamps' pools of light, one mesh, rebuilt when one goes out. */
+  _lampGlowMesh(ch) {
+    if (ch.lampGlow) { ch.group.remove(ch.lampGlow); ch.lampGlow.geometry.dispose(); ch.own.delete(ch.lampGlow.geometry); ch.lampGlow = null; }
+    if (!ch.lampGlows || !ch.lampGlows.length) return;
+    const m = this._glows(ch.lampGlows, ch, this.city ? this.glowCityMat : this.glowMat);
+    if (m) { ch.group.add(m); ch.lampGlow = m; }
   }
 
   /** Position at lateral offset u from sample p, left positive, on the ground unless y is given. */
@@ -528,6 +684,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     ch.group.add(this._ribbon(ch));
     yield;
     ch.rails = this._railPlan(ch);
+    this._hardLines(ch);
     const rail = this._rails(ch); if (rail) ch.group.add(rail);
     const tube = this._tunnel(ch); if (tube) ch.group.add(tube);
     yield;
@@ -535,7 +692,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this._setPieces(ch);
     this._avenueFor(ch);
     this._signsFor(ch);
-    if (this.city) this.City.cityChunk(this, ch);
+    this._studs(ch);
+    if (this.city) yield* this.City.cityChunk(this, ch);
     this.root.add(ch.group);
     ch.built = true;
   }
@@ -550,13 +708,13 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       const p = pts[ch.i0 + k];
       const lx = Math.cos(p.h), lz = -Math.sin(p.h);
       const us = [-p.wr, -Math.min(TW, p.wr), -half, 0, half, Math.min(TW, p.wl), p.wl];
-      const v = p.s / this.texLen;
+      const v = p.s / this.texLen, tb = Math.tan(p.bank || 0), cb = Math.cos(p.bank || 0), sb = Math.sin(p.bank || 0);
       for (let j = 0; j < cols; j++) {
         const u = us[j], o = k * per + j;
         const dy = Math.abs(u) < half ? 0.012 * (1 - Math.abs(u) / half) : 0;
-        pos[o * 3] = p.x + lx * u; pos[o * 3 + 1] = p.y + dy; pos[o * 3 + 2] = p.z + lz * u;
+        pos[o * 3] = p.x + lx * u; pos[o * 3 + 1] = p.y + dy - u * tb; pos[o * 3 + 2] = p.z + lz * u;
         uv[o * 2] = (clamp(u, -TW, TW) + TW) / (2 * TW); uv[o * 2 + 1] = v;
-        nor[o * 3 + 1] = 1;
+        nor[o * 3] = lx * sb; nor[o * 3 + 1] = cb; nor[o * 3 + 2] = lz * sb;
       }
       for (let e = 0; e < 2; e++) {
         const src = k * per + (e === 0 ? 0 : cols - 1), o = k * per + cols + e;
@@ -601,7 +759,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         const [x, z] = this._at(p, (w + 4.5) * side);
         const drop = p.y - g.height(x, z);
         const tight = Math.abs(p.k) > 1 / 45 && Math.sign(p.k) === -side;
-        if (this.city || drop > 0.9 || tight) plan[side][i - ch.i0] = 1;
+        // a rail where the ground falls away or on the outside of a tight bend (in the city there is none: the
+        // expressway's edges are its concrete barriers, and hard all the same)
+        if (!this.city && (drop > 0.9 || tight)) plan[side][i - ch.i0] = 1;
       }
     }
     // no stubs, no gaps: fill gaps of up to 4 samples, drop runs shorter than 6
@@ -890,18 +1050,21 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       if (t.markerAt(p.s, side) || t.padAt(p.s, side)) side = -side;
       if (t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
       const w = side > 0 ? p.wl : p.wr;
-      const [x, z] = this._at(p, (w + 0.55) * side);
-      const y = g.height(x, z);
+      const [x, z] = this._at(p, (w + (p.express ? 0.45 : 0.55)) * side);
+      const y = p.express ? p.y - (w + 0.45) * side * Math.tan(p.bank || 0) + 0.95 : g.height(x, z);
       const ry = side > 0 ? p.h + Math.PI : p.h;               // the arm reaches local +X: point it at the road
-      this._putLod(ch, 'lamp', x, y, z, ry, 1, null);
+      const rec = this._putLod(ch, 'lamp', x, y, z, ry, 1, null);
       const hx = x + Math.cos(ry) * this.lampHead[0], hz = z - Math.sin(ry) * this.lampHead[0];
       const hy = y + this.lampHead[1];
-      this.lamps.push(this.city ? { x: hx, y: hy - 0.25, z: hz, c: ch.c, color: 0xe2ecff, power: 230 } : { x: hx, y: hy - 0.25, z: hz, c: ch.c });
+      rec.light = this.city ? { x: hx, y: hy - 0.25, z: hz, c: ch.c, color: 0xe2ecff, power: 230 } : { x: hx, y: hy - 0.25, z: hz, c: ch.c };
+      this.lamps.push(rec.light);
       _q.setFromAxisAngle(_up, 0); _m4.compose(_v.set(hx, hy - 0.22, hz), _q, _s.set(1, 1, 1));
-      this.pools.bulb.add(ch.c * 2, _m4);
-      glows.push([hx, hz, this.city ? 9 : 12]);
+      rec.bulbId = this.pools.bulb.add(ch.c * 2, _m4);
+      rec.glow = [hx, hz, this.city ? 9 : 12]; rec.glowList = glows;
+      glows.push(rec.glow);
     }
-    if (glows.length) { const m = this._glows(glows, ch, this.city ? this.glowCityMat : this.glowMat); if (m) ch.group.add(m); }
+    ch.lampGlows = glows;
+    this._lampGlowMesh(ch);
   }
 
   /** Light pools that lie on the ground (a small grid draped over it), so none floats beside an embankment. */
@@ -958,8 +1121,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
           else this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.85 + rng() * 0.3, cherryColour(rng()));
         }
         for (let k = 0; k < 4; k++) { const a = at(m.s + 2 + k * 7, u0 + 12 + rng() * 1.5); this._put('bamboo', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.85 + rng() * 0.35); }
-        const l = at(m.s + 24, u0 + 2.4); this._put('lamp', own, l.x, l.y, l.z, face(l.p) + Math.PI);
-        this._lampAt(ch, l.x, l.y, l.z, face(l.p) + Math.PI);
+        const l = at(m.s + 24, u0 + 2.4); this._lampAt(ch, l.x, l.y, l.z, face(l.p) + Math.PI, this._put('lamp', own, l.x, l.y, l.z, face(l.p) + Math.PI));
         continue;
       }
       // a lay-by: the building stands on the pad beyond its edge, facing the road
@@ -971,12 +1133,12 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         { const a = at(mid, edge - 1.5); const gm = this._glows([[a.x, a.z, 16]], ch, this.glowCoolMat); if (gm) ch.group.add(gm);
           this.lamps.push({ x: a.x, y: a.y + 3.2, z: a.z, c: ch.c, color: 0xdcecff, power: 260 }); }
         for (const [ds, du] of [[mid - 9, 0.9], [mid - 7.8, 0.9]]) { const a = at(ds, edge + du); this._put('vending', own, a.x, a.y, a.z, face(a.p)); }
-        for (const ds of [m.s - 4, m.s + m.len - 6]) { const a = at(ds, edge + 0.4); this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI); }
+        for (const ds of [m.s - 4, m.s + m.len - 6]) { const a = at(ds, edge + 0.4); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI, this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI)); }
         { const a = at(m.s + m.len - 2, edge + m.depth - 1); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.9, cherryColour(rng())); }
       } else if (m.kind === 'busstop') {
         { const a = at(mid, edge + 1.6); this._put('busstop', own, a.x, a.y, a.z, face(a.p)); }
         { const a = at(mid - 3.4, edge + 0.8); this._put('jizo', own, a.x, a.y, a.z, face(a.p), 1.0); }
-        { const a = at(mid + 8, edge + 0.6); this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI); }
+        { const a = at(mid + 8, edge + 0.6); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI, this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI)); }
         { const a = at(mid - 7, edge + 3); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 1.0, cherryColour(rng())); }
         for (let k = 0; k < 3; k++) { const a = at(mid + 12 + k * 4, edge + 2 + rng() * 2); this._put('bamboo', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.8 + rng() * 0.3); }
       } else if (m.kind === 'hut' || m.kind === 'vista') {
@@ -991,7 +1153,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
           { const a = at(mid - 4, edge + m.depth - 2.2); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 1.05, PAL.sakuraPale); }
         }
         if (m.kind === 'hut') { const a = at(mid + 7, edge + m.depth - 1.5); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.95, cherryColour(rng())); }
-        { const a = at(m.s + 2, edge + 0.6); this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI); }
+        { const a = at(m.s + 2, edge + 0.6); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI, this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI)); }
       }
     }
   }
@@ -1194,6 +1356,42 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     return m;
   }
 
+  /**
+   * Road studs along the chunk: white on the centre line every 12 m, amber at both edges every 8 m, a few
+   * centimetres above the ribbon. One Points draw per chunk; their light is the shader's.
+   */
+  _studs(ch) {
+    const t = this.track, pts = t.pts;
+    const pos = [], col = [];
+    const W = [1.0, 0.95, 0.86], A = [1.0, 0.56, 0.14];
+    for (let i = ch.i0; i < ch.i1; i++) {
+      const p = pts[i];
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h), bank = p.bank || 0;
+      const ph = (((p.s - 2) % 12) + 12) % 12, pe = (((p.s - 6) % 8) + 8) % 8;
+      if (ph < t.step) { pos.push(p.x, p.y + 0.06, p.z); col.push(...W); }
+      if (pe < t.step) for (const side of [1, -1]) {
+        const u = (t.half - 0.3) * side;
+        pos.push(p.x + lx * u, p.y + 0.055 - u * Math.tan(bank), p.z + lz * u); col.push(...A);
+      }
+    }
+    if (!pos.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('aCol', new THREE.Float32BufferAttribute(col, 3));
+    geo.computeBoundingSphere();
+    ch.own.add(geo);
+    const m = new THREE.Points(geo, this.studMat);
+    m.name = 'studs'; m.renderOrder = 3;
+    ch.group.add(m);
+  }
+
+  /** Where the studs are looked at from: the car and its heading, how dark it is, the view's height in pixels. */
+  setStudView(x, y, z, fx, fz, night, heightPx) {
+    if (!this.studMat) return;
+    const u = this.studMat.uniforms;
+    u.uCar.value.set(x, y, z); u.uFwd.value.set(fx, fz); u.uNight.value = night; u.uScale.value = heightPx;
+  }
+
   /** Where the pass runs through a cherry avenue: 170 m in every 640, clear of the tunnels. */
   avenueAt(s) {
     const ph = (((s + 230) % 640) + 640) % 640;
@@ -1284,21 +1482,31 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
    * beside the car. Placements are kept on the chunk to swap back.
    */
   _putLod(ch, name, x, y, z, ry, sc, colour) {
-    (ch.lod || (ch.lod = [])).push([name, x, y, z, ry, sc, colour]);
-    const far = this.pools[name + 'Far'];
-    if (ch.near || !far) this._put(name, ch.near ? ch.c * 2 + 1 : ch.c * 2, x, y, z, ry, sc, 1, colour);
-    else this._put(name + 'Far', ch.c * 2, x, y, z, ry, sc, 1, colour);
+    const C = COLL[name] || {};
+    const rec = { name, x, y, z, ry, sc, colour, kind: C.kind || 'none', r: (C.r || 0.3) * sc, m: C.m || 0, alive: true, lod: true, ch };
+    (ch.lod || (ch.lod = [])).push(rec);
+    this._lodPlace(ch, rec, ch.near);
+    if (C.kind) this._reg(ch.c * 2, rec);
+    return rec;
+  }
+
+  _lodPlace(ch, rec, near) {
+    const far = this.pools[rec.name + 'Far'];
+    rec.pool = near || !far ? rec.name : rec.name + 'Far';
+    const owner = near && far ? ch.c * 2 + 1 : ch.c * 2;
+    const pool = this.pools[rec.pool]; if (!pool) { rec.id = 0; return; }
+    _q.setFromAxisAngle(_up, rec.ry); _s.set(rec.sc, rec.sc, rec.sc);
+    _m4.compose(_v.set(rec.x, rec.y, rec.z), _q, _s);
+    rec.id = pool.add(owner, _m4, rec.colour);
   }
 
   _lodSwap(ch, near) {
     if (!ch.lod) return;
-    const names = new Set(ch.lod.map((l) => l[0]));
+    const names = new Set(ch.lod.map((l) => l.name));
     for (const n of names) { const far = this.pools[n + 'Far']; if (far) far.removeOwner(ch.c * 2); }
-    for (const [name, x, y, z, ry, sc, colour] of ch.lod) {
-      const far = this.pools[name + 'Far'];
-      if (!far) continue;                       // (placed full at build level, never swapped)
-      if (near) this._put(name, ch.c * 2 + 1, x, y, z, ry, sc, 1, colour);
-      else this._put(name + 'Far', ch.c * 2, x, y, z, ry, sc, 1, colour);
+    for (const rec of ch.lod) {
+      if (!rec.alive || !this.pools[rec.name + 'Far']) continue;   // (knocked over, or placed full and never swapped)
+      this._lodPlace(ch, rec, near);
     }
   }
 
@@ -1309,12 +1517,14 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   }
 
   /** A lamp placed by a set piece: its bulb, its light and its pool of light. */
-  _lampAt(ch, x, y, z, ry) {
+  _lampAt(ch, x, y, z, ry, rec = null) {
     const hx = x + Math.cos(ry) * this.lampHead[0], hz = z - Math.sin(ry) * this.lampHead[0], hy = y + this.lampHead[1];
-    this.lamps.push({ x: hx, y: hy - 0.25, z: hz, c: ch.c });
+    const light = { x: hx, y: hy - 0.25, z: hz, c: ch.c };
+    this.lamps.push(light);
     _q.setFromAxisAngle(_up, 0); _m4.compose(_v.set(hx, hy - 0.22, hz), _q, _s.set(1, 1, 1));
-    this.pools.bulb.add(ch.c * 2, _m4);
+    const bulbId = this.pools.bulb.add(ch.c * 2, _m4);
     const m = this._glows([[hx, hz, 10]], ch); if (m) ch.group.add(m);
+    if (rec) { rec.light = light; rec.bulbId = bulbId; rec.glowMesh = m; }
   }
 
   // ------------------------------------------------------------------ dress: the small things, near the car only
@@ -1340,8 +1550,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         }
       }
     }
-    // cat's eyes: white on the centre dashes every 12 m, red at the edges every 24 m (not in the city)
-    if (!this.city) for (let i = ch.i0; i < ch.i1; i++) {
+    // (the old cat's-eye models: replaced by the road studs, points of light built with the chunk)
+    if (false) for (let i = ch.i0; i < ch.i1; i++) {
       const p = pts[i];
       const ph = ((p.s - 2) % 12 + 12) % 12;
       if (ph >= 2) continue;
@@ -1444,7 +1654,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         if (t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
         const w = side > 0 ? p.wl : p.wr;
         if (rng() < 0.45 * dens && !lampNear(p.s)) {
-          const u = w + 1.8 + rng() * 3.8;
+          // (a clear strip beyond the edge: the car can leave the road now, and a trunk at the kerb is a wall)
+          const u = w + 3.2 + rng() * 3.4;
           const [x, z] = this._at(p, u * side);
           g.sample(x, z, 2.2, probe);
           if (probe.edge > 1.2 && !probe.tunnel) {
@@ -1505,7 +1716,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       geo.setIndex(idx); geo.computeVertexNormals();
-      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: colour, roughness: 1, metalness: 0, side: THREE.DoubleSide, flatShading: true }));
+      // (unlit and unfogged: the haze would take them to exactly the sky's colour; skylineTint mixes it in by hand)
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: colour, side: THREE.DoubleSide, fog: false }));
+      m.userData.base = new THREE.Color(colour);
       m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false;
       return m;
     };
@@ -1543,6 +1756,19 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this.town.geometry.attributes.position.needsUpdate = true; this.town.geometry.attributes.color.needsUpdate = true;
     this.town.geometry.computeBoundingSphere();
     this._townAt = [x, z];
+  }
+
+  /**
+   * The far ridges in the light of the hour: each ring its own colour mixed toward the haze (the nearer ring less),
+   * a little darker than the haze itself, so the ranges stand one behind another against the sky.
+   */
+  skylineTint(haze, night) {
+    if (!this.skyline) return;
+    this.skyline.children.forEach((m, i) => {
+      if (!m.userData.base) return;
+      const k = i === 0 ? 0.5 : 0.7, dark = (i === 0 ? 0.78 : 0.88) - 0.12 * night;
+      m.material.color.copy(m.userData.base).lerp(haze, k).multiplyScalar(dark);
+    });
   }
 
   /** Far things follow the camera: the skyline rings exactly, the towns in steps. */
@@ -1625,7 +1851,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       for (const name of ['maple', 'shrub', 'broadleaf', 'cedar', 'bamboo']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.40, 0.52, 0.92]);
       // blossom keeps more of its pink by night: moonlight turns it pale lilac rather than blue
       for (const name of ['sakura', 'weeping']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.80, 0.62, 0.74]);
-      if (this.skyline) this.skyline.children.forEach((m) => grab(m.material, [0.30, 0.38, 0.75]));
+      // (the far ridges take their colour from the haze: skylineTint)
     }
     for (const t of this._tinted) {
       const wk = t.mat === this.roadMat ? 1 - 0.38 * w : t.mat === this.groundMat ? 1 - 0.22 * w : 1;

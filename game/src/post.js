@@ -55,6 +55,9 @@ const Cel = {
       float dl = lin(vUv - vec2(px.x, 0.0)), dr = lin(vUv + vec2(px.x, 0.0)), du = lin(vUv + vec2(0.0, px.y)), dd = lin(vUv - vec2(0.0, px.y));
       float rel = (abs(dl - d0) + abs(dr - d0) + abs(du - d0) + abs(dd - d0)) / d0;
       float sil = smoothstep(0.04, 0.14, rel) * (1.0 - step(uFar * 0.9, d0));
+      // the sky (nothing written to depth): no bands, no dots, no ink, so the sun's glow stays a soft glow and
+      // is not cut into a great flat disc
+      float sky = step(uFar * 0.985, d0);
       // creases: a sobel on tone-mapped luma
       float a = tl(vUv + vec2(-px.x,  px.y)), b = tl(vUv + vec2(0.0,  px.y)), cc = tl(vUv + vec2( px.x,  px.y));
       float d = tl(vUv + vec2(-px.x,  0.0)),                                   e = tl(vUv + vec2( px.x,  0.0));
@@ -66,14 +69,14 @@ const Cel = {
       float l = luma(tm);
       float steps = 6.0;
       float q = floor(l * steps + 0.5) / steps;
-      float band = mix(l, q, 0.55 * uBands);
+      float band = mix(l, q, 0.55 * uBands * (1.0 - sky));
       vec3 col = c * (band + 0.006) / (l + 0.006);
       // halftone dots in the shade, the way printed shade is drawn
       float dots = 0.5 + 0.5 * sin(gl_FragCoord.x * 0.62) * sin(gl_FragCoord.y * 0.62);
       float shade = smoothstep(0.26, 0.06, l);
-      col *= 1.0 - 0.16 * shade * dots * uBands;
+      col *= 1.0 - 0.16 * shade * dots * uBands * (1.0 - sky);
       // ink
-      float ink = clamp(sil + crease * 0.45, 0.0, 1.0) * uInk;
+      float ink = clamp(sil + crease * 0.45 * (1.0 - sky), 0.0, 1.0) * uInk;
       col *= 1.0 - ink * 0.92;
       // grain and a faint scanline veneer
       float gr = (hash(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5) * uGrain;

@@ -1,0 +1,12 @@
+[
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.teleport(3000, 0); const c = D.car, U = D.track.field.U; const y = D.world.ground.height(c.x, c.z); window.__CAM__ = { pos: [c.x, y + 8, c.z], look: [c.x - U[0] * 500 + U[1] * 200, y - 20, c.z - U[1] * 500 - U[0] * 200], fov: 60 }; })()" },
+  { "wait": 2500 }, { "shot": "V1_night" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 11; D.G.hourShown = 11; D.G.lastApplied = -9; })()" },
+  { "wait": 3500 }, { "shot": "V2_day" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 17.9; D.G.hourShown = 17.9; D.G.lastApplied = -9; })()" },
+  { "wait": 3500 }, { "shot": "V3_dusk" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car, U = D.track.field.U; const y = D.world.ground.height(c.x, c.z); window.__CAM__ = { pos: [c.x, y + 8, c.z], look: [c.x + U[1] * 500, y + 30, c.z - U[0] * 500], fov: 60 }; })()" },
+  { "wait": 1200 }, { "shot": "V4_dusk_along" }
+]

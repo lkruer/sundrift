@@ -1,0 +1,15 @@
+[
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { window.__SUNCAM__ = (h) => { const D = window.__DEBUG__; D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9; }; window.__SUNCAM__(7.2); })()" },
+  { "wait": 3200 },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car, d = D.rig.sunDir; const y = D.world.ground.height(c.x, c.z); window.__CAM__ = { pos: [c.x, y + 3, c.z], look: [c.x + d.x * 100, y + 3 + d.y * 100, c.z + d.z * 100], fov: 60 }; return [d.x.toFixed(2), d.y.toFixed(2), d.z.toFixed(2)]; })()" },
+  { "wait": 600 }, { "shot": "SUN1_0712" },
+  { "js": "window.__SUNCAM__(10)" }, { "wait": 3200 },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car, d = D.rig.sunDir; const y = D.world.ground.height(c.x, c.z); window.__CAM__ = { pos: [c.x, y + 3, c.z], look: [c.x + d.x * 100, y + 3 + d.y * 100, c.z + d.z * 100], fov: 60 }; })()" },
+  { "wait": 600 }, { "shot": "SUN2_1000" },
+  { "js": "window.__SUNCAM__(17.5)" }, { "wait": 3200 },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car, d = D.rig.sunDir; const y = D.world.ground.height(c.x, c.z); window.__CAM__ = { pos: [c.x, y + 3, c.z], look: [c.x + d.x * 100, y + 3 + d.y * 100, c.z + d.z * 100], fov: 60 }; })()" },
+  { "wait": 600 }, { "shot": "SUN3_1730" },
+  { "js": "(() => { window.__CAM__ = null; })()" }, { "wait": 800 }, { "shot": "SUN4_1730_chase" }
+]

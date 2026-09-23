@@ -11,9 +11,10 @@
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202609230328';
-import { buildingMaterial } from './buildings.js?v=202609230328';
-import { neonAtlas } from './neon.js?v=202609230328';
+import { clamp, lerp, mulberry32 } from './config.js?v=202609230440';
+import { buildingMaterial } from './buildings.js?v=202609230440';
+import { neonAtlas } from './neon.js?v=202609230440';
+import { cityPropMaterials, lotProps, streetProps, bollardGeometry } from './cityprops.js?v=202609230440';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
@@ -113,7 +114,26 @@ export function cityLoad(w, Pool, fontFamily) {
   w.signalDim = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.3, metalness: 0.2 });
   w.zebraMat = new THREE.MeshStandardMaterial({ map: zebraTexture(), transparent: true, depthWrite: false, roughness: 0.55,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-  return [w.bldgMat, w.neonMat, w.neonHousingMat, w.neonGlowMat, w.streakMat, w.signalPoleMat, w.signalBoxMat, ...w.signalLit, w.signalDim, w.zebraMat];
+  // the street's clutter (cityprops.js), one draw per material per chunk
+  w.propMats = cityPropMaterials(THREE);
+  // the bollards the car can take out: a pool of their own
+  {
+    const b = bollardGeometry(THREE);
+    const m = w.propMats[b.material] || w.propMats.glossy;
+    w.pools.bollard = new Pool([{ geometry: b.geometry, material: m, local: new THREE.Matrix4() }], 900);
+    w.root.add(w.pools.bollard.group);
+    w.parts.bollard = [{ geometry: b.geometry, material: m, local: new THREE.Matrix4() }];
+    b.geometry.computeBoundingBox(); const bb = b.geometry.boundingBox;
+    w.foot.bollard = [(bb.max.x - bb.min.x) / 2, (bb.max.z - bb.min.z) / 2, bb.max.y - bb.min.y];
+  }
+  // the expressway: concrete deck and piers, Jersey barriers, a lit strip along them, the gantry's steel and its sign
+  w.deckMat = new THREE.MeshStandardMaterial({ color: 0x77746f, roughness: 0.93, metalness: 0 });
+  w.barrierMat = new THREE.MeshStandardMaterial({ color: 0xa9a59d, roughness: 0.88, metalness: 0 });
+  w.stripMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe2b8).multiplyScalar(1.9) });
+  w.gantryMat = new THREE.MeshStandardMaterial({ color: 0x565a62, roughness: 0.5, metalness: 0.55 });
+  w.shutoMat = shutoSignMaterial(w);
+  return [w.bldgMat, w.neonMat, w.neonHousingMat, w.neonGlowMat, w.streakMat, w.signalPoleMat, w.signalBoxMat, ...w.signalLit, w.signalDim, w.zebraMat,
+    ...Object.values(w.propMats), w.deckMat, w.barrierMat, w.stripMat, w.gantryMat, w.shutoMat];
 }
 
 /** How wet the street is: the neon streaks come up with it. */
@@ -121,6 +141,7 @@ export function cityWet(w, wet, night) {
   if (w.streakMat) w.streakMat.opacity = (0.22 + 0.78 * wet) * (0.3 + 0.7 * night);
   if (w.neonGlowMat) w.neonGlowMat.opacity = 0.9 * (0.35 + 0.65 * night);
   if (w.bldgMat && w.bldgMat.userData.uNight) w.bldgMat.userData.uNight.value = night;
+  if (w.bldgMat && w.bldgMat.userData.uWet) w.bldgMat.userData.uWet.value = wet;
 }
 
 /**
@@ -195,12 +216,14 @@ function signQuad(list, a, b, c, d, cell, flip) {
 /**
  * The city beside one chunk of road. w is the World; its track, ground, pools and lamps are used directly.
  */
-export function cityChunk(w, ch) {
+export function* cityChunk(w, ch) {
   const t = w.track, g = w.ground, pts = t.pts;
   const own = ch.c * 2;
   const rng = mulberry32((w.seed * 911 + ch.c * 7331) >>> 0);
   const probe = {};
   const signs = [], housings = [], glows = [], streaks = [], poles = [], boxes = [], lampsOn = [[], [], []], lampsOff = [], zebras = [];
+  const clutter = {};
+  let nLots = 0;
   const vSigns = w.neon.signs.filter((s) => s.vertical), hSigns = w.neon.signs.filter((s) => !s.vertical);
   const s0 = pts[ch.i0].s, s1 = pts[ch.i1].s;
   const at = (s, u) => { const p = t.sample(s); const lx = Math.cos(p.h), lz = -Math.sin(p.h); return [p.x + lx * u, p.z + lz * u, p]; };
@@ -217,7 +240,8 @@ export function cityChunk(w, ch) {
       // the inside of a square corner has no room for a lot
       if (Math.abs(p.k) > 1 / 70 && Math.sign(p.k) === side) continue;
       const wall = side > 0 ? p.wl : p.wr;
-      const u0 = wall + 2.9;
+      const up = p.express && p.elev > 3;                     // beside the viaduct: the towers it weaves between
+      const u0 = wall + (up ? 3.4 : 2.9);
       let depth = 10 + rng() * 14;
       // the footprint must clear every road: the one beside it and any other street behind or across
       const fits = (dep) => {
@@ -229,7 +253,8 @@ export function cityChunk(w, ch) {
       };
       if (!fits(depth)) { depth = 7; if (!fits(depth)) continue; }
       const r = rng();
-      const H = r < 0.55 ? 9 + rng() * 14 : r < 0.88 ? 22 + rng() * 22 : 44 + rng() * 40;
+      let H = r < 0.55 ? 9 + rng() * 14 : r < 0.88 ? 22 + rng() * 22 : 44 + rng() * 40;
+      if (up) H = Math.max(H, p.elev + 10 + rng() * 26);
       const [cx, cz] = at(sm, side * (u0 + depth / 2));
       const gy = g.height(cx, cz) - 0.3;
       // turned by the heading plus a quarter, the unit box's x runs along the road and its z across it
@@ -249,7 +274,7 @@ export function cityChunk(w, ch) {
         const sw = cell.w * scale, sh = cell.h * scale;
         const edge = (rng() < 0.5 ? -1 : 1) * (lotW * 0.5 - 0.7);
         const bx = frontX + fx * edge, bz = frontZ + fz * edge;
-        const yb = fy + 3.4 + rng() * Math.max(0, H - 4.2 - sh - 3.4) * 0.5, yt = yb + sh;
+        const yb = Math.max(fy + 3.4 + rng() * Math.max(0, H - 4.2 - sh - 3.4) * 0.5, up ? p.y - 1 + rng() * 3 : -1e9), yt = yb + sh;
         const out0 = -0.15, out1 = -0.15 - sw;                           // from the facade out over the pavement
         const P = (u, y, d) => [bx + lx * u + fx * d, y, bz + lz * u + fz * d];
         // (on the left of the road the sign's outer end is on a driver's right, so the cell is mirrored to read)
@@ -278,6 +303,10 @@ export function cityChunk(w, ch) {
         const [gx, gz] = at(sm, side * (wall + 0.8));
         glows.push([gx, gz, fx, fz, 6, Math.max(6, sw + 3), cell.colour]);
       }
+      // the building's clutter: air conditioners, pipes, fire escapes, balconies, roof tanks, awnings, lanterns
+      if (w.propMats) lotProps(THREE, { x: frontX, z: frontZ, y: fy, fx, fz, lx, lz, width: lotW * 0.985, depth, height: H, shop: !up }, rng, clutter);
+      // (a lot's clutter is half a millisecond: the chunk is built across frames, a few lots at a time)
+      if (++nLots % 4 === 0) yield;
       // vending machines on the pavement now and then
       if (rng() < 0.2 && w.pools.vending) {
         const [vx, vz] = at(sm + (rng() - 0.5) * lotW * 0.5, side * (u0 - 0.45));
@@ -285,6 +314,21 @@ export function cityChunk(w, ch) {
       }
     }
   }
+
+  // the pavement's clutter, in 30 m stretches on both sides (not under the viaduct, not in a corner's inside)
+  yield;
+  if (w.propMats) for (const side of [1, -1]) for (let s = s0; s < s1 - 4; s += 30) {
+    const p = t.sample(s);
+    if (p.tunnel || (p.express && p.elev > 1) || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
+    const wall = side > 0 ? p.wl : p.wr;
+    const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, fx = Math.sin(p.h), fz = Math.cos(p.h);
+    const x = p.x + lx * (wall + 0.15), z = p.z + lz * (wall + 0.15);
+    streetProps(THREE, { x, z, y: g.height(x, z), fx, fz, lx, lz, length: Math.min(30, s1 - s), heightAt: (qx, qz) => g.height(qx, qz) }, rng, clutter);
+  }
+  for (const [bx, by, bz] of clutter.__bollards || []) w._put('bollard', own, bx, by, bz, rng() * 6.28);
+  // the expressway: deck, piers, barriers and their lit strips, and a gantry at the top of the ramp
+  yield;
+  viaduct(w, ch);
 
   // square corners: zebra crossings either side of the turn, STOP painted before it, and a signal on the outside
   // (a corner already under way where the chunk begins belongs to the chunk before; one that runs on past the
@@ -310,6 +354,7 @@ export function cityChunk(w, ch) {
       const lx = Math.cos(q.h) * outside, lz = -Math.sin(q.h) * outside, fx = Math.sin(q.h), fz = Math.cos(q.h);
       const px = q.x + lx * (wall + 0.9), pz = q.z + lz * (wall + 0.9), py = g.height(px, pz);
       const pole = new THREE.CylinderGeometry(0.11, 0.13, 6.2, 10); pole.translate(px, py + 3.1, pz); poles.push(pole);
+      w._reg(own, { name: 'signal', kind: 'solid', x: px, y: py, z: pz, r: 0.16, alive: true });
       const armLen = wall + 0.9 - 2.2;
       const arm = new THREE.CylinderGeometry(0.07, 0.07, armLen, 8); arm.rotateZ(Math.PI / 2); arm.rotateY(q.h);
       arm.translate(px - lx * armLen / 2, py + 5.8, pz - lz * armLen / 2); poles.push(arm);
@@ -333,6 +378,7 @@ export function cityChunk(w, ch) {
     const m = new THREE.Mesh(geo, mat); m.name = name; m.castShadow = shadow; m.receiveShadow = true;
     ch.group.add(m);
   };
+  for (const [name, list] of Object.entries(clutter)) if (!name.startsWith('__') && list.length && w.propMats[name]) addMesh(list, w.propMats[name], 'clutter ' + name, name === 'props' || name === 'metal');
   addMesh(signs, w.neonMat, 'neon signs');
   addMesh(housings, w.neonHousingMat, 'sign housings');
   addMesh(poles, w.signalPoleMat, 'signal poles', true);
@@ -389,6 +435,125 @@ export function citySkyBuild(w, L) {
   g.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isLineSegments) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; } });
   g.userData = { aviation: ring.userData && ring.userData.aviation, tower };
   return g;
+}
+
+/** The Shuto's green gantry sign: the route, and two exits with their distances. */
+function shutoSignMaterial(w) {
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 320;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#0d6b44'; ctx.fillRect(0, 0, 1024, 320);
+  ctx.strokeStyle = '#f2f4f2'; ctx.lineWidth = 10; ctx.strokeRect(14, 14, 996, 292);
+  const jp = '"Dela Gothic One", "Noto Serif JP", "Yu Gothic", "Hiragino Sans", sans-serif';
+  const ok = w.glyphs ? w.glyphs('44px ' + jp, '首都高速環状線銀座新宿') : false;
+  ctx.fillStyle = '#f2f4f2'; ctx.textBaseline = 'middle';
+  // the route shield: a white rounded square with C1 in green
+  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(46, 52, 150, 108, 16); else ctx.rect(46, 52, 150, 108); ctx.fill();
+  ctx.fillStyle = '#0d6b44'; ctx.textAlign = 'center'; ctx.font = '700 84px Rajdhani, sans-serif'; ctx.fillText('C1', 121, 110);
+  ctx.fillStyle = '#f2f4f2'; ctx.textAlign = 'left';
+  ctx.font = ok ? '62px ' + jp : '700 58px Rajdhani, sans-serif'; ctx.fillText(ok ? '首都高速 環状線' : 'SHUTO EXPWY', 226, 92);
+  ctx.font = '700 30px Rajdhani, sans-serif'; ctx.fillText('SHUTO EXPRESSWAY  INNER CIRCULAR', 230, 150);
+  // the exits
+  const row = (y, kanji, romaji, km, arrow) => {
+    ctx.font = ok ? '56px ' + jp : '700 50px Rajdhani, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(ok ? kanji : romaji, 64, y);
+    if (ok) { ctx.font = '700 30px Rajdhani, sans-serif'; ctx.fillText(romaji, 64 + ctx.measureText('xxxxxxxx').width * 0 + 190, y + 4); }
+    ctx.textAlign = 'right'; ctx.font = '700 54px Rajdhani, sans-serif'; ctx.fillText(km, 900, y); ctx.font = '700 30px Rajdhani, sans-serif'; ctx.fillText('km', 960, y + 6);
+    ctx.save(); ctx.translate(990, y); ctx.rotate(arrow); ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(12, 4); ctx.lineTo(4, 4); ctx.lineTo(4, 16); ctx.lineTo(-4, 16); ctx.lineTo(-4, 4); ctx.lineTo(-12, 4); ctx.closePath(); ctx.fill(); ctx.restore();
+  };
+  ctx.fillStyle = 'rgba(242,244,242,.35)'; ctx.fillRect(40, 188, 944, 3); ctx.fillStyle = '#f2f4f2';
+  row(228, '銀座', 'Ginza', '2', 0);
+  row(282, '新宿', 'Shinjuku', '7', Math.PI / 4);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  return new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.3, roughness: 0.45 });
+}
+
+/**
+ * The expressway through a chunk: under the road ribbon a concrete deck whose sides run down to the street while
+ * it is low (a solid ramp) and stop at a girder's depth once it is up (with a pier every 30 m), a Jersey barrier
+ * along each edge with a lit strip on its inside face, and a green gantry where the ramp reaches the top.
+ */
+function viaduct(w, ch) {
+  const t = w.track, g = w.ground, pts = t.pts, last = Math.min(ch.i1 + 1, t.nFinal - 1);
+  const deck = { pos: [], nor: [], idx: [] }, bar = { pos: [], nor: [], idx: [] }, strip = { pos: [], nor: [], idx: [] };
+  const piers = [], gantry = [], signs = [];
+  // a strip of quads along a run: rows[k] is the k-th sample's list of points; faces join point j to j+1
+  const loft = (M, rows, closeRows) => {
+    const n = rows.length, m = rows[0].length, base = M.pos.length / 3;
+    for (const r of rows) for (const q of r) { M.pos.push(q[0], q[1], q[2]); M.nor.push(0, 1, 0); }
+    for (let k = 0; k < n - 1; k++) for (let j = 0; j < (closeRows ? m : m - 1); j++) {
+      const j2 = (j + 1) % m, a = base + k * m + j, b = base + k * m + j2, c = a + m, d = b + m;
+      M.idx.push(a, c, b, b, c, d);
+    }
+  };
+  let run = [];
+  const flush = () => {
+    if (run.length < 2) { run = []; return; }
+    const deckRows = [], barL = [], barR = [], stL = [], stR = [];
+    for (const p of run) {
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h), tb = Math.tan(p.bank || 0);
+      const Y = (u, dy = 0) => p.y - u * tb + dy;
+      const P = (u, y) => [p.x + lx * u, y, p.z + lz * u];
+      const uL = p.wl + 0.55, uR = -(p.wr + 0.55);
+      const low = p.elev < 5;
+      const gL = g.height(p.x + lx * uL, p.z + lz * uL), gR = g.height(p.x + lx * uR, p.z + lz * uR);
+      const bL = low ? Math.min(Y(uL) - 0.3, gL - 0.3) : Y(uL, -1.8), bR = low ? Math.min(Y(uR) - 0.3, gR - 0.3) : Y(uR, -1.8);
+      // the deck's cross-section, round from the left top edge, down, across the underside, up the right
+      deckRows.push([P(uL, Y(uL, -0.05)), P(uL, bL), P(uR, bR), P(uR, Y(uR, -0.05))]);
+      // the barriers: inner foot at the road's edge, a bevel, the top, the outer face
+      const wl = p.wl, wr = p.wr;
+      barL.push([P(wl, Y(wl, -0.02)), P(wl + 0.07, Y(wl, 0.32)), P(wl + 0.3, Y(wl, 1.0)), P(uL, Y(wl, 1.0)), P(uL, Y(uL, -0.05))]);
+      barR.push([P(-wr, Y(-wr, -0.02)), P(-wr - 0.07, Y(-wr, 0.32)), P(-wr - 0.3, Y(-wr, 1.0)), P(uR, Y(-wr, 1.0)), P(uR, Y(uR, -0.05))]);
+      stL.push([P(wl + 0.2, Y(wl, 0.66)), P(wl + 0.23, Y(wl, 0.76))]);
+      stR.push([P(-wr - 0.2, Y(-wr, 0.66)), P(-wr - 0.23, Y(-wr, 0.76))]);
+      // a pier every 30 m while the deck is up
+      if (!low && ((p.s % 30) + 30) % 30 < t.step) {
+        const gy = g.height(p.x, p.z), top = Math.min(bL, bR) - 0.05, hgt = top - gy;
+        if (hgt > 1) {
+          const col = new THREE.BoxGeometry(1.5, hgt, 1.1); col.rotateY(p.h); col.translate(p.x, gy + hgt / 2, p.z); piers.push(col);
+          const cap = new THREE.BoxGeometry(uL - uR - 0.6, 0.9, 1.4); cap.rotateY(p.h); cap.translate(p.x + lx * (uL + uR) / 2, top - 0.45, p.z + lz * (uL + uR) / 2); piers.push(cap);
+        }
+      }
+      // the gantry, once, where the ramp tops out
+      if (!ch.gantried && p.elev > 9 && p.elev < 12 && Math.abs(p.k) < 0.004) {
+        ch.gantried = true;
+        const H = 6.4, yl = Y(p.wl + 0.3, 1.0), yr = Y(-p.wr - 0.3, 1.0);
+        for (const [u, yb] of [[p.wl + 0.3, yl], [-p.wr - 0.3, yr]]) { const c = new THREE.BoxGeometry(0.34, H, 0.34); c.translate(p.x + lx * u, yb + H / 2, p.z + lz * u); gantry.push(c); }
+        const span = p.wl + p.wr + 0.6, ym = Y(0, 0) + H + 0.7;
+        const beam = new THREE.BoxGeometry(span, 0.4, 0.4); beam.rotateY(p.h); beam.translate(p.x + lx * (p.wl - p.wr) / 2, ym + 0.4, p.z + lz * (p.wl - p.wr) / 2); gantry.push(beam);
+        const back = new THREE.BoxGeometry(6.4, 2.0, 0.12); back.rotateY(p.h); back.translate(p.x, ym - 0.7, p.z); gantry.push(back);
+        const face = new THREE.PlaneGeometry(6.3, 1.95); face.rotateY(p.h + Math.PI);
+        face.translate(p.x - Math.sin(p.h) * 0.07, ym - 0.7, p.z - Math.cos(p.h) * 0.07); signs.push(face);
+      }
+    }
+    loft(deck, deckRows, false);
+    loft(bar, barL, false); loft(bar, barR, false);
+    loft(strip, stL, false); loft(strip, stR, false);
+    run = [];
+  };
+  for (let i = ch.i0; i <= last; i++) { const p = pts[i]; if (p.express && p.elev > 0.25) run.push(p); else flush(); }
+  flush();
+  const mesh = (M, mat, name, shadow) => {
+    if (!M.idx.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(M.pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(M.pos.length / 3 * 2), 2));
+    geo.setIndex(M.idx); geo.computeVertexNormals(); geo.computeBoundingSphere();
+    ch.own.add(geo);
+    const m = new THREE.Mesh(geo, mat); m.name = name; m.castShadow = shadow; m.receiveShadow = true;
+    // (the lofts wind either way round: draw both faces)
+    mat.side = THREE.DoubleSide;
+    ch.group.add(m);
+  };
+  mesh(deck, w.deckMat, 'viaduct deck', true);
+  mesh(bar, w.barrierMat, 'viaduct barriers', true);
+  mesh(strip, w.stripMat, 'viaduct strips', false);
+  const add = (list, mat, name) => {
+    if (!list.length) return;
+    const geo = merge(list); ch.own.add(geo);
+    const m = new THREE.Mesh(geo, mat); m.name = name; m.castShadow = true; m.receiveShadow = true; ch.group.add(m);
+  };
+  add(piers, w.deckMat, 'viaduct piers');
+  add(gantry, w.gantryMat, 'gantry');
+  add(signs, w.shutoMat, 'gantry sign');
 }
 
 /** Blink the aviation lights (a slow red pulse, as on a real skyline). */

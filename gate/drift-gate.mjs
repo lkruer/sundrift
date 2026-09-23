@@ -11,6 +11,7 @@
  *   node gate/drift-gate.mjs game --metres=800    how far to drive (default 600)
  *   node gate/drift-gate.mjs game --city          on the NEO TOKYO map (chosen with a real click on the title)
  *   node gate/drift-gate.mjs game --rain          in a downpour held for the whole run
+ *   node gate/drift-gate.mjs game --course=hard   on the HARD course (chosen with a real click; default: the title's)
  *   node gate/drift-gate.mjs game --out=_gate     where the frames go (default <game>/_gate)
  *   node gate/drift-gate.mjs game --recipe=../404-game-recipe   where puppeteer lives
  *
@@ -64,6 +65,9 @@ await page.goto(URL, { waitUntil: 'load', timeout: 90000 });
 await page.waitForFunction('window.__READY__ === true', { timeout: 120000 }).catch(() => { throw new Error('never signalled __READY__'); });
 const readyS = ((Date.now() - t0) / 1000).toFixed(1);
 // --city: choose NEO TOKYO on the title (a real click on its map button) and wait for the city to build
+// --course=easy|hard: choose the course on the title with a real click (default: whatever the title shows)
+const COURSE = arg('course', '');
+if (COURSE) { await page.click('.diff[data-d=' + COURSE + ']'); await new Promise((r) => setTimeout(r, 400)); await page.waitForFunction("!document.getElementById('building').classList.contains('on')", { timeout: 60000 }); await new Promise((r) => setTimeout(r, 1200)); }
 if (process.argv.includes('--city')) {
   await page.click('.map[data-m=city]');
   await new Promise((r) => setTimeout(r, 400));

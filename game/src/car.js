@@ -74,10 +74,23 @@ export class Car {
     this.gForce = 0;
     this._assist = 0; this._gain = 1; this._dAB = 0; this._prevAB = 0;
     this.jturn = 0;                 // seconds left in which a fast reverse may still swing round
+    this.air = false;               // off the ground (a crest taken fast off the road): no tyre does anything
+    this.extF = 0; this.extL = 0;   // an outside acceleration in the car's frame, m/s^2: a slope's gravity, a banked road's
     this.jt = 0; this.jtT = 0; this.jtTravel = 0; this.jtRem = 0; this.jturnDone = false;   // a J-turn in progress (its turning sign)
   }
 
   get speed() { return Math.hypot(this.vF, this.vL); }
+
+  /** In the air: the car keeps its velocity and its spin, and the air slows both a touch. */
+  _airSub(h) {
+    this.vF *= Math.exp(-0.04 * h); this.vL *= Math.exp(-0.04 * h); this.omega *= Math.exp(-0.5 * h);
+    const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
+    this.x += (s * this.vF + c * this.vL) * h;
+    this.z += (c * this.vF - s * this.vL) * h;
+    this.yaw += this.omega * h;
+    this.beta = Math.atan2(this.vL, Math.max(Math.abs(this.vF), 0.8));
+    this.slipRear = 0; this.slipFront = 0; this.accF = 0; this.accL = 0;
+  }
   get kmh() { return this.speed * 3.6; }
   forward() { return [Math.sin(this.yaw), Math.cos(this.yaw)]; }
   left() { return [Math.cos(this.yaw), -Math.sin(this.yaw)]; }
@@ -87,6 +100,7 @@ export class Car {
     this.vF = this.vL = this.omega = 0; this.steer = 0; this.boost = 0; this.handGrip = 1;
     this.beta = this.alphaR = this.alphaF = 0; this.slipRear = this.slipFront = 0;
     this._assist = 0; this._gain = 1; this._dAB = 0; this._prevAB = 0; this.jturn = 0; this.jt = 0; this.jturnDone = false;
+    this.air = false; this.extF = 0; this.extL = 0;
   }
 
   /** World-space position of a point given in car space (left, forward). */
@@ -118,6 +132,7 @@ export class Car {
   }
 
   _sub(h, inp, surface) {
+    if (this.air) { this._airSub(h); return; }
     const P = this.P;
     const g = 9.81, m = P.mass, L_ = P.a + P.b, L = L_;
     this.surface = surface;
@@ -222,7 +237,9 @@ export class Car {
     const revSlow = this.vF < -0.15 && this.jturn <= 0 ? 1 - sstep(3, 6.5, -this.vF) : 0;
     // on the reverse gear the car follows its wheels at any speed, so backing up is steady and a tap on the wheel
     // is a correction; let the gear go at speed and the tyres have it, which is how a J-turn starts
-    const revHeld = inp.reverse && this.vF < -0.15 && !this.jt ? 0.9 : 0;
+    // (only once the car is rolling straight: going backwards out of a spin, reverse drives it on and the tyres
+    // carry the slide, instead of the kinematic blend stopping it dead)
+    const revHeld = inp.reverse && this.vF < -0.15 && !this.jt ? 0.9 * (1 - sstep(0.18, 0.45, Math.abs(this.beta))) * (1 - sstep(1.2, 3.5, Math.abs(this.vL))) : 0;
     const lowT = Math.max(1 - sstep(0.4, P.lowSpeed, speed), revSlow, revHeld);
 
     // ---- accelerations in the body frame
@@ -231,8 +248,8 @@ export class Car {
     let omegaDot = (P.a * FyF * Math.cos(d) - P.b * FyR) / P.izz;
 
     this.accF = aFwd; this.accL = aLat;
-    this.vF += (aFwd + this.vL * this.omega) * h;
-    this.vL += (aLat - this.vF * this.omega) * h;
+    this.vF += (aFwd + this.extF + this.vL * this.omega) * h;
+    this.vL += (aLat + this.extL - this.vF * this.omega) * h;
     this.omega += omegaDot * h;
     this._jturnAssist(h, inp);
     // yaw damping: a little always; more while a slide is being caught (continuous, so it never twitches on and

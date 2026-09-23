@@ -45,6 +45,7 @@ export class Pool {
     this.group = new THREE.Group();
     this.cap = cap; this.n = 0;
     this.owner = new Int32Array(cap);
+    this.ids = new Int32Array(cap); this.nextId = 1;   // every instance's own id, so one can be taken out (knocked over)
     this.base = new Float32Array(cap * 16);
     this.col = new Float32Array(cap * 3);
     this.dirty = false;
@@ -61,16 +62,40 @@ export class Pool {
     });
   }
 
+  /** Add one instance; returns its id (0 if the pool is full). */
   add(owner, m4, colour = null) {
-    if (this.n >= this.cap) return false;
+    if (this.n >= this.cap) return 0;
     const k = this.n++;
-    this.owner[k] = owner;
+    this.owner[k] = owner; this.ids[k] = this.nextId++;
     m4.toArray(this.base, k * 16);
     if (colour !== null) { _c.set(colour); this.col[k * 3] = _c.r; this.col[k * 3 + 1] = _c.g; this.col[k * 3 + 2] = _c.b; }
     else { this.col[k * 3] = this.col[k * 3 + 1] = this.col[k * 3 + 2] = 1; }
     this._write(k);
     this.dirty = true;
-    return true;
+    return this.ids[k];
+  }
+
+  /** Move one instance (by its id) to a new transform: a bush squashed flat where it stands. */
+  setById(id, m4) {
+    for (let k = 0; k < this.n; k++) if (this.ids[k] === id) { m4.toArray(this.base, k * 16); this._write(k); this.dirty = true; return true; }
+    return false;
+  }
+
+  /** Take one instance out by its id (the last one fills the hole). */
+  removeId(id) {
+    for (let k = 0; k < this.n; k++) {
+      if (this.ids[k] !== id) continue;
+      const last = --this.n;
+      if (k !== last) {
+        this.owner[k] = this.owner[last]; this.ids[k] = this.ids[last];
+        this.base.copyWithin(k * 16, last * 16, last * 16 + 16);
+        this.col.copyWithin(k * 3, last * 3, last * 3 + 3);
+        this._write(k);
+      }
+      this.dirty = true;
+      return true;
+    }
+    return false;
   }
 
   _write(k) {
@@ -89,7 +114,7 @@ export class Pool {
       any = true;
       const last = --this.n;
       if (k !== last) {
-        this.owner[k] = this.owner[last];
+        this.owner[k] = this.owner[last]; this.ids[k] = this.ids[last];
         this.base.copyWithin(k * 16, last * 16, last * 16 + 16);
         this.col.copyWithin(k * 3, last * 3, last * 3 + 3);
         this._write(k);

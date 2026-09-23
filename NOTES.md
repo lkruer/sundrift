@@ -394,3 +394,72 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   0.81 M; NEO TOKYO, ready 6.8 s / 6.2 s, peak 604 / 478 draws, 0.89 M / 0.82 M triangles, drifts banked through
   the square corners in both. Ready rose from 5.5 s with the city's atlas and materials (both maps load both).
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
+
+
+## 23 September, later: off the road, things to smash, the Shuto, and fixes
+
+Asked for, in two messages: reflective studs down the road so the way ahead shows in the dark; hold a mouse button
+to orbit the car; no hard barrier where there is no guardrail, a five-second countdown and then a magnet (as in
+Mario Kart) that takes the car back to where it left; bollards, lamps and bushes that fly and flatten, absurdly
+satisfyingly; a much more detailed and grimier Tokyo; an elevated road that weaves between the buildings, banked.
+Then: a huge sun glare; remove MEDIUM; reversing out of a slide should not stop the car; the distant mountains are
+not rendering; keep improving.
+
+- **Road studs.** White on the centre line every 12 m, amber at both edges every 8 m: points of light drawn by one
+  shader per chunk, a few pixels across at any distance, bright wherever the car points (a retroreflector sends
+  the headlights straight back) and dim elsewhere. They replace the old 208-triangle cat's-eye models.
+- **Orbit.** Either mouse button held on the scene turns the camera round the car (yaw free, pitch clamped); let go
+  and it eases home the short way round. The lens is kept out of street fronts and tunnel linings.
+- **Off the road.** Each sample of road now says how hard each edge is: a guardrail or a tunnel's lining (and 12 m
+  either side of a portal), a city's street fronts 2.75 m past the edge, or nothing. On the medium pass about two
+  thirds of the edges are open. Past the edge the car rides the ground: its height and its tilt from the ground under
+  its wheels, a slope's gravity along the car, less grip on steep ground, a face rising more than 0.9 m at a corner
+  is a wall, and where the ground falls away faster than the car can follow it takes off, flies, and lands with a
+  thump, dust and a bounce on its springs. From the moment the car's centre is 0.35 m past the edge a countdown
+  runs in a panel under the score (a draining ring and a seven-segment digit, a tick every second, red for the last
+  two); 0.4 m back on the road and it folds away. At zero a big red horseshoe magnet swoops in from the road's side,
+  the car leaps up and clanks onto it, and it is carried along an arc (with one full turn for fun, the camera
+  holding the line of flight) to the road where the car left it, and dropped, squash and all, with a ring of dust,
+  in 2.15 s. The magnet and the rain are drawn once in the load's warm-up frame: their first draw mid-drive was a
+  stall.
+- **Things to hit.** Every prop the car can meet is a record in a spatial hash (about 1,600 of them near the car:
+  the forest's trunks, registered by each near terrain tile, and every pooled prop). Trees, boulders, huts,
+  shrines, torii legs, jizo, the city's signal poles: solid, hit like a wall (a trunk shakes out a burst of
+  blossom). Snow poles and the city's bollards, lamp posts, chevrons, traffic mirrors, vending machines: knocked
+  out of their pool and thrown as rigid bodies (the prop's own model, drawn as an instanced mesh of one so it uses
+  the pool's compiled program): a box of eight corners bouncing and sliding on the ground with restitution and
+  Coulomb friction, spun from where the bumper struck, sleeping when settled and sinking away after a few seconds.
+  First version: the car's full speed went into them and a lamp left the frame at 22 m/s; now they are swatted
+  ahead at half the car's speed and popped high, so the car passes under them. Steel throws a spark trail; a lamp
+  goes out (its light, its bulb and its pool of light); the world stops for a blink (hit-stop, heavier things
+  longer) and the camera kicks; a counter punches in (BOLLARD!, LIGHTS OUT!, FLATTENED!, JACKPOT!) with the chain.
+  Bushes are squashed flat in place with a springy overshoot and a leaf burst. The roadside trees were moved back
+  to 3.2 m past the edge: at 1.8 m the gate's driver hit one mid-drift at 86 km/h.
+- **Tokyo, grimier** (buildings.js and the new cityprops.js, by a sub-agent): rain streaks from every sill, slab and
+  roof edge, a wet band at the foot of every wall, stains, roller shutters on a quarter of the shops, older tiled
+  buildings; air conditioners, downpipes, cable runs, gas risers, fire escapes, balconies with laundry and futons,
+  roof tanks, masts, billboard frames, awnings, noren and lantern pairs; on the pavement bin bags, crates, bicycles,
+  cones, A-boards, manholes, drain grates and puddles (about 37 k triangles a chunk, one draw per material, the
+  chunk built a few lots per frame). The walls darken and gloss in the rain.
+- **The Shuto.** The city's generator now lays an expressway two to five times every 12 km: a 150 m ramp up to 11.5
+  to 14.5 m, two pairs of S-bends (R 70-115 m) that net no turn, and a ramp down. The road banks into its bends
+  (up to 12 degrees, once it is up), everything that sits on the road follows the camber, and gravity along the
+  camber helps the car round. The ground ignores the viaduct, so the street runs on underneath; the deck's sides
+  run down to the street while it is low and stop at a girder once it is up, with a pier every 30 m, Jersey
+  barriers with a lit strip along both edges, and a green gantry at the top of the ramp (首都高速 環状線, C1,
+  銀座 2 km, 新宿 7 km). The towers beside it are at least ten metres taller than the deck.
+- **The glare.** The sky's glow round the sun was being cut into cel bands: one great flat disc. The cel pass now
+  leaves the sky (nothing written to depth) out of its bands, dots and creases, and the glow is tighter.
+- **MEDIUM is gone** from both maps; an old MEDIUM choice opens as EASY. The gate takes --course=easy|hard.
+- **Reverse out of a slide.** Holding reverse used to lock the car onto its wheels (the kinematic blend meant for
+  backing up) and a sideways slide stopped dead. The lock now only comes in once the car is rolling nearly
+  straight: backwards at 9 m/s and sliding at 5, holding reverse, the car carries on to 14 m/s as the slide settles.
+- **The far mountains.** The two skyline rings were lit and fogged like anything else, and at 2.4 and 3.4 km the
+  haze took them to exactly the sky's colour; only their ink outlines showed. They are now unlit silhouettes,
+  each mixed toward the haze by hand (the nearer less) and a little darker than it, and the haze is a little
+  thinner (0.0012 to 0.00095).
+- **Measured.** Gates (600 m, desktop / phone): pass EASY 590 / 480 draws, 1.01 M / 0.72 M triangles; pass HARD
+  589 draws, 1.04 M; NEO TOKYO 564 / 455 draws, 0.81 M / 0.73 M; ready 6.8-7.6 s. The gates showed an occasional
+  single 83-100 ms frame just after one of their own screenshots; the same drive with no screenshots (an
+  autopilot hook, 45 s): 2,641 frames on HARD and 2,640 in a Tokyo downpour over the expressway, the worst 17 and
+  18 ms.

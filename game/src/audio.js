@@ -11,7 +11,7 @@
  * playing an eight-bar tune in the hirajoshi scale over it, and a delayed arpeggio that only joins while a drift
  * is held.
  */
-import { clamp } from './config.js?v=202609230328';
+import { clamp } from './config.js?v=202609230440';
 
 const NOTES = { A2: 110, C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880 };
 // the koto's tune: eight bars in A hirajoshi (A B C E F), which sits on the Am-F-C-G loop; one note per 16th, 0 a rest
@@ -309,6 +309,59 @@ export class Audio {
     const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.master);
     this._env(g, t, 0.005, 0.3, 0.16 * strength, 0, 0.05); s.start(t); s.stop(t + 0.4);
   }
+  /** One-shots for smashing things, landing, the countdown and the magnet; k scales the loudness. */
+  sfx(name, k = 1) {
+    if (!this.ready || !this.ctx) return;
+    const c = this.ctx, t = c.currentTime, out = this.master;
+    const noise = (dur, type, f, q, peak, a = 0.002, f1 = 0) => {
+      const s = c.createBufferSource(); s.buffer = this.noiseBuf;
+      const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
+      if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      const g = this._gain(0); s.connect(fl); fl.connect(g); g.connect(out);
+      this._env(g, t, a, dur, peak * k, 0, 0.04); s.start(t, Math.random()); s.stop(t + dur + a + 0.1);
+    };
+    const tone = (type, f0, f1, dur, peak, a = 0.002) => {
+      const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+      const g = this._gain(0); o.connect(g); g.connect(out);
+      this._env(g, t, a, dur, peak * k, 0, 0.04); o.start(t); o.stop(t + dur + a + 0.1);
+    };
+    switch (name) {
+      case 'pole': case 'bollard':            // a plastic post: a crack and a hollow tok
+        noise(0.08, 'bandpass', 1500, 1.3, 0.55); tone('triangle', 460, 170, 0.13, 0.4); break;
+      case 'shrub':                           // a bush going flat: a soft whump and a rustle
+        noise(0.24, 'lowpass', 520, 0.7, 0.5); noise(0.4, 'bandpass', 3400, 0.8, 0.2, 0.02); break;
+      case 'lamp': case 'chevron': case 'mirror': {   // steel: a crack, then a bell of partials
+        noise(0.05, 'highpass', 2600, 0.7, 0.45);
+        for (const [f, p, d] of [[392, 0.24, 1.2], [1046, 0.15, 0.85], [1733, 0.1, 0.6], [2598, 0.06, 0.45]]) tone('sine', f * (0.97 + Math.random() * 0.06), f * 0.98, d, p);
+        if (name === 'lamp') { tone('square', 130, 55, 0.3, 0.07); noise(0.34, 'highpass', 5200, 0.5, 0.14, 0.01); }
+        break;
+      }
+      case 'vending':                         // a fridge falling over: a thump, a crash, cans
+        tone('sine', 88, 42, 0.45, 0.8); noise(0.55, 'lowpass', 1000, 0.8, 0.55);
+        for (let i = 0; i < 7; i++) setTimeout(() => this.sfx('can', 0.6), 70 + i * 60);
+        break;
+      case 'can': tone('sine', 1700 + Math.random() * 1100, 1400, 0.11, 0.09); break;
+      case 'tree':                            // a trunk: a woody thunk and the canopy shaking
+        tone('sine', 125, 60, 0.26, 0.65); noise(0.3, 'lowpass', 420, 0.8, 0.45); noise(0.55, 'bandpass', 3000, 0.7, 0.16, 0.04); break;
+      case 'land': tone('sine', 98, 46, 0.3, 0.75); noise(0.26, 'lowpass', 520, 0.7, 0.5); break;
+      case 'tick': tone('square', 1900, 1900, 0.03, 0.08); break;
+      case 'tickHot': tone('square', 2700, 2700, 0.045, 0.13); tone('square', 1350, 1350, 0.045, 0.06); break;
+      case 'grab': {                          // the magnet's field coming up: a rising, resonant buzz
+        const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(80, t); o.frequency.exponentialRampToValueAtTime(820, t + 0.6);
+        const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(380, t); f.frequency.exponentialRampToValueAtTime(3400, t + 0.6); f.Q.value = 7;
+        const g = this._gain(0); o.connect(f); f.connect(g); g.connect(out); this._env(g, t, 0.06, 0.6, 0.2 * k, 0.5, 0.18); o.start(t); o.stop(t + 1.0);
+        tone('square', 57, 63, 0.65, 0.05, 0.06);
+        break;
+      }
+      case 'clank':                           // the car striking the magnet
+        noise(0.04, 'highpass', 3000, 0.7, 0.55); for (const [f, p, d] of [[622, 0.32, 0.7], [1488, 0.18, 0.5], [2317, 0.1, 0.34]]) tone('sine', f, f * 0.99, d, p); break;
+      case 'fly': noise(0.9, 'bandpass', 300, 1.1, 0.34, 0.25, 1600); break;
+      case 'drop': noise(0.3, 'bandpass', 1400, 1.0, 0.18, 0.02, 300); break;
+      case 'done': this.chime([1047, 1319, 1568, 2093], t + 0.02, 0.07, 0.32, 0.14); break;
+      default: break;
+    }
+  }
+
   chime(freqs, t0, gap, len, vol = 0.18, type = 'triangle') {
     const c = this.ctx;
     freqs.forEach((f, i) => {

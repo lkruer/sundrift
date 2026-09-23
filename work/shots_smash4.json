@@ -1,0 +1,10 @@
+[
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 12.5; D.G.hourShown = 12.5; })()" },
+  { "wait": 2500 },
+  { "js": "(() => { const D = window.__DEBUG__, W = D.world, c = D.car; const cands = []; W.near(c.x, c.z, 500, (r) => { if (r.name === 'pole' && r.alive) cands.push(r); }); cands.sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z)); const r = cands[4]; const q = D.track.nearest(r.x, r.z, D.G.idx); D.teleport(Math.max(10, q.s - 26), 0); c.yaw = Math.atan2(r.x - c.x, r.z - c.z); c.vF = 18; D.G.carY = W.ground.height(c.x, c.z); window.__T0__ = performance.now(); return [Math.round(q.s), +q.u.toFixed(1)]; })()" },
+  { "keys": ["KeyW"], "ms": 1150 },
+  { "shot": "U1" }, { "wait": 60 }, { "shot": "U2" }, { "wait": 60 }, { "shot": "U3" }, { "wait": 60 }, { "shot": "U4" }, { "wait": 60 }, { "shot": "U5" }, { "wait": 60 }, { "shot": "U6" },
+  { "js": "(() => { const d = window.__DEBUG__.debris; return d.list.map((b) => [b.g.position.toArray().map((v) => +v.toFixed(1)), +b.age.toFixed(2)]); })()" }
+]

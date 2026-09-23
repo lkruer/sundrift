@@ -1,0 +1,17 @@
+[
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__, W = D.world, c = D.car; const cands = []; W.near(c.x, c.z, 400, (r) => { if (r.name === 'lamp' && r.alive) cands.push(r); }); cands.sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z)); const r = cands[3]; const q = D.track.nearest(r.x, r.z, D.G.idx); D.teleport(Math.max(10, q.s - 18), 0); c.yaw = Math.atan2(r.x - c.x, r.z - c.z); c.vF = 17; D.G.carY = W.ground.height(c.x, c.z); const p = D.track.sample(q.s); const lx = Math.cos(p.h), lz = -Math.sin(p.h), side = q.u > 0 ? -1 : 1; const y = W.ground.height(r.x, r.z); window.__CAM__ = { pos: [r.x + lx * side * 13 - Math.sin(p.h) * 6, y + 4, r.z + lz * side * 13 - Math.cos(p.h) * 6], look: [r.x + Math.sin(p.h) * 4, y + 2, r.z + Math.cos(p.h) * 4], fov: 60 }; return [Math.round(q.s), +q.u.toFixed(1)]; })()" },
+  { "keys": ["KeyW"], "ms": 850 },
+  { "shot": "T1" },
+  { "js": "(() => { const d = window.__DEBUG__.debris; return d.list.map((b) => [b.g.position.toArray().map((v) => +v.toFixed(1)), b.v.toArray().map((v) => +v.toFixed(1)), b.m]); })()" },
+  { "wait": 120 },
+  { "shot": "T2" },
+  { "wait": 200 },
+  { "shot": "T3" },
+  { "wait": 300 },
+  { "shot": "T4" },
+  { "wait": 900 },
+  { "shot": "T5" },
+  { "js": "(() => { const d = window.__DEBUG__.debris; return d.list.map((b) => [b.g.position.toArray().map((v) => +v.toFixed(1)), b.g.children[0].children.length, b.asleep, +b.age.toFixed(1)]); })()" }
+]

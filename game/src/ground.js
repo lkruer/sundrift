@@ -12,8 +12,8 @@
  *
  * Pure maths, no Three.js: the terrain tiles, the props, the camera and the tests all ask this one function.
  */
-import { clamp, smoothstep } from './config.js?v=202609230328';
-import { CELL, ckey } from './track.js?v=202609230328';
+import { clamp, smoothstep } from './config.js?v=202609230440';
+import { CELL, ckey } from './track.js?v=202609230440';
 
 export const CUT = 1.25;          // steepest cut face: rise per metre (51 degrees)
 export const FILL = 0.8;          // steepest embankment (39 degrees)
@@ -86,6 +86,8 @@ export class Ground {
           const sm = a.s + (b.s - a.s) * tt;
           for (let q = 0; q < mouths.length; q += 2) if (sm > mouths[q] && sm < mouths[q + 1]) { out.mouth = true; break; }
         }
+        // the expressway up on its viaduct shapes nothing: the street runs on underneath it
+        if (a.express && b.express && (a.elev > 0.6 || b.elev > 0.6)) continue;
         if (a.tunnel && b.tunnel) {
           // the tunnel: the ground is at least the roof over the lining, falling away beside it
           const foot = this.tubeHalf + 1.2;

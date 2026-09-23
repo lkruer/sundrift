@@ -1,0 +1,21 @@
+[
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__, W = D.world, c = D.car; window.__AIM__ = (kind, dist, v) => { const cands = []; W.near(c.x, c.z, 400, (r) => { if (r.name === kind && r.alive) cands.push(r); }); cands.sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z)); const r = cands[Math.min(3, cands.length - 1)]; if (!r) return 'none'; const q = D.track.nearest(r.x, r.z, D.G.idx); D.teleport(Math.max(10, q.s - dist), 0); const yaw = Math.atan2(r.x - c.x, r.z - c.z); c.yaw = yaw; c.vF = v; D.G.carY = D.world.ground.height(c.x, c.z); return [kind, Math.round(q.s), +q.u.toFixed(1)]; }; return 'ok'; })()" },
+  { "js": "window.__AIM__('lamp', 16, 15)" },
+  { "keys": ["KeyW"], "ms": 900 },
+  { "shot": "S1_lamp_hit" },
+  { "wait": 350 },
+  { "shot": "S2_lamp_fly" },
+  { "wait": 900 },
+  { "shot": "S3_lamp_down" },
+  { "js": "window.__AIM__('pole', 14, 16)" },
+  { "keys": ["KeyW"], "ms": 800 },
+  { "shot": "S4_pole" },
+  { "wait": 300 },
+  { "shot": "S5_pole_fly" },
+  { "js": "window.__AIM__('shrub', 12, 12)" },
+  { "keys": ["KeyW"], "ms": 850 },
+  { "shot": "S6_shrub" },
+  { "js": "({ score: Math.round(window.__DEBUG__.scoring.total), debris: window.__DEBUG__.world ? 0 : 0 })" }
+]

@@ -1,7 +1,7 @@
 /**
  * A render rig, for any Three.js game in this format.
  *
- *     import { createRig } from './rig.js?v=202609230328';
+ *     import { createRig } from './rig.js?v=202609230440';
  *     const rig = createRig(THREE, renderer, scene, { hour: 16.5, azimuth: 250 });
  *     rig.render(camera, dt);        // once a frame, instead of renderer.render(scene, camera)
  *
@@ -392,7 +392,8 @@ vec3 atmosSky(vec3 d) {
   float band = pow(1.0 - clamp(el / 0.14, 0.0, 1.0), 1.7);
   col = mix(col, uAtmHaze, band * 0.8);
   float sd = max(dot(d, uAtmSunDir), 0.0);
-  float glow = pow(sd, 6.0) * 0.18 + pow(sd, 48.0) * 0.5;
+  // (MINIDRIFT) a softer, tighter glow: the old one, banded by the cel pass, read as a huge glare
+  float glow = pow(sd, 8.0) * 0.12 + pow(sd, 90.0) * 0.3;
   // the glow spreads along the horizon toward the sun's bearing, not just around the disc
   float az = max(dot(normalize(vec3(d.x, 0.0, d.z) + 1e-5), normalize(vec3(uAtmSunDir.x, 0.0, uAtmSunDir.z) + 1e-5)), 0.0);
   glow += pow(az, 3.0) * 0.10 * (1.0 - smoothstep(0.0, 0.5, el));

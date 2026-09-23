@@ -1,0 +1,19 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; let s = 250; for (; s < 1800; s += 2) { const i = t.index(s), p = t.pts[i]; let ok = true; for (let k = i; k < i + 20; k++) if (t.pts[k].hardR !== Infinity) ok = false; if (ok) break; } D.teleport(s, 40); window.__LOG__ = []; window.__ONFRAME__ = () => { const G = D.G; window.__LOG__.push([Math.round(G.s), +(G.u || 0).toFixed(1), G.off ? +G.off.t.toFixed(1) : null, D.car.air ? 1 : 0, +(G.carY || 0).toFixed(1)]); }; return s; })()" },
+  { "keys": ["KeyW", "KeyD"], "ms": 900 },
+  { "keys": ["KeyW"], "ms": 900 },
+  { "shot": "M1_off" },
+  { "wait": 1600 },
+  { "shot": "M2_countdown" },
+  { "wait": 2300 },
+  { "shot": "M3_grab" },
+  { "wait": 500 },
+  { "shot": "M4_fly" },
+  { "wait": 500 },
+  { "shot": "M5_fly2" },
+  { "wait": 700 },
+  { "shot": "M6_landed" },
+  { "js": "(() => { const L = window.__LOG__; const out = []; for (let i = 0; i < L.length; i += 15) out.push(L[i]); return out; })()" }
+]

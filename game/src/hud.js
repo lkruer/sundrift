@@ -7,7 +7,7 @@
  * Everything is DOM and SVG, written only when a value changes (the needle, which moves every frame, is one
  * attribute), so a phone is not re-laying out text sixty times a second.
  */
-import { SCORE, clamp, damp } from './config.js?v=202609230328';
+import { SCORE, clamp, damp } from './config.js?v=202609230440';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -16,7 +16,7 @@ const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const SEGS = { 0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg', '-': 'g', ' ': '', r: 'eg', n: 'ceg', P: 'abefg' };
 
 /** Seven-segment digits drawn as SVG polygons. */
-class Seg7 {
+export class Seg7 {
   constructor(svg, n, { dotAfter = -1, colonAfter = -1 } = {}) {
     this.svg = svg; this.n = n; this.cells = []; this.str = null;
     const pitch = 15, w = 12, h = 22, t = 2.3, g = 0.45;
@@ -132,6 +132,15 @@ export class Hud {
   }
 
   reset() { this.shown = 0; this.score.set(''); this.lastCombo = -1; }
+
+  /** The smash counter: one label, punched in on every hit, the chain and its points under it. */
+  smash(label, total, n) {
+    let el = this.el.smash;
+    if (!el) { el = this.el.smash = document.createElement('div'); el.id = 'smash'; this.el.hud.appendChild(el); }
+    el.innerHTML = `<b>${label}</b><span>${n > 1 ? 'SMASH ×' + n + '   ' : ''}+${fmt(total)}</span>`;
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop', 'on');
+    clearTimeout(this._smashT); this._smashT = setTimeout(() => el.classList.remove('on'), 1500);
+  }
 
   toast(text, cls = '', big = false) {
     const t = document.createElement('div');

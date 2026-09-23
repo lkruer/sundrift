@@ -2,16 +2,20 @@
 
 Endless night drifting in Japan, on two maps: a mountain pass in cherry-blossom season (夜桜峠, Yozakura Pass)
 or the rain-slick neon streets of NEO TOKYO (ネオ東京). Chain drifts to bank score and boost, clip the guardrail
-without touching it, and every banked drift pushes the night toward dawn.
+without touching it, and every banked drift pushes the night toward dawn. Where there is no guardrail the car can
+leave the road: take out the bollards, the lamp posts and the signs, flatten the bushes, and get back on within
+five seconds, or a giant magnet comes down and carries you back.
 
 **The look:** a playable 90s drift anime.
 - **The pass.** Cherry trees in blossom line the road and dot the cedar forest, and petals drift on the air and
   lie on the asphalt. Red paper lanterns are strung along the cherry avenues. A great vermilion torii spans the
   road at every shrine, with jizo in red bibs beside the path. Blue guide signs carry kanji. Fuji stands under
   the moon across the valley. The pass also has sodium lamps, slope lattices and tunnels through the spurs.
-- **The city.** Street fronts line the road with stacked neon signs, and the neon's light lies on the pavement
-  and streaks across the wet asphalt. The corners are square, with crossings and signals, and Tokyo Tower glows
-  orange on the skyline.
+- **The city.** Grimy street fronts line the road, with rain streaks, roller shutters, air conditioners, fire
+  escapes, laundry and roof tanks. Stacked neon signs hang over the street, and their light lies on the pavement
+  and streaks across the wet asphalt. The corners are square, with crossings and signals. Now and then the road
+  climbs onto an elevated expressway (the Shuto) and weaves between the towers on banked bends, and Tokyo Tower
+  glows orange on the skyline.
 - **Weather and time.** Rain comes and goes: the sky clouds over, the road turns glossy, and the lamps and signs
   streak across it. The time of day moves smoothly from night through dawn and day to dusk and back.
 - **The frame.** It is drawn as cel bands with ink outlines, halftone shade and scanlines, then shown on a curved
@@ -33,22 +37,24 @@ at load time.
 
 The difference between them is the road.
 
-| pass | road | wall to wall | corners |
+| pass | road | road edge to road edge | corners |
 |---|---|---|---|
 | EASY | 10.8 m of asphalt | 14.6 m | long legs, wide switchbacks, flowing sweepers |
-| MEDIUM | 9.6 m | 13.0 m | the pass: hairpins and S-bends |
 | HARD | 8.6 m | 11.6 m | short legs, tight hairpins, relentless |
 
-| NEO TOKYO | road | wall to wall | corners |
+| NEO TOKYO | road | road edge to road edge | corners |
 |---|---|---|---|
-| EASY | 12.0 m | 16.4 m | broad avenues, wide square corners |
-| MEDIUM | 10.8 m | 15.0 m | square corners, turns round a block, dog-legs |
-| HARD | 9.6 m | 13.4 m | tight back streets |
+| EASY | 12.0 m | 16.4 m | broad avenues, wide square corners, the expressway |
+| HARD | 9.6 m | 13.4 m | tight back streets, the expressway |
 
 In the city the same generator lays its switchbacks flat: a leg is an avenue, a switchback is the way round a
 block (two square corners with the block between), and an S-bend is a dog-leg onto a cross street and back.
 
-The gravel between the edge line and the wall keeps most of its grip: running wide costs a little, not the run.
+The gravel between the edge line and the road's edge keeps most of its grip: running wide costs a little, not
+the run. Past the edge the pass has a guardrail only where the ground falls away or on the outside of a tight
+bend; everywhere else (about two thirds of it) the car can drive off onto the verge, up a bank, into a field, and
+over a crest at speed it leaves the ground. Trunks, boulders, huts and shrines stop it. In the city the street
+fronts are the edge, so the car can mount the pavement.
 
 Each is one fixed, endless course (same seed every run), so best scores compare.
 
@@ -61,6 +67,7 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 | handbrake | `Space` | hold the right half of the screen |
 | pause | `Esc` or `P` | the pause button |
 | camera zoom | mouse wheel, `+` / `-` | |
+| orbit the camera | hold either mouse button and drag (let go: back to the chase view) | |
 | mute | `M` | the note button |
 | reverse | hold `S` when stopped (a strong gear, to about 40 mph) | pull the finger down |
 | J-turn | reverse fast, full lock, then `W` | pull down, slide over, push up |
@@ -68,6 +75,11 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 Drift: tap the handbrake into a corner (or lift and turn), steer into the slide, hold it with the throttle.
 The car does part of the counter-steer for you (more on a phone), holds a slide at a comfortable angle, and
 A and D ask for as much lock as the corner ahead needs. Nothing steers the car when no key is held.
+
+Off the road: a countdown comes up under the score. Get back on the road before it runs out; at zero a big red
+horseshoe magnet swoops down, the car clanks onto it, and it is carried back to where it left the road and set
+down facing the right way. Knocking things over scores (a bollard 50, a sign 90, a lamp post 150, a vending machine
+300, chained within two seconds for up to five times as much). A lamp you knock down goes out.
 
 J-turn: back up past about 10 mph, throw the wheel to full lock and get on the gas. The nose swings out, the
 car comes round to face the way it is travelling and pulls away; the camera looks where you are going while
@@ -92,6 +104,10 @@ you reverse and swings round with the car. A clean one scores 500.
   (`neon.js`), the light they throw on the pavement and the wet road, crossings and signals at the corners, the
   far skyline and Tokyo Tower (`landmarks.js`); `buildings.js` draws every building's windows from world
   position, so a floor is a floor at any size.
+- `game/src/offroad.js`: the countdown panel and the magnet (its swoop, the flight, the drop, every beat of it).
+- `game/src/debris.js`: what the car knocks over, as rigid bodies for a few seconds: the prop's own model and
+  materials, a box of corners bouncing and sliding on the ground with restitution and friction, spun from where
+  it was struck; bushes are flattened in place instead.
 - `game/src/fx.js`: skid marks, smoke, spray and sparks, and two GPU showers placed entirely by the vertex shader
   in a box that travels with the camera: cherry petals (pushed aside by the car's wind) and rain (lit where the
   headlights and lamps catch it).

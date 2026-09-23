@@ -1,0 +1,21 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 4000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); const f = D.track.features.find((f) => f.type === 'express'); window.__EX__ = [f.s0, f.s1]; D.teleport(f.s0 + 60, 55); return window.__EX__.map(Math.round); })()" },
+  { "keys": ["KeyW"], "ms": 2200 },
+  { "shot": "E1_ramp" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const [a, b] = window.__EX__; let best = a; for (let s = a; s < b; s += 2) { const p = t.sample(s); if (Math.abs(p.bank || 0) > 0.18) { best = s; break; } } D.teleport(best - 40, 60); return Math.round(best); })()" },
+  { "keys": ["KeyW"], "ms": 1800 },
+  { "shot": "E2_bank" },
+  { "keys": ["KeyW", "KeyA"], "ms": 900 },
+  { "shot": "E3_bank2" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const [a, b] = window.__EX__; const s = (a + b) / 2, p = t.sample(s); const lx = Math.cos(p.h), lz = -Math.sin(p.h); window.__CAM__ = { pos: [p.x + lx * 38 - Math.sin(p.h) * 30, p.y - 6, p.z + lz * 38 - Math.cos(p.h) * 30], look: [p.x, p.y - 4, p.z], fov: 58 }; D.teleport(s - 30, 50); })()" },
+  { "wait": 1600 },
+  { "shot": "E4_side" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const [a, b] = window.__EX__; const s = a + 280, p = t.sample(s); window.__CAM__ = { pos: [p.x - Math.sin(p.h) * 30, p.y + 22, p.z - Math.cos(p.h) * 30], look: [p.x + Math.sin(p.h) * 40, p.y, p.z + Math.cos(p.h) * 40], fov: 60 }; })()" },
+  { "wait": 1200 },
+  { "shot": "E5_above" },
+  { "js": "({ fps: window.__GAME__.fps, draws: window.__GAME__.draws, tris: window.__GAME__.tris })" }
+]
