@@ -396,6 +396,62 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 25 September, early: nothing stops dead, reverse that behaves, a city that lives
+
+- **The car no longer stops dead.** The owner: "sometimes some inputs make the car just stop dead. For instance,
+  sometimes reverse will be funky". The cause was the kinematic blend that keeps a slowly reversing car on its
+  wheels: it was fully on whenever the car rolled backwards slower than 3 m/s, whatever else it was doing, and it
+  killed the sideways speed at 25 per second. A slide braked on S (the brake is also reverse, so the car goes a
+  little backwards) and every spin passing 90 degrees are exactly that, and stopped dead: 2.8 to 0.7 m/s in five
+  frames, sliding sideways with no key held. work/stop_hunt.mjs drives the car sim with 600 runs of random keyboard
+  sequences from rolling, drifting, reversing and spinning starts on open ground, and flags any 0.1 s in which the
+  car loses more speed than its tyres could take (1.5 m/s, 2.5 with a brake held) or a spin stops faster than tyres
+  could stop it: 390 at the old code (105 going slowly backwards, 231 sliding sideways, 54 spins), 5 now, all of them
+  pirouettes at walking pace coming to rest. The blend now holds the car to its wheels only while it is rolling
+  straight on them (slip under 10 to 25 degrees, sideways speed under 1.2 to 3.5 m/s, yaw within 1 to 2 rad/s of
+  what the wheels ask); sliding or spinning, it is capped at what tyres could do. Backing up on the gear measures
+  exactly as before (work/reverse_test.mjs).
+- **Reverse that behaves.** Letting go of S while backing up faster than about 9 mph with the wheel turned, or a
+  tap on the wheel just after letting go, started a J-turn: the car whipped round 170 degrees and more
+  (work/reverse_release_test.mjs: backing round a corner on S and A for 2 s and letting go of both, 167 degrees; a
+  0.12 s tap on A after letting go at 16 mph, 171). A J-turn now takes what a J-turn is: S let go at speed after
+  backing up roughly straight (the wheel's average over the last fifth of a second on the gear under half), then
+  the wheel thrown over and held a tenth of a second. Let go with the wheel still over and the car rolls on
+  following its wheels, as if still on the gear. Every J-turn in work/jturn_test.mjs is still clean (round in
+  0.87 s, was 0.77: the tenth of a second the flick is held). One thing left as designed: full lock and full
+  throttle from a standstill is a donut (asked for in the power round), so W with the wheel over straight after
+  reversing spins the car round.
+- **Steam** (citysteam.js): out of a third of the manhole covers (the city road's texture has one 39 m and one 17 m
+  into every 48, so the steam comes out of a cover), out of a vent in one shop front in five (a grille on the front,
+  the puffs pushed out over the pavement and lit by the shop's sign), and in slow tall plumes off one building in
+  eight over 40 m. Every puff is a quad turned to the camera and moved by the clock in the vertex shader, one mesh a
+  chunk; the cel pass bands it into painted clouds. It shows most on a wet night and thins out before the lens.
+- **Neon that lives.** One sign in eleven is a failing tube (steady for most of an 8 to 20 s cycle, then a
+  stutter, and one time in three dark for a second before it catches) and one in twenty-five blinks; the light it
+  throws on the pavement and its streak down the wet road go with it (a per-vertex seed on the signs, the pools and
+  the streaks, and the city's clock). The signals cycle, green ten seconds, amber three, red nine, each on its own
+  phase, from one mesh a chunk (it was four).
+- **An airship** over the skyline, 64 m long, with an LED screen along each flank showing the street's ads (the
+  screens' own shader), a pulsing red beacon and a white strobe. It circles a point that follows the camera 12 s
+  behind, 170 m up, so it drifts across the sky and shifts as the car sets off or stops.
+- **People**, where a car cannot reach them: in the rooms behind the glass (customers from behind at the ramen and
+  bar counters, a shopper at the end of a convenience store aisle, a player at an arcade machine, someone at an
+  office desk late), and standing in the light at the mouths of the alleys and by their cars in the coin parkings,
+  always past the building line, where the car's wall is (2.75 m past the kerb). Figures are drawn once into an
+  atlas, turned to the camera about their upright and cut out into the depth buffer, so the cel pass inks them;
+  in the rain they have umbrellas up (clear convenience-store ones, mostly).
+- **The city's sound** (a sub-agent, audio.js cityUpdate, only on NEO TOKYO): the far city (stereo brown noise in a
+  low roar and a faint mid wash, both drifting), a car or bus passing on the next street every few seconds, horns
+  (a kei car's one, a car's pair, a truck's; taps or leaning on it; now and then answered), an ambulance's pee-po
+  going by with its doppler every minute or so, the elevated train's rumble with its wheels' clacks timed exactly
+  from the train you see (pairs 0.15 s apart, ga-tan go-ton), and the crossings' chirps for the blind, piyo or
+  kak-koo, while the walkers have green (each signal's record carries the phase its lamps run on). A short street
+  reverb (the fronts' early echoes, a 1.8 s tail) and a muffle inside a bore. Measured against the music (work/
+  city_audio_level.json): the bed 19 dB under, the siren at its nearest 16 dB under, the train's clacks 12 dB under
+  up close; driving at 108 km/h the whole of it is 24 dB under the engine. 0.05 ms a frame, about 25 standing nodes,
+  built on the first city frame; should the calls stop (the title) it fades away on its own.
+- Gates, city: peak 628 draws (was 596), 0.90 M triangles, no slow frames; on a phone 501 draws.
+
 ## 24 September, night: the wheel is the player's
 
 - **The counter-steer assist no longer overrides the player.** In a deep slide the assist (which steers the front

@@ -83,6 +83,8 @@ export class Car {
     this._donut = 0; this.spin = 0;   // how much the car is being asked to spin on the spot; how much the rear is spinning
     this.extF = 0; this.extL = 0;   // an outside acceleration in the car's frame, m/s^2: a slope's gravity, a banked road's
     this.jt = 0; this.jtT = 0; this.jtTravel = 0; this.jtRem = 0; this.jturnDone = false;   // a J-turn in progress (its turning sign)
+    // a J-turn may start; off the gear but still held to the wheels; the flick's hold; the wheel while on the gear
+    this._jtOk = false; this._revCoast = false; this._jtHold = 0; this._revSteer = 0; this._revWas = false;
   }
 
   get speed() { return Math.hypot(this.vF, this.vL); }
@@ -106,6 +108,7 @@ export class Car {
     this.vF = this.vL = this.omega = 0; this.steer = 0; this.boost = 0; this.handGrip = 1;
     this.beta = this.alphaR = this.alphaF = 0; this.slipRear = this.slipFront = 0;
     this._assist = 0; this._gain = 1; this._dAB = 0; this._prevAB = 0; this.jturn = 0; this.jt = 0; this.jturnDone = false;
+    this._jtOk = false; this._revCoast = false; this._jtHold = 0; this._revSteer = 0; this._revWas = false;
     this.air = false; this.extF = 0; this.extL = 0;
   }
 
@@ -270,13 +273,30 @@ export class Car {
     // ---- low speed, and slow reversing: blend toward a kinematic bicycle so the car parks and backs up without
     // twitching. Reversing fast (a J-turn in the making) it is left to the tyres: a reversing car is unstable,
     // and that instability is the manoeuvre.
-    if (this.vF < -3.8) this.jturn = 1.4; else this.jturn = Math.max(0, this.jturn - h);
-    const revSlow = this.vF < -0.15 && this.jturn <= 0 ? 1 - sstep(3, 6.5, -this.vF) : 0;
+    // The J-turn window opens only when the reverse gear is let go at speed after backing up roughly straight (a
+    // flick, held, then swings the car round). Let go after backing round something with the wheel over, which is
+    // stopping backing up, and the car keeps following its wheels as it rolls, as if still on the gear: it used to
+    // take that for a J-turn and whip the car round to face the other way.
+    if (inp.reverse) {
+      this._revSteer += (Math.abs(inp.steer) - this._revSteer) * Math.min(1, h * 5);
+      this._jtOk = false; this._revCoast = this.vF < -0.15; this._revWas = true;
+    } else {
+      if (this._revWas) { this._revWas = false; this._jtOk = this.vF < -3.8 && this._revSteer < 0.45; if (this._jtOk) this._revCoast = false; }
+      if (this.vF > -0.5) { this._jtOk = false; this._revCoast = false; this._revSteer = 0; }
+    }
+    if (this.vF < -3.8 && this._jtOk) this.jturn = 1.4; else this.jturn = Math.max(0, this.jturn - h);
+    // the kinematic bicycle's yaw rate (the lateral g capped, so full lock backing up fast is a brisk arc, not a
+    // pirouette on the spot)
+    const wMax = 9 / Math.max(1, speed);
+    const omegaKin = clamp(this.vF * Math.tan(d) / L, -wMax, wMax);
+    // (both only once the car is rolling straight on its wheels: a car sliding sideways that is going a little
+    // backwards, which is every spin as it passes 90 degrees and every slide braked on S, or still spinning, is the
+    // tyres' to slow, not the blend's to stop dead)
+    const straight = (1 - sstep(0.18, 0.45, Math.abs(this.beta))) * (1 - sstep(1.2, 3.5, Math.abs(this.vL))) * (1 - sstep(1.0, 2.2, Math.abs(this.omega - omegaKin)));
+    const revSlow = this.vF < -0.15 && this.jturn <= 0 ? (1 - sstep(3, 6.5, -this.vF)) * straight : 0;
     // on the reverse gear the car follows its wheels at any speed, so backing up is steady and a tap on the wheel
     // is a correction; let the gear go at speed and the tyres have it, which is how a J-turn starts
-    // (only once the car is rolling straight: going backwards out of a spin, reverse drives it on and the tyres
-    // carry the slide, instead of the kinematic blend stopping it dead)
-    const revHeld = inp.reverse && this.vF < -0.15 && !this.jt ? 0.9 * (1 - sstep(0.18, 0.45, Math.abs(this.beta))) * (1 - sstep(1.2, 3.5, Math.abs(this.vL))) : 0;
+    const revHeld = (inp.reverse || this._revCoast) && this.vF < -0.15 && !this.jt ? 0.9 * straight : 0;
     // (not in a donut: there the car is meant to go round on its spinning tyres, however slowly it moves)
     const lowT = Math.max((1 - sstep(0.4, P.lowSpeed, speed)) * (1 - 0.75 * D), revSlow, revHeld);
 
@@ -311,11 +331,11 @@ export class Car {
     }
 
     if (lowT > 0) {
-      // (the lateral g is capped, so full lock backing up fast is a brisk arc, not a pirouette on the spot)
-      const wMax = 9 / Math.max(1, speed);
-      const omegaKin = clamp(this.vF * Math.tan(d) / L, -wMax, wMax);
-      this.omega += (omegaKin - this.omega) * lowT * Math.min(1, h * 30);
-      this.vL *= 1 - lowT * Math.min(1, h * 25);
+      // (rolling straight it holds the car to its wheels; sliding or spinning, never faster than tyres could: the
+      // blend steadies a slow car, it does not stop a slide or a spin dead)
+      const capW = (4 + 42 * straight) * h, capV = (3 + 44 * straight) * h;
+      this.omega += clamp((omegaKin - this.omega) * lowT * Math.min(1, h * 30), -capW, capW);
+      this.vL -= clamp(this.vL * lowT * Math.min(1, h * 25), -capV, capV);
     }
     // ---- tight corners, taken sideways: a hand on the line. Held in a slide through a bend tighter than about 50 m,
     // sliding the bend's way round (the tail out to the outside), the direction of travel is helped round toward the
@@ -375,9 +395,10 @@ export class Car {
     const vx = s * this.vF + c * this.vL, vz = c * this.vF - s * this.vL;
     if (!this.jt) {
       // (jturnDone stays up until the game has read it)
-      // it starts when the reverse gear is let go at speed with the wheel hard over: a deliberate thing, so a tap
-      // on the wheel while backing up on the gear is only ever a correction
-      if (this.jturn > 0 && !inp.reverse && this.vF < -1.5 && speed > 3.6 && Math.abs(inp.steer) > 0.7) {
+      // it starts when, the reverse gear let go at speed (the window above), the wheel is put hard over and held
+      // there a moment: a deliberate thing, so a tap on the wheel, on the gear or off it, is only ever a correction
+      this._jtHold = this.jturn > 0 && !inp.reverse && this.vF < -1.5 && speed > 3.6 && Math.abs(inp.steer) > 0.7 ? this._jtHold + h : 0;
+      if (this._jtHold > 0.1) {
         // backing up, wheels left swing the nose right: the kinematic sign, unless the car is already turning
         this.jt = Math.abs(this.omega) > 0.25 ? Math.sign(this.omega) : -Math.sign(inp.steer);
         this.jtT = 0; this.jtTravel = Math.atan2(vx, vz);

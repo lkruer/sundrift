@@ -1,0 +1,23 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 4000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 22; D.G.hourShown = 22; D.rainNow(0); D.teleport(420, 0); window.__PPL__ = (k) => { const out = []; D.world.root.traverse((o) => { if (o.name === 'people' && o.geometry) { const P = o.geometry.attributes.position; for (let i = 0; i < P.count; i += 4) out.push([P.getX(i), P.getY(i), P.getZ(i)]); } }); const c = D.car; out.sort((a, b) => Math.hypot(a[0] - c.x, a[2] - c.z) - Math.hypot(b[0] - c.x, b[2] - c.z)); return k === undefined ? out.length : out[k]; }; return window.__PPL__(); })()" },
+  { "wait": 400 },
+  { "js": "(() => { const e = window.__PPL__(0); if (!e) return 'none'; const D = window.__DEBUG__, t = D.track; const n = t.nearest(e[0], e[2], D.G.idx); const p = t.sample(n.s); const lx = Math.cos(p.h), lz = -Math.sin(p.h), fx = Math.sin(p.h), fz = Math.cos(p.h); const sd = Math.sign(n.u) || 1; window.__CAM__ = { pos: [p.x - fx * 7, p.y + 1.7, p.z - fz * 7], look: [e[0], e[1] + 1.2, e[2]], fov: 55 }; return [e, n.u]; })()" },
+  { "wait": 1200 },
+  { "shot": "Q1_people" },
+  { "js": "(() => { const e = window.__PPL__(0); const D = window.__DEBUG__, t = D.track; const n = t.nearest(e[0], e[2], D.G.idx); const p = t.sample(n.s); window.__CAM__ = { pos: [p.x, p.y + 1.6, p.z], look: [e[0], e[1] + 1.1, e[2]], fov: 40 }; })()" },
+  { "wait": 900 },
+  { "shot": "Q2_people_close" },
+  { "js": "(() => { window.__DEBUG__.rainNow(0.8); })()" },
+  { "wait": 1500 },
+  { "shot": "Q3_people_rain" },
+  { "js": "(() => { const e = window.__PPL__(3); if (!e) return 'none'; const D = window.__DEBUG__, t = D.track; const n = t.nearest(e[0], e[2], D.G.idx); const p = t.sample(n.s); window.__CAM__ = { pos: [p.x, p.y + 1.6, p.z], look: [e[0], e[1] + 1.1, e[2]], fov: 40 }; return [e, n.u]; })()" },
+  { "wait": 900 },
+  { "shot": "Q4_people2" },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); window.__CAM__ = null; D.teleport(600, 40); })()" },
+  { "keys": ["KeyW"], "ms": 2000 },
+  { "shot": "Q5_drive" }
+]

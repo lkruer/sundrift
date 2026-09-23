@@ -94,7 +94,7 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 | orbit the camera | hold either mouse button and drag (let go: back to the chase view) | |
 | mute | `M` | the note button |
 | reverse | hold `S` when stopped (a strong gear, to about 40 mph) | pull the finger down |
-| J-turn | reverse fast, full lock, then `W` | pull down, slide over, push up |
+| J-turn | reverse straight and fast, let go of `S`, then full lock (held) and `W` | pull down, then push up and slide over |
 
 Drift: tap the handbrake into a corner (or lift and turn), steer into the slide, hold it with the throttle.
 The car does part of the counter-steer for you (more on a phone), holds a slide at a comfortable angle, and
@@ -116,9 +116,13 @@ down facing the right way. Knocking things over scores (a bollard 50, a sign 90,
 pavement's clutter goes flying too: trash bags and boxes (TRASH!), beer crates, traffic cones, menu boards and
 parked bicycles, each with its own burst and sound.
 
-J-turn: back up past about 10 mph, throw the wheel to full lock and get on the gas. The nose swings out, the
-car comes round to face the way it is travelling and pulls away; the camera looks where you are going while
-you reverse and swings round with the car. A clean one scores 500.
+J-turn: back up straight past about 10 mph, let go of the reverse, throw the wheel to full lock, hold it, and get on
+the gas. The nose swings out, the car comes round to face the way it is travelling and pulls away; the camera looks
+where you are going while you reverse and swings round with the car. A clean one scores 500. It takes that: back
+up round something with the wheel turned and let go of `S`, and the car just rolls to a stop following its wheels;
+a quick tap on the wheel is only ever a correction. Whatever you press, the car never stops dead: a slide or a spin
+is always slowed by its tyres, even when it is going a little backwards (braking on `S` in a slide, or a spin
+passing 90 degrees).
 
 ## How the world is made
 
@@ -142,7 +146,12 @@ you reverse and swings round with the car. A clean one scores 500.
   of interiors drawn at load, looked into with a parallax so the room has depth). `citydetail.js`: the LED screens
   (one ad atlas, animated in the shader), the overhead wires and their poles, the shopping arches and lantern
   strings, the skybridges, the pavement's paving. `citytrain.js`: the elevated line, its stations and its train.
-  `citycars.js`: the coin parkings' cars.
+  `citycars.js`: the coin parkings' cars. `citysteam.js`: steam out of the manholes in the road, the kitchens'
+  vents and the tall roofs, lit by the light nearest it. `citypeople.js`: people where a car cannot reach them, at
+  the mouths of the alleys and in the coin parkings, umbrellas up in the rain (and in the rooms' atlas, customers
+  at the counters, shoppers, players at the machines, someone working late). A few neon tubes are failing and
+  stutter, a few signs blink, the signals cycle green, amber, red, and an airship with an LED screen along its
+  flanks drifts over the skyline.
 - `game/src/offroad.js`: the countdown panel and the magnet (its swoop, the flight, the drop, every beat of it).
 - `game/src/atmos.js`: the air: the cloud deck (moonlit wisps on the pass, lit from beneath over the city), the
   searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of
@@ -159,7 +168,10 @@ you reverse and swings round with the car. A clean one scores 500.
   equal, into the exhaust's fixed resonances, so the harmonics sweep through the formants as the revs climb, the
   way a real engine sounds and a bank of oscillators does not; around it the intake roar, the straight-cut gears'
   whine, the turbo's whistle and its flutter on a lift, tyres that squeal in narrow wandering bands over the
-  tread's scrub; and the music.
+  tread's scrub; and the music. In NEO TOKYO, under it all and heard from the camera: the far city's roar, a car or
+  a bus going by on the next street, horns now and then, an ambulance passing, the elevated train with its wheels
+  clacking over the rail joints in time with the train you see, and the crossings' bird-call chirps (piyo or the
+  cuckoo's kak-koo) while the walkers have green, with a short street echo off the fronts.
 
 ## What is in the repo
 

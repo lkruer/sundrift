@@ -11,13 +11,15 @@
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202609232110';
-import { buildingMaterial } from './buildings.js?v=202609232110';
-import { neonAtlas } from './neon.js?v=202609232110';
-import { cityPropMaterials, lotProps, parkingProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609232110';
-import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet } from './citydetail.js?v=202609232110';
-import { railSkip } from './citytrain.js?v=202609232110';
-import { carsLoad, parkCar } from './citycars.js?v=202609232110';
+import { clamp, lerp, mulberry32 } from './config.js?v=202609232326';
+import { buildingMaterial } from './buildings.js?v=202609232326';
+import { neonAtlas } from './neon.js?v=202609232326';
+import { cityPropMaterials, lotProps, parkingProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609232326';
+import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet } from './citydetail.js?v=202609232326';
+import { railSkip } from './citytrain.js?v=202609232326';
+import { carsLoad, parkCar } from './citycars.js?v=202609232326';
+import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202609232326';
+import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202609232326';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
@@ -96,8 +98,85 @@ function zebraTexture() {
   return t;
 }
 
+// Neon that is not all steady: now and then a tube that is going stutters, and drops out for a moment before it
+// catches; and a few signs blink on purpose. aFlick per vertex: 0 steady, (0, 1) a failing tube (its own seed),
+// (1, 2) a blinker. A sign, its light on the pavement and its streak down the wet road flicker together.
+const FLICK = /* glsl */`
+uniform float uClock;
+float neonFlick(float f, float t) {
+  if (f <= 0.0) return 1.0;
+  if (f > 1.0) {
+    float s = f - 1.0;
+    float c = mod(t * (0.8 + 0.5 * s) + s * 17.0, 4.0);
+    return c < 2.4 ? (fract(c * 1.25) < 0.55 ? 1.0 : 0.1) : 1.0;
+  }
+  float cyc = t * (0.05 + 0.07 * fract(f * 7.13)) + f * 31.0;
+  float k = fract(cyc);
+  if (k < 0.86) return 1.0;
+  float h = fract(sin(floor(cyc) * 91.7 + f * 473.3) * 43758.5453);
+  float st = fract(sin(floor(t * 19.0) * 12.9898 + f * 78.233) * 43758.5453);
+  float on = st > 0.42 ? 1.0 : 0.08;
+  // (and one time in three it goes out for a second before it catches again)
+  if (h > 0.66 && k > 0.94) on = 0.06;
+  return on;
+}`;
+
+const NL = String.fromCharCode(10);
+function flickering(mat, w, key) {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uClock = w.cityClock;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>' + NL + 'attribute float aFlick;' + NL + 'varying float vFlick;' + NL + FLICK)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>' + NL + 'vFlick = neonFlick(aFlick, uClock);');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>' + NL + 'varying float vFlick;')
+      .replace('#include <map_fragment>', '#include <map_fragment>' + NL + 'diffuseColor.rgb *= vFlick;');
+  };
+  mat.customProgramCacheKey = () => key;
+}
+
+/**
+ * The signals' lamps: every lamp of a chunk in one mesh, and the shader lights one of each signal's three from the
+ * city's clock (green ten seconds, amber three, red nine), each signal on its own phase.
+ */
+function signalMaterial(w) {
+  const lin = (hex) => new THREE.Color(hex).multiplyScalar(2.2);
+  const m = new THREE.ShaderMaterial({
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uG: { value: lin(0x1ee8a8) }, uY: { value: lin(0xffb21e) }, uR: { value: lin(0xff3322) }, uOff: { value: new THREE.Color(0x15171b) }, uClock: { value: 0 } }]),
+    vertexShader: /* glsl */`
+      attribute float aLamp;
+      attribute float aPhase;
+      uniform float uClock;
+      uniform vec3 uG, uY, uR, uOff;
+      varying vec3 vCol;
+      #include <fog_pars_vertex>
+      void main() {
+        float T = 22.0, t = mod(uClock + aPhase * T, T);
+        float st = t < 10.0 ? 0.0 : t < 13.0 ? 1.0 : 2.0;
+        vec3 lit = aLamp < 0.5 ? uG : aLamp < 1.5 ? uY : uR;
+        vCol = abs(aLamp - st) < 0.5 ? lit : uOff;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: /* glsl */`
+      varying vec3 vCol;
+      #include <fog_pars_fragment>
+      void main() {
+        gl_FragColor = vec4(vCol, 1.0);
+        #include <fog_fragment>
+      }`,
+    fog: true,
+  });
+  m.uniforms.uClock = w.cityClock;
+  m.name = 'signal lamps';
+  return m;
+}
+
 /** The city's materials and pools, made once at load (so every program compiles with the rest). */
 export function cityLoad(w, Pool, fontFamily) {
+  // the city's clock: the signs' flicker, the signals, the steam (kept small for precision)
+  w.cityClock = { value: 0 };
   w.bldgMat = buildingMaterial(THREE, {});
   w.bldgMat.userData.tinted = true;
   const unit = new THREE.BoxGeometry(1, 1, 1);                  // centred: an instance sits at its lot's middle
@@ -107,16 +186,18 @@ export function cityLoad(w, Pool, fontFamily) {
   w.neon = atlas;
   w.neonMat = new THREE.MeshBasicMaterial({ map: atlas.texture, side: THREE.DoubleSide, color: new THREE.Color(1.7, 1.7, 1.7), transparent: false });
   w.neonMat.name = 'neon';
+  flickering(w.neonMat, w, 'neon-flick1');
   w.neonHousingMat = new THREE.MeshStandardMaterial({ color: 0x1b1c21, roughness: 0.55, metalness: 0.35 });
   const glowTex = gradientTexture(false), streakTex = gradientTexture(true);
   w.neonGlowMat = new THREE.MeshBasicMaterial({ map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, opacity: 0.9 });
   w.streakMat = new THREE.MeshBasicMaterial({ map: streakTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6, opacity: 0.35 });
+  flickering(w.neonGlowMat, w, 'neon-glow-flick1');
+  flickering(w.streakMat, w, 'neon-streak-flick1');
   w.signalPoleMat = new THREE.MeshStandardMaterial({ color: 0x5a5e66, roughness: 0.5, metalness: 0.5 });
   w.signalBoxMat = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.6, metalness: 0.3 });
-  w.signalLit = [0x1ee8a8, 0xffb21e, 0xff3322].map((c) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(2.2) }));
-  w.signalDim = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.3, metalness: 0.2 });
+  w.signalMat = signalMaterial(w);
   w.zebraMat = new THREE.MeshStandardMaterial({ map: zebraTexture(), transparent: true, depthWrite: false, roughness: 0.55,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   // the street's clutter (cityprops.js), one draw per material per chunk
@@ -159,10 +240,12 @@ export function cityLoad(w, Pool, fontFamily) {
   // the detail over and along the street (citydetail.js): screens, wires, the pavement
   const detailMats = detailLoad(w, Pool);
   carsLoad(w, Pool);                                              // the parked cars' pool (citycars.js)
+  w.steamMat = steamLoad(w);                                      // manholes, vents and roofs (citysteam.js)
+  w.peopleMat = peopleLoad(w);                                    // in the alleys and the coin parkings (citypeople.js)
   // (the building material is drawn only instanced, by the buildings' pool and the terrain's blocks: the pool's own
   // instanced program is compiled at load with every pool, so it is not handed over for a plain mesh's program too,
   // which nothing draws and which cost a second compile of the city's biggest shader)
-  return [...detailMats, w.neonMat, w.neonHousingMat, w.neonGlowMat, w.streakMat, w.signalPoleMat, w.signalBoxMat, ...w.signalLit, w.signalDim, w.zebraMat,
+  return [...detailMats, w.neonMat, w.neonHousingMat, w.neonGlowMat, w.streakMat, w.signalPoleMat, w.signalBoxMat, w.signalMat, w.steamMat, w.peopleMat, w.zebraMat,
     ...new Set(Object.values(w.propMats)), w.deckMat, w.barrierMat, w.stripMat, w.gantryMat, w.shutoMat];
 }
 
@@ -174,6 +257,8 @@ export function cityWet(w, wet, night) {
   if (w.bldgMat && w.bldgMat.userData.uNight) w.bldgMat.userData.uNight.value = night;
   if (w.bldgMat && w.bldgMat.userData.uWet) w.bldgMat.userData.uWet.value = wet;
   detailWet(w, wet);
+  steamWeather(w, wet, night);
+  peopleWeather(w, wet, night);
 }
 
 /**
@@ -183,16 +268,16 @@ export function cityWet(w, wet, night) {
 function drape(w, ch, list, mat, lift, onRoad = false) {
   const g = w.ground, t = w.track, N = 6, probe = {};
   const hAt = (x, z) => { if (!onRoad) return g.height(x, z); g.sample(x, z, 2.2, probe); return t.sample(probe.s).y; };
-  const pos = [], uv = [], col = [], idx = [];
+  const pos = [], uv = [], col = [], idx = [], fl = [];
   const c = new THREE.Color();
-  for (const [cx, cz, ax, az, wid, len, hex] of list) {
+  for (const [cx, cz, ax, az, wid, len, hex, flick] of list) {
     c.set(hex);
     const base = pos.length / 3;
     const bx = az, bz = -ax;                      // across
     for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
       const a = (j / N - 0.5) * len, b = (i / N - 0.5) * wid;
       const x = cx + ax * a + bx * b, z = cz + az * a + bz * b;
-      pos.push(x, hAt(x, z) + lift, z); uv.push(i / N, j / N); col.push(c.r, c.g, c.b);
+      pos.push(x, hAt(x, z) + lift, z); uv.push(i / N, j / N); col.push(c.r, c.g, c.b); fl.push(flick || 0);
     }
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const a = base + j * (N + 1) + i, b = a + 1, cc = a + N + 1, d = cc + 1;
@@ -203,23 +288,30 @@ function drape(w, ch, list, mat, lift, onRoad = false) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setAttribute('aFlick', new THREE.Float32BufferAttribute(fl, 1));
   geo.setIndex(idx); geo.computeBoundingSphere();
   ch.own.add(geo);
   const m = new THREE.Mesh(geo, mat); m.renderOrder = 2; m.name = 'neon light';
   return m;
 }
 
-/** Merge simple geometries (position, normal, uv) into one; each is disposed. */
+/** Merge simple geometries (position, normal, uv, and any other attribute some of them carry) into one; each is disposed. */
 function merge(list) {
   let nv = 0, ni = 0;
-  for (const g of list) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const extra = new Map();
+  for (const g of list) {
+    nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count;
+    for (const [k, a] of Object.entries(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv' && !extra.has(k)) extra.set(k, a.itemSize);
+  }
   const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = new Uint32Array(ni);
+  const ex = new Map([...extra].map(([k, size]) => [k, new Float32Array(nv * size)]));
   let ov = 0, oi = 0;
   for (const g of list) {
     const n = g.attributes.position.count;
     pos.set(g.attributes.position.array, ov * 3);
     if (g.attributes.normal) nor.set(g.attributes.normal.array, ov * 3);
     if (g.attributes.uv) uv.set(g.attributes.uv.array, ov * 2);
+    for (const [k, arr] of ex) { const a = g.attributes[k]; if (a) arr.set(a.array, ov * a.itemSize); }
     if (g.index) { const a = g.index.array; for (let k = 0; k < a.length; k++) idx[oi++] = a[k] + ov; }
     else for (let k = 0; k < n; k++) idx[oi++] = ov + k;
     ov += n; g.dispose();
@@ -228,18 +320,20 @@ function merge(list) {
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  for (const [k, arr] of ex) out.setAttribute(k, new THREE.BufferAttribute(arr, extra.get(k)));
   out.setIndex(new THREE.BufferAttribute(idx, 1));
   out.computeBoundingSphere();
   return out;
 }
 
 /** One sign face: a quad through corners a (bottom-left), b (bottom-right), c (top-right), d (top-left) with the atlas cell. */
-function signQuad(list, a, b, c, d, cell, flip) {
+function signQuad(list, a, b, c, d, cell, flip, flick = 0) {
   const g = new THREE.BufferGeometry();
   const P = [...a, ...b, ...c, ...d];
   const u0 = flip ? cell.u1 : cell.u0, u1 = flip ? cell.u0 : cell.u1;
   g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute([u0, cell.v0, u1, cell.v0, u1, cell.v1, u0, cell.v1], 2));
+  g.setAttribute('aFlick', new THREE.Float32BufferAttribute([flick, flick, flick, flick], 1));
   g.setIndex([0, 1, 2, 0, 2, 3]);
   g.computeVertexNormals();
   list.push(g);
@@ -253,7 +347,11 @@ export function* cityChunk(w, ch) {
   const own = ch.c * 2;
   const rng = mulberry32((w.seed * 911 + ch.c * 7331) >>> 0);
   const probe = {};
-  const signs = [], housings = [], glows = [], streaks = [], poles = [], boxes = [], lampsOn = [[], [], []], lampsOff = [], zebras = [];
+  const signs = [], housings = [], glows = [], streaks = [], poles = [], boxes = [], lamps = [], zebras = [], steam = [], people = [];
+  // (a hash of a place, for what is new here, so the random sequence the street was built from is as it was)
+  const h01 = (a, b) => { const x = Math.sin(a * 12.9898 + b * 78.233 + (w.seed % 1000) * 0.371) * 43758.5453; return x - Math.floor(x); };
+  // one sign in eleven is a failing tube, one in twenty-five blinks
+  const flickOf = (a, b) => { const f = h01(a, b); return f < 0.09 ? 0.02 + f / 0.09 * 0.96 : f < 0.13 ? 1.02 + (f - 0.09) / 0.04 * 0.96 : 0; };
   const parkSign = w.neon.signs.find((q) => q.name === 'parking');
   const clutter = {};
   let nLots = 0;
@@ -270,6 +368,7 @@ export function* cityChunk(w, ch) {
       const lotW = 7 + rng() * 11;
       const sm = s + lotW / 2;
       s += lotW + (rng() < 0.14 ? 2.5 + rng() * 5 : 0.35);             // an alley now and then
+      const alleyW = s - (sm + lotW / 2);
       const p = t.sample(sm);
       if (p.tunnel || t.nearTunnel(p.s, 12) || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
       // (an elevated railway runs along some avenues: its viaduct and stations stand where these lots would)
@@ -293,7 +392,7 @@ export function* cityChunk(w, ch) {
       // behind (a hash of the lot's place decides, so the rest of the street is as it was)
       const hp = Math.sin(sm * 12.9898 + side * 78.233 + (w.seed % 1000) * 0.113) * 43758.5453;
       if (!up && w.pools.parked && parkSign && lotW >= 8 && lotW <= 16 && depth >= 12.5 && hp - Math.floor(hp) < 0.075) {
-        coinParking(w, ch, { sm, side, lotW, depth, u0, p, at, rng, clutter, signs, housings, glows, D, parkSign });
+        coinParking(w, ch, { sm, side, lotW, depth, u0, p, at, rng, clutter, signs, housings, glows, D, parkSign, people, h01, clearAt });
         continue;
       }
       const r = rng();
@@ -312,7 +411,7 @@ export function* cityChunk(w, ch) {
       const [frontX, frontZ] = at(sm, side * u0);
       const fy = g.height(frontX, frontZ);
       // a vertical sign standing out from the front at one end of the lot, faces along the street
-      let vEdge = 0;
+      let vEdge = 0, vColour = 0xffc890;
       if (rng() < 0.72 && H > 8) {
         const cell = vSigns[Math.floor(rng() * vSigns.length)];
         const scale = Math.min(1, (H - 4.2) / cell.h);
@@ -324,17 +423,19 @@ export function* cityChunk(w, ch) {
         const out0 = -0.15, out1 = -0.15 - sw;                           // from the facade out over the pavement
         const P = (u, y, d) => [bx + lx * u + fx * d, y, bz + lz * u + fz * d];
         // (on the left of the road the sign's outer end is on a driver's right, so the cell is mirrored to read)
-        signQuad(signs, P(out1, yb, -0.14), P(out0, yb, -0.14), P(out0, yt, -0.14), P(out1, yt, -0.14), cell, side > 0);
-        signQuad(signs, P(out0, yb, 0.14), P(out1, yb, 0.14), P(out1, yt, 0.14), P(out0, yt, 0.14), cell, side > 0);
+        const flick = flickOf(sm * 1.7 + 3.1, side);
+        vColour = cell.colour;
+        signQuad(signs, P(out1, yb, -0.14), P(out0, yb, -0.14), P(out0, yt, -0.14), P(out1, yt, -0.14), cell, side > 0, flick);
+        signQuad(signs, P(out0, yb, 0.14), P(out1, yb, 0.14), P(out1, yt, 0.14), P(out0, yt, 0.14), cell, side > 0, flick);
         // the housing: across the road (the sign's width) by the sign's height, thin along the road
         const hb = new THREE.BoxGeometry(sw + 0.12, sh + 0.18, 0.24);
         hb.rotateY(p.h); hb.translate(bx + lx * (out0 + out1) / 2, (yb + yt) / 2, bz + lz * (out0 + out1) / 2);
         housings.push(hb);
         const gx = bx - lx * (1.2 + sw), gz = bz - lz * (1.2 + sw);
-        glows.push([gx, gz, fx, fz, 7, 7, cell.colour]);
+        glows.push([gx, gz, fx, fz, 7, 7, cell.colour, flick]);
         // on the road, the sign's reflection: a streak down the asphalt toward the car coming up it
         const [rx, rz] = at(sm + edge - 5, side * (wall - 1.8 - rng() * 1.5));
-        streaks.push([rx, rz, fx, fz, 1.6 + sw * 0.6, 9 + sh * 0.6, cell.colour]);
+        streaks.push([rx, rz, fx, fz, 1.6 + sw * 0.6, 9 + sh * 0.6, cell.colour, flick]);
         if (rng() < 0.5) w.lamps.push({ x: gx, y: yb + 1.2, z: gz, c: ch.c, color: cell.colour, power: 110 });
       }
       // a lit sign over the shop front, facing the road
@@ -345,17 +446,43 @@ export function* cityChunk(w, ch) {
         const yb = fy + 3.1 + rng() * 0.8, yt = yb + sh;
         hTop = yt - fy;
         const P = (d, y) => [frontX - lx * 0.06 + fx * d, y, frontZ - lz * 0.06 + fz * d];
+        const flick = flickOf(sm * 2.3 + 11.7, side);
         // seen from the road: left to right is against the road's direction on the left side
-        if (side > 0) signQuad(signs, P(-sw / 2, yb), P(sw / 2, yb), P(sw / 2, yt), P(-sw / 2, yt), cell, false);
-        else signQuad(signs, P(sw / 2, yb), P(-sw / 2, yb), P(-sw / 2, yt), P(sw / 2, yt), cell, false);
+        if (side > 0) signQuad(signs, P(-sw / 2, yb), P(sw / 2, yb), P(sw / 2, yt), P(-sw / 2, yt), cell, false, flick);
+        else signQuad(signs, P(sw / 2, yb), P(-sw / 2, yb), P(-sw / 2, yt), P(sw / 2, yt), cell, false, flick);
         const [gx, gz] = at(sm, side * (wall + 0.8));
-        glows.push([gx, gz, fx, fz, 6, Math.max(6, sw + 3), cell.colour]);
+        glows.push([gx, gz, fx, fz, 6, Math.max(6, sw + 3), cell.colour, flick]);
       }
       // the building's clutter: air conditioners, pipes, fire escapes, balconies, roof tanks, awnings, lanterns
       // its screens (a big one on the upper floors, a vertical LED tower, a billboard on the roof) come first: the
       // clutter keeps clear of them
       const clear = detailLot(w, D, { s: sm, side, W: lotW * 0.985, D: depth, H, up, x: frontX, z: frontZ, y: fy, fx, fz, lx, lz, wall, vEdge, hTop });
       if (w.propMats) lotProps(THREE, { x: frontX, z: frontZ, y: fy, fx, fz, lx, lz, width: lotW * 0.985, depth, height: H, shop: !up, clear }, rng, clutter);
+      // a kitchen's vent in the shop front now and then, puffing steam out over the pavement, lit by the sign
+      if (!up && h01(sm * 3.1 + 5.5, side) < 0.2) {
+        const ve = (vEdge ? -vEdge : h01(sm * 0.7, side) < 0.5 ? -1 : 1) * (lotW * 0.5 - 1.1);
+        const vx = frontX + fx * ve, vz = frontZ + fz * ve, vy = fy + 2.35;
+        const vb = new THREE.BoxGeometry(0.2, 0.42, 0.62); vb.rotateY(p.h); vb.translate(vx - lx * 0.1, vy, vz - lz * 0.1); housings.push(vb);
+        steam.push([vx - lx * 0.25, vy, vz - lz * 0.25, 1, vColour, -lx, -lz]);
+      }
+      // at the mouth of the alley beside it, now and then, a few people in the light of a back door: past the
+      // building line, where the car's wall is, so no car ever reaches them
+      if (!up && alleyW > 2.4 && h01(sm * 5.3 + 9.1, side) < 0.6) {
+        const sa = sm + lotW / 2 + alleyW / 2, pa = t.sample(sa);
+        const ax = Math.cos(pa.h) * side, az = -Math.sin(pa.h) * side, afx = Math.sin(pa.h), afz = Math.cos(pa.h);
+        const aw = side > 0 ? pa.wl : pa.wr, n = 1 + Math.floor(h01(sm * 6.1, side) * 3);
+        for (let k = 0; k < n; k++) {
+          const along = (h01(sm * 7.3 + k, side) - 0.5) * (alleyW - 1.3), into = aw + 3.9 + h01(sm * 8.9 + k, side) * 2.2;
+          const x = pa.x + ax * into + afx * along, z = pa.z + az * into + afz * along;
+          // (and clear of every road by more than the car can reach past its kerb: a corner's other leg too)
+          if (!clearAt(x, z, 3.4)) continue;
+          people.push([x, g.height(x, z), z, Math.floor(h01(sm * 3.7 + k * 1.9, side) * 8), 0xffc890, 0.9]);
+        }
+        const gx = pa.x + ax * (aw + 4.6), gz = pa.z + az * (aw + 4.6);
+        glows.push([gx, gz, afx, afz, Math.max(2.5, alleyW - 0.4), 4.5, 0xffb070]);
+      }
+      // and a slow plume off the roof of a tall one, lit by the city's glow on the cloud
+      if (H > 40 && h01(sm * 4.7 + 1.3, side) < 0.12) steam.push([cx, gy + H + 1.2, cz, 2, 0xd8a6c8, 0, 0]);
       // (a lot's clutter is half a millisecond: the chunk is built across frames, a few lots at a time)
       if (++nLots % 4 === 0) yield;
       // vending machines on the pavement now and then
@@ -363,6 +490,16 @@ export function* cityChunk(w, ch) {
         const [vx, vz] = at(sm + (rng() - 0.5) * lotW * 0.5, side * (u0 - 0.45));
         w._put('vending', own, vx, g.height(vx, vz), vz, p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2));
       }
+    }
+  }
+  // steam out of the manholes in the road (its texture has a cover 39 m and 17 m into every 48), a third of them
+  for (const [off, uk] of [[39, 0.45], [17, -0.5]]) {
+    for (let s = Math.ceil((s0 - off) / 48) * 48 + off; s < s1; s += 48) {
+      if (h01(s * 0.37 + 2.2, uk) > 0.33) continue;
+      const p = t.sample(s);
+      if (p.tunnel || (p.express && p.elev > 0.25) || t.nearTunnel(s, 10)) continue;
+      const u = t.half * uk, lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      steam.push([p.x + lx * u, p.y + 0.05, p.z + lz * u, 0, 0xffd8b0, 0, 0]);
     }
   }
   // the wires and their poles, the shopping street, the pavement, the screens
@@ -410,19 +547,26 @@ export function* cityChunk(w, ch) {
       const lx = Math.cos(q.h) * outside, lz = -Math.sin(q.h) * outside, fx = Math.sin(q.h), fz = Math.cos(q.h);
       const px = q.x + lx * (wall + 0.9), pz = q.z + lz * (wall + 0.9), py = g.height(px, pz);
       const pole = new THREE.CylinderGeometry(0.11, 0.13, 6.2, 10); pole.translate(px, py + 3.1, pz); poles.push(pole);
-      w._reg(own, { name: 'signal', kind: 'solid', x: px, y: py, z: pz, r: 0.16, alive: true });
+      // (its phase in the lamps' cycle: the crossing's chirp sings while the walkers have green, the cars red)
+      const phase = h01(sa * 0.91 + 7.7, outside);
+      w._reg(own, { name: 'signal', kind: 'solid', x: px, y: py, z: pz, r: 0.16, alive: true, phase });
       const armLen = wall + 0.9 - 2.2;
       const arm = new THREE.CylinderGeometry(0.07, 0.07, armLen, 8); arm.rotateZ(Math.PI / 2); arm.rotateY(q.h);
       arm.translate(px - lx * armLen / 2, py + 5.8, pz - lz * armLen / 2); poles.push(arm);
       const hx = px - lx * armLen, hz = pz - lz * armLen;
       const box = new THREE.BoxGeometry(1.25, 0.42, 0.3); box.rotateY(q.h); box.translate(hx - fx * 0.05, py + 5.55, hz - fz * 0.05); boxes.push(box);
-      const lit = rng() < 0.62 ? 0 : rng() < 0.5 ? 1 : 2;
-      // left to right as the driver sees it (their left is the road's left): blue-green, amber, red
+      // (the draw that picked the lit lamp when the signals stood still, kept so the rest of the street is as it was)
+      void (rng() < 0.62 || rng());
+      // left to right as the driver sees it (their left is the road's left): blue-green, amber, red; the shader
+      // lights them in turn
       const Lx = Math.cos(q.h), Lz = -Math.sin(q.h);
       [0.4, 0, -0.4].forEach((d, k) => {
         const disc = new THREE.CircleGeometry(0.15, 16); disc.rotateY(q.h + Math.PI);
         disc.translate(hx - fx * 0.21 + Lx * d, py + 5.55, hz - fz * 0.21 + Lz * d);
-        if (k === lit) lampsOn[k].push(disc); else lampsOff.push(disc);
+        const nv = disc.attributes.position.count;
+        disc.setAttribute('aLamp', new THREE.BufferAttribute(new Float32Array(nv).fill(k), 1));
+        disc.setAttribute('aPhase', new THREE.BufferAttribute(new Float32Array(nv).fill(phase), 1));
+        lamps.push(disc);
       });
     }
     i = j + 1;
@@ -439,8 +583,9 @@ export function* cityChunk(w, ch) {
   addMesh(housings, w.neonHousingMat, 'sign housings');
   addMesh(poles, w.signalPoleMat, 'signal poles', true);
   addMesh(boxes, w.signalBoxMat, 'signal boxes', true);
-  lampsOn.forEach((l, k) => addMesh(l, w.signalLit[k], 'signal lamp'));
-  addMesh(lampsOff, w.signalDim, 'signal lamps off');
+  addMesh(lamps, w.signalMat, 'signal lamps');
+  steamChunk(w, ch, steam);
+  peopleChunk(w, ch, people);
   if (glows.length) ch.group.add(drape(w, ch, glows, w.neonGlowMat, 0.06));
   if (streaks.length) ch.group.add(drape(w, ch, streaks, w.streakMat, 0.04, true));
   // the crossings: a strip of zebra paint across the road, 4 m along it, on the ribbon itself
@@ -479,7 +624,7 @@ void lerp;
  * corner facing along the street, a lamp over the bays, and a low block of shops and flats behind the back wall.
  */
 function coinParking(w, ch, o) {
-  const { sm, side, lotW, depth, u0, p, at, rng, clutter, signs, housings, glows, D, parkSign } = o;
+  const { sm, side, lotW, depth, u0, p, at, rng, clutter, signs, housings, glows, D, parkSign, people, h01, clearAt } = o;
   const g = w.ground, own = ch.c * 2;
   const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, fx = Math.sin(p.h), fz = Math.cos(p.h);
   const [frontX, frontZ] = at(sm, side * u0);
@@ -493,6 +638,11 @@ function coinParking(w, ch, o) {
     const [x, z] = L(bx + (rng() - 0.5) * 0.25, bz + (rng() - 0.5) * 0.3);
     const toRoad = rng() < 0.72;
     parkCar(w, own, x, g.height(x, z) + 0.01, z, p.h + (toRoad ? -side : side) * Math.PI / 2 + (rng() - 0.5) * 0.06, rng);
+    // now and then someone at their car's door, under the lot's lamp
+    if (people && h01(bx * 3.1 + sm, bz + side) < 0.16) {
+      const [qx, qz] = L(bx + 1.25, bz - 0.6);
+      if (clearAt(qx, qz, 3.4)) people.push([qx, g.height(qx, qz), qz, Math.floor(h01(bx + sm * 2.3, side) * 8), 0xdfe8ff, 0.85]);
+    }
   }
   // the P sign: a pole at the front corner, the sign along the street over the lot's edge, both faces lit
   {
@@ -560,9 +710,58 @@ export function citySkyBuild(w, L) {
     skytree.scale.setScalar(1.3);                                // (larger than life too: it stands over the far towers)
     g.add(skytree);
   }
+  const ship = airship(w);
+  if (ship) g.add(ship.g);
   g.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isLineSegments) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; } });
-  g.userData = { aviation: ring.userData && ring.userData.aviation, tower, skytree };
+  g.userData = { aviation: ring.userData && ring.userData.aviation, tower, skytree, airship: ship };
   return g;
+}
+
+/**
+ * An airship over the city: a long silver hull, its fins and gondola, an LED screen along each flank showing the
+ * street's ads (the screens' own material and clock), a red beacon pulsing and a white strobe. It circles a point
+ * that follows the camera a few seconds behind, so it drifts across the sky and shifts as the car sets off or
+ * stops, as a real one would, but is never left behind.
+ */
+function airship(w) {
+  if (!w.screenMat) return null;
+  const g = new THREE.Group(); g.name = 'airship';
+  const L = 64, R = 8.4;
+  // the hull's radius a way along it, tail (0) to nose (1): a blunt nose, fattest a little forward, a long taper
+  const rAt = (a) => R * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(a, 1.25))), 0.6);
+  const prof = [];
+  for (let i = 0; i <= 20; i++) { const a = i / 20; prof.push(new THREE.Vector2(Math.max(0.02, rAt(a)), (a - 0.5) * L)); }
+  const hull = new THREE.LatheGeometry(prof, 28);
+  hull.rotateX(Math.PI / 2);                                       // its axis along z, the nose at +z
+  const parts = [hull];
+  const zF = -L / 2 + 8, rF = rAt(8 / L);
+  for (const [ax, ay] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    const f = new THREE.BoxGeometry(ax ? 7.5 : 0.35, ay ? 7.5 : 0.35, 9);
+    f.translate(ax * (rF + 3.2), ay * (rF + 3.2), zF);
+    parts.push(f);
+  }
+  const gondola = new THREE.BoxGeometry(2.6, 2.0, 9); gondola.translate(0, -R - 0.6, 6); parts.push(gondola);
+  const hullMat = new THREE.MeshStandardMaterial({ color: 0x8e949e, roughness: 0.45, metalness: 0.3, emissive: 0x1a1822 });
+  hullMat.name = 'airship';
+  g.add(new THREE.Mesh(merge(parts), hullMat));
+  // the screens: flat panels hung on the flanks, each reading left to right from its own side
+  const scr = [];
+  for (const side of [1, -1]) {
+    const q = new THREE.PlaneGeometry(24, 8.5);
+    q.rotateY(side * Math.PI / 2);
+    q.translate(side * (R + 0.15), 0.8, 3);
+    const seed = side > 0 ? 0.37 : 0.81;
+    q.setAttribute('aScr', new THREE.Float32BufferAttribute(new Array(q.attributes.position.count).fill([seed, 24, 8.5, 1]).flat(), 4));
+    scr.push(q);
+  }
+  g.add(new THREE.Mesh(merge(scr), w.screenMat));
+  // the beacon, under the gondola and on the top; the strobe on the top fin and the nose
+  const beaconMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.12, 0.08).multiplyScalar(3) });
+  const strobeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(4) });
+  const ball = (x, y, z, r) => { const b = new THREE.SphereGeometry(r, 8, 6); b.translate(x, y, z); return b; };
+  g.add(new THREE.Mesh(merge([ball(0, -R - 1.8, 6, 1.3), ball(0, R + 0.4, 4, 1.3)]), beaconMat));
+  g.add(new THREE.Mesh(merge([ball(0, rF + 7.2, zF - 3.5, 1.1), ball(0, 0, L / 2 + 0.4, 1.1)]), strobeMat));
+  return { g, beaconMat, strobeMat, c: null, t: null };
 }
 
 /** The Shuto's green gantry sign: the route, and two exits with their distances. */
@@ -692,6 +891,23 @@ export function citySkyUpdate(w, t) {
   if (sk && sk.userData.aviation) sk.userData.aviation.material.opacity = 0.3 + 0.7 * Math.max(0, Math.sin(t * 1.7 + 1.1)) ** 2;
   // the clock the televisions, the arcade screens and the street's animated signs run on (kept small for precision)
   const tt = t % 3600;
+  if (w.cityClock) w.cityClock.value = tt;
+  // the airship: round a point that follows the camera a few seconds behind, nose along its way, a slow sway
+  const A = w.citySky && w.citySky.userData.airship;
+  if (A) {
+    const cam = w.citySky.position;
+    const dt = Math.min(0.1, Math.max(0, t - (A.t ?? t))); A.t = t;
+    if (!A.c || Math.hypot(cam.x - A.c.x, cam.z - A.c.z) > 2500) A.c = { x: cam.x, z: cam.z };
+    const k = 1 - Math.exp(-dt / 12);
+    A.c.x += (cam.x - A.c.x) * k; A.c.z += (cam.z - A.c.z) * k;
+    const th = t * 0.011 + 1.3;
+    const gy = w.ground ? w.ground.height(cam.x, cam.z) : cam.y;
+    A.g.position.set(A.c.x + Math.cos(th) * 480 - cam.x, 170 + gy - cam.y, A.c.z + Math.sin(th) * 480 - cam.z);
+    A.g.rotation.set(Math.sin(t * 0.21) * 0.02, -th, Math.sin(t * 0.17) * 0.015);
+    A.beaconMat.color.setRGB(1, 0.12, 0.08).multiplyScalar(0.4 + 2.6 * Math.max(0, Math.sin(t * 2.4)) ** 2);
+    const sp = (t * 0.7) % 1;
+    A.strobeMat.color.setScalar(sp < 0.04 || (sp > 0.1 && sp < 0.14) ? 5 : 0.05);
+  }
   if (w.bldgMat && w.bldgMat.userData.uTime) w.bldgMat.userData.uTime.value = tt;
   detailUpdate(w, tt);
 }

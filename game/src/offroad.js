@@ -11,7 +11,7 @@
  * GPU process); the magnet, its beam and its rings are a handful of meshes made once and parked out of sight.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from './config.js?v=202609232110';
+import { clamp, lerp, smoothstep } from './config.js?v=202609232326';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const COURSE_OUT_S = 5;

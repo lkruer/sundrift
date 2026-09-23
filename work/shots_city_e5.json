@@ -1,0 +1,20 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 4000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 22; D.G.hourShown = 22; D.rainNow(0); D.teleport(440, 0); })()" },
+  { "wait": 600 },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const p = t.sample(452); const lx = Math.cos(p.h), lz = -Math.sin(p.h), fx = Math.sin(p.h), fz = Math.cos(p.h); const u = p.wl - 1.5; window.__CAM__ = { pos: [p.x + lx * (u - 3), p.y + 1.6, p.z + lz * (u - 3)], look: [p.x + lx * (u + 6) + fx * 3, p.y + 1.7, p.z + lz * (u + 6) + fz * 3], fov: 60 }; })()" },
+  { "wait": 1000 },
+  { "shot": "P1_left_fronts" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const p = t.sample(482); const lx = Math.cos(p.h), lz = -Math.sin(p.h), fx = Math.sin(p.h), fz = Math.cos(p.h); const u = -(p.wr - 1.5); window.__CAM__ = { pos: [p.x + lx * (u + 3), p.y + 1.6, p.z + lz * (u + 3)], look: [p.x + lx * (u - 6) + fx * 3, p.y + 1.7, p.z + lz * (u - 6) + fz * 3], fov: 60 }; })()" },
+  { "wait": 1000 },
+  { "shot": "P2_right_fronts" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const p = t.sample(640); const lx = Math.cos(p.h), lz = -Math.sin(p.h), fx = Math.sin(p.h), fz = Math.cos(p.h); const u = p.wl - 1.5; window.__CAM__ = { pos: [p.x + lx * (u - 3), p.y + 1.6, p.z + lz * (u - 3)], look: [p.x + lx * (u + 6) + fx * 3, p.y + 1.7, p.z + lz * (u + 6) + fz * 3], fov: 60 }; })()" },
+  { "wait": 1000 },
+  { "shot": "P3_left_fronts2" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; const p = t.sample(700); const lx = Math.cos(p.h), lz = -Math.sin(p.h), fx = Math.sin(p.h), fz = Math.cos(p.h); const u = -(p.wr - 1.5); window.__CAM__ = { pos: [p.x + lx * (u + 3), p.y + 1.6, p.z + lz * (u + 3)], look: [p.x + lx * (u - 6) + fx * 3, p.y + 1.7, p.z + lz * (u - 6) + fz * 3], fov: 60 }; })()" },
+  { "wait": 1000 },
+  { "shot": "P4_right_fronts2" }
+]

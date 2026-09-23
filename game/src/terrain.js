@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609232110';
-import { REACH } from './ground.js?v=202609232110';
-import { instanceGroup, Pool } from './instancing.js?v=202609232110';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609232326';
+import { REACH } from './ground.js?v=202609232326';
+import { instanceGroup, Pool } from './instancing.js?v=202609232326';
 
 export const TILE = 96;
 export const LODS = [

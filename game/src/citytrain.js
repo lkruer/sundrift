@@ -166,6 +166,7 @@ export function railUpdate(w, t) {
   const pool = w.pools && w.pools.train, T = w._train;
   if (!pool || !T || !w.city || !w.track || !w.citySky) return;
   const cam = w.citySky.position;
+  T.pos = null;                // (for the city's sounds, audio.js: set below to the point of the train nearest the camera)
   const g = w.ground, tr = w.track;
   let best = null, bd = 520;
   for (const st of railStretches(w)) {
@@ -202,6 +203,16 @@ export function railUpdate(w, t) {
     _q.setFromAxisAngle(_up, hd);
     _m.compose(_p.set(x - ax * CAR_L / 2, y, z - az * CAR_L / 2), _q, _s);
     pool.setById(T.ids[k], _m);
+    // ---- for the city's sounds (audio.js cityUpdate): the point of the train nearest the camera, its speed, and how
+    // far the head has run (the wheels' clacks over the rail joints are timed from it); one object, reused
+    {
+      const q = Math.max(-CAR_L / 2, Math.min(CAR_L / 2, (cam.x - x) * ax + (cam.z - z) * az));
+      const nx = x + ax * q, nz = z + az * q, d2 = (nx - cam.x) * (nx - cam.x) + (nz - cam.z) * (nz - cam.z);
+      if (!T.pos || d2 < T.pos.d2) {
+        const P = T.pos = T._pos || (T._pos = { x: 0, y: 0, z: 0, d2: 0, speed: 0, od: 0 });
+        P.x = nx; P.y = y + 2; P.z = nz; P.d2 = d2; P.speed = speed; P.od = head;
+      }
+    }
   }
 }
 

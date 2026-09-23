@@ -14,8 +14,13 @@
  * piece of 8-bit in it, a pulse-wave arpeggio, comes up under the tune while a drift is held. Each song is a
  * sixteen-bar form (A A B A) of four-bar phrases, and every phrase picks one of its section's tunes or leaves the
  * chords to themselves for a while, so it never plays the same way twice.
+ *
+ * In NEO TOKYO the city itself is heard under all of that (cityUpdate): the far traffic's roar breathing slowly, a car
+ * on the next street, a horn now and then, an ambulance going by, the elevated train's rumble and the ta-tan of its
+ * wheels over the rail joints, and a crossing's chirp for the blind as the car passes a signal. Each is placed where it
+ * is: quieter, duller and wetter (a street's own reverb) the further off, and panned to its side.
  */
-import { clamp } from './config.js?v=202609232110';
+import { clamp, smoothstep } from './config.js?v=202609232326';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -69,6 +74,19 @@ const ENGINE_WORKLET = "\n/**\n * The engine, sample by sample: an inline four f
 
 // the left hand breaks the chord in quarters: the bass, then three of the pad's notes
 const LH = { 0: -1, 4: 1, 8: 2, 12: 3 };
+
+// NEO TOKYO's sounds (see cityUpdate): how loud each part is at its nearest, set against the music by measurement
+// (work/city_audio_level.json), all of it well under the music and the engine
+const CITY = { roar: 0.026, air: 0.01, pass: 0.056, horn: 0.09, siren: 0.035, train: 0.063, chirp: 0.05 };
+// the train's axles, metres back from a car's front (two bogies of two), and the rail between joints: a car and its
+// gap, so every joint under the train is struck in step and the street hears one rhythm, ga-tan ... go-ton
+const AXLES = [2.15, 4.25, 15.25, 17.35], RAIL = 20;
+// roughly normal (four uniforms), for the slow random walks; and the noise generators' step
+const gauss = () => (Math.random() + Math.random() + Math.random() + Math.random() - 2) * 1.732;
+const lcg = (s) => (Math.imul(s, 1664525) + 1013904223) >>> 0;
+// the city's signals (city.js, signalMaterial) run a 22 s cycle on the city's clock: green 10 s, amber 3, red 9. The
+// crossing by one sings while its walkers go: from just after the cars' red until the walkers' light starts to blink
+const walking = (clock, ph) => { const u = ((clock + ph * 22) % 22 + 22) % 22; return u >= 14 && u < 19.5; };
 
 export class Audio {
   constructor() {
@@ -216,11 +234,12 @@ export class Audio {
     this.rainGain.connect(this.master);
   }
 
-  /** Which map: each has its own song (a new one starts from its first phrase). */
+  /** Which map: each has its own song (a new one starts from its first phrase), and the city its own sounds. */
   setMap(city) {
     if (this.city === !!city) return;
     this.city = !!city;
     Object.assign(this.music, { step: 0, phrase: 0, chords: null, tune: null });
+    if (!this.city && this.cy) this._cityDrop();
   }
 
   /** How hard it rains, 0..1 (and 0 inside a tunnel). */
@@ -697,5 +716,395 @@ export class Audio {
       case 'bump': this.impact(e.value); break;
       case 'sun': { const [a, , c2] = this._tonic(-1); this.chime([a, c2, a * 2], t, 0.16, 0.6, 0.1, 'sine'); break; }
     }
+  }
+
+  // ------------------------------------------------------------------ the city
+
+  /**
+   * NEO TOKYO's own sound, every frame of a run on the city map, heard from (x, z) looking along yaw (0 faces +z, and
+   * it grows turning left): the city far off, a car on the next street, a horn now and then, an ambulance going by,
+   * the elevated train when it runs near (world._train.pos, from citytrain.js), and the chirp of a crossing's signal
+   * for the blind when one is near (the signals' poles are in the world's collision grid). tunnel 0..1: inside a bore
+   * the city outside goes quiet and dull. Built at the first call; should the calls stop (the title), it fades away.
+   */
+  cityUpdate(dt, x, z, yaw, world, tunnel = 0) {
+    if (!this.ready || !this.city || this._cityOff) return;
+    // (a sound that fails is only a sound missed: it must never cost the game its frame; and a city that could not be
+    // built is not tried again every frame)
+    try { this._cityFrame(dt, x, z, yaw, world, tunnel); } catch (e) {
+      if (!this.cy) this._cityOff = true;
+      if (!this._cityWarned) { this._cityWarned = true; console.warn('city sound', e); }
+    }
+  }
+
+  _cityFrame(dt, x, z, yaw, world, tunnel) {
+    if (!this.cy) this._cityBuild();
+    const C = this.cy, t = this.ctx.currentTime;
+    C.x = x; C.z = z; C.yaw = yaw;
+    C.rx = -Math.cos(yaw); C.rz = Math.sin(yaw);             // the listener's right: a thing over there pans right
+    C.tun += (tunnel - C.tun) * Math.min(1, dt * 4);
+    const shut = C.tun > 0.5;                                 // (inside a tunnel nothing new starts out there)
+    // now and then: a car on the next street, a horn (once in a while another answering it), an ambulance
+    if ((C.passIn -= dt) <= 0) { C.passIn = 2.5 + Math.random() * 8; if (!shut) this._passBy(); }
+    if ((C.hornIn -= dt) <= 0) { C.hornIn = 6 + Math.random() * 14; if (!shut) { this._horn(); if (Math.random() < 0.12) C.hornIn = 0.5 + Math.random(); } }
+    if ((C.sirenIn -= dt) <= 0) { C.sirenIn = shut ? 6 : 45 + Math.random() * 55; if (!shut) this._siren(); }
+    // the far city breathes: slow random walks (each drawn back toward the middle) in its level and its colour
+    const k1 = dt / 6, k2 = dt / 10, k3 = dt / 4;
+    C.w1 += -C.w1 * k1 + Math.sqrt(2 * k1) * gauss();
+    C.w2 += -C.w2 * k2 + Math.sqrt(2 * k2) * gauss();
+    C.w3 += -C.w3 * k3 + Math.sqrt(2 * k3) * gauss();
+    // the train: the point of it nearest, and each wheel over a joint as it happens (a moment ahead, exactly in time)
+    const P = world && world._train ? world._train.pos : null;
+    let tg = 0;
+    if (P) {
+      const dx = P.x - x, dz = P.z - z, d = Math.sqrt(dx * dx + dz * dz + 36);    // (its deck is 8 m up)
+      tg = Math.pow(Math.min(1, 14 / d), 0.85) * smoothstep(150, 95, d);
+      C.tD = d; C.tP = (dx * C.rx + dz * C.rz) / d;
+      if (tg > 0.004 && C.od !== null && P.od > C.od && P.od - C.od < 6) {
+        const v = P.speed || 14;
+        for (let i = 0; i < 4; i++) {
+          const o = AXLES[i], n = Math.floor((P.od - o) / RAIL);
+          if (n > Math.floor((C.od - o) / RAIL)) this._clack(Math.max(t, t + 0.05 - (P.od - o - n * RAIL) / v), i);
+        }
+      }
+      C.od = P.od;
+    } else C.od = null;
+    // the crossing: the nearest signal's pole, looked for a few times a second
+    if ((C.sigIn -= dt) <= 0 && world && world.near) {
+      C.sigIn = 0.25;
+      const px = C.sx, pz = C.sz, had = C.sOn;
+      C.sd2 = 47 * 47; C.sOn = false;
+      world.near(x, z, 47, C.sigFn);
+      if (C.sOn && (!had || C.sx !== px || C.sz !== pz)) this._signal();     // a new one: its own voice and rhythm
+    }
+    let cg = 0;
+    if (C.sOn) {
+      const dx = C.sx - x, dz = C.sz - z, d = Math.sqrt(dx * dx + dz * dz + 4);    // (its speaker is up the pole)
+      cg = Math.min(1, 7 / d) * smoothstep(46, 30, d);
+      C.cD = d; C.cP = (dx * C.rx + dz * C.rz) / d;
+      // it sings in spells (while the walkers' light is green), each call queued a moment ahead: in step with the
+      // signal's lamps when its record carries the phase they run on, otherwise in spells of its own
+      if (cg > 0.003) {
+        if (C.chirpAt < t) C.chirpAt = t + 0.05;
+        const clock = C.sPh !== undefined && world && world.cityClock ? world.cityClock.value - t : null;
+        while (C.chirpAt < t + 0.12) {
+          if (clock !== null ? walking(clock + C.chirpAt, C.sPh) : (C.chirpAt + C.sigPh) % C.sigCycle < C.sigOn) this._chirp(C.chirpAt, C.chirpN++);
+          C.chirpAt += C.sigStep * (0.99 + Math.random() * 0.02);
+        }
+      }
+    }
+    // the levels, twenty times a second
+    if ((C.tick += dt) < 0.05) return;
+    C.tick = 0;
+    const rain = this._rainV || 0;
+    // the whole city: up as the run starts, down and dull inside a tunnel; and should these calls stop, away
+    const g = C.bus.gain;
+    g.cancelScheduledValues(t + 0.3);
+    g.setTargetAtTime(1 - 0.85 * C.tun, t, 0.4);
+    g.setTargetAtTime(0, t + 0.6, 0.5);
+    C.muff.frequency.setTargetAtTime(700 + 17000 * Math.pow(1 - C.tun, 3), t, 0.08);
+    // the far roar and the wash over it (the rain's hiss covers some of both)
+    C.loG.gain.setTargetAtTime(CITY.roar * Math.exp(0.2 * C.w1) * (1 - 0.3 * rain), t, 0.3);
+    C.lo.frequency.setTargetAtTime(230 * Math.exp(0.16 * C.w2), t, 0.3);
+    C.midG.gain.setTargetAtTime(CITY.air * Math.exp(0.28 * C.w3) * (1 - 0.55 * rain), t, 0.3);
+    C.mid.frequency.setTargetAtTime(720 * Math.exp(0.14 * C.w2), t, 0.3);
+    C.bed.playbackRate.setTargetAtTime(Math.exp(0.04 * C.w2), t, 0.5);     // (and so the loop never quite repeats)
+    // the train, and the crossing's speaker, only while they can be heard
+    if (tg > 0 || C.tOn) {
+      C.tOn = tg > 0;
+      C.tG.gain.setTargetAtTime(CITY.train * tg, t, 0.15);
+      C.tLP.frequency.setTargetAtTime(350 + 5200 * Math.pow(Math.min(1, 14 / C.tD), 1.2), t, 0.1);
+      if (C.tPan.pan) C.tPan.pan.setTargetAtTime(clamp(C.tP, -1, 1) * 0.85, t, 0.08);
+    }
+    if (cg > 0 || C.cOn) {
+      C.cOn = cg > 0;
+      C.cG.gain.setTargetAtTime(CITY.chirp * cg, t, 0.1);
+      C.cLP.frequency.setTargetAtTime(1800 + 7000 * Math.min(1, 7 / C.cD), t, 0.1);
+      if (C.cPan.pan) C.cPan.pan.setTargetAtTime(clamp(C.cP, -1, 1) * 0.85, t, 0.08);
+    }
+    // an ambulance going by turns with the listener (its way past is fixed when it sets out)
+    const S = C.siren;
+    if (S) {
+      const u = t - S.t0;
+      if (u > S.D + 0.3) C.siren = null;
+      else if (u > 0 && S.pan.pan) S.pan.pan.setTargetAtTime(Math.sin(S.a0 + S.dir * Math.atan2(S.v * (u - S.tc), S.d0) + yaw - S.yaw0) * 0.9, t, 0.06);
+    }
+  }
+
+  /** The city's standing nodes: its bus and a street's reverb, the far roar, the train's voice, the crossing's. */
+  _cityBuild() {
+    const c = this.ctx, t = c.currentTime;
+    const C = {
+      x: 0, z: 0, yaw: 0, rx: -1, rz: 0, tun: 0, tick: 1, w1: 0, w2: 0, w3: 0, srcs: [],
+      passIn: 1 + Math.random() * 3, hornIn: 4 + Math.random() * 8, sirenIn: 25 + Math.random() * 35, siren: null,
+      od: null, tD: 1e3, tP: 0, tOn: false,
+      sigIn: 0, sOn: false, sx: 0, sz: 0, sPh: undefined, sd2: 0, cD: 1e3, cP: 0, cOn: false,
+      sigKind: 0, sigF: 2600, sigStep: 0.42, sigCycle: 10, sigOn: 6.5, sigPh: 0, chirpAt: 0, chirpN: 0,
+    };
+    // everything the city makes goes through one bus: faded in and out as a whole, muffled inside a tunnel
+    C.bus = this._gain(0);
+    C.muff = c.createBiquadFilter(); C.muff.type = 'lowpass'; C.muff.frequency.value = 18000; C.muff.Q.value = 0.5;
+    C.bus.connect(C.muff); C.muff.connect(this.master);
+    // a street's reverb: early echoes off the fronts, then a short dark tail
+    if (!this.streetIR) this.streetIR = this._streetImpulse(1.8);
+    C.verb = c.createConvolver(); C.verb.buffer = this.streetIR;
+    const ret = this._gain(0.8); C.verb.connect(ret); ret.connect(C.bus);
+    // the far city: brown noise (each side its own) in two bands, the traffic's low roar and a faint wash above it
+    if (!this.brownBuf) this.brownBuf = this._brown(10);
+    const bed = C.bed = c.createBufferSource(); bed.buffer = this.brownBuf; bed.loop = true; bed.start(t, Math.random() * 10);
+    C.lo = c.createBiquadFilter(); C.lo.type = 'lowpass'; C.lo.frequency.value = 230; C.lo.Q.value = 0.4;
+    C.loG = this._gain(0); bed.connect(C.lo); C.lo.connect(C.loG); C.loG.connect(C.bus);
+    C.mid = c.createBiquadFilter(); C.mid.type = 'bandpass'; C.mid.frequency.value = 720; C.mid.Q.value = 0.55;
+    C.midG = this._gain(0); bed.connect(C.mid); C.mid.connect(C.midG); C.midG.connect(C.bus);
+    // the train: the viaduct's rumble (the brown noise as one point), the wheels' roll, and the joints' clacks
+    // (_clack), all through one distance: its level, a low-pass that closes as it goes off, and its side
+    const tr = c.createBufferSource(); tr.buffer = this.brownBuf; tr.loop = true; tr.start(t, Math.random() * 10);
+    const tLow = c.createBiquadFilter(); tLow.type = 'lowpass'; tLow.frequency.value = 170; tLow.Q.value = 0.9;
+    tLow.channelCount = 1; tLow.channelCountMode = 'explicit';
+    const rumG = this._gain(0.7);
+    const rn = c.createBufferSource(); rn.buffer = this.noiseBuf; rn.loop = true; rn.start(t, Math.random() * 1.9);
+    const tRoll = c.createBiquadFilter(); tRoll.type = 'bandpass'; tRoll.frequency.value = 950; tRoll.Q.value = 0.8;
+    const rollG = this._gain(0.22);
+    C.tClack = this._gain(1); C.tG = this._gain(0);
+    C.tLP = c.createBiquadFilter(); C.tLP.type = 'lowpass'; C.tLP.frequency.value = 1500; C.tLP.Q.value = 0.5;
+    C.tPan = this._pan(); const tSend = this._gain(0.35);
+    tr.connect(tLow); tLow.connect(rumG); rumG.connect(C.tG); rn.connect(tRoll); tRoll.connect(rollG); rollG.connect(C.tG); C.tClack.connect(C.tG);
+    C.tG.connect(C.tLP); C.tLP.connect(C.tPan); C.tPan.connect(C.bus); C.tLP.connect(tSend); tSend.connect(C.verb);
+    // the crossing's speaker on its pole (a small speaker's tone: a sine with a little of its second and third)
+    C.cG = this._gain(0);
+    C.cLP = c.createBiquadFilter(); C.cLP.type = 'lowpass'; C.cLP.frequency.value = 6000; C.cLP.Q.value = 0.5;
+    C.cPan = this._pan(); const cSend = this._gain(0.25);
+    C.cG.connect(C.cLP); C.cLP.connect(C.cPan); C.cPan.connect(C.bus); C.cLP.connect(cSend); cSend.connect(C.verb);
+    C.wave = c.createPeriodicWave(new Float32Array([0, 0, 0, 0]), new Float32Array([0, 1, 0.1, 0.04]));
+    C.srcs.push(bed, tr, rn);
+    // (from the collision grid's records near the listener, the nearest signal's pole; the shopping streets' arches
+    // stand in the grid as signals too, a little stouter, and have no crossing)
+    C.sigFn = (rec) => {
+      if (rec.name !== 'signal' || rec.r > 0.19) return;
+      const d2 = (rec.x - C.x) * (rec.x - C.x) + (rec.z - C.z) * (rec.z - C.z);
+      if (d2 < C.sd2) { C.sd2 = d2; C.sx = rec.x; C.sz = rec.z; C.sPh = rec.phase; C.sOn = true; }
+    };
+    this.cy = C;
+  }
+
+  /** Leaving the city: its sounds fade out and its standing nodes stop (whatever is still ringing dies away by itself). */
+  _cityDrop() {
+    const C = this.cy, t = this.ctx.currentTime;
+    this.cy = null;
+    C.bus.gain.cancelScheduledValues(t); C.bus.gain.setTargetAtTime(0, t, 0.1);
+    setTimeout(() => { for (const s of C.srcs) { try { s.stop(); } catch {} } C.bus.disconnect(); }, 800);
+  }
+
+  _pan() { const c = this.ctx; return c.createStereoPanner ? c.createStereoPanner() : this._gain(1); }
+
+  /** Brown noise for the city's roar, each side its own and looping without a seam; nothing high in it is kept. */
+  _brown(sec) {
+    const sr = 22050, n = Math.floor(sr * sec), F = Math.floor(sr * 0.5), b = this.ctx.createBuffer(2, n, sr);
+    const a = Math.exp(-2 * Math.PI * 50 / sr), a1 = 1 - a, k = Math.exp(-2 * Math.PI * 35 / sr);
+    const tmp = new Float32Array(n + F);
+    for (let ch = 0; ch < 2; ch++) {
+      // white noise through a gentle low-pass (the brown slope) and a DC blocker (no rumble below hearing); one flat
+      // loop, as it runs on the first city frame
+      let s = ch ? 4242 : 777, lo = 0, hp = 0, prev = 0, e = 0;
+      for (let i = 0; i < n + F; i++) {
+        s = lcg(s); lo = lo * a + (s / 2147483648 - 1) * a1;
+        hp = k * (hp + lo - prev); prev = lo; tmp[i] = hp; e += hp * hp;
+      }
+      const g = 0.3 / Math.sqrt(e / (n + F) || 1), d = b.getChannelData(ch);
+      for (let i = 0; i < n; i++) d[i] = tmp[i] * g;
+      // the noise that would have followed the end fades in over the start, so the loop has no seam
+      for (let i = 0; i < F; i++) { const u = i / F; d[i] = d[i] * Math.sqrt(u) + tmp[n + i] * g * Math.sqrt(1 - u); }
+    }
+    return b;
+  }
+
+  /**
+   * A street's reverb for the city's sounds: a handful of early echoes off the fronts across the way and along it (each a
+   * short smear of dull noise, as off rough walls), then a short tail, the highs dying first. Each side its own.
+   */
+  _streetImpulse(sec) {
+    const c = this.ctx, sr = c.sampleRate, n = Math.floor(sr * sec), b = c.createBuffer(2, n, sr);
+    const kLo = Math.exp(-3.6 / sr), kHi = Math.exp(-8 / sr), on = Math.floor(sr * 0.06), len = Math.floor(sr * 0.005);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = b.getChannelData(ch);
+      let s = ch ? 313 : 1031, lo = 0, eLo = 0.63, eHi = 0.16;
+      for (let i = 0; i < n; i++) {
+        s = lcg(s); const w = s / 2147483648 - 1;
+        lo += (w - lo) * 0.2;
+        d[i] = (lo * eLo + (w - lo) * eHi) * (i < on ? i / on : 1);
+        eLo *= kLo; eHi *= kHi;
+      }
+      for (let k = 0; k < 7; k++) {
+        s = lcg(s); const at = Math.floor(sr * (0.012 + (s / 4294967296) * 0.1));
+        s = lcg(s); const amp = (2.4 - k * 0.22) * (s < 2147483648 ? -1 : 1);
+        let e = 0, dec = 1;
+        const kd = Math.exp(-1 / (len * 0.3));
+        for (let i = 0; i < len && at + i < n; i++) { s = lcg(s); e += (s / 2147483648 - 1 - e) * 0.3; d[at + i] += amp * e * dec; dec *= kd; }
+      }
+    }
+    return b;
+  }
+
+  /** A signal's own voice and rhythm, the same each time it is passed (from where its pole stands). */
+  _signal() {
+    const C = this.cy;
+    const h = (k) => { const v = Math.sin(C.sx * 12.9898 + C.sz * 78.233 + k * 37.719) * 43758.5453; return v - Math.floor(v); };
+    C.sigKind = h(1) < 0.6 ? 0 : 1;                          // a chick's piyo-piyo, or the cuckoo's kak-koo
+    C.sigF = C.sigKind ? 980 + 120 * h(2) : 2500 + 450 * h(2);
+    C.sigStep = C.sigKind ? 1.1 : 0.42;
+    C.sigCycle = 8 + 5 * h(3); C.sigOn = C.sigCycle * (0.62 + 0.12 * h(4)); C.sigPh = C.sigCycle * h(5);
+    C.chirpAt = 0; C.chirpN = 0;
+  }
+
+  /**
+   * One call of a crossing's signal at time tc: a chick's piyo (a quick rise and a fall, every other one from the far
+   * side's speaker, a little lower), or the cuckoo's kak-koo (a short note and a longer one a third below).
+   */
+  _chirp(tc, n) {
+    const c = this.ctx, C = this.cy;
+    const notes = C.sigKind ? [[0, 1, 0.075], [0.19, 0.82, 0.26]] : [[0, n & 1 ? 0.94 : 1, 0.1]];
+    for (const [at, mul, len] of notes) {
+      const t = tc + at, f = C.sigF * mul;
+      const o = c.createOscillator(); o.setPeriodicWave(C.wave);
+      if (C.sigKind) { o.frequency.setValueAtTime(f * 1.02, t); o.frequency.exponentialRampToValueAtTime(f * 0.97, t + len); }
+      else { o.frequency.setValueAtTime(f * 0.78, t); o.frequency.exponentialRampToValueAtTime(f * 1.1, t + 0.02); o.frequency.exponentialRampToValueAtTime(f * 0.8, t + len); }
+      const g = this._gain(0); o.connect(g); g.connect(C.cG);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.006); g.gain.setValueAtTime(0.5, t + len - 0.03); g.gain.linearRampToValueAtTime(0, t + len);
+      o.start(t); o.stop(t + len + 0.02);
+      o.onended = () => g.disconnect();
+    }
+  }
+
+  /** One wheel over a rail joint at time tc: the clunk of the steel, and a thump down through the viaduct. */
+  _clack(tc, i) {
+    const c = this.ctx, C = this.cy;
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf;
+    const hi = c.createBiquadFilter(); hi.type = 'bandpass'; hi.frequency.value = 900 + Math.random() * 700; hi.Q.value = 0.8;
+    const lo = c.createBiquadFilter(); lo.type = 'lowpass'; lo.frequency.value = 240 + Math.random() * 90; lo.Q.value = 1.2;
+    const gh = this._gain(0), gl = this._gain(0);
+    s.connect(hi); hi.connect(gh); gh.connect(C.tClack); s.connect(lo); lo.connect(gl); gl.connect(C.tClack);
+    // (a bogie's second wheel comes down a little harder than its first: ta-TAN)
+    const k = (i & 1 ? 1 : 0.75) * (0.75 + Math.random() * 0.5);
+    gh.gain.setValueAtTime(0, tc); gh.gain.linearRampToValueAtTime(2.6 * k, tc + 0.0015); gh.gain.setTargetAtTime(0, tc + 0.0015, 0.012);
+    gl.gain.setValueAtTime(0, tc); gl.gain.linearRampToValueAtTime(10 * k, tc + 0.002); gl.gain.setTargetAtTime(0, tc + 0.002, 0.03);
+    s.start(tc, Math.random() * 1.8); s.stop(tc + 0.2);
+    s.onended = () => { gh.disconnect(); gl.disconnect(); };
+  }
+
+  /**
+   * A horn somewhere off in the streets: a tap, two, a longer one, or a tap and then leaning on it; a kei car's one high
+   * horn, a car's pair (a third apart) or a truck's low pair, each a buzzing voice through the horn's own band, dulled
+   * and quietened by how far off it is, with the street's echo.
+   */
+  _horn() {
+    const c = this.ctx, C = this.cy, t0 = c.currentTime + 0.03, r = Math.random();
+    const kind = r < 0.35 ? 0 : r < 0.82 ? 1 : 2;
+    const f = kind === 0 ? 420 + Math.random() * 100 : kind === 1 ? 350 + Math.random() * 70 : 200 + Math.random() * 60;
+    const f2 = kind === 0 ? f * 1.003 : f * (1.19 + Math.random() * 0.07);
+    const d = 45 + 255 * Math.sqrt(Math.random()), near = 45 / d;          // metres off (more streets far than near)
+    const q = Math.random(), sc = 0.85 + Math.random() * 0.3;
+    // [start, length] of each note
+    const B = q < 0.34 ? [0, 0.12] : q < 0.72 ? [0, 0.1, 0.19, 0.12] : q < 0.92 ? [0, 0.34 + Math.random() * 0.3] : [0, 0.11, 0.21, 0.6 + Math.random() * 0.6];
+    const att = kind === 2 ? 0.035 : 0.012;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(1900, f * 3.1); bp.Q.value = 0.8;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700 + 3600 * near * near; lp.Q.value = 0.5;
+    const env = this._gain(0), pan = this._pan(), send = this._gain(0.35 + 0.45 * (1 - near));
+    bp.connect(lp); lp.connect(env); env.connect(pan); pan.connect(C.bus); env.connect(send); send.connect(C.verb);
+    if (pan.pan) pan.pan.value = (Math.random() * 2 - 1) * 0.9;
+    const pk = CITY.horn * Math.pow(near, 0.9) * (0.6 + 0.4 * Math.random());
+    const oscs = [];
+    for (const [type, fv, v, det] of [['sawtooth', f, 0.6, 3], ['square', f2, 0.4, -4]]) {
+      const o = c.createOscillator(); o.type = type; o.detune.value = det;
+      const g = this._gain(v); o.connect(g); g.connect(bp);
+      // each note starts a little flat, the diaphragm coming up to speed
+      for (let i = 0; i < B.length; i += 2) { const tb = t0 + B[i] * sc; o.frequency.setValueAtTime(fv * 0.94, tb); o.frequency.exponentialRampToValueAtTime(fv, tb + 0.04); }
+      oscs.push(o);
+    }
+    // the diaphragm's rattle: a burst of noise through the horn's band as each note catches, a little under it after
+    const nz = c.createBufferSource(); nz.buffer = this.noiseBuf; nz.loop = true;
+    const ng = this._gain(0); nz.connect(ng); ng.connect(bp);
+    let end = t0;
+    for (let i = 0; i < B.length; i += 2) {
+      const tb = t0 + B[i] * sc, te = tb + B[i + 1] * sc;
+      env.gain.setValueAtTime(0, tb); env.gain.linearRampToValueAtTime(pk, tb + att);
+      env.gain.setTargetAtTime(pk * 0.88, tb + att, 0.25);
+      env.gain.setTargetAtTime(0, te, 0.016);
+      ng.gain.setValueAtTime(0, tb); ng.gain.linearRampToValueAtTime(0.5, tb + 0.004); ng.gain.setTargetAtTime(0.06, tb + 0.004, 0.012); ng.gain.setTargetAtTime(0, te, 0.01);
+      end = te;
+    }
+    for (const o of oscs) { o.start(t0); o.stop(end + 0.15); }
+    nz.start(t0, Math.random() * 1.5); nz.stop(end + 0.1);
+    oscs[0].onended = () => { env.disconnect(); send.disconnect(); };
+  }
+
+  /**
+   * An ambulance on another street: pee-po, pee-po (960 and 770 Hz, 0.65 s each), coming nearer then going away over
+   * several seconds: louder and brighter as it nears, its pitch falling as it passes (the doppler, a few per cent), a
+   * facade's echo combing with it as the path changes, and crossing from one side to the other.
+   */
+  _siren() {
+    const c = this.ctx, C = this.cy, t0 = c.currentTime + 0.05;
+    const D = 6.5 + Math.random() * 2.5, v = 11 + Math.random() * 6, d0 = 22 + Math.random() * 40, tc = D * (0.42 + Math.random() * 0.16);
+    const S = C.siren = { t0, D, v, d0, tc, a0: (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.7, dir: Math.random() < 0.5 ? 1 : -1, yaw0: C.yaw, pan: this._pan() };
+    const oA = c.createOscillator(), oB = c.createOscillator(); oA.type = 'square'; oB.type = 'triangle';
+    const gA = this._gain(0.3), gB = this._gain(0.7);
+    const spk = c.createBiquadFilter(); spk.type = 'lowpass'; spk.frequency.value = 2400; spk.Q.value = 0.8;   // its horn speaker
+    const echo = c.createDelay(0.05), eg = this._gain(0.45);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.5;
+    const env = this._gain(0), send = this._gain(0);
+    oA.connect(gA); oB.connect(gB); gA.connect(spk); gB.connect(spk);
+    spk.connect(lp); spk.connect(echo); echo.connect(eg); eg.connect(lp);
+    lp.connect(env); env.connect(S.pan); S.pan.connect(C.bus); lp.connect(send); send.connect(C.verb);
+    // pee and po, starting part way through one (each change a few milliseconds' glide, not a kink)
+    let hi = Math.random() < 0.5;
+    for (let tt = t0 - Math.random() * 0.6; tt < t0 + D; tt += 0.65, hi = !hi) {
+      const f = hi ? 960 : 770;
+      if (tt <= t0) { oA.frequency.setValueAtTime(f, t0); oB.frequency.setValueAtTime(f, t0); } else { oA.frequency.setTargetAtTime(f, tt, 0.004); oB.frequency.setTargetAtTime(f, tt, 0.004); }
+    }
+    // the way past, as curves: level (and the reverb's, which falls off slower), brightness, doppler, the echo's delay
+    const N = 64, L = new Float32Array(N), R = new Float32Array(N), F = new Float32Array(N), DA = new Float32Array(N), DB = new Float32Array(N), E = new Float32Array(N);
+    const pk = CITY.siren * (0.7 + 0.3 * Math.random());
+    for (let i = 0; i < N; i++) {
+      const u = D * i / (N - 1), x = v * (u - tc), r = Math.hypot(x, d0);
+      // (round a corner it goes behind the buildings: fainter still than its distance alone)
+      const k = Math.min(1, 20 / r) / Math.sqrt(1 + (x / 40) * (x / 40)), win = Math.max(0, Math.min(1, u / 1.2, (D - u) / 1.6));
+      L[i] = pk * k * win; R[i] = 0.45 * Math.sqrt(pk * L[i]);
+      F[i] = 600 + 5200 * Math.pow(k, 1.5);
+      DA[i] = 1200 * Math.log2(343 / (343 + v * x / r)); DB[i] = DA[i] + 7;
+      E[i] = 0.004 + 0.012 * (1 - d0 / r);
+    }
+    env.gain.setValueCurveAtTime(L, t0, D); send.gain.setValueCurveAtTime(R, t0, D);
+    lp.frequency.setValueCurveAtTime(F, t0, D); echo.delayTime.setValueCurveAtTime(E, t0, D);
+    oA.detune.setValueCurveAtTime(DA, t0, D); oB.detune.setValueCurveAtTime(DB, t0, D);
+    if (S.pan.pan) S.pan.pan.value = Math.sin(S.a0 + S.dir * Math.atan2(-v * tc, d0)) * 0.9;
+    oA.start(t0); oB.start(t0); oA.stop(t0 + D + 0.05); oB.stop(t0 + D + 0.05);
+    oA.onended = () => { env.disconnect(); send.disconnect(); S.pan.disconnect(); };
+  }
+
+  /** A car going by on the next street: tyre roar and a little engine rising and falling, from one side to the other. */
+  _passBy() {
+    const c = this.ctx, C = this.cy, t0 = c.currentTime + 0.05;
+    const D = 4 + Math.random() * 4, v = 9 + Math.random() * 10, d0 = 22 + Math.random() * 40, tc = D * (0.4 + Math.random() * 0.2);
+    const heavy = Math.random() < 0.2;                        // a truck or a bus: lower, and more engine
+    // one broad roar, not bands: the engine's low end (a shelf) and the hump the tread sings in, dulled by distance
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
+    const eng = c.createBiquadFilter(); eng.type = 'lowshelf'; eng.frequency.value = heavy ? 180 : 240; eng.gain.value = heavy ? 13 : 9;
+    const tyre = c.createBiquadFilter(); tyre.type = 'peaking'; tyre.frequency.value = heavy ? 600 : 800 + Math.random() * 350; tyre.Q.value = 0.8; tyre.gain.value = 5;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.5;
+    const env = this._gain(0), pan = this._pan();
+    s.connect(eng); eng.connect(tyre); tyre.connect(lp); lp.connect(env); env.connect(pan); pan.connect(C.bus);
+    const N = 32, G = new Float32Array(N), F = new Float32Array(N), P = new Float32Array(N);
+    const a0 = (Math.random() < 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.8, dir = Math.random() < 0.5 ? 1 : -1;
+    const pk = CITY.pass * (0.6 + 0.4 * Math.random()) * (heavy ? 1.3 : 1);
+    for (let i = 0; i < N; i++) {
+      // (heard round the buildings: it swells out of the roar and sinks back into it)
+      const u = D * i / (N - 1), x = v * (u - tc), r = Math.hypot(x, d0);
+      const k = Math.min(1, 16 / r) / Math.sqrt(1 + (x / 30) * (x / 30)), win = Math.pow(Math.max(0, Math.sin(Math.PI * i / (N - 1))), 1.2);
+      G[i] = pk * k * win; F[i] = 450 + 3800 * Math.pow(k, 1.5); P[i] = Math.sin(a0 + dir * Math.atan2(x, d0)) * 0.85;
+    }
+    env.gain.setValueCurveAtTime(G, t0, D); lp.frequency.setValueCurveAtTime(F, t0, D);
+    if (pan.pan) pan.pan.setValueCurveAtTime(P, t0, D);
+    s.start(t0, Math.random() * 1.9); s.stop(t0 + D + 0.05);
+    s.onended = () => { env.disconnect(); pan.disconnect(); };
   }
 }

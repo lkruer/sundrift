@@ -6,22 +6,22 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609232110';
-import { createRig, detectTier } from '../rig.js?v=202609232110';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609232110';
-import { Car, gearbox } from './car.js?v=202609232110';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609232110';
-import { World, drawsGlyphs } from './world.js?v=202609232110';
-import { ChaseCam } from './camera.js?v=202609232110';
-import { Input } from './input.js?v=202609232110';
-import { Scoring } from './scoring.js?v=202609232110';
-import { Hud } from './hud.js?v=202609232110';
-import { Audio } from './audio.js?v=202609232110';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609232110';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609232110';
-import { Atmosphere } from './atmos.js?v=202609232110';
-import { Debris } from './debris.js?v=202609232110';
-import { makePost } from './post.js?v=202609232110';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609232326';
+import { createRig, detectTier } from '../rig.js?v=202609232326';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609232326';
+import { Car, gearbox } from './car.js?v=202609232326';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609232326';
+import { World, drawsGlyphs } from './world.js?v=202609232326';
+import { ChaseCam } from './camera.js?v=202609232326';
+import { Input } from './input.js?v=202609232326';
+import { Scoring } from './scoring.js?v=202609232326';
+import { Hud } from './hud.js?v=202609232326';
+import { Audio } from './audio.js?v=202609232326';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609232326';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609232326';
+import { Atmosphere } from './atmos.js?v=202609232326';
+import { Debris } from './debris.js?v=202609232326';
+import { makePost } from './post.js?v=202609232326';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -978,6 +978,8 @@ function step(dt, t0) {
   audio.update(dt, car, rpmIn, scoring.active, boost01, surface, gb.gear);
   const inTun = !!track.inTunnel(G.s);
   if (audio.setTunnel) audio.setTunnel(inTun ? 1 : 0);
+  // NEO TOKYO's own sounds under it all (far traffic, horns, a siren, the train, the crossings' chirps), heard from the lens
+  if (G.map === 'city' && audio.cityUpdate) { const e = camera.matrixWorld.elements; audio.cityUpdate(dt, camera.position.x, camera.position.z, Math.atan2(-e[8], -e[10]), world, inTun ? 1 : 0); }
   // in a tunnel the sodium lamps are the light: the headlights drop back so the bore stays orange
   G.tunnelK = damp(G.tunnelK || 0, inTun || track.nearTunnel(G.s + 25, 0) ? 1 : 0, 3, dt);
   for (const hl of headlights) hl.intensity = 2.6 * G.night * (1 - 0.6 * G.tunnelK);

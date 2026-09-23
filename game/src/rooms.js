@@ -17,6 +17,9 @@
  *   7 a bar (backlit bottles, a neon squiggle, dark wood, small spots; the counter and its stools)
  * Anything drawn at full white is a lamp (the shader makes it glow); the television's screen is drawn pure blue so the
  * shader can find it (lit when a flat is watching, dark otherwise). Tiled cells wrap at their edges.
+ * People are drawn into the furniture rows, from behind: customers on the stools at the eatery's and the bar's
+ * counters, a shopper at the convenience store's shelves, players at the arcade's machines, someone working late at an
+ * office desk; so the lit shops a car goes by are open, and busy.
  */
 import * as THREE from 'three';
 
@@ -29,14 +32,14 @@ function mulberry32(seed) {
 
 // the kinds: [back, side, floor, ceiling] tiles in metres (0: fit the surface); [z, h, tile, on] the furniture row
 export const ROOM_KINDS = [
-  { name: 'eatery', a: [4.8, 3.2, 1.8, 2.8], b: [0.7, 1.05, 2.4, 1] },
+  { name: 'eatery', a: [4.8, 3.2, 1.8, 2.8], b: [0.7, 1.62, 2.4, 1] },
   { name: 'boutique', a: [3.2, 3.2, 2.4, 2.4], b: [0.5, 1.64, 2.4, 1] },
-  { name: 'konbini', a: [3.2, 3.2, 2.4, 2.4], b: [0.44, 1.46, 3.0, 1] },
+  { name: 'konbini', a: [3.2, 3.2, 2.4, 2.4], b: [0.44, 1.8, 3.0, 1] },
   { name: 'arcade', a: [3.2, 3.2, 2.4, 2.4], b: [0.5, 1.9, 3.2, 1] },
   { name: 'flat', a: [0, 0, 1.8, 0], b: [0, 0, 0, 0] },
   { name: 'tatami', a: [0, 0, 1.8, 0], b: [0.55, 0.45, 0, 1] },
-  { name: 'office', a: [3.2, 3.2, 2.4, 2.4], b: [0.36, 1.18, 2.6, 1] },
-  { name: 'bar', a: [3.2, 3.2, 2.4, 2.4], b: [0.62, 1.1, 2.4, 1] },
+  { name: 'office', a: [3.2, 3.2, 2.4, 2.4], b: [0.36, 1.62, 2.6, 1] },
+  { name: 'bar', a: [3.2, 3.2, 2.4, 2.4], b: [0.62, 1.62, 2.4, 1] },
 ];
 
 export function roomAtlas(T = THREE) {
@@ -74,6 +77,33 @@ export function roomAtlas(T = THREE) {
   // a rectangle in metres (x, y the lower left, y up)
   const M = (X, Y) => (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(X(x), Y(y + h), X(x + w) - X(x), Y(y) - Y(y + h)); };
   const disc = (x, y, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); };
+  // a person seen from behind, x their middle in metres: sitting (on a seat 0.7 m up) or standing; their clothes
+  // and hair from Tokyo at night (dark suits, a white shirt, a camel coat, a hoodie; black hair, now and then grey
+  // or dyed)
+  const COATS = ['#23283a', '#2c2c32', '#3a2c26', '#4a4a52', '#dcd8d0', '#6a4e34', '#2a3a2e', '#5a2630', '#1c1c20', '#8a7a64'];
+  const HAIR = ['#120c0a', '#120c0a', '#1c140e', '#2a1c12', '#6a6660', '#8a5a2a'];
+  const person = (X, Y, x, sitting) => {
+    const coat = pick(COATS), hair = pick(HAIR), legs = pick(['#1a1a20', '#24242c', '#2a2a36', '#3a3a44']);
+    const y0 = sitting ? 0.7 : 0, sh = sitting ? 1.28 : 1.42, hw = 0.2 + rnd() * 0.04;
+    const px = (m) => X(m), py = (m) => Y(m);
+    if (!sitting) {
+      // legs, a little apart
+      c.fillStyle = legs;
+      c.fillRect(px(x - 0.15), py(0.84), px(0.12) - px(0), py(0) - py(0.84));
+      c.fillRect(px(x + 0.03), py(0.84), px(0.12) - px(0), py(0) - py(0.84));
+    }
+    // the back and the shoulders, rounded at the top
+    c.fillStyle = coat;
+    c.beginPath();
+    const bx = px(x - hw), bw = px(2 * hw) - px(0), top = py(sh), bot = py(sitting ? y0 + 0.02 : 0.8), r = (px(0.08) - px(0));
+    if (c.roundRect) c.roundRect(bx, top, bw, bot - top, [r, r, 1, 1]); else c.rect(bx, top, bw, bot - top);
+    c.fill();
+    // the neck and the head, the hair over most of it
+    c.fillStyle = '#c89878'; c.fillRect(px(x - 0.045), py(sh + 0.08), px(0.09) - px(0), py(sh) - py(sh + 0.08) + 1);
+    const hr = px(0.105) - px(0), hy = py(sh + 0.19);
+    disc(px(x), hy, hr, '#c89878');
+    disc(px(x), hy - hr * 0.1, hr * 1.02, hair);
+  };
   const planks = (w, h, base, dark, step, vertical) => {
     R(0, 0, w, h, base);
     c.fillStyle = dark;
@@ -127,13 +157,14 @@ export function roomAtlas(T = THREE) {
     const cx = w / 2, cy = h / 2;
     disc(cx, cy, X(0.26), '#ffb060'); disc(cx, cy, X(0.18), '#ffe8c0'); disc(cx, cy, X(0.12), '#ffffff');
   }, true);
-  cell(4, 2.4, 1.05, (g, w, h, X, Y) => {
+  cell(4, 2.4, 1.62, (g, w, h, X, Y) => {
     const m = M(X, Y);
     m(0, 0, 2.4, 1.05, '#4a2e18');
     for (let x = 0; x < 2.4; x += 0.3) m(x, 0, 0.02, 0.95, '#3a2210');
     m(0, 0.93, 2.4, 0.12, '#b08050');
-    // stools in front: dark legs, red seats
+    // stools in front: dark legs, red seats; customers on two of them, their bowls on the counter
     for (let x = 0.3; x < 2.4; x += 0.6) { m(x - 0.03, 0, 0.06, 0.66, '#140c08'); m(x - 0.17, 0.64, 0.34, 0.08, '#a8201a'); }
+    for (const x of [0.3, 1.5]) { m(x + 0.14, 1.05, 0.16, 0.07, '#e8e0d0'); person(X, Y, x, true); }
   }, true);
 
   // ---------------------------------------------------------------- 1 a boutique or a cafe
@@ -199,11 +230,14 @@ export function roomAtlas(T = THREE) {
     R(0, 0, w, h, '#e8eaec');
     for (const y of [0.25, 0.75]) { R(w * 0.08, y * h - 4, w * 0.84, 8, '#f4f8ff'); R(w * 0.1, y * h - 2, w * 0.8, 4, '#ffffff'); }
   }, true);
-  cell(14, 3.0, 1.46, (g, w, h, X, Y) => {
+  cell(14, 3.0, 1.8, (g, w, h, X, Y) => {
     const m = M(X, Y);
     m(0, 0, 2.3, 1.46, '#c8ccd0');
     shelves(X, Y, 2.3, 0.08, 1.38, 4, vivid.concat(muted), '#f4f4f0');
     m(0, 1.38, 2.3, 0.08, '#e8201e');
+    // a shopper at the end of the aisle, a basket in hand
+    person(X, Y, 2.62, false);
+    m(2.84, 0.46, 0.14, 0.2, '#3a62c8'); m(2.86, 0.62, 0.1, 0.02, '#1a1a20');
   }, true);
 
   // ---------------------------------------------------------------- 3 an arcade
@@ -239,6 +273,8 @@ export function roomAtlas(T = THREE) {
   cell(19, 3.2, 1.9, (g, w, h, X, Y) => {
     const m = M(X, Y);
     for (let k = 0; k < 3; k++) machine(m, 0.1 + k * 0.8, pick(vivid), pick(vivid));
+    // a player at the middle machine
+    person(X, Y, 1.3, false);
   }, true);
 
   // ---------------------------------------------------------------- 4 a flat (the television's screen pure blue)
@@ -322,10 +358,13 @@ export function roomAtlas(T = THREE) {
     c.fillStyle = '#b8bcc0'; for (let i = 0; i <= 4; i++) { c.fillRect(Math.round(i * w / 4), 0, 1, h); c.fillRect(0, Math.round(i * h / 4), w, 1); }
     for (const [x, y] of [[0.125, 0.125], [0.625, 0.625]]) { R(x * w, y * h, w / 4, h / 4, '#f4f8ff'); R(x * w + 3, y * h + 3, w / 4 - 6, h / 4 - 6, '#ffffff'); }
   }, true);
-  cell(34, 2.6, 1.18, (g, w, h, X, Y) => {
+  cell(34, 2.6, 1.62, (g, w, h, X, Y) => {
     const m = M(X, Y);
     m(0, 0, 2.5, 0.72, '#6a6e76'); m(0, 0.7, 2.5, 0.04, '#a8acb4');
     for (const x of [0.35, 1.6]) { m(x, 0.76, 0.56, 0.4, '#1a1c22'); m(x + 0.03, 0.8, 0.5, 0.33, '#9ec8f0'); m(x + 0.24, 0.72, 0.08, 0.06, '#1a1c22'); m(x + 0.08, 0.9, 0.2, 0.03, '#ffffff'); }
+    // someone still at the first desk, the back of their chair and their head over it
+    m(0.46, 0.35, 0.34, 0.62, '#16181e');
+    person(X, Y, 0.63, true);
   }, true);
 
   // ---------------------------------------------------------------- 7 a bar
@@ -350,11 +389,13 @@ export function roomAtlas(T = THREE) {
     for (const [x, y] of [[0.25, 0.3], [0.75, 0.3], [0.5, 0.8]]) { disc(x * w, y * h, 6, '#ffb070'); disc(x * w, y * h, 3, '#ffffff'); }
     R(0, h * 0.55, w, 4, '#8a3ad8');
   }, true);
-  cell(39, 2.4, 1.1, (g, w, h, X, Y) => {
+  cell(39, 2.4, 1.62, (g, w, h, X, Y) => {
     const m = M(X, Y);
     m(0, 0, 2.4, 1.02, '#24160e');
     m(0, 0.98, 2.4, 0.12, '#6a4a30'); m(0, 0.94, 2.4, 0.03, '#ffc080');
     for (let x = 0.3; x < 2.4; x += 0.6) { m(x - 0.02, 0, 0.04, 0.7, '#0a0604'); m(x - 0.15, 0.68, 0.3, 0.06, '#5a1a3a'); }
+    // two at the counter, their glasses by them
+    for (const x of [0.9, 1.5]) { m(x + 0.2, 1.1, 0.06, 0.12, '#f0c070'); person(X, Y, x, true); }
   }, true);
 
   const tex = new T.CanvasTexture(cv);
