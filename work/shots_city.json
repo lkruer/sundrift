@@ -1,0 +1,22 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 4000 },
+  { "shot": "N0_title" },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "window.__DEBUG__.rainNow(0.8)" },
+  { "keys": ["KeyW"], "ms": 2500 },
+  { "shot": "N1_start" },
+  { "js": "(() => { const t = window.__DEBUG__.track; const f = t.features.find((f) => f.type === 'hairpin' && t.pts[f.i0].s > 150); window.__DEBUG__.teleport(t.pts[f.i0].s - 40, 40); })()" },
+  { "wait": 1800 },
+  { "shot": "N2_corner" },
+  { "js": "window.__DEBUG__.teleport(700, 50)" },
+  { "wait": 1800 },
+  { "shot": "N3_street" },
+  { "js": "(() => { window.__DEBUG__.rainNow(0); window.__DEBUG__.teleport(1200, 50); })()" },
+  { "wait": 1800 },
+  { "shot": "N4_dry" },
+  { "js": "(() => { const D = window.__DEBUG__; const c = D.car; const y = D.world.ground.height(c.x, c.z); window.__CAM__ = { pos: [c.x, y + 60, c.z], look: [c.x + 300, y + 40, c.z + 300], fov: 55 }; })()" },
+  { "wait": 1200 },
+  { "shot": "N5_skyline" }
+]

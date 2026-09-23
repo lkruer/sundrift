@@ -1,0 +1,12 @@
+{
+  "w": 640, "h": 400, "cols": 2,
+  "cars": { "before": "C:/Users/liamk/sundrift/work/cands/car3/before/hero_coupe.js", "after": "C:/Users/liamk/sundrift/work/cands/car3/after/hero_coupe.js" },
+  "panels": [
+    { "car": "before", "p": [-2.6, 1.35, -2.4], "t": [-0.3, 1.1, -2.0], "fov": 24, "label": "wing before" },
+    { "car": "after", "p": [-2.6, 1.35, -2.4], "t": [-0.3, 1.1, -2.0], "fov": 24, "label": "wing after" },
+    { "car": "before", "cel": true, "p": [-3.2, 1.3, -1.9], "t": [0, 1.0, -1.9], "fov": 30, "label": "wing side before cel" },
+    { "car": "after", "cel": true, "p": [-3.2, 1.3, -1.9], "t": [0, 1.0, -1.9], "fov": 30, "label": "wing side after cel" },
+    { "car": "before", "p": [1.6, 1.6, 2.8], "t": [0.0, 1.0, -0.1], "fov": 30, "label": "screen before" },
+    { "car": "after", "p": [1.6, 1.6, 2.8], "t": [0.0, 1.0, -0.1], "fov": 30, "label": "screen after" }
+  ]
+}

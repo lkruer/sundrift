@@ -1,0 +1,14 @@
+{
+  "w": 640, "h": 420, "cols": 2, "checks": true,
+  "cars": { "after": "C:/Users/liamk/sundrift/game/assets/hero_coupe.js" },
+  "panels": [
+    { "car": "after", "p": [2.1, 1.3, 3.9], "t": [0.35, 0.72, 1.65], "fov": 30 },
+    { "car": "after", "open": true, "p": [2.1, 1.3, 3.9], "t": [0.35, 0.72, 1.65], "fov": 30 },
+    { "car": "after", "p": [0.0, 1.0, 4.2], "t": [0.0, 0.75, 1.7], "fov": 30 },
+    { "car": "after", "open": true, "p": [0.0, 1.0, 4.2], "t": [0.0, 0.75, 1.7], "fov": 30 },
+    { "car": "after", "p": [3.6, 1.1, 1.6], "t": [0.3, 0.8, 1.5], "fov": 24 },
+    { "car": "after", "open": true, "p": [3.6, 1.1, 1.6], "t": [0.3, 0.8, 1.5], "fov": 24 },
+    { "car": "after", "cel": true, "p": [-1.2, 2.2, -1.2], "t": [0.3, 0.8, 1.6], "fov": 30 },
+    { "car": "after", "cel": true, "open": true, "p": [-1.2, 2.2, -1.2], "t": [0.3, 0.8, 1.6], "fov": 30 }
+  ]
+}

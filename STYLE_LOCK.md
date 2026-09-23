@@ -1,6 +1,6 @@
-# SUNDRIFT — the locked style
+# MINIDRIFT — the locked style (spring night, since 23 September)
 
-> Stylised autumn Japanese mountain-pass objects: clean low-segment geometry with crisp silhouettes and chunky
+> Stylised Japanese mountain-pass objects on a spring night in cherry-blossom season (yozakura): clean low-segment geometry with crisp silhouettes and chunky
 > proportions, one flat matte colour per part from the palette below, flat shading on foliage and rock, smooth
 > shading on painted metal and glass, no glyphs or printed text anywhere, and every member thick enough that
 > the object still reads from a chase camera thirty metres away.
@@ -32,6 +32,15 @@ Hand this whole file to every agent that generates anything. Do not paraphrase i
 | tint glass | `0x1c2a33` | car glass, hut windows |
 | lamp warm | `0xffcf7a` | lamp lenses, headlight lenses (emissive) |
 | tail red | `0xd11c1c` | car tail-lights, reflectors, red pole bands (emissive on cars) |
+| sakura pale | `0xf6d3de` | cherry blossom, Somei-Yoshino (the main tree): almost white, faintly pink |
+| sakura pink | `0xf0a6bf` | cherry blossom, variant B; the inside of a blossom cluster |
+| sakura deep | `0xdd6f98` | weeping cherry and double-flowered cherry blossom |
+| cherry bark | `0x3b2a27` | cherry trunks and limbs: near-black brown, darker than cedar bark |
+| young leaf | `0x8cbf4f` | spring broadleaf canopy, fresh leaves among the blossom |
+| spring grass | `0x7a9a3e` | verges and meadows in spring |
+| azalea | `0xd6408e` | azalea shrubs by the road |
+| lantern red | `0xd8342a` | paper lanterns (chochin), their body (emissive at night) |
+| lantern glow | `0xffb070` | the light inside a paper lantern (emissive colour) |
 | chrome dark | `0x2b2d31` | car underbody, grilles, exhaust tips, wipers, black trim |
 
 ## Fixed decisions
@@ -40,7 +49,9 @@ Hand this whole file to every agent that generates anything. Do not paraphrase i
   0.32 m, ground clearance 0.14 m. Maple is 7.0 m tall with a 6.0 m canopy. Cedar is 14 m tall, 4.5 m wide.
   Guardrail post is 0.75 m tall. Lamp post is 6.0 m. Torii is 5.0 m tall and 5.4 m wide. Stone lantern is 1.8 m.
   Boulder is 1.5 m. Snow pole (delineator) is 1.4 m. Traffic mirror is 2.6 m to the top of the mirror.
-  Tunnel portal is 9.0 m wide, 6.0 m tall, 3.0 m deep. Mountain hut is 4.0 m wide, 3.6 m tall, 3.0 m deep.
+  Tunnel portal is 9.0 m wide, 6.0 m tall, 3.0 m deep. Cherry (Somei-Yoshino) is 7.0 m tall with a 9.0 m
+  canopy spread, wider than tall, on a short trunk that forks low. Weeping cherry is 6.5 m tall, 6.5 m wide.
+  Paper lantern is 0.55 m tall, 0.34 m across. Jizo statue is 0.75 m tall. Mountain hut is 4.0 m wide, 3.6 m tall, 3.0 m deep.
   Vending machine is 1.83 m tall, 1.0 m wide, 0.75 m deep. Chevron sign is 1.8 m tall including its post.
 - Base at y = 0, centred on x and z, front faces +Z. A car's nose points +Z. A hut's door faces +Z.
 - Flat colours with sensible roughness; surfaces are applied at load time. Foliage, rock and ground use
@@ -52,7 +63,8 @@ Hand this whole file to every agent that generates anything. Do not paraphrase i
   truly that substance (stone lantern → `stone`, hut walls → `timber`, roof → `tile`, guardrail → `metal`,
   cedar canopy → `foliage`). Leave car paint, glass and lamp lenses unnamed.
 - Emissive: lamp lenses `0xffcf7a` at emissiveIntensity 1.2; car tail-lights `0xd11c1c` at 1.5; car headlight
-  lenses `0xfff1d6` at 0.8. Nothing else emits.
+  lenses `0xfff1d6` at 0.8; paper lantern bodies emissive `0xffb070` at 1.0 (the game raises it at night).
+  Nothing else emits.
 - Triangle bands: trees 300 to 1,600 (they are instanced hundreds of times); small props 150 to 2,500;
   set-piece structures 800 to 12,000; hero coupe 9,000 to 30,000. Reduce segment counts at generation, never
   decimate.

@@ -1,0 +1,7 @@
+{
+  "w": 1920, "h": 1080, "cols": 1,
+  "cars": { "after": "C:/Users/liamk/sundrift/work/cands/car3/before/hero_coupe.js" },
+  "panels": [
+    { "car": "after", "cel": true, "p": [-1.96, 2.06, -5.38], "t": [1.66, 0.97, 4.55], "fov": 58, "label": "chase drift" }
+  ]
+}

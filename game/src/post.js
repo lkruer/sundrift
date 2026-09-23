@@ -90,28 +90,47 @@ const Cel = {
 };
 
 /**
- * The tube, last, in display space: a slight barrel curve with rounded corners, colour cut to 32 levels a channel
- * with an ordered dither (the grain of a 90s console's output), and a faint aperture grille.
+ * The tube, last, in display space. The glass is nearly flat in the middle and bends more toward the edges and
+ * most into the corners (a quadratic plus a quartic term in the distance from the centre), so the picture's own
+ * edges bow and its corners pull in round, the way a 90s set's did. The picture sits a little back from the
+ * glass: it darkens into the rounded edge, and a faint cold sheen runs round the rim. Then colour is cut to 32
+ * levels a channel with an ordered dither (the grain of a 90s console's output), and a faint aperture grille.
  */
 const Retro = {
-  uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uCurve: { value: 0.045 }, uLevels: { value: 32 }, uMask: { value: 0.06 } },
+  uniforms: {
+    tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
+    uCurve: { value: 0.022 }, uEdge: { value: 0.055 }, uCorner: { value: 0.045 },
+    uLevels: { value: 32 }, uMask: { value: 0.06 },
+  },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uLevels, uMask;
+    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uLevels, uMask;
     varying vec2 vUv;
     float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
     float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+    // signed distance to a rounded rectangle of half-size b and corner radius r
+    float rbox(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
     void main(){
       vec2 c = vUv * 2.0 - 1.0;
-      vec2 uv = vUv + c * dot(c, c) * uCurve * 0.5;
-      vec2 edge = smoothstep(vec2(0.0), vec2(0.012), uv) * smoothstep(vec2(0.0), vec2(0.012), 1.0 - uv);
-      if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
-      vec3 col = texture2D(tDiffuse, uv).rgb;
+      float r2 = dot(c, c) * 0.5;                          // 0 at the centre, 0.5 mid-edge, 1 in the corners
+      vec2 uv = vUv + c * (uCurve * r2 + uEdge * r2 * r2);
+      // the picture's frame, in pixels of the picture: a rounded rectangle, anti-aliased over a pixel and a half
+      vec2 px = (uv - 0.5) * uRes;
+      float rad = uCorner * uRes.y;
+      float d = rbox(px, 0.5 * uRes, rad);
+      float inside = 1.0 - smoothstep(-1.5, 0.0, d);
+      if (inside <= 0.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+      vec3 col = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
       col = floor(col * uLevels + bayer4(gl_FragCoord.xy)) / uLevels;
       float m = mod(gl_FragCoord.x, 3.0);
       vec3 mask = vec3(m < 1.0 ? 1.0 : 1.0 - uMask, (m >= 1.0 && m < 2.0) ? 1.0 : 1.0 - uMask, m >= 2.0 ? 1.0 : 1.0 - uMask);
       col *= mask * (1.0 + uMask * 0.6);
-      gl_FragColor = vec4(col * edge.x * edge.y, 1.0);
+      // set back behind the glass: darker into the rim, and a faint cold sheen along it, brightest top left
+      float rim = -d / uRes.y;                             // distance in from the edge, in picture heights
+      col *= 0.55 + 0.45 * smoothstep(0.0, 0.035, rim);
+      float sheen = smoothstep(0.012, 0.0, abs(rim - 0.006)) * (0.5 + 0.5 * dot(normalize(c + 1e-4), vec2(-0.6, 0.8)));
+      col += vec3(0.05, 0.06, 0.075) * sheen;
+      gl_FragColor = vec4(col * inside, 1.0);
     }`,
 };
 

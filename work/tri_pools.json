@@ -1,0 +1,6 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "window.__DEBUG__.teleport(2300, 30)" }, { "wait": 1500 },
+  { "js": "(() => { const W = window.__DEBUG__.world; const out = []; for (const [k, p] of Object.entries(W.pools)) { let t = 0; for (const part of p.parts) { const g = part.im.geometry; t += (g.index ? g.index.count : g.attributes.position.count) / 3; } out.push([k, p.n, Math.round(t), Math.round(t * p.n / 1000) + 'k']); } out.sort((a, b) => b[1] * b[2] - a[1] * a[2]); return out.slice(0, 16); })()" }
+]

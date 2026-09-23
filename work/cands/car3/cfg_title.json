@@ -1,0 +1,10 @@
+{
+  "w": 1920, "h": 1080, "cols": 2,
+  "cars": { "after": "C:/Users/liamk/sundrift/work/cands/car3/after/hero_coupe.js" },
+  "panels": [
+    { "car": "after", "cel": true, "p": [-1.244, 1.85, -8.124], "t": [1.513, 0.806, -0.550], "fov": 44, "label": "title 200 closed" },
+    { "car": "after", "cel": true, "open": true, "p": [-1.244, 1.85, -8.124], "t": [1.513, 0.806, -0.550], "fov": 44, "label": "title 200 open" },
+    { "car": "after", "cel": true, "p": [-7.368, 1.85, -3.641], "t": [0.4167, 0.806, -1.555], "fov": 44, "label": "title 255 closed" },
+    { "car": "after", "cel": true, "open": true, "p": [-7.368, 1.85, -3.641], "t": [0.4167, 0.806, -1.555], "fov": 44, "label": "title 255 open" }
+  ]
+}

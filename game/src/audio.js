@@ -7,12 +7,24 @@
  * The engine is four detuned voices at the four-cylinder firing frequency (rpm / 30 Hz) through a low-pass
  * whose cutoff follows the throttle, with a noise rasp on top and a turbo whistle that climbs with load and
  * blows off when the throttle lifts. Tyres are band-passed noise whose centre wanders with slip. The music
- * is a scheduled 128 bpm loop in A minor pentatonic: kick, hat, snare, a filtered saw bass, a chord pad and
- * a delayed arpeggio that only joins while a drift is held.
+ * is a scheduled 128 bpm loop in A minor pentatonic: kick, hat, snare, a filtered saw bass, a chord pad, a koto
+ * playing an eight-bar tune in the hirajoshi scale over it, and a delayed arpeggio that only joins while a drift
+ * is held.
  */
-import { clamp } from './config.js?v=202609230143';
+import { clamp } from './config.js?v=202609230328';
 
-const NOTES = { A2: 110, C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, G4: 392, A4: 440, C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880 };
+const NOTES = { A2: 110, C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, G4: 392, A4: 440, B4: 493.88, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880 };
+// the koto's tune: eight bars in A hirajoshi (A B C E F), which sits on the Am-F-C-G loop; one note per 16th, 0 a rest
+const KOTO = (() => {
+  const N = { A4: NOTES.A4, B4: NOTES.B4, C5: NOTES.C5, E5: NOTES.E5, F5: NOTES.F5, A5: NOTES.A5, E4: NOTES.E4 };
+  const bars = [
+    'E5 . . . C5 . B4 . A4 . . . . . . .', 'F5 . E5 . C5 . . . A4 . C5 . . . . .',
+    'E5 . . . C5 . E5 . F5 . E5 . C5 . . .', 'B4 . . . C5 . B4 . A4 . . . . . . .',
+    'A5 . . . F5 . E5 . C5 . . . E5 . . .', 'F5 . . . E5 . C5 . A4 . . . . . . .',
+    'C5 . E5 . F5 . E5 . C5 . B4 . C5 . . .', 'B4 . . . . . . . E4 . . . . . . .',
+  ];
+  return bars.flatMap((b) => b.split(' ').map((n) => N[n] || 0));
+})();
 // four bars: Am, F, C, G, as bass roots and pad triads
 const PROG = [
   { root: NOTES.A2, pad: [NOTES.A3, NOTES.C4, NOTES.E4], arp: [NOTES.A4, NOTES.C5, NOTES.E5, NOTES.A5] },
@@ -48,7 +60,7 @@ export class Audio {
     this.echoLP = ctx.createBiquadFilter(); this.echoLP.type = 'lowpass'; this.echoLP.frequency.value = 2200;
     this.echoIn.connect(this.echoDelay); this.echoDelay.connect(this.echoLP); this.echoLP.connect(this.echoFb); this.echoFb.connect(this.echoDelay);
     this.echoLP.connect(this.master);
-    this._engine(); this._tyres(); this._wind(); this._musicBus();
+    this._engine(); this._tyres(); this._wind(); this._rain(); this._musicBus();
     for (const g of [this.engGain, this.raspGain, this.turboGain, this.screechGain]) if (g) g.connect(this.echoIn);
     this.ready = true;
   }
@@ -117,6 +129,28 @@ export class Audio {
     this.windGain = this._gain(0); this.wind.connect(wf); wf.connect(this.windGain); this.windGain.connect(this.master);
   }
 
+  /** Rain: a hiss of high noise over a soft low roar, both following how hard it rains. */
+  _rain() {
+    const c = this.ctx;
+    this.rainSrc = this._noiseSource();
+    const hi = c.createBiquadFilter(); hi.type = 'bandpass'; hi.frequency.value = 3200; hi.Q.value = 0.35;
+    const lo = c.createBiquadFilter(); lo.type = 'lowpass'; lo.frequency.value = 420;
+    this.rainGain = this._gain(0);
+    this.rainSrc.connect(hi); hi.connect(this.rainGain);
+    const lg = this._gain(0.9); this.rainSrc.connect(lo); lo.connect(lg); lg.connect(this.rainGain);
+    this.rainGain.connect(this.master);
+  }
+
+  /** Which map: the city drops the koto for the synth arpeggio. */
+  setMap(city) { this.city = !!city; }
+
+  /** How hard it rains, 0..1 (and 0 inside a tunnel). */
+  setRain(x) {
+    if (!this.ready || Math.abs((this._rainV ?? -1) - x) < 0.01) return;
+    this._rainV = x;
+    this.rainGain.gain.setTargetAtTime(0.16 * x, this.ctx.currentTime, 0.4);
+  }
+
   _musicBus() {
     const c = this.ctx;
     this.musicGain = this._gain(0.55); this.musicGain.connect(this.master);
@@ -130,6 +164,7 @@ export class Audio {
     const df = c.createBiquadFilter(); df.type = 'lowpass'; df.frequency.value = 2400;
     this.arpGain.connect(this.musicGain); this.arpGain.connect(this.delay); this.delay.connect(df); df.connect(this.musicGain);
     this.drumGain = this._gain(0.9); this.drumGain.connect(this.musicGain);
+    this.kotoGain = this._gain(0.7); this.kotoGain.connect(this.musicGain); this.kotoGain.connect(this.delay);
     this.music.next = c.currentTime + 0.1;
   }
 
@@ -174,7 +209,8 @@ export class Audio {
     // music
     this.music.intensity += ((drifting ? 1 : 0) + boost01 * 0.5 - this.music.intensity) * Math.min(1, dt * 2);
     this.padFilter.frequency.setTargetAtTime(700 + 2200 * this.music.intensity, t, 0.2);
-    this.arpGain.gain.setTargetAtTime(0.18 * clamp(this.music.intensity, 0, 1), t, 0.2);
+    // in the city the arpeggio always runs under the loop (a synth night, not a koto one); drifting lifts it
+    this.arpGain.gain.setTargetAtTime(0.18 * clamp(this.music.intensity + (this.city ? 0.4 : 0), 0, 1), t, 0.2);
     this._schedule();
   }
 
@@ -194,6 +230,9 @@ export class Audio {
       if (beat === 0) this._pad(t, ch.pad, spb * 4);
       // arpeggio, sixteenths, only audible while drifting through arpGain
       this._arp(t, ch.arp[(beat + (bar % 2)) % 4] * (beat % 8 >= 4 ? 1 : 0.5), s16 * 0.9);
+      // the koto, always, over the top: a pluck that bends in from a touch sharp, and now and then a pressed bend
+      const kf = KOTO[step % KOTO.length];
+      if (kf && !this.city) this._koto(t, kf, step % 32 === 16);
       m.next += s16; m.step++;
     }
   }
@@ -237,6 +276,21 @@ export class Audio {
       const g = this._gain(0); o.connect(g); g.connect(this.padFilter);
       this._env(g, t, 0.08, len * 0.7, 0.045, 0.8, 0.25); o.start(t); o.stop(t + len + 0.3);
     }
+  }
+  /** A plucked koto string: a bright attack falling away over a second, pitch settling from a touch sharp. */
+  _koto(t, f, press) {
+    const c = this.ctx, out = this._gain(0);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.7;
+    lp.frequency.setValueAtTime(5200, t); lp.frequency.exponentialRampToValueAtTime(1400, t + 0.6);
+    out.connect(lp); lp.connect(this.kotoGain);
+    for (const [type, mul, vol] of [['triangle', 1, 1], ['sawtooth', 1, 0.28], ['sine', 2, 0.35]]) {
+      const o = c.createOscillator(); o.type = type;
+      o.frequency.setValueAtTime(f * mul * 1.012, t); o.frequency.exponentialRampToValueAtTime(f * mul, t + 0.05);
+      if (press) { o.frequency.setValueAtTime(f * mul, t + 0.22); o.frequency.exponentialRampToValueAtTime(f * mul * 1.0595, t + 0.36); }
+      const g = this._gain(vol); o.connect(g); g.connect(out);
+      o.start(t); o.stop(t + 1.6);
+    }
+    this._env(out, t, 0.002, 1.2, 0.2, 0, 0.2);
   }
   _arp(t, f, len) {
     if (f < 30) return;

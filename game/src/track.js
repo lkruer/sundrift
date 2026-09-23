@@ -13,8 +13,8 @@
  *
  * Pure maths, no Three.js: the game, the physics sim and the gate share it.
  */
-import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609230143';
-import { Field } from './field.js?v=202609230143';
+import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609230328';
+import { Field } from './field.js?v=202609230328';
 
 const TAU = Math.PI * 2;
 const wrap = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
@@ -29,7 +29,7 @@ const SET_ROTATION = ['busstop', 'tunnel', 'conbini', 'vista', 'shrine', 'tunnel
 export const DIFFS = {
   easy: {
     key: 'easy', label: 'EASY', blurb: 'Wide road, flowing sweepers', salt: 101,
-    half: 5.0, wall: 6.9, gmax: 0.07,
+    half: 5.4, wall: 7.3, gmax: 0.07,
     leg: [360, 700], hairpinR: [30, 40], approach: [30, 50],
     sweeperR: [70, 150], sweeperAng: [0.35, 0.9], essR: [55, 95], essAng: [0.4, 0.75],
     kinkR: [110, 220], kinkAng: [0.15, 0.35], straight: [60, 130], ramp: [18, 28],
@@ -37,7 +37,7 @@ export const DIFFS = {
   },
   medium: {
     key: 'medium', label: 'MEDIUM', blurb: 'The pass: hairpins and S-bends', salt: 202,
-    half: 4.4, wall: 6.1, gmax: 0.085,
+    half: 4.8, wall: 6.5, gmax: 0.085,
     leg: [190, 380], hairpinR: [16, 22], approach: [22, 40],
     sweeperR: [42, 110], sweeperAng: [0.45, 1.15], essR: [30, 58], essAng: [0.6, 1.1],
     kinkR: [70, 160], kinkAng: [0.2, 0.5], straight: [40, 100], ramp: [12, 20],
@@ -45,7 +45,7 @@ export const DIFFS = {
   },
   hard: {
     key: 'hard', label: 'HARD', blurb: 'Narrow, tight, relentless', salt: 303,
-    half: 3.9, wall: 5.4, gmax: 0.10,
+    half: 4.3, wall: 5.8, gmax: 0.10,
     leg: [120, 240], hairpinR: [11.5, 15], approach: [16, 30],
     sweeperR: [30, 80], sweeperAng: [0.6, 1.45], essR: [22, 42], essAng: [0.7, 1.3],
     kinkR: [50, 110], kinkAng: [0.3, 0.6], straight: [25, 65], ramp: [9, 15],
@@ -53,12 +53,48 @@ export const DIFFS = {
   },
 };
 
+/**
+ * NEO TOKYO: the same ladder laid flat across a city. A leg is an avenue; a switchback is the way round a block
+ * (two square corners with the block between); an S-bend is a dog-leg onto a cross street and back. The corners
+ * are square and the straights long, so a drift is a turn at an intersection.
+ */
+export const CITY_DIFFS = {
+  easy: {
+    key: 'easy', label: 'EASY', blurb: 'Broad avenues, wide corners', salt: 505, city: true, startSet: 'conbini',
+    half: 6.0, wall: 8.2, gmax: 0.03,
+    leg: [360, 640], hairpinR: [17, 22], block: [44, 72], approach: [26, 44],
+    sweeperR: [70, 140], sweeperAng: [0.3, 0.6], essR: [18, 24], essAng: [1.5, 1.6], jog: [36, 64],
+    kinkR: [150, 280], kinkAng: [0.12, 0.3], straight: [80, 160], ramp: [8, 12],
+    weights: [['straight', 0.3], ['ess', 0.3], ['kink', 0.25], ['sweeper', 0.15]], maxOff: 0.45, setEvery: 3,
+    sets: ['busstop', 'conbini', 'shrine', 'conbini', 'busstop', 'shrine'],
+  },
+  medium: {
+    key: 'medium', label: 'MEDIUM', blurb: 'Square corners and dog-legs', salt: 606, city: true, startSet: 'conbini',
+    half: 5.4, wall: 7.5, gmax: 0.03,
+    leg: [260, 480], hairpinR: [13, 17], block: [36, 60], approach: [22, 38],
+    sweeperR: [50, 110], sweeperAng: [0.35, 0.7], essR: [14, 18], essAng: [1.5, 1.6], jog: [28, 52],
+    kinkR: [110, 220], kinkAng: [0.15, 0.35], straight: [60, 130], ramp: [7, 10],
+    weights: [['straight', 0.26], ['ess', 0.38], ['kink', 0.22], ['sweeper', 0.14]], maxOff: 0.5, setEvery: 3,
+    sets: ['busstop', 'conbini', 'shrine', 'conbini', 'busstop', 'shrine'],
+  },
+  hard: {
+    key: 'hard', label: 'HARD', blurb: 'Tight back streets', salt: 707, city: true, startSet: 'conbini',
+    half: 4.8, wall: 6.7, gmax: 0.035,
+    leg: [180, 340], hairpinR: [10.5, 13], block: [28, 46], approach: [16, 30],
+    sweeperR: [36, 80], sweeperAng: [0.4, 0.8], essR: [11, 14], essAng: [1.5, 1.6], jog: [22, 42],
+    kinkR: [80, 160], kinkAng: [0.2, 0.4], straight: [40, 100], ramp: [6, 9],
+    weights: [['straight', 0.2], ['ess', 0.44], ['kink', 0.22], ['sweeper', 0.14]], maxOff: 0.55, setEvery: 3,
+    sets: ['busstop', 'conbini', 'shrine', 'conbini', 'busstop', 'shrine'],
+  },
+};
+
 export class Track {
-  constructor(seed = 20260921, diffKey = 'medium') {
+  constructor(seed = 20260921, diffKey = 'medium', map = 'mountain') {
     this.seed = seed;
-    this.D = DIFFS[diffKey] || DIFFS.medium;
-    this.diff = this.D.key;
-    this.field = new Field(seed);
+    const table = map === 'city' ? CITY_DIFFS : DIFFS;
+    this.D = table[diffKey] || table.medium;
+    this.diff = this.D.key; this.map = this.D.city ? 'city' : 'mountain'; this.city = !!this.D.city;
+    this.field = new Field(seed, { flat: this.city });
     this.rng = mulberry32((seed * 31 + this.D.salt) >>> 0);
     this.step = 2;
     this.half = this.D.half; this.wall = this.D.wall;
@@ -257,6 +293,17 @@ export class Track {
 
   _planEss(dir, e) {
     const D = this.D, r = this.rng;
+    if (D.city) {
+      // a dog-leg: a square corner onto a cross street, a block along it, and a square corner back
+      const R1 = within(r, D.essR), R2 = within(r, D.essR), a1 = within(r, D.essAng);
+      const a2 = clamp(a1 + dir * e * 0.5, 1.2, 1.75);
+      const segs = [];
+      this._arc(segs, dir, R1, a1);
+      segs.push({ len: within(r, D.jog), k0: 0, k1: 0 });
+      this._arc(segs, -dir, R2, a2);
+      segs.push({ len: within(r, [14, 30]), k0: 0, k1: 0 });
+      return { type: 'ess', dir, R: Math.min(R1, R2), segs };
+    }
     const R1 = within(r, D.essR), R2 = within(r, D.essR);
     const a1 = within(r, D.essAng);
     // the second arc undoes the first, plus half of the current wander, so an S-bend nets back toward the contour
@@ -281,6 +328,15 @@ export class Track {
     // the turn that leaves along the contour the other way, aimed a little uphill of it, and always a little short
     // of a full half-turn so the new leg diverges from the one it came up from
     A = clamp(Math.PI - dir * e - 0.12, 2.45, Math.PI - 0.06);
+    if (D.city) {
+      // in the city a switchback is the way round a block: a square corner, the block, a square corner
+      const segs = [{ len: within(r, D.approach), k0: 0, k1: 0 }];
+      this._arc(segs, dir, R, A / 2);
+      segs.push({ len: within(r, D.block), k0: 0, k1: 0 });
+      this._arc(segs, dir, R, A / 2);
+      segs.push({ len: within(r, D.approach), k0: 0, k1: 0 });
+      return { type: 'hairpin', dir, R, segs };
+    }
     const segs = [{ len: within(r, D.approach), k0: 0, k1: 0 }];
     this._arc(segs, dir, R, A, true);
     segs.push({ len: within(r, D.approach), k0: 0, k1: 0 });
@@ -395,11 +451,12 @@ export class Track {
         if (p.s >= ts0 - 1 && p.s <= ts1 + 1) { p.tunnel = true; p.wl = p.wr = this.half + 0.55; }   // the kerbs
       }
     } else if (fi === 0) {
-      this._placeSet('shrine', 34, i0, i1);
+      this._placeSet(D.startSet || 'shrine', 34, i0, i1);
     } else if (plan.type !== 'hairpin') {
       this._sinceSet++;
       if (this._sinceSet >= D.setEvery) {
-        const kind = SET_ROTATION[this._setIdx % SET_ROTATION.length];
+        const rot = D.sets || SET_ROTATION;
+        const kind = rot[this._setIdx % rot.length];
         if (kind === 'tunnel') { this._pendingTunnel = true; this._setIdx++; this._sinceSet = 0; }
         else if ((plan.type === 'straight' || plan.type === 'kink' || (plan.type === 'sweeper' && plan.R >= 45)) && len >= 86) {
           this._placeSet(kind, s0 + 20, i0, i1);

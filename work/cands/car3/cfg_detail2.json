@@ -1,0 +1,15 @@
+{
+  "w": 640, "h": 440, "cols": 3,
+  "cars": { "before": "C:/Users/liamk/sundrift/work/cands/car3/before/hero_coupe.js", "after": "C:/Users/liamk/sundrift/work/cands/car3/after/hero_coupe.js" },
+  "panels": [
+    { "car": "after", "p": [0.35, 1.32, 1.3], "t": [0.0, 1.15, -0.4], "fov": 22, "label": "mirror close" },
+    { "car": "after", "p": [1.25, 0.45, 1.35], "t": [0.88, 0.40, 1.2], "fov": 26, "label": "valve close" },
+    { "car": "after", "p": [-2.4, 0.45, -1.95], "t": [-0.68, 0.37, -1.93], "fov": 18, "label": "strap side" },
+    { "diff": ["before", "after"], "view": "front" },
+    { "diff": ["before", "after"], "view": "right" },
+    { "diff": ["before", "after"], "view": "back" },
+    { "diff": ["before", "after"], "view": "left" },
+    { "diff": ["before", "after"], "view": "three-quarter" },
+    { "car": "after", "cel": true, "p": [-1.96, 2.06, -5.38], "t": [1.66, 0.97, 4.55], "fov": 58, "label": "chase" }
+  ]
+}

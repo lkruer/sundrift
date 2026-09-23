@@ -1,0 +1,20 @@
+[
+  { "wait": 2500 },
+  { "js": "(() => { const s = __DEBUG__.scene, a = s.getObjectByName('popL'), b = s.getObjectByName('popR'); return { popL: !!a, popR: !!b, parent: a && a.parent && a.parent.type, plates: (() => { let n = 0; s.traverse((o) => { if (o.isMesh && o.material && o.material.name === 'plate') n++; }); return n; })() }; })()" },
+  { "shot": "g_title_closed" },
+  { "js": "(() => { const s = __DEBUG__.scene; for (const n of ['popL', 'popR']) s.getObjectByName(n).rotation.x = -1.13; return 'open'; })()" },
+  { "wait": 500 },
+  { "shot": "g_title_open" },
+  { "js": "(() => { const c = __DEBUG__.car, r = __DEBUG__.scene.getObjectByName('car'), p = r.position, yaw = c.yaw; const W = (lx, ly, lz) => { const x = lx * 0.62, y = ly * 0.62, z = lz * 0.62; return [p.x + x * Math.cos(yaw) + z * Math.sin(yaw), p.y + y, p.z - x * Math.sin(yaw) + z * Math.cos(yaw)]; }; window.__W__ = W; window.__CAM__ = { pos: W(2.4, 1.35, 4.2), look: W(0.2, 0.62, 1.3), fov: 36 }; return 'front'; })()" },
+  { "wait": 500 },
+  { "shot": "g_front_open" },
+  { "js": "(() => { const s = __DEBUG__.scene; for (const n of ['popL', 'popR']) s.getObjectByName(n).rotation.x = 0; return 'closed'; })()" },
+  { "wait": 500 },
+  { "shot": "g_front_closed" },
+  { "js": "(() => { const W = window.__W__; window.__CAM__ = { pos: W(-1.9, 1.25, -4.6), look: W(-0.1, 0.55, -1.6), fov: 36 }; return 'rear'; })()" },
+  { "wait": 500 },
+  { "shot": "g_rear" },
+  { "js": "(() => { const W = window.__W__; window.__CAM__ = { pos: W(-1.96, 2.06, -5.38), look: W(1.66, 0.97, 4.55), fov: 58 }; return 'chase'; })()" },
+  { "wait": 500 },
+  { "shot": "g_chase" }
+]

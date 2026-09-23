@@ -6,19 +6,19 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609230143';
-import { createRig, detectTier } from '../rig.js?v=202609230143';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609230143';
-import { Car, gearbox } from './car.js?v=202609230143';
-import { Track, DIFFS } from './track.js?v=202609230143';
-import { World } from './world.js?v=202609230143';
-import { ChaseCam } from './camera.js?v=202609230143';
-import { Input } from './input.js?v=202609230143';
-import { Scoring } from './scoring.js?v=202609230143';
-import { Hud } from './hud.js?v=202609230143';
-import { Audio } from './audio.js?v=202609230143';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609230143';
-import { makePost } from './post.js?v=202609230143';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609230328';
+import { createRig, detectTier } from '../rig.js?v=202609230328';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609230328';
+import { Car, gearbox } from './car.js?v=202609230328';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609230328';
+import { World, drawsGlyphs } from './world.js?v=202609230328';
+import { ChaseCam } from './camera.js?v=202609230328';
+import { Input } from './input.js?v=202609230328';
+import { Scoring } from './scoring.js?v=202609230328';
+import { Hud } from './hud.js?v=202609230328';
+import { Audio } from './audio.js?v=202609230328';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain } from './fx.js?v=202609230328';
+import { makePost } from './post.js?v=202609230328';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -39,6 +39,7 @@ const START_S = 8;
 const G = {
   mode: 'loading', hour: 20.6, hourShown: 0, fps: 60, frameAvg: 1 / 60, s: 0, u: 0, idx: 0, dist: 0, lastS: 0, night: 0,
   diff: DIFFS[store.get('diff', 'medium')] ? store.get('diff', 'medium') : 'medium',
+  map: store.get('map', 'mountain') === 'city' ? 'city' : 'mountain',
   paint: clamp(Number(store.get('paint', 0)) || 0, 0, PAINTS.length - 1),
   gear: null, best: {},
 };
@@ -60,14 +61,75 @@ const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier
 const post = makePost(renderer, scene, camera, { bloom: tier !== 'phone', fringe: tier !== 'phone', width: innerWidth, height: innerHeight });
 renderer.info.autoReset = false;
 
-let track, world, car, carRoot, bodyPivot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, paintMat;
+let track, world, car, carRoot, bodyPivot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, paintMat, petals, rain;
 const lampLights = [];
-const night = { moon: null, stars: null, disc: null, dir: new THREE.Vector3(0.35, 0.6, -0.72).normalize(), amt: 0 };
+const pops = { list: [], t: 0, open: -1.13, lamp: null };
+// weather: spells of clear and of rain, each coming on and clearing over seconds; the road stays wet a while after
+const W = { rain: 0, target: 0, wet: 0, t: 0, next: 75, raining: false, shownWet: -1 };
+function resetWeather() {
+  W.rain = 0; W.target = 0; W.wet = 0; W.t = 0; W.raining = false; W.next = 45 + Math.random() * 60;
+  if (G.map === 'city') {
+    W.raining = Math.random() < 0.55;
+    W.target = W.rain = W.raining ? 0.6 + Math.random() * 0.35 : 0;
+    W.wet = W.raining ? 1 : 0.4;
+    W.next = W.raining ? 60 + Math.random() * 60 : 25 + Math.random() * 40;
+  }
+  W.shownWet = -1;
+  if (world) { world.setWet(W.wet); W.shownWet = W.wet; }
+}
+function weather(dt, inTunnel) {
+  W.t += dt;
+  if (W.t > W.next) {
+    W.t = 0; W.raining = !W.raining;
+    W.target = W.raining ? 0.55 + Math.random() * 0.45 : 0;
+    W.next = W.raining ? 50 + Math.random() * 60 : 70 + Math.random() * 90;
+    if (W.raining) hud.onEvent({ type: 'sun', value: 'RAIN' });
+  }
+  W.rain = damp(W.rain, W.target, W.target > W.rain ? 0.14 : 0.1, dt);
+  W.wet = damp(W.wet, W.rain > 0.08 ? 1 : G.map === 'city' ? 0.4 : 0, W.rain > 0.08 ? 0.09 : 0.018, dt);
+  if (Math.abs(W.wet - W.shownWet) > 0.004) { W.shownWet = W.wet; world.setWet(W.wet); }
+  audio.setRain && audio.setRain(W.rain * (inTunnel ? 0.15 : 1));
+}
+const night = { moon: null, stars: null, disc: null, fuji: null, dir: new THREE.Vector3(0.36, 0.38, -0.85).normalize(), amt: 0 };
 // the body on its springs, and the visible wheel angles (clamped so a fast wheel never strobes)
 const susp = { roll: 0, rollV: 0, pitch: 0, pitchV: 0, accL: 0, accF: 0, spinF: 0, spinR: 0 };
 const prof = { on: new URLSearchParams(location.search).has('prof'), long: 0, worst: 0, parts: { sim: 0, world: 0, render: 0 }, log: [] };
 
 // ---------------------------------------------------------------- night
+/**
+ * Fuji, across the valley and a little to one side of the moon: a lathe with the mountain's concave flanks and
+ * its crater dip, snow down to about two thirds of its height and further in the gullies, the moon's side of it
+ * brighter. It is drawn unlit and unfogged in the night's own colours and travels with the camera like the far
+ * skyline, so it is always the same far mountain; the nearer skyline ring crosses its foot.
+ */
+function buildFuji() {
+  const R = 1300, H = 1080;
+  const prof = [[1.25, -0.06], [1.0, 0.05], [0.85, 0.15], [0.7, 0.29], [0.55, 0.44], [0.4, 0.61], [0.27, 0.78], [0.15, 0.925], [0.075, 0.985], [0.04, 1.0], [0.0, 0.975]];
+  const geo = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r * R, y * H)), 72);
+  geo.computeVertexNormals();
+  const az = Math.atan2(night.dir.x, night.dir.z) + 0.55;
+  const dir = [Math.sin(az), Math.cos(az)];
+  const moon = new THREE.Vector3(night.dir.x, night.dir.y * 0.6, night.dir.z).normalize();
+  const P = geo.attributes.position, N = geo.attributes.normal, col = new Float32Array(P.count * 3);
+  const rock = new THREE.Color(0x121827), snow = new THREE.Color(0x8494b4), haze = new THREE.Color(0x2a3350), c = new THREE.Color(), n = new THREE.Vector3();
+  for (let i = 0; i < P.count; i++) {
+    const x = P.getX(i), y = P.getY(i), z = P.getZ(i), yf = y / H, th = Math.atan2(z, x);
+    const gully = Math.pow(Math.max(0, Math.sin(th * 9 + 1.3 * Math.sin(th * 4))), 3);
+    const line = 0.79 - 0.1 * gully - 0.025 * Math.sin(th * 23);
+    const sn = smoothstep(line - 0.015, line + 0.015, yf);
+    n.fromBufferAttribute(N, i);
+    const lit = 0.6 + 0.55 * Math.max(0, n.dot(moon));
+    c.copy(rock).lerp(snow, sn).multiplyScalar(lit);
+    c.lerp(haze, smoothstep(0.5, 0.05, yf) * 0.85);
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+  m.name = 'fuji'; m.frustumCulled = false; m.renderOrder = -1; m.castShadow = false; m.receiveShadow = false;
+  m.userData.dir = dir;
+  return m;
+}
+
 function buildNight() {
   // the moon is a far spot light, not a directional one: the sun's cascaded shadows assume every shadowed
   // directional light is one of their cascades, and a second one breaks every lit shader
@@ -91,7 +153,15 @@ function buildNight() {
   scene.add(stars); night.stars = stars;
   const disc = new THREE.Group();
   const dm = new THREE.Mesh(new THREE.CircleGeometry(38, 24), new THREE.MeshBasicMaterial({ color: 0xfff4dc, transparent: true, opacity: 0, fog: false, depthWrite: false }));
-  const halo = new THREE.Mesh(new THREE.CircleGeometry(120, 24), new THREE.MeshBasicMaterial({ color: 0x9fb4e0, transparent: true, opacity: 0, fog: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+  // the halo: a soft radial falloff, not a flat disc
+  const haloTex = (() => {
+    const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s;
+    const ctx = cv.getContext('2d'), gr = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,255,255,0.45)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.12)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, s, s);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const halo = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshBasicMaterial({ color: 0x9fb4e0, map: haloTex, transparent: true, opacity: 0, fog: false, depthWrite: false, blending: THREE.AdditiveBlending }));
   halo.position.z = -1;
   disc.add(halo, dm); disc.userData = { dm, halo };
   scene.add(disc); night.disc = disc;
@@ -112,6 +182,8 @@ function buildNight() {
   const glow = new THREE.Mesh(gg, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
   glow.frustumCulled = false; glow.renderOrder = -1;
   scene.add(glow); night.glow = glow;
+  night.fuji = buildFuji();
+  scene.add(night.fuji);
   night.hemiDay = rig.hemi ? rig.hemi.intensity : 1;
   for (let i = 0; i < (tier === 'phone' ? 3 : 5); i++) {
     const pl = new THREE.PointLight(0xffa040, 0, 26, 2.0);
@@ -124,15 +196,21 @@ async function boot() {
   const tb = performance.now(); window.__BOOT__ = [];
   const prog = (f, msg) => { barf.style.width = (f * 100).toFixed(0) + '%'; if (msg) loadmsg.textContent = msg; window.__BOOT__.push([msg, Math.round(performance.now() - tb)]); };
   prog(0.02, 'laying the road');
-  for (const k of Object.keys(DIFFS)) G.best[k] = Number(store.get('best.' + k, 0)) || 0;
-  track = new Track(SEED, G.diff);
+  for (const m of ['mountain', 'city']) for (const k of Object.keys(DIFFS)) G.best[bestKey(m, k)] = Number(store.get('best.' + bestKey(m, k), 0)) || 0;
+  track = new Track(SEED, G.diff, G.map);
   track.ensure(2400);
+  // the Japanese faces the canvases draw with (tunnel plates, the torii plaque, the number plate): wait a moment
+  // for them, never long, and draw with whatever there is if they do not come
+  try {
+    await Promise.race([Promise.all([document.fonts.load('900 64px "Noto Serif JP"', '櫻宮霧峰'), document.fonts.load('64px "Dela Gothic One"', '夜桜峠霧峰'), document.fonts.load('700 30px Rajdhani', 'Kirimine 12 km'), document.fonts.load('800 64px "M PLUS Rounded 1c"', 'ラーメンカラオケBAR'), document.fonts.load('64px "Dela Gothic One"', 'GAME CENTER 24H')]), new Promise((r) => setTimeout(r, 2500))]);
+  } catch {}
   world = new World(scene, Q);
   await world.load((f, k) => prog(0.05 + f * 0.55, k.replace('_', ' ')));
   world.setTrack(track);
   prog(0.62, 'the car');
   await buildCar();
   buildNight();
+  applyMapLook(); resetWeather();
   car = new Car();
   const start = track.sample(START_S);
   car.reset(start.x, start.z, start.h);
@@ -147,9 +225,12 @@ async function boot() {
   scoring = new Scoring();
   hud = new Hud();
   audio = new Audio();
+  audio.setMap(G.map === 'city');
   skids = new SkidMarks(scene, Q.skid);
   particles = new Particles(scene, Q.smoke);
   particles.setScale(innerHeight);
+  petals = new Petals(scene, Q.petals || 600);
+  rain = new Rain(scene, Q.rain || 2000);
   placeCar(start.y, 0, 0);
   applySun(10, true);
   // the rig loads its cascaded shadows on its own; they re-patch every material, so compile after, not before
@@ -173,7 +254,9 @@ async function boot() {
   const [fx0, fz0] = car.forward();
   await world.precompile(renderer, camera, (root) => rig.refresh(root), post.sceneRT, { x: car.x + fx0 * 6, y: start.y, z: car.z + fz0 * 6, render: warmRender });
   warmRender();
-  window.__DEBUG__ = { world, get track() { return track; }, car, rig, scene, renderer, G, chase, audio, post, get scoring() { return scoring; }, prof,
+  window.__DEBUG__ = { world, get track() { return track; }, car, rig, scene, renderer, G, chase, audio, post, get scoring() { return scoring; }, prof, W,
+    // hold the weather at x (0 clear .. 1 downpour) for testing
+    rainNow(x) { W.raining = x > 0; W.target = x; W.rain = x; W.wet = x > 0 ? 1 : 0; W.t = 0; W.next = 1e9; },
     teleport(s, kmh = 0) {
       const p = track.sample(s);
       car.reset(p.x, p.z, p.h); car.vF = kmh / 3.6;
@@ -222,6 +305,7 @@ async function buildCar() {
       out.emissiveIntensity = hex === PAL.tailRed && m.emissiveIntensity > 1 ? 2.4 : hex === 0xfff1d6 ? 2.4 : m.emissiveIntensity * 0.35;
       upgraded.set(m, out); return out;
     }
+    if (m.name === 'plate') { out = plateMaterial(); upgraded.set(m, out); return out; }
     if (m.name === 'paint' || m.color.getHex() === PAL.pearl) {
       if (!paintMat) { paintMat = new THREE.MeshPhysicalMaterial({ color: m.color, roughness: 0.22, metalness: 0.12, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 1.2 }); paintMat.name = 'paint'; }
       out = paintMat;
@@ -263,6 +347,18 @@ async function buildCar() {
     for (const c of [...w.children]) w.remove(c);
     for (const c of [...baked.children]) w.add(c);
   }
+  // pop-up lamps: joints of their own, baked like the wheels and carried by the body on its springs
+  pops.list = [];
+  for (const key of ['popL', 'popR']) {
+    const p = joints[key]; if (!p) continue;
+    const baked = bakeInto(p, p);
+    for (const c of [...p.children]) p.remove(c);
+    for (const c of [...baked.children]) p.add(c);
+    p.parent.remove(p); p.position.y -= 0.5; bodyPivot.add(p);
+    pops.list.push(p);
+  }
+  pops.open = obj.userData.popOpen ?? -1.13;
+  pops.lamp = obj.userData.popLamp || null;
   obj.scale.setScalar(CAR_SCALE);
   carRoot = new THREE.Group(); carRoot.name = 'car';
   carRoot.add(obj);
@@ -288,6 +384,28 @@ async function buildCar() {
   bodyPivot.add(tailGlow); night.tailGlow = tailGlow;
 }
 
+/** A Japanese number plate: white, green characters, the region and class number over the kana and the number. */
+function plateMaterial() {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 256;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#f2f1ea'; ctx.fillRect(0, 0, 512, 256);
+  const green = '#1c6a3b';
+  ctx.strokeStyle = green; ctx.lineWidth = 7;
+  if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(10, 10, 492, 236, 18); ctx.stroke(); } else ctx.strokeRect(10, 10, 492, 236);
+  ctx.fillStyle = '#a3a8ad'; for (const x of [120, 392]) { ctx.beginPath(); ctx.arc(x, 40, 10, 0, Math.PI * 2); ctx.fill(); }
+  const jp = '"Dela Gothic One", "Noto Serif JP", "Yu Gothic", "Hiragino Sans", sans-serif', num = '700 SIZEpx Rajdhani, "Share Tech Mono", sans-serif';
+  const kanji = drawsGlyphs('44px ' + jp, '群馬た');
+  ctx.fillStyle = green; ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'right'; ctx.font = kanji ? '52px ' + jp : num.replace('SIZE', 50); ctx.fillText(kanji ? '群馬' : 'GUNMA', 262, 96);
+  ctx.textAlign = 'left'; ctx.font = num.replace('SIZE', 64); ctx.fillText('330', 284, 98);
+  ctx.textAlign = 'center'; ctx.font = kanji ? '60px ' + jp : num.replace('SIZE', 56); ctx.fillText(kanji ? 'た' : 'TA', 70, 214);
+  ctx.font = num.replace('SIZE', 150); ctx.fillText('86-86', 300, 226);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const m = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.14, roughness: 0.45, metalness: 0.05 });
+  m.name = 'plate';
+  return m;
+}
+
 function setPaint(i) {
   G.paint = i; store.set('paint', i);
   if (paintMat) {
@@ -310,13 +428,62 @@ function buildTitle() {
   });
   setPaint(G.paint);
   document.querySelectorAll('.diff').forEach((b) => b.addEventListener('click', () => setCourse(b.dataset.d)));
-  markDiff();
+  document.querySelectorAll('.map').forEach((b) => b.addEventListener('click', () => setMap(b.dataset.m)));
+  markDiff(); markMap();
   refreshBests();
   document.body.classList.toggle('touch', input.touchMode);
 }
 
 function markDiff() { document.querySelectorAll('.diff').forEach((b) => b.classList.toggle('sel', b.dataset.d === G.diff)); }
-function refreshBests() { for (const k of Object.keys(DIFFS)) { const e = $('best-' + k); if (e) e.textContent = G.best[k] > 0 ? 'BEST ' + Math.round(G.best[k]).toLocaleString('en-US') : 'BEST —'; } }
+function refreshBests() { for (const k of Object.keys(DIFFS)) { const e = $('best-' + k), b = G.best[bestKey(G.map, k)]; if (e) e.textContent = b > 0 ? 'BEST ' + Math.round(b).toLocaleString('en-US') : 'BEST —'; } }
+/** Where a best score is kept: the mountain's under the course alone (as before the city), the city's under city. */
+function bestKey(m = G.map, d = G.diff) { return (m === 'city' ? 'city.' : '') + d; }
+function courseLabel() { const D = (G.map === 'city' ? CITY_DIFFS : DIFFS)[G.diff]; return G.map === 'city' ? 'NEO TOKYO · ' + D.label : D.label + ' PASS'; }
+
+/** The title's map buttons, the course blurbs and the Japanese strip follow the map. */
+function markMap() {
+  document.querySelectorAll('.map').forEach((b) => b.classList.toggle('sel', b.dataset.m === G.map));
+  const T = G.map === 'city' ? CITY_DIFFS : DIFFS;
+  document.querySelectorAll('.diff').forEach((b) => { const sp = b.querySelector('span'); if (sp && T[b.dataset.d]) sp.textContent = T[b.dataset.d].blurb; });
+  const tate = document.querySelector('#title .tate');
+  if (tate) { tate.textContent = G.map === 'city' ? 'ネオ東京' : '夜桜峠'; tate.classList.toggle('city', G.map === 'city'); }
+  document.body.classList.toggle('city', G.map === 'city');
+  const tag = $('tagline'); if (tag) tag.textContent = G.map === 'city' ? 'NEON STREETS · ENDLESS' : 'NIGHT TOUGE · ENDLESS';
+  refreshBests();
+}
+
+/** Everything in the scene that belongs to one map and not the other. */
+function applyMapLook() {
+  const city = G.map === 'city';
+  if (audio && audio.setMap) audio.setMap(city);
+  if (night.fuji) night.fuji.visible = !city;
+  if (night.glow) {
+    // the horizon: a warm dusk over the mountains, a magenta light-polluted haze over the city
+    const c = night.glow.geometry.attributes.color, a = c.array;
+    const lo = city ? [0.95, 0.3, 0.72, 0.8] : [0.95, 0.45, 0.35, 0.6], hi = city ? [0.4, 0.18, 0.7, 0.0] : [0.35, 0.25, 0.55, 0.0];
+    for (let i = 0; i < a.length; i += 8) { a.set(lo, i); a.set(hi, i + 4); }
+    c.needsUpdate = true;
+  }
+  night.starK = city ? 0.3 : 1;
+}
+
+async function setMap(m) {
+  if (building || G.mode !== 'title' || (m !== 'city' && m !== 'mountain') || m === G.map) return;
+  building = true;
+  G.map = m; store.set('map', m); markMap();
+  $('building').classList.add('on');
+  await nextFrame(); await nextFrame();
+  track = new Track(SEED, G.diff, G.map);
+  track.ensure(2400);
+  world.setTrack(track);
+  applyMapLook(); resetWeather(); applySun(0, true);
+  skids.clear && skids.clear();
+  resetCarToStart();
+  world.prime(car.x, car.z, START_S);
+  rig.refresh(scene);
+  $('building').classList.remove('on');
+  building = false;
+}
 
 let building = false;
 async function setCourse(diff) {
@@ -326,7 +493,7 @@ async function setCourse(diff) {
   G.diff = diff; store.set('diff', diff); markDiff();
   $('building').classList.add('on');
   await nextFrame(); await nextFrame();
-  track = new Track(SEED, diff);
+  track = new Track(SEED, diff, G.map);
   track.ensure(2400);
   world.setTrack(track);
   skids.clear && skids.clear();
@@ -361,14 +528,15 @@ function startGame() {
   if (night.hero) night.hero.intensity = 0;
   hud.warm(false);
   scoring.reset(); hud.reset();
-  G.hour = 20.6; G.dist = 0; G.newBest = false; G.runBest = G.best[G.diff] || 0;
+  G.hour = 20.6; G.dist = 0; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
+  resetWeather();
   G.playT = 0; G.longFrames = 0; G.worstFrame = 0;
   const p = track.sample(G.s || START_S);
   chase.snap(car, p.y);
   hud.show(true);
   audio.unlock();
   G.mode = 'playing';
-  hud.toast(DIFFS[G.diff].label + ' PASS', 'good', true);
+  hud.toast(courseLabel(), 'good', true);
 }
 
 function setPaused(on) {
@@ -376,7 +544,7 @@ function setPaused(on) {
     G.mode = 'paused';
     $('pause').classList.add('on');
     const st = scoring.stats;
-    $('pstats').textContent = `${DIFFS[G.diff].label}   SCORE ${Math.round(scoring.total).toLocaleString('en-US')}   ${(G.dist / 1609.344).toFixed(1)} MI   ${st.drifts} DRIFTS`;
+    $('pstats').textContent = `${courseLabel()}   SCORE ${Math.round(scoring.total).toLocaleString('en-US')}   ${(G.dist / 1609.344).toFixed(1)} MI   ${st.drifts} DRIFTS`;
     audio.pause && audio.pause(true);
   } else if (!on && G.mode === 'paused') {
     $('pause').classList.remove('on');
@@ -387,15 +555,16 @@ function setPaused(on) {
 }
 
 function saveBest() {
-  const b = G.best[G.diff] || 0;
-  if (scoring.total > b) { G.best[G.diff] = scoring.total; store.set('best.' + G.diff, Math.round(scoring.total)); }
+  const b = G.best[bestKey()] || 0;
+  if (scoring.total > b) { G.best[bestKey()] = scoring.total; store.set('best.' + bestKey(), Math.round(scoring.total)); }
   refreshBests();
 }
 
 function restartRun() {
   saveBest();
   scoring.reset(); hud.reset();
-  G.hour = 20.6; G.newBest = false; G.runBest = G.best[G.diff] || 0;
+  G.hour = 20.6; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
+  resetWeather();
   resetCarToStart();
   world.prime(car.x, car.z, START_S);
   hud.toast('NEW RUN', '', false);
@@ -422,6 +591,7 @@ const WHEEL_R = 0.32 * K;
 const sunColor = new THREE.Color(1, 0.9, 0.8);
 let perfLine = '';
 
+const _fwd = new THREE.Vector3(), _carAt = { x: 0, y: 0, z: 0, vx: 0, vz: 0 };
 function frame(now) {
   requestAnimationFrame(frame);
   const real = Math.max(1e-4, (now - last) / 1000);
@@ -439,6 +609,23 @@ function frame(now) {
 
   // a debug camera for inspecting the world from anywhere (set window.__CAM__ = { pos: [x,y,z], look: [x,y,z], fov })
   if (window.__CAM__) { const c = window.__CAM__; camera.position.set(...c.pos); camera.up.set(0, 1, 0); camera.lookAt(...c.look); if (c.fov && camera.fov !== c.fov) { camera.fov = c.fov; camera.updateProjectionMatrix(); } }
+  // rain, lit by the headlights and the lamps near the car
+  if (rain && car && G.mode !== 'paused') {
+    camera.getWorldDirection(_fwd);
+    const hh = Math.hypot(_fwd.x, _fwd.z) || 1;
+    const [cfx, cfz] = car.forward();
+    _carAt.x = car.x; _carAt.y = carRoot ? carRoot.position.y + 0.4 : 0; _carAt.z = car.z; _carAt.fx = cfx; _carAt.fz = cfz;
+    rain.update(dt, W.rain * (1 - (G.tunnelK || 0)), camera.position, _fwd.x / hh, _fwd.z / hh, _carAt, G.night, lampLights, 0.05 + 0.3 * (1 - G.night));
+  }
+  // cherry petals on the air, round the camera wherever it is (not while paused, and not inside a tunnel)
+  if (petals && car && G.mode !== 'paused') {
+    camera.getWorldDirection(_fwd);
+    const h = Math.hypot(_fwd.x, _fwd.z) || 1;
+    const [cfx, cfz] = car.forward(), [clx, clz] = car.left();
+    _carAt.x = car.x; _carAt.y = carRoot ? carRoot.position.y + 0.4 : 0; _carAt.z = car.z;
+    _carAt.vx = cfx * car.vF + clx * car.vL; _carAt.vz = cfz * car.vF + clz * car.vL;
+    petals.update(dt, camera.position, _fwd.x / h, _fwd.z / h, _carAt, G.map === 'city' ? 0 : 1 - (G.tunnelK || 0));
+  }
   const t1 = performance.now();
   renderer.info.reset();
   rig.update(camera, dt);
@@ -529,7 +716,7 @@ function step(dt, t0) {
   const w = n.u >= 0 ? n.wl : n.wr;
   const surface = au < track.half + 0.35 ? 1 : au < w + 0.1 ? 0.88 : 0.65;
   inp.line = { curv: track.sample(G.s + 12 + car.speed * 0.55).k };
-  car.step(dt, inp, surface);
+  car.step(dt, inp, surface * (1 - 0.07 * W.wet));            // a wet road gives a little grip away
 
   // ---- walls: the corridor's edges on each side, the tunnel lining
   let impact = 0, clipping = false, noseIn = false;
@@ -574,11 +761,13 @@ function step(dt, t0) {
   }
   for (const e of scoring.drain()) {
     hud.onEvent(e); audio.onEvent(e);
-    if (e.type === 'bank') { G.hour += e.value / 6000; if (scoring.total > (G.best[G.diff] || 0)) { G.best[G.diff] = scoring.total; store.set('best.' + G.diff, Math.round(scoring.total)); } }
+    if (e.type === 'bank') { G.hour += e.value / 6000; if (scoring.total > (G.best[bestKey()] || 0)) { G.best[bestKey()] = scoring.total; store.set('best.' + bestKey(), Math.round(scoring.total)); } }
     if (e.type === 'crash') chase.kick(0.9);
   }
   if (!G.newBest && G.runBest > 0 && scoring.total > G.runBest) { G.newBest = true; hud.onEvent({ type: 'best' }); }
   const boost01 = clamp(car.boost / 1.2, 0, 1);
+
+  weather(dt, !!track.inTunnel(G.s));
 
   // ---- distance, time of day
   const ds = Math.max(0, G.s - G.lastS); G.lastS = G.s;
@@ -616,7 +805,7 @@ function step(dt, t0) {
   world.update(car.x, car.z, G.s, performance.now() + spare);
   world.updateFar(camera.position.x, y, camera.position.z);
   lampsFollow();
-  hud.update(dt, scoring, car, gb, G.hour, G.dist, car.boost, SCORE.boostMax, perfLine);
+  hud.update(dt, scoring, car, gb, G.hourShown, G.dist, car.boost, SCORE.boostMax, perfLine);
   G.simMs = t1 - t0; G.worldMs = performance.now() - t1;
 }
 
@@ -626,6 +815,7 @@ function camGround(x, z) { const s = world.ground.sample(x, z, 2.2, camProbe); r
 
 function nightFollow() {
   if (!night.moon) return;
+  if (night.fuji) { const f = night.fuji.userData.dir; night.fuji.position.set(camera.position.x + f[0] * 2900, camera.position.y - 700, camera.position.z + f[1] * 2900); }
   if (night.stars) night.stars.position.copy(camera.position);
   if (night.glow) night.glow.position.set(camera.position.x, camera.position.y - 60, camera.position.z);
   if (night.disc) {
@@ -641,18 +831,31 @@ function nightFollow() {
   m.target.updateMatrixWorld();
 }
 
-let sunTimer = 0;
+/**
+ * The light follows the clock smoothly. The clock shown chases the real one (a banked drift moves the real one
+ * half an hour at once; the light gets there over a couple of seconds, easing in), and the sun, sky, haze and
+ * fill are updated as often as the shown hour moves at all, which costs a few uniforms. Only the environment
+ * map (a PMREM build, milliseconds) waits, and is rebuilt every two and a half seconds while the sky changes.
+ */
+let sunTimer = 0, envTimer = 0;
 function applySun(dt, force = false) {
-  sunTimer += dt;
-  const moved = Math.abs(G.hour - G.hourShown);
+  let d = G.hour - G.hourShown;
+  if (d > 12) d -= 24; else if (d < -12) d += 24;
+  const move = force ? d : Math.sign(d) * Math.min(Math.abs(d), (0.02 + Math.abs(d) * 1.6) * dt);
+  let shown = G.hourShown + move;
+  if (shown >= 24) shown -= 24; else if (shown < 0) shown += 24;
   const elOf = (h) => Math.max(-12, 62 * Math.sin(Math.PI * (h - 6) / 12));
-  if (!force) {
-    if (elOf(G.hour) <= -12 && elOf(G.hourShown) <= -12 && G.sunApplied) return;
-    if (sunTimer < 3 && moved < 0.15) return;
-    if (moved < 0.006) return;
+  sunTimer += dt; envTimer += dt;
+  if (!force && G.sunApplied) {
+    const still = Math.abs(shown - G.lastApplied) < 0.0025 && Math.abs(W.rain - (G.lastRain ?? 0)) < 0.01;
+    if ((elOf(shown) <= -12 && elOf(G.lastApplied) <= -12) || still) { G.hourShown = shown; return; }
   }
-  sunTimer = 0; G.hourShown = G.hour; G.sunApplied = true;
-  const t = rig.setTime({ hour: G.hour });
+  G.hourShown = shown; sunTimer = 0;
+  const full = force || envTimer > 2.5;
+  if (full) envTimer = 0;
+  G.lastApplied = shown; G.sunApplied = true; G.lastRain = W.rain;
+  rig.setOvercast(W.rain * 0.9);
+  const t = rig.setTime({ hour: shown }, { env: full });
   const el = t.elevation;
   const nightAmt = smoothstep(4, -3, el);
   G.night = nightAmt; night.amt = nightAmt;
@@ -661,8 +864,13 @@ function applySun(dt, force = false) {
   if (night.glow) night.glow.material.opacity = 0.42 * smoothstep(-0.5, -5, el);
   if (night.tailGlow) night.tailGlow.intensity = 0.9 * nightAmt;
   if (rig.hemi && night.hemiDay) rig.hemi.intensity = night.hemiDay * (1 - 0.66 * nightAmt);
-  if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el);
-  if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el); }
+  // cloud takes the stars and most of the moon
+  const clear = 1 - W.rain;
+  if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el) * clear * clear * (night.starK ?? 1);
+  if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el) * (1 - 0.85 * W.rain); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el) * (1 - 0.6 * W.rain); }
+  if (night.fuji) { night.fuji.material.transparent = true; night.fuji.material.opacity = 1 - 0.85 * W.rain; }
+  // Fuji is drawn in the night's colours; by day the same mountain, lifted into daylight
+  if (night.fuji) night.fuji.material.color.setRGB(lerp(2.5, 1, nightAmt), lerp(2.45, 1, nightAmt), lerp(2.2, 1, nightAmt));
   world.setNight(nightAmt);
   sunColor.copy(rig.sun.color).lerp(new THREE.Color(0.55, 0.65, 0.95), nightAmt);
 }
@@ -698,6 +906,18 @@ function placeCar(y, grade, dt) {
   if (joints.wheelFR) joints.wheelFR.rotation.x = susp.spinF;
   if (joints.wheelRL) joints.wheelRL.rotation.x = susp.spinR;
   if (joints.wheelRR) joints.wheelRR.rotation.x = susp.spinR;
+  // the pop-ups flip up once the run is under way at night (with a little overshoot, as a motor stops), and fold
+  // away by day; the headlights move up into them as they rise
+  if (pops.list.length && dt > 0) {
+    const want = (G.mode === 'playing' || G.mode === 'paused') && G.night > 0.3 ? 1 : 0;
+    pops.t = clamp(pops.t + (want ? dt : -dt) / 0.45, 0, 1);
+    const e = pops.t < 1 ? pops.t * pops.t * (3 - 2 * pops.t) * (1 + 0.12 * Math.sin(pops.t * Math.PI)) : 1;
+    for (const p of pops.list) p.rotation.x = pops.open * e;
+    if (pops.lamp && headlights) headlights.forEach((hl, i) => {
+      const sg = i === 0 ? -1 : 1;
+      hl.position.set(lerp(sg * 0.6, sg * Math.abs(pops.lamp[0]), e), lerp(0.22, pops.lamp[1] - 0.5, e), lerp(2.0, pops.lamp[2], e));
+    });
+  }
 }
 
 function effects(dt, y, boost01) {
@@ -711,6 +931,8 @@ function effects(dt, y, boost01) {
     const a = onRoad ? clamp(slip * 1.2 + (car.hand ? 0.5 : 0) * clamp(car.speed / 8, 0, 1), 0, 1) : 0;
     skids.add(i, wx, y + 0.02, wz, lx, lz, a, 0.19);
     if (a > 0.25 && car.speed > 6 && Math.random() < a * 0.9) particles.smoke(wx, y, wz, vx, vz, a, sunColor);
+    // on a wet road the tyres throw spray
+    if (W.wet > 0.3 && onRoad && car.speed > 8 && Math.random() < W.wet * 0.55) particles.spray(wx, y, wz, vx, vz, W.wet * clamp(car.speed / 30, 0, 1), sunColor);
     if (!onRoad && car.speed > 4 && Math.random() < 0.45) particles.dust(wx, y, wz, vx, vz, clamp(car.speed / 20, 0, 1), sunColor);
   });
   FRONT.forEach(([l, f], i) => {

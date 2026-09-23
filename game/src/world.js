@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609230143';
-import { surface } from '../surfaces.js?v=202609230143';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230143';
-import { Ground } from './ground.js?v=202609230143';
-import { Terrain, LODS } from './terrain.js?v=202609230143';
-import { partsOf, Pool } from './instancing.js?v=202609230143';
+import { ASSET } from '../assetlib.js?v=202609230328';
+import { surface } from '../surfaces.js?v=202609230328';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230328';
+import { Ground } from './ground.js?v=202609230328';
+import { Terrain, LODS } from './terrain.js?v=202609230328';
+import { partsOf, Pool } from './instancing.js?v=202609230328';
 
 const ASSETS = {
   cedar: './assets/cedar_tree.js', maple: './assets/maple_tree.js', boulder: './assets/boulder.js',
@@ -29,21 +29,39 @@ const ASSETS = {
   lantern: './assets/stone_lantern.js', portal: './assets/tunnel_portal.js', hut: './assets/mountain_hut.js',
   vending: './assets/vending_machine.js', shrub: './assets/roadside_shrub.js', broadleaf: './assets/broadleaf_tree.js',
   catseye: './assets/cats_eye.js', upole: './assets/power_pole.js', bamboo: './assets/bamboo_clump.js', bare: './assets/bare_tree.js',
-  conbini: './assets/conbini.js', busstop: './assets/bus_shelter.js',
+  conbini: './assets/conbini.js', busstop: './assets/bus_shelter.js', chochin: './assets/chochin.js', jizo: './assets/jizo.js',
+  sakura: './assets/sakura_tree.js', weeping: './assets/weeping_cherry.js',
 };
-const SURFACED = new Set(['boulder', 'post', 'pole', 'lamp', 'mirror', 'chevron', 'torii', 'lantern', 'portal', 'hut', 'vending', 'upole', 'conbini', 'busstop']);
+const SURFACED = new Set(['boulder', 'post', 'pole', 'lamp', 'mirror', 'chevron', 'torii', 'lantern', 'portal', 'hut', 'vending', 'upole', 'conbini', 'busstop', 'jizo']);
 // pool capacities: what the whole visible road can hold at once
 const CAPS = {
   lamp: 320, post: 1400, pole: 500, catseye: 900, chevron: 120, mirror: 40, boulder: 300, upole: 160,
-  maple: 500, broadleaf: 500, shrub: 1600, bamboo: 160, bare: 160,
-  torii: 8, lantern: 24, hut: 12, vending: 24, conbini: 6, busstop: 8, portal: 8,
+  maple: 300, broadleaf: 500, shrub: 1600, bamboo: 160, bare: 120, sakura: 700, weeping: 24,
+  torii: 8, lantern: 24, hut: 12, vending: 90, conbini: 6, busstop: 8, portal: 8, chochin: 700, jizo: 40,
 };
-const TINTED = new Set(['maple', 'broadleaf', 'shrub']);
+const TINTED = new Set(['maple', 'broadleaf', 'shrub', 'sakura', 'weeping']);
+// a cherry's colour, by a number in 0..1: mostly the pale Somei-Yoshino, some pinker, a few nearly white
+const cherryColour = (r) => (r < 0.6 ? PAL.sakuraPale : r < 0.86 ? PAL.sakuraPink : PAL.sakuraWhite);
 const CHUNK = 60;
 const NEAR_R = 150, FAR_R = 470, DROP_R = 540;
 const LAMP_EVERY = 30;
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+
+/**
+ * Whether a font really draws these characters rather than the missing-glyph box: the text and as many unassigned
+ * code points are drawn and the pixels compared. (Comparing widths is not enough: a Japanese face's box is a full
+ * em wide, like its kanji.)
+ */
+export function drawsGlyphs(font, text) {
+  const cv = document.createElement('canvas'); cv.width = 56 * text.length; cv.height = 56;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  const draw = (str) => { ctx.clearRect(0, 0, cv.width, cv.height); ctx.font = font; ctx.fillStyle = '#fff'; ctx.textBaseline = 'top'; ctx.fillText(str, 2, 4); return ctx.getImageData(0, 0, cv.width, cv.height).data; };
+  const a = draw(text), b = draw(String.fromCharCode(0x378).repeat(text.length));
+  let diff = 0;
+  for (let i = 3; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) > 60) diff++;
+  return diff > 40 * text.length;
+}
 
 /** Road texture over the corridor's base width: asphalt with grain, wear, patches, edge lines and a dashed centre. */
 function roadTexture(half, wall) {
@@ -72,6 +90,16 @@ function roadTexture(half, wall) {
       const onEdge = Math.abs(au - (half - 0.25)) < 0.075;
       const onCentre = au < 0.07 && (vm % 12) < 4.0;
       if (onEdge || onCentre) { c = line.map((v) => v * (onCentre ? 0.93 : 1) + grain * 0.5); rough = 0.62; }
+    }
+    // fallen cherry petals: blown into drifts against the edges and the gravel, a few across the lanes
+    {
+      const drift = 0.55 + 0.45 * Math.sin(vm * 0.61 + u * 0.8) * Math.sin(vm * 0.19 + 1.7);
+      const k = (au > half ? 0.1 : 0.0022 + 0.06 * Math.exp(-Math.pow((half - au) / 0.5, 2))) * drift;
+      if (rnd() < k) {
+        const pk = rnd();
+        c = (pk < 0.55 ? [224, 176, 190] : pk < 0.82 ? [212, 146, 170] : [232, 208, 216]).map((v) => v * (0.85 + 0.15 * rnd()));
+        rough = 0.82;
+      }
     }
     const i = (y * W + x) * 4;
     img.data[i] = clamp(c[0], 0, 255); img.data[i + 1] = clamp(c[1], 0, 255); img.data[i + 2] = clamp(c[2], 0, 255); img.data[i + 3] = 255;
@@ -190,12 +218,14 @@ export class World {
       n++; if (progress) progress(n / names.length, k);
     }));
     // foliage materials turn white so the instance colour is the leaf colour
-    for (const name of ['maple', 'shrub', 'broadleaf']) {
+    for (const name of ['maple', 'shrub', 'broadleaf', 'sakura', 'weeping']) {
       const tpl = this.templates[name]; if (!tpl) continue;
       tpl.traverse((o) => {
         const hex = o.isMesh && o.material ? o.material.color.getHex() : -1;
         if (o.isMesh && o.material && (o.material.name === 'foliage' || hex === PAL.mapleOrange || hex === PAL.dryGrass || hex === PAL.mapleGold)) {
           o.material = o.material.clone(); o.material.color.set(0xffffff); o.material.name = 'foliage_tinted';
+          // blossom holds a little light of its own, so a cherry reads as a pale cloud even away from a lamp
+          if (name === 'sakura' || name === 'weeping') { o.material.emissive = new THREE.Color(0x3a2230); o.material.emissiveIntensity = 1; }
         }
       });
     }
@@ -214,11 +244,35 @@ export class World {
       tpl.traverse((o) => { if (o.isMesh && o.material && o.material.emissive && o.material.emissiveIntensity > 0.5) { o.material = o.material.clone(); o.material.emissiveIntensity = 2.6; } });
     }
     for (const k of names) this.parts[k] = partsOf(this.templates[k]);
+    // the far forest's cherry: the same blossom and bark materials on a hundred-odd triangles (five flattened
+    // clouds in an umbrella over a trunk), for the ring of tiles past 200 m where the full tree's 1,200 would be
+    // spent on a pink dot
+    if (this.parts.sakura) {
+      const fol = this.parts.sakura.find((p) => p.material.name === 'foliage_tinted'), bark = this.parts.sakura.find((p) => p.material.name !== 'foliage_tinted');
+      const clouds = [[0, 5.6, 0, 2.6], [2.4, 5.0, 0.6, 2.0], [-2.2, 5.1, -0.7, 2.1], [0.5, 5.0, -2.3, 1.9], [-0.6, 4.9, 2.3, 1.9]].map(([x, y, z, r]) => {
+        const g = new THREE.IcosahedronGeometry(r, 0); g.scale(1, 0.62, 1); g.translate(x, y, z); return g;
+      });
+      const trunk = new THREE.CylinderGeometry(0.16, 0.26, 4.4, 5); trunk.translate(0, 2.2, 0);
+      this.parts.sakuraFar = [];
+      if (fol) this.parts.sakuraFar.push({ geometry: mergeGeos(clouds.map((g) => g.index ? g.toNonIndexed() : g)), material: fol.material, local: new THREE.Matrix4() });
+      if (bark) this.parts.sakuraFar.push({ geometry: mergeGeos([trunk]), material: bark.material, local: new THREE.Matrix4() });
+    }
     // the lamp's head: the far end of its arm, found from the template rather than assumed
     {
       const box = new THREE.Box3().setFromObject(this.templates.lamp);
       this.lampHead = [box.max.x - 0.28, box.max.y - 0.3];
       this.lampReach = box.max.x;
+      // the far lamp: a post, the arm and a head in the lamp's own metal, thirty-odd triangles for a lamp a few
+      // hundred metres off (its bulb and its pool of light are separate and stay)
+      const metal = this.parts.lamp.slice().sort((a, b) => b.geometry.attributes.position.count - a.geometry.attributes.position.count)[0];
+      if (metal) {
+        // (the template is centred, as every asset is, so its post stands at the box's -x end, not at the origin)
+        const H = this.lampHead[1] + 0.25, R = this.lampHead[0], x0 = box.min.x + 0.1;
+        const post = new THREE.CylinderGeometry(0.07, 0.1, H, 6); post.translate(x0, H / 2, 0);
+        const arm = new THREE.BoxGeometry(R - x0 + 0.1, 0.09, 0.09); arm.translate((R + x0) / 2, H - 0.12, 0);
+        const head = new THREE.BoxGeometry(0.62, 0.14, 0.3); head.translate(R, H - 0.26, 0);
+        this.pools.lampFar = new Pool([{ geometry: mergeGeos([post, arm, head]), material: metal.material, local: new THREE.Matrix4() }], 360);
+      }
     }
     const g = surface(THREE, 'ground', 256);
     this.groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: g.map, roughnessMap: g.roughnessMap, normalMap: g.normalMap,
@@ -268,6 +322,17 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this.copingMat = new THREE.MeshStandardMaterial({ color: 0x4a4f5a, roughness: 0.8, metalness: 0 });
     this._plateMat(['霧峰', 'KIRIMINE']);                          // one plate made now, so its program compiles with the rest
     this.wireMat = new THREE.LineBasicMaterial({ color: 0x15161a });
+    this.postMat = new THREE.MeshStandardMaterial({ color: PAL.timber, roughness: 0.85, metalness: 0 });
+    this.postMat.name = 'timber';
+    this.toriiRedMat = new THREE.MeshStandardMaterial({ color: PAL.vermilion, roughness: 0.62, metalness: 0, side: THREE.DoubleSide, emissive: 0x3a0c06, emissiveIntensity: 1 });
+    this.toriiBlackMat = new THREE.MeshStandardMaterial({ color: 0x1c1a1a, roughness: 0.55, metalness: 0, side: THREE.DoubleSide });
+    this.toriiPlaqueGeo = new THREE.PlaneGeometry(1.0, 1.5);
+    this.signBoardGeo = new THREE.BoxGeometry(3.4, 2.02, 0.08);
+    this.signFaceGeo = new THREE.PlaneGeometry(3.3, 1.94);
+    this.signBackMat = new THREE.MeshStandardMaterial({ color: PAL.galvanised, roughness: 0.5, metalness: 0.6 });
+    this._signFaces();
+    this._roadTextMat('徐行');
+    this._toriiPlaqueMat();
     this.bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffc070, emissiveIntensity: 2.1, roughness: 0.6 });
     {
       const sz = 128, cv = document.createElement('canvas'); cv.width = cv.height = sz;
@@ -278,8 +343,18 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
       this.glowMat = new THREE.MeshBasicMaterial({ color: 0xffa046, map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
       this.glowCoolMat = this.glowMat.clone(); this.glowCoolMat.color.set(0xd8ecff);
+      this.glowLanternMat = this.glowMat.clone(); this.glowLanternMat.color.set(0xff7050);
+      this.glowCityMat = this.glowMat.clone(); this.glowCityMat.color.set(0xc6d8ff);
     }
     // the shared pools
+    if (this.parts.sakuraFar) this.pools.sakuraFar = new Pool(this.parts.sakuraFar, 700, { tint: true });
+    if (this.parts.chochin) {
+      const lit = this.parts.chochin.find((p) => p.material.name === 'lantern');
+      if (lit) {
+        const g = new THREE.IcosahedronGeometry(0.17, 0); g.scale(1, 1.55, 1); g.translate(0, 0.28, 0);
+        this.pools.chochinFar = new Pool([{ geometry: g, material: lit.material, local: new THREE.Matrix4() }], 700);
+      }
+    }
     const bulbParts = [{ geometry: new THREE.SphereGeometry(0.2, 8, 6), material: this.bulbMat, local: new THREE.Matrix4() }];
     this.pools.bulb = new Pool(bulbParts, CAPS.lamp);
     for (const k of Object.keys(CAPS)) {
@@ -288,6 +363,15 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     }
     for (const p of Object.values(this.pools)) this.root.add(p.group);
     this.buildSky();
+    // the city (NEO TOKYO): its module is loaded here, and its materials made now so they compile with the rest
+    try {
+      this.City = await import('./city.js?v=202609230328');
+      this._cityMats = this.City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
+      const L = await import('./landmarks.js?v=202609230328').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+      this.citySky = this.City.citySkyBuild(this, L);
+      this.citySky.visible = false;
+      this.scene.add(this.citySky);
+    } catch (e) { console.warn('city', e && e.message); this.City = null; this._cityMats = []; }
   }
 
   /** A new course: everything built for the old one goes. */
@@ -299,13 +383,20 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this.track = track;
     this.ground = new Ground(track);
     this.seed = track.seed;
-    const rt = roadTexture(track.half, track.wall);
+    this.city = !!track.city && !!this.City;
+    const rt = this.city ? this.City.cityRoadTexture(track.half, track.wall) : roadTexture(track.half, track.wall);
+    // a city fence is painted white; the mountain's guardrail is bare galvanised steel
+    this.railMat.color.set(this.city ? 0xd8d6ce : PAL.galvanised);
+    if (this.skyline) this.skyline.visible = !this.city;
+    if (this.town) this.town.visible = !this.city;
+    if (this.citySky) this.citySky.visible = this.city;
     if (this.roadMat.map) { this.roadMat.map.dispose(); this.roadMat.roughnessMap.dispose(); }
     this.roadMat.map = rt.map; this.roadMat.roughnessMap = rt.roughnessMap; this.roadMat.needsUpdate = true;
     this.texLen = rt.len;
-    const tp = { cedar: this.parts.cedar, maple: this.parts.maple, broadleaf: this.parts.broadleaf, bare: this.parts.bare };
-    if (!this.terrain) this.terrain = new Terrain({ scene: this.scene, ground: this.ground, mat: this.groundMat, farMat: this.farMat, parts: tp, density: this.q.trees, seed: track.seed });
-    else { this.terrain.o.seed = track.seed; this.terrain.reset(this.ground); }
+    const tp = { cedar: this.parts.cedar, maple: this.parts.maple, broadleaf: this.parts.broadleaf, bare: this.parts.bare, sakura: this.parts.sakura || null, sakuraFar: this.parts.sakuraFar || null };
+    const building = this.city ? { geometry: this.pools.bldg.parts[0].im.geometry, material: this.bldgMat } : null;
+    if (!this.terrain) this.terrain = new Terrain({ scene: this.scene, ground: this.ground, mat: this.groundMat, farMat: this.farMat, parts: tp, density: this.q.trees, seed: track.seed, city: this.city, building });
+    else { this.terrain.o.seed = track.seed; this.terrain.o.city = this.city; this.terrain.o.building = building; this.terrain.reset(this.ground); }
     // new final road dirties the terrain beside it
     track.onAdd((i0, i1) => {
       if (this.track !== track) return;
@@ -406,6 +497,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   _undress(ch) {
     if (!ch.near) return;
     for (const p of Object.values(this.pools)) p.removeOwner(ch.c * 2 + 1);
+    this._lodSwap(ch, false);
     if (ch.nearGroup) {
       ch.group.remove(ch.nearGroup);
       ch.nearGroup.traverse((o) => { if ((o.isMesh || o.isLineSegments) && o.geometry) o.geometry.dispose(); });
@@ -441,6 +533,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     yield;
     this._lampsFor(ch);
     this._setPieces(ch);
+    this._avenueFor(ch);
+    this._signsFor(ch);
+    if (this.city) this.City.cityChunk(this, ch);
     this.root.add(ch.group);
     ch.built = true;
   }
@@ -506,7 +601,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         const [x, z] = this._at(p, (w + 4.5) * side);
         const drop = p.y - g.height(x, z);
         const tight = Math.abs(p.k) > 1 / 45 && Math.sign(p.k) === -side;
-        if (drop > 0.9 || tight) plan[side][i - ch.i0] = 1;
+        if (this.city || drop > 0.9 || tight) plan[side][i - ch.i0] = 1;
       }
     }
     // no stubs, no gaps: fill gaps of up to 4 samples, drop runs shorter than 6
@@ -769,9 +864,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     ctx.strokeStyle = 'rgba(230,226,214,0.85)'; ctx.lineWidth = 5; ctx.strokeRect(8, 8, 496, 112);
     ctx.fillStyle = '#ece8dc'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     // a system without a Japanese font draws boxes for kanji: then the reading alone, larger
-    ctx.font = '600 58px "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", "Noto Serif JP", serif';
-    const kw = ctx.measureText(kanji + 'トンネル').width, tofu = ctx.measureText('͸͹΀΁΂΃').width;
-    if (Math.abs(kw - tofu) > 2) {
+    ctx.font = '900 58px "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", serif';
+    if (drawsGlyphs('900 44px "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", serif', kanji + 'トンネル')) {
       ctx.fillText(kanji + 'トンネル', 256, 54);
       ctx.font = '26px "Share Tech Mono", monospace'; ctx.fillText(romaji + ' TUNNEL', 256, 100);
     } else {
@@ -799,15 +893,15 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       const [x, z] = this._at(p, (w + 0.55) * side);
       const y = g.height(x, z);
       const ry = side > 0 ? p.h + Math.PI : p.h;               // the arm reaches local +X: point it at the road
-      this._put('lamp', ch.c * 2, x, y, z, ry);
+      this._putLod(ch, 'lamp', x, y, z, ry, 1, null);
       const hx = x + Math.cos(ry) * this.lampHead[0], hz = z - Math.sin(ry) * this.lampHead[0];
       const hy = y + this.lampHead[1];
-      this.lamps.push({ x: hx, y: hy - 0.25, z: hz, c: ch.c });
+      this.lamps.push(this.city ? { x: hx, y: hy - 0.25, z: hz, c: ch.c, color: 0xe2ecff, power: 230 } : { x: hx, y: hy - 0.25, z: hz, c: ch.c });
       _q.setFromAxisAngle(_up, 0); _m4.compose(_v.set(hx, hy - 0.22, hz), _q, _s.set(1, 1, 1));
       this.pools.bulb.add(ch.c * 2, _m4);
-      glows.push([hx, hz, 12]);
+      glows.push([hx, hz, this.city ? 9 : 12]);
     }
-    if (glows.length) { const m = this._glows(glows, ch); if (m) ch.group.add(m); }
+    if (glows.length) { const m = this._glows(glows, ch, this.city ? this.glowCityMat : this.glowMat); if (m) ch.group.add(m); }
   }
 
   /** Light pools that lie on the ground (a small grid draped over it), so none floats beside an embankment. */
@@ -847,12 +941,22 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       const face = (p) => p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2);      // turned to face the road
       const at = (s, u) => { const p = t.sample(s); const [x, z] = this._at(p, u * side); return { p, x, z, y: g.height(x, z) }; };
       if (m.kind === 'shrine') {
+        // the approach: a great torii over the road, on the first spot before the shrine where both of its
+        // legs can stand on ground near the road's height
+        for (const ds of [-26, -34, -18, -42]) { if (this._bigTorii(ch, m.s + ds)) break; }
         const pad = t.pads.find((q) => q.kind === 'shrine' && Math.abs(q.s0 + 8 - m.s) < 1);
         const u0 = pad ? pad.u0 : t.wall + 3.6;
         { const a = at(m.s + 11, u0 + 2.2); this._put('torii', own, a.x, a.y, a.z, face(a.p)); }
         for (const ds of [4, 18]) { const a = at(m.s + ds, u0 + 1.2); this._put('lantern', own, a.x, a.y, a.z, face(a.p)); }
+        // a row of jizo in their red bibs by the path, facing the road
+        for (const ds of [6.2, 7.3, 8.4]) { const a = at(m.s + ds, u0 + 0.9); this._put('jizo', own, a.x, a.y, a.z, face(a.p) + (rng() - 0.5) * 0.15, 0.95 + rng() * 0.12); }
         { const a = at(m.s + 11, u0 + 9.5); this._put('hut', own, a.x, a.y, a.z, face(a.p)); }
-        for (let k = 0; k < 3; k++) { const a = at(m.s - 2 + k * 12, u0 + 5 + rng() * 3); this._put('maple', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.9 + rng() * 0.3, 1, k === 1 ? PAL.mapleGold : PAL.mapleRed); }
+        // a weeping cherry behind the gate, a Somei-Yoshino either side
+        for (let k = 0; k < 3; k++) {
+          const a = at(m.s - 2 + k * 12, u0 + 5 + rng() * 3);
+          if (k === 1) this._cherry('weeping', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.95 + rng() * 0.2, PAL.sakuraDeep);
+          else this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.85 + rng() * 0.3, cherryColour(rng()));
+        }
         for (let k = 0; k < 4; k++) { const a = at(m.s + 2 + k * 7, u0 + 12 + rng() * 1.5); this._put('bamboo', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.85 + rng() * 0.35); }
         const l = at(m.s + 24, u0 + 2.4); this._put('lamp', own, l.x, l.y, l.z, face(l.p) + Math.PI);
         this._lampAt(ch, l.x, l.y, l.z, face(l.p) + Math.PI);
@@ -868,11 +972,12 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
           this.lamps.push({ x: a.x, y: a.y + 3.2, z: a.z, c: ch.c, color: 0xdcecff, power: 260 }); }
         for (const [ds, du] of [[mid - 9, 0.9], [mid - 7.8, 0.9]]) { const a = at(ds, edge + du); this._put('vending', own, a.x, a.y, a.z, face(a.p)); }
         for (const ds of [m.s - 4, m.s + m.len - 6]) { const a = at(ds, edge + 0.4); this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI); }
-        { const a = at(m.s + m.len - 2, edge + m.depth - 1); this._put('bare', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.9); }
+        { const a = at(m.s + m.len - 2, edge + m.depth - 1); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.9, cherryColour(rng())); }
       } else if (m.kind === 'busstop') {
         { const a = at(mid, edge + 1.6); this._put('busstop', own, a.x, a.y, a.z, face(a.p)); }
+        { const a = at(mid - 3.4, edge + 0.8); this._put('jizo', own, a.x, a.y, a.z, face(a.p), 1.0); }
         { const a = at(mid + 8, edge + 0.6); this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI); }
-        { const a = at(mid - 7, edge + 3); this._put('bare', own, a.x, a.y - 0.2, a.z, rng() * 6, 1.0); }
+        { const a = at(mid - 7, edge + 3); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 1.0, cherryColour(rng())); }
         for (let k = 0; k < 3; k++) { const a = at(mid + 12 + k * 4, edge + 2 + rng() * 2); this._put('bamboo', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.8 + rng() * 0.3); }
       } else if (m.kind === 'hut' || m.kind === 'vista') {
         if (m.kind === 'hut') {
@@ -881,10 +986,326 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         } else {
           for (let k = 0; k < 5; k++) { const a = at(m.s + 2 + k * 7, edge + m.depth - 0.6); this._put('pole', own, a.x, a.y, a.z, face(a.p)); }
           { const a = at(mid + 6, edge + 2); this._put('boulder', own, a.x, a.y - 0.2, a.z, rng() * 6, 1.1); }
+          for (const du of [0, 0.62]) { const a = at(mid + 2 + du * 1.4, edge + 1.0); this._put('jizo', own, a.x, a.y, a.z, face(a.p), 0.9 + du * 0.2); }
+          // the lone cherry at the viewpoint, leaning out over the drop
+          { const a = at(mid - 4, edge + m.depth - 2.2); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 1.05, PAL.sakuraPale); }
         }
+        if (m.kind === 'hut') { const a = at(mid + 7, edge + m.depth - 1.5); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.95, cherryColour(rng())); }
         { const a = at(m.s + 2, edge + 0.6); this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI); }
       }
     }
+  }
+
+  /**
+   * A great torii across the road at s, myojin style: two vermilion legs on black feet, the tie beam (nuki)
+   * through them, the painted lintel (shimaki) and the black top lintel (kasagi) whose ends sweep up, a strut
+   * between them carrying a black plaque with the shrine's name in gold, and a warm light on it. The legs
+   * stand just beyond the walls and reach down to whatever ground is under them. False if it cannot stand.
+   */
+  _bigTorii(ch, s) {
+    const t = this.track, g = this.ground;
+    if (s < 5 || t.nearTunnel(s, 20)) return false;
+    const p = t.sample(s);
+    const half = Math.max(p.wl, p.wr) + 1.1;
+    const legs = [1, -1].map((side) => { const [x, z] = this._at(p, half * side); return { x, z, y: g.height(x, z) }; });
+    if (legs.some((l) => Math.abs(l.y - p.y) > 2.2)) return false;
+    const y0 = p.y, H = 8.4, R = 0.42;
+    const red = [], black = [];
+    const lx = Math.cos(p.h), lz = -Math.sin(p.h);           // across the road
+    const place = (geo, u, y) => { geo.rotateY(p.h); geo.translate(p.x + lx * u, y, p.z + lz * u); return geo; };
+    for (const [k, side] of [[0, 1], [1, -1]]) {
+      const l = legs[k], bottom = Math.min(l.y, y0) - 0.4;
+      red.push(place(new THREE.CylinderGeometry(R * 0.86, R, y0 + H - 0.2 - bottom, 16), half * side, (bottom + y0 + H - 0.2) / 2));
+      black.push(place(new THREE.CylinderGeometry(R * 1.14, R * 1.2, l.y + 1.0 - bottom, 16), half * side, (bottom + l.y + 1.0) / 2));
+    }
+    const span = 2 * half;
+    // the nuki: a tie beam through both legs, standing out past them
+    red.push(place(new THREE.BoxGeometry(span + 2.2, 0.52, 0.42), 0, y0 + H - 2.1));
+    // the lintels: shimaki (painted) under kasagi (black), both sweeping up toward their ends
+    const lintel = (len, h, d, yc, lift) => {
+      const N = 16, pos = [], idx = [];
+      const yy = (x) => yc + lift * Math.pow(Math.abs(x) / (len / 2), 2.6);
+      for (let i = 0; i <= N; i++) {
+        const x = -len / 2 + (len * i) / N, y = yy(x);
+        for (const [dy, dz] of [[-h / 2, -d / 2], [-h / 2, d / 2], [h / 2, d / 2], [h / 2, -d / 2]]) pos.push(x, y + dy, dz);
+      }
+      for (let i = 0; i < N; i++) for (let k = 0; k < 4; k++) {
+        const a = i * 4 + k, b = i * 4 + ((k + 1) % 4), c = a + 4, d2 = b + 4;
+        idx.push(a, c, b, b, c, d2);
+      }
+      for (const e of [0, N * 4]) idx.push(e, e + 1, e + 2, e, e + 2, e + 3, e + 2, e + 1, e, e + 3, e + 2, e);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setIndex(idx); geo.computeVertexNormals();
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3 * 2), 2));
+      return geo;
+    };
+    red.push(place(lintel(span + 3.0, 0.5, 0.5, y0 + H - 0.2, 0.35), 0, 0));
+    black.push(place(lintel(span + 3.8, 0.42, 0.62, y0 + H + 0.26, 0.6), 0, 0));
+    // the strut between the beams, and the plaque on it
+    red.push(place(new THREE.BoxGeometry(0.42, 1.6, 0.36), 0, y0 + H - 1.05));
+    const geoR = mergeGeos(red), geoB = mergeGeos(black);
+    ch.own.add(geoR); ch.own.add(geoB);
+    const mr = new THREE.Mesh(geoR, this.toriiRedMat), mb = new THREE.Mesh(geoB, this.toriiBlackMat);
+    for (const m of [mr, mb]) { m.castShadow = true; m.receiveShadow = true; m.name = 'great torii'; ch.group.add(m); }
+    const plaque = new THREE.Mesh(this.toriiPlaqueGeo, this._toriiPlaqueMat());
+    // (facing the car that comes up the road, a hand's breadth proud of the strut)
+    plaque.position.set(p.x - Math.sin(p.h) * 0.24, y0 + H - 1.05, p.z - Math.cos(p.h) * 0.24); plaque.rotation.y = p.h + Math.PI;
+    ch.group.add(plaque);
+    // lit from below, as a shrine lights its gate
+    this.lamps.push({ x: p.x, y: y0 + 4.5, z: p.z, c: ch.c, color: 0xffb070, power: 150 });
+    const gm = this._glows([[p.x, p.z, 11]], ch); if (gm) ch.group.add(gm);
+    return true;
+  }
+
+  /** The plaque's face: gold characters, top to bottom, on black lacquer (the name in romaji where the font has no kanji). */
+  _toriiPlaqueMat() {
+    if (this._plaqueMat) return this._plaqueMat;
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 256;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#16120f'; ctx.fillRect(0, 0, 128, 256);
+    ctx.strokeStyle = '#b8843a'; ctx.lineWidth = 8; ctx.strokeRect(8, 8, 112, 240);
+    const kanji = '櫻宮';
+    ctx.font = '900 84px "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", serif';
+    const tofu = !drawsGlyphs('900 44px "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", serif', kanji);
+    ctx.fillStyle = '#e8c068'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (!tofu) { ctx.fillText(kanji[0], 64, 76); ctx.fillText(kanji[1], 64, 180); }
+    else { ctx.font = 'bold 30px serif'; for (const [k, ch] of [...'SAKURA'].entries()) ctx.fillText(ch, 64, 42 + k * 36); }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    this._plaqueMat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.25, roughness: 0.5 });
+    return this._plaqueMat;
+  }
+
+  /**
+   * Blue guide signs, the national road kind: two destinations up the pass, kanji over romaji, the distance
+   * beside each, an arrow. A handful of faces are drawn once; each sign picks one.
+   */
+  _signFaces() {
+    if (this._signMats) return this._signMats;
+    const sets = [
+      [['霧峰', 'Kirimine', 12], ['星降', 'Hoshifuri', 27]], [['月見', 'Tsukimi', 8], ['天狗', 'Tengu', 19]],
+      [['白樺', 'Shirakaba', 15], ['雷鳥', 'Raicho', 34]], [['狐塚', 'Kitsunezuka', 6], ['紅葉', 'Momiji', 22]],
+    ];
+    const jp = '"Dela Gothic One", "Noto Serif JP", "Yu Gothic", "Hiragino Sans", sans-serif';
+    this._signMats = sets.map((rows) => {
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 304;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#1f55a6'; ctx.fillRect(0, 0, 512, 304);
+      ctx.strokeStyle = '#f2f4f6'; ctx.lineWidth = 9; ctx.strokeRect(12, 12, 488, 280);
+      // the arrow: straight on, up the pass
+      ctx.fillStyle = '#f2f4f6';
+      ctx.beginPath(); ctx.moveTo(70, 44); ctx.lineTo(112, 104); ctx.lineTo(84, 104); ctx.lineTo(84, 260); ctx.lineTo(56, 260); ctx.lineTo(56, 104); ctx.lineTo(28, 104); ctx.closePath(); ctx.fill();
+      ctx.font = `76px ${jp}`;
+      const tofu = !drawsGlyphs(`44px ${jp}`, rows[0][0] + rows[1][0]);
+      rows.forEach(([kanji, romaji, km], k) => {
+        const y = 92 + k * 128;
+        ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+        if (!tofu) { ctx.font = `76px ${jp}`; ctx.fillText(kanji, 138, y); ctx.font = '700 30px Rajdhani, "Share Tech Mono", sans-serif'; ctx.fillText(romaji, 142, y + 38); }
+        else { ctx.font = '700 58px Rajdhani, "Share Tech Mono", sans-serif'; ctx.fillText(romaji, 138, y + 18); }
+        ctx.textAlign = 'right'; ctx.font = '700 60px Rajdhani, "Share Tech Mono", sans-serif'; ctx.fillText(String(km), 440, y + 14);
+        ctx.font = '700 30px Rajdhani, "Share Tech Mono", sans-serif'; ctx.fillText('km', 486, y + 14);
+      });
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+      // retroreflective: the headlights and lamps make it bright, and it holds a little glow of its own
+      return new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.22, roughness: 0.45, metalness: 0 });
+    });
+    return this._signMats;
+  }
+
+  /** Guide signs on the left of the road every 900 m or so, on a straight stretch with room beside it. */
+  _signsFor(ch) {
+    const t = this.track, g = this.ground, pts = t.pts;
+    const faces = this._signFaces(), posts = [];
+    for (let i = ch.i0; i < ch.i1; i++) {
+      const p = pts[i];
+      const ph = (((p.s - 120) % 900) + 900) % 900;
+      if (ph >= t.step || p.tunnel || t.nearTunnel(p.s, 30) || Math.abs(p.k) > 0.012) continue;
+      const side = 1;
+      if (t.markerAt(p.s, side) || t.padAt(p.s, side) || this.avenueAt(p.s)) continue;
+      const w = p.wl, u = w + 1.4;
+      const [x, z] = this._at(p, u);
+      const gy = g.height(x, z);
+      if (Math.abs(gy - p.y) > 1.8) continue;
+      const H = 2.02, top = p.y + 5.2, bottom = top - H;
+      const fx = Math.sin(p.h), fz = Math.cos(p.h), lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      for (const d of [-1.2, 1.2]) posts.push([x + lx * d + fx * 0.13, gy - 0.3, z + lz * d + fz * 0.13, top - 0.05, p.h]);
+      const k = Math.abs(Math.floor(p.s / 900)) % faces.length;
+      const board = new THREE.Mesh(this.signBoardGeo, this.signBackMat);
+      board.position.set(x, (top + bottom) / 2, z); board.rotation.y = p.h;
+      const face = new THREE.Mesh(this.signFaceGeo, faces[k]);
+      face.position.set(x - fx * 0.05, (top + bottom) / 2, z - fz * 0.05); face.rotation.y = p.h + Math.PI;
+      for (const m of [board, face]) { m.castShadow = true; m.receiveShadow = true; ch.group.add(m); }
+    }
+    if (posts.length) {
+      const geos = posts.map(([x, y0, z, y1, h]) => { const b = new THREE.CylinderGeometry(0.09, 0.09, y1 - y0, 10); b.rotateY(h); b.translate(x, (y0 + y1) / 2, z); return b; });
+      const geo = mergeGeos(geos); ch.own.add(geo);
+      const m = new THREE.Mesh(geo, this.railMat); m.castShadow = true; m.name = 'sign posts';
+      ch.group.add(m);
+    }
+  }
+
+  /** The paint for road-marking text: the characters stacked along the road, first one nearest, stretched long. */
+  _roadTextMat(chars) {
+    this._roadTexts = this._roadTexts || new Map();
+    let m = this._roadTexts.get(chars);
+    if (m) return m;
+    const n = chars.length, cv = document.createElement('canvas'); cv.width = 128; cv.height = 256 * n;
+    const ctx = cv.getContext('2d');
+    const jp = '"Dela Gothic One", "Noto Serif JP", "Yu Gothic", "Hiragino Sans", sans-serif';
+    ctx.fillStyle = '#e9e5db'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const ok = drawsGlyphs(`44px ${jp}`, chars);
+    [...chars].forEach((c, k) => {
+      ctx.save(); ctx.translate(64, 256 * (n - 1 - k) + 128); ctx.scale(1, 2.1);
+      ctx.font = ok ? `112px ${jp}` : '700 100px Rajdhani, sans-serif';
+      ctx.fillText(ok ? c : 'SLOW'[k] || '', 0, 4);
+      ctx.restore();
+    });
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+    m = new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.62, metalness: 0,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    this._roadTexts.set(chars, m);
+    return m;
+  }
+
+  /** Paint text on the road at s, centred at lateral offset u, reading for a car coming up the road. */
+  _roadText(group, s, u, chars) {
+    const t = this.track;
+    const n = chars.length, L = 2.7 * n, W = 1.7, NS = 5 * n, NU = 3;
+    const pos = [], uv = [], idx = [];
+    for (let j = 0; j <= NS; j++) {
+      const p = t.sample(s + (j / NS) * L);
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      for (let i = 0; i <= NU; i++) {
+        const uu = u + (i / NU - 0.5) * W, x = p.x + lx * uu, z = p.z + lz * uu;
+        pos.push(x, p.y + 0.03, z); uv.push(1 - i / NU, j / NS);          // on the ribbon (the ground can sit under it)
+      }
+    }
+    for (let j = 0; j < NS; j++) for (let i = 0; i < NU; i++) {
+      const a = j * (NU + 1) + i, b = a + 1, c = a + NU + 1, d = c + 1;
+      idx.push(a, c, b, b, c, d);                    // forward x left is up
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx); geo.computeVertexNormals(); geo.computeBoundingSphere();
+    const m = new THREE.Mesh(geo, this._roadTextMat(chars));
+    m.receiveShadow = true; m.renderOrder = 1; m.name = 'road text';
+    group.add(m);
+    return m;
+  }
+
+  /** Where the pass runs through a cherry avenue: 170 m in every 640, clear of the tunnels. */
+  avenueAt(s) {
+    const ph = (((s + 230) % 640) + 640) % 640;
+    return ph < 170 && !this.track.nearTunnel(s, 25);
+  }
+
+  /**
+   * The cherry avenue (sakura namiki) through a chunk: cherries at an even step on both sides, and on the side
+   * that is not a drop, a string of red paper lanterns on timber posts, each span sagging between its posts,
+   * with a warm pool of light under it and a real light every other post. Built with the chunk, so an avenue
+   * glows across the valley before the car gets there.
+   */
+  _avenueFor(ch) {
+    const t = this.track, g = this.ground, pts = t.pts;
+    const own = ch.c * 2;
+    const rng = mulberry32((this.seed * 613 + ch.c * 2887) >>> 0);
+    const probe = {};
+    const posts = [], wires = [], glows = [];
+    const STEP = 9, ROPE = 3.7, SAG = 0.36;
+    const lanternSide = (p) => {
+      // the lanterns go on the uphill side (a string along a drop reads as a fence to nowhere)
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      return g.height(p.x + lx * (p.wl + 6), p.z + lz * (p.wl + 6)) >= g.height(p.x - lx * (p.wr + 6), p.z - lz * (p.wr + 6)) ? 1 : -1;
+    };
+    let prev = null;
+    for (let i = ch.i0; i < ch.i1; i++) {
+      const p = pts[i];
+      if (p.tunnel || !this.avenueAt(p.s)) { prev = null; continue; }
+      // cherries every 10 m a side, the two sides staggered by half a step (a city street keeps only the lanterns)
+      if (!this.city) for (const side of [1, -1]) {
+        const ph = (((p.s + (side > 0 ? 0 : 6)) % 12) + 12) % 12;
+        if (ph >= t.step || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
+        const w = side > 0 ? p.wl : p.wr;
+        const [x, z] = this._at(p, (w + 2.5 + (rng() - 0.5) * 0.8) * side);
+        g.sample(x, z, 2.2, probe);
+        if (probe.tunnel || probe.edge < 0.8) continue;
+        if (this.pools.sakura) this._putLod(ch, 'sakura', x, probe.h - 0.25, z, rng() * 6.28, 0.95 + rng() * 0.2, cherryColour(rng()));
+        else this._cherry('sakura', own, x, probe.h - 0.25, z, rng() * 6.28, 0.95 + rng() * 0.2, cherryColour(rng()));
+      }
+      // the lantern posts, every STEP metres on one side, just behind the wall line
+      const ph = ((p.s % STEP) + STEP) % STEP;
+      if (ph >= t.step) continue;
+      const side = lanternSide(p);
+      if (t.markerAt(p.s, side) || t.padAt(p.s, side)) { prev = null; continue; }
+      const w = side > 0 ? p.wl : p.wr;
+      const [x, z] = this._at(p, (w + 0.75) * side);
+      const gy = g.height(x, z), top = p.y + ROPE;
+      if (Math.abs(gy - p.y) > 1.6) { prev = null; continue; }
+      posts.push([x, gy - 0.2, z, top + 0.25, p.h]);
+      const post = { x, z, y: top, side };
+      if (prev && prev.side === side && Math.hypot(prev.x - x, prev.z - z) < STEP * 1.5) {
+        // the span: a sagging rope, three lanterns hanging from it, a pool of light under them
+        const K = 8;
+        const at = (u) => [lerp(prev.x, x, u), lerp(prev.y, top, u) - SAG * 4 * u * (1 - u), lerp(prev.z, z, u)];
+        for (let k = 0; k < K; k++) { const a = at(k / K), b = at((k + 1) / K); wires.push(...a, ...b); }
+        if (this.pools.chochin) for (const u of [0.33, 0.67]) {
+          const [lx, ly, lz] = at(u);
+          this._putLod(ch, 'chochin', lx, ly - 0.62, lz, p.h + rng() * 0.3 - 0.15, 0.95 + rng() * 0.1, null);
+        }
+        const [mx, , mz] = at(0.5);
+        glows.push([mx, mz, 6.5]);
+        if ((Math.round(p.s / STEP) & 1) === 0) this.lamps.push({ x: mx, y: top - 0.9, z: mz, c: ch.c, color: 0xff8a5c, power: 70 });
+      }
+      prev = post;
+    }
+    if (posts.length) {
+      const geos = posts.map(([x, y0, z, y1, h]) => {
+        const b = new THREE.BoxGeometry(0.13, y1 - y0, 0.13);
+        b.rotateY(h); b.translate(x, (y0 + y1) / 2, z);
+        return b;
+      });
+      const geo = mergeGeos(geos); ch.own.add(geo);
+      const m = new THREE.Mesh(geo, this.postMat); m.castShadow = true; m.receiveShadow = true; m.name = 'lantern posts';
+      ch.group.add(m);
+    }
+    if (wires.length) {
+      const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3)); wg.computeBoundingSphere();
+      ch.own.add(wg);
+      const wl = new THREE.LineSegments(wg, this.wireMat); wl.name = 'lantern ropes';
+      ch.group.add(wl);
+    }
+    if (glows.length) { const gm = this._glows(glows, ch, this.glowLanternMat); if (gm) ch.group.add(gm); }
+  }
+
+  /**
+   * A prop with a near and a far model (the pool name + 'Far'): placed far with the chunk, and swapped for the
+   * full model while the chunk is dressed (within NEAR_R), so an avenue half a kilometre off costs a tenth of one
+   * beside the car. Placements are kept on the chunk to swap back.
+   */
+  _putLod(ch, name, x, y, z, ry, sc, colour) {
+    (ch.lod || (ch.lod = [])).push([name, x, y, z, ry, sc, colour]);
+    const far = this.pools[name + 'Far'];
+    if (ch.near || !far) this._put(name, ch.near ? ch.c * 2 + 1 : ch.c * 2, x, y, z, ry, sc, 1, colour);
+    else this._put(name + 'Far', ch.c * 2, x, y, z, ry, sc, 1, colour);
+  }
+
+  _lodSwap(ch, near) {
+    if (!ch.lod) return;
+    const names = new Set(ch.lod.map((l) => l[0]));
+    for (const n of names) { const far = this.pools[n + 'Far']; if (far) far.removeOwner(ch.c * 2); }
+    for (const [name, x, y, z, ry, sc, colour] of ch.lod) {
+      const far = this.pools[name + 'Far'];
+      if (!far) continue;                       // (placed full at build level, never swapped)
+      if (near) this._put(name, ch.c * 2 + 1, x, y, z, ry, sc, 1, colour);
+      else this._put(name + 'Far', ch.c * 2, x, y, z, ry, sc, 1, colour);
+    }
+  }
+
+  /** A cherry: the Somei-Yoshino or the weeping one, or whichever of them (or the maple) the build has. */
+  _cherry(kind, owner, x, y, z, ry, sc, colour) {
+    const name = kind === 'weeping' && this.pools.weeping ? 'weeping' : this.pools.sakura ? 'sakura' : 'maple';
+    this._put(name, owner, x, y, z, ry, name === 'maple' ? sc * 1.1 : sc, 1, colour);
   }
 
   /** A lamp placed by a set piece: its bulb, its light and its pool of light. */
@@ -900,6 +1321,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
 
   *_dress(ch) {
     if (!ch || ch.near) return;
+    this._lodSwap(ch, true);
     const t = this.track, pts = t.pts, g = this.ground;
     const own = ch.c * 2 + 1;
     const rng = mulberry32((this.seed * 977 + ch.c * 104729) >>> 0);
@@ -913,13 +1335,13 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         const w = side > 0 ? p.wl : p.wr;
         if (ch.rails[side][k]) {
           if (i % 2 === 0) { const [x, z] = this._at(p, (w - 0.12) * side); this._put('post', own, x, p.y, z, face(p, side)); }
-        } else if (i % 10 === 3 && !p.tunnel && !t.nearTunnel(p.s, 4) && !t.markerAt(p.s, side) && !t.padAt(p.s, side)) {
+        } else if (!this.city && i % 10 === 3 && !p.tunnel && !t.nearTunnel(p.s, 4) && !t.markerAt(p.s, side) && !t.padAt(p.s, side)) {
           const [x, z] = this._at(p, (w - 0.2) * side); this._put('pole', own, x, p.y, z, face(p, side));
         }
       }
     }
-    // cat's eyes: white on the centre dashes every 12 m, red at the edges every 24 m
-    for (let i = ch.i0; i < ch.i1; i++) {
+    // cat's eyes: white on the centre dashes every 12 m, red at the edges every 24 m (not in the city)
+    if (!this.city) for (let i = ch.i0; i < ch.i1; i++) {
       const p = pts[i];
       const ph = ((p.s - 2) % 12 + 12) % 12;
       if (ph >= 2) continue;
@@ -934,7 +1356,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       if (!tight) continue;
       const outside = -f.dir;
       const entry = t.pts[Math.min(f.i1, f.i0 + (f.type === 'hairpin' ? 14 : 4))].s;
-      for (let k = 0; k < (f.type === 'hairpin' ? 4 : 2); k++) {
+      for (let k = 0; k < (this.city ? 0 : f.type === 'hairpin' ? 4 : 2); k++) {
         const s = entry + k * 8;
         const i = t.index(s); if (i < ch.i0 || i >= ch.i1) continue;
         const p = t.sample(s);
@@ -942,6 +1364,11 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         const w = outside > 0 ? p.wl : p.wr;
         const [x, z] = this._at(p, (w + 0.7) * outside);
         this._put('chevron', own, x, g.height(x, z), z, p.h + Math.PI, 1, f.dir > 0 ? -1 : 1);
+      }
+      // before a hairpin, SLOW (jokou) painted on the lane, as the mountain roads have it
+      if (f.type === 'hairpin') {
+        const st = t.pts[f.i0].s - 30, it = t.index(st);
+        if (!this.city && st > 10 && it >= ch.i0 && it < ch.i1 && !t.nearTunnel(st, 12)) this._roadText(nearGroup, st, t.half * 0.5, '徐行');
       }
       if (f.type === 'hairpin') {
         const s = (t.pts[f.i0].s + t.pts[f.i1].s) / 2;
@@ -954,7 +1381,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       }
     }
     // boulders at the foot of a cutting
-    for (let i = ch.i0; i < ch.i1; i += 5) {
+    if (!this.city) for (let i = ch.i0; i < ch.i1; i += 5) {
       const p = pts[i];
       if (p.tunnel || t.nearTunnel(p.s, 12)) continue;
       for (const side of [1, -1]) {
@@ -1005,12 +1432,14 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       nearGroup.add(wl);
     }
     yield;
-    // the verge: maples and broadleaf, bamboo and the odd bare tree, shrubs crowding the edge
+    // the verge: cherries in blossom, fresh broadleaf, bamboo, a young red maple now and then; azaleas and shrubs
+    // crowding the edge
     const dens = this.q.trees || 1;
     const probe = {};
-    for (let i = ch.i0; i < ch.i1; i += 4) {
+    const verge = !this.city;
+    for (let i = ch.i0; verge && i < ch.i1; i += 4) {
       const p = pts[i];
-      if (p.tunnel || t.nearTunnel(p.s, 14)) continue;
+      if (p.tunnel || t.nearTunnel(p.s, 14) || this.avenueAt(p.s)) continue;
       for (const side of [1, -1]) {
         if (t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
         const w = side > 0 ? p.wl : p.wr;
@@ -1023,27 +1452,28 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
             const hx = g.height(x + 1.2, z) - g.height(x - 1.2, z), hz = g.height(x, z + 1.2) - g.height(x, z - 1.2);
             if (hx * hx + hz * hz < 4.0) {
               const pick = rng(), kind = rng();
-              if (kind < 0.12) this._put('bare', own, x, h - 0.25, z, rng() * 6.28, 0.8 + rng() * 0.4);
-              else if (kind < 0.2) this._put('bamboo', own, x, h - 0.25, z, rng() * 6.28, 0.8 + rng() * 0.35);
-              else if (kind < 0.55) this._put('broadleaf', own, x, h - 0.25, z, rng() * 6.28, 0.8 + rng() * 0.45, 1, pick < 0.5 ? PAL.mapleGold : pick < 0.85 ? PAL.dryGrass : PAL.mapleOrange);
-              else this._put('maple', own, x, h - 0.25, z, rng() * 6.28, 0.75 + rng() * 0.45, 1, pick < 0.3 ? PAL.mapleRed : pick < 0.7 ? PAL.mapleOrange : PAL.mapleGold);
+              if (kind < 0.03) this._put('bare', own, x, h - 0.25, z, rng() * 6.28, 0.8 + rng() * 0.4);
+              else if (kind < 0.13) this._put('bamboo', own, x, h - 0.25, z, rng() * 6.28, 0.8 + rng() * 0.35);
+              else if (kind < 0.46) this._put('broadleaf', own, x, h - 0.25, z, rng() * 6.28, 0.8 + rng() * 0.45, 1, pick < 0.6 ? PAL.youngLeaf : PAL.leafDeep);
+              else if (kind < 0.52) this._put('maple', own, x, h - 0.25, z, rng() * 6.28, 0.7 + rng() * 0.35, 1, pick < 0.6 ? PAL.mapleRed : PAL.youngLeaf);
+              else this._cherry('sakura', own, x, h - 0.25, z, rng() * 6.28, 0.8 + rng() * 0.35, cherryColour(pick));
             }
           }
         }
       }
     }
-    for (let i = ch.i0; i < ch.i1; i += 2) {
+    for (let i = ch.i0; verge && i < ch.i1; i += 2) {
       const p = pts[i];
       if (p.tunnel || t.nearTunnel(p.s, 6)) continue;
       for (const side of [1, -1]) {
-        if (rng() < 0.35 / dens || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
+        if (rng() < 0.52 / dens || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
         const w = side > 0 ? p.wl : p.wr;
         const u = w + 0.7 + rng() * 2.4;
         const [x, z] = this._at(p, u * side + (rng() - 0.5));
         g.sample(x, z, 2.2, probe);
         if (probe.edge < 0.5 || probe.tunnel) continue;
         const pick = rng();
-        const colour = pick < 0.4 ? PAL.dryGrass : pick < 0.68 ? PAL.moss : pick < 0.9 ? PAL.mapleGold : PAL.mapleOrange;
+        const colour = pick < 0.3 ? PAL.youngLeaf : pick < 0.52 ? PAL.moss : pick < 0.68 ? PAL.leafDeep : pick < 0.82 ? PAL.azalea : pick < 0.93 ? PAL.azaleaPink : PAL.sakuraWhite;
         this._put('shrub', own, x, probe.h - 0.12, z, rng() * 6.28, 0.7 + rng() * 0.7, 1, colour);
       }
     }
@@ -1118,6 +1548,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   /** Far things follow the camera: the skyline rings exactly, the towns in steps. */
   updateFar(x, y, z) {
     if (this.skyline) this.skyline.position.set(x, y, z);
+    if (this.citySky && this.city) { this.citySky.position.set(x, y - 1, z); if (this.City.citySkyUpdate) this.City.citySkyUpdate(this, performance.now() / 1000); }
     if (this.track && (!this._townAt || Math.hypot(x - this._townAt[0], z - this._townAt[1]) > 700)) this._placeTowns(x, z);
   }
 
@@ -1137,7 +1568,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       }
     }
     const box = new THREE.BoxGeometry(1, 1, 1);
-    for (const m of [this.tunnelMat, this.tunnelLampMat, this.glowMat, this.glowCoolMat, this.bulbMat, this.groundMat, this.farMat, this.roadMat, this.railMat,
+    for (const m of [this.tunnelMat, this.tunnelLampMat, this.glowMat, this.glowCoolMat, this.glowLanternMat, this.glowCityMat, this.postMat, this.toriiRedMat, this.toriiBlackMat, this._plaqueMat, this.signBackMat, ...this._signMats, this._roadTextMat('徐行'), this._roadTextMat('止まれ'), ...(this._cityMats || []), this.bulbMat, this.groundMat, this.farMat, this.roadMat, this.railMat,
       this.fixMetalMat, this.signGreenMat, this.signRedMat, this.reflectorMat, this.portalMat, this.copingMat, [...this._plates.values()][0]]) {
       const x = new THREE.Mesh(box, m); x.position.y = -500; x.castShadow = true; stage.add(x);
     }
@@ -1169,18 +1600,37 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   }
 
   /** Night: light pools come up, towns light, and ground, road and foliage take a cool dark tint. */
+  /** Wet, 0..1: the road and the ground darken and turn glossy, and the pools of lamplight on them brighten. */
+  setWet(w) {
+    this._wet = w;
+    // (a wet road is glossy enough that a lamp draws a streak on it, not a broad blob)
+    if (this.roadMat) this.roadMat.roughness = 1 - 0.8 * w;
+    if (this.groundMat) this.groundMat.roughness = 1 - 0.4 * w;
+    this.setNight(this._n ?? 1);
+  }
+
   setNight(n) {
-    if (this.glowMat) this.glowMat.opacity = 0.75 * n;
-    if (this.glowCoolMat) this.glowCoolMat.opacity = 0.7 * n;
+    this._n = n;
+    if (this.city && this.City) this.City.cityWet(this, this._wet || 0, n);
+    const w = this._wet || 0, pool = 1 + 0.45 * w;
+    if (this.glowMat) this.glowMat.opacity = 0.75 * n * pool;
+    if (this.glowCoolMat) this.glowCoolMat.opacity = Math.min(0.78, 0.62 * n * pool);
+    if (this.glowLanternMat) this.glowLanternMat.opacity = 0.6 * n * pool;
+    if (this.glowCityMat) this.glowCityMat.opacity = 0.3 * n * (1 + 0.3 * w);
     if (this.town) this.town.material.opacity = 0.9 * n;
     if (!this._tinted) {
       this._tinted = [];
       const grab = (mat, k) => { if (mat && mat.color && !this._tinted.some((t) => t.mat === mat)) this._tinted.push({ mat, base: mat.color.clone(), k }); };
       grab(this.groundMat, [0.42, 0.55, 0.95]); grab(this.farMat, [0.34, 0.45, 0.85]); grab(this.roadMat, [0.62, 0.70, 0.95]);
       for (const name of ['maple', 'shrub', 'broadleaf', 'cedar', 'bamboo']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.40, 0.52, 0.92]);
+      // blossom keeps more of its pink by night: moonlight turns it pale lilac rather than blue
+      for (const name of ['sakura', 'weeping']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.80, 0.62, 0.74]);
       if (this.skyline) this.skyline.children.forEach((m) => grab(m.material, [0.30, 0.38, 0.75]));
     }
-    for (const t of this._tinted) t.mat.color.setRGB(t.base.r * (1 + (t.k[0] - 1) * n), t.base.g * (1 + (t.k[1] - 1) * n), t.base.b * (1 + (t.k[2] - 1) * n));
+    for (const t of this._tinted) {
+      const wk = t.mat === this.roadMat ? 1 - 0.38 * w : t.mat === this.groundMat ? 1 - 0.22 * w : 1;
+      t.mat.color.setRGB(t.base.r * (1 + (t.k[0] - 1) * n) * wk, t.base.g * (1 + (t.k[1] - 1) * n) * wk, t.base.b * (1 + (t.k[2] - 1) * n) * wk);
+    }
   }
 }
 

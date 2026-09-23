@@ -13,3 +13,5 @@ work/jam_*/samples.json
 work/critic*/pairs/
 work/critic*/frames/
 work/shots/
+work/cands/**/*.png
+work/city_test/shots/

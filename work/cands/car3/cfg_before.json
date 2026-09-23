@@ -1,0 +1,15 @@
+{
+  "w": 640, "h": 420, "cols": 3,
+  "cars": { "before": "C:/Users/liamk/sundrift/work/cands/car3/before/hero_coupe.js" },
+  "panels": [
+    { "car": "before", "p": [2.3, 1.4, 4.0], "t": [0.3, 0.6, 1.5], "fov": 34, "label": "front34" },
+    { "car": "before", "p": [-1.6, 1.1, -4.4], "t": [-0.1, 0.55, -1.9], "fov": 34, "label": "rear34" },
+    { "car": "before", "p": [0, 0.8, -4.6], "t": [0, 0.6, -1.9], "fov": 30, "label": "rear" },
+    { "car": "before", "p": [2.3, 0.55, 1.9], "t": [0.85, 0.32, 1.19], "fov": 26, "label": "wheel" },
+    { "car": "before", "p": [2.6, 0.9, 1.5], "t": [0.8, 0.55, 1.1], "fov": 30, "label": "flank" },
+    { "car": "before", "p": [0.25, 1.45, 2.4], "t": [0, 1.15, -0.35], "fov": 26, "label": "interior" },
+    { "car": "before", "cel": true, "p": [-1.96, 2.06, -5.38], "t": [1.66, 0.97, 4.55], "fov": 58, "label": "chase" },
+    { "car": "before", "cel": true, "p": [-7.2, 1.85, -3.6], "t": [0, 0.8, 0], "fov": 44, "label": "title" },
+    { "car": "before", "cel": true, "p": [2.4, 1.2, 2.0], "t": [0.46, 0.8, 1.85], "fov": 26, "label": "popside" }
+  ]
+}

@@ -27,7 +27,7 @@ export function instanceGroup(parts, items, { castShadow = false, tint = false }
   if (!items.length) return g;
   for (const p of parts) {
     const im = new THREE.InstancedMesh(p.geometry, p.material, items.length);
-    const tinted = tint && p.material.name === 'foliage_tinted';
+    const tinted = tint && (p.material.name === 'foliage_tinted' || p.material.userData.tinted);
     for (let i = 0; i < items.length; i++) {
       _m.multiplyMatrices(items[i].m, p.local);
       im.setMatrixAt(i, _m);
@@ -54,7 +54,7 @@ export class Pool {
       im.frustumCulled = false;
       im.castShadow = castShadow; im.receiveShadow = true;
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      const tinted = tint && p.material.name === 'foliage_tinted';
+      const tinted = tint && (p.material.name === 'foliage_tinted' || p.material.userData.tinted);
       if (tinted) { im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3); im.instanceColor.setUsage(THREE.DynamicDrawUsage); }
       this.group.add(im);
       return { im, local: p.local, tinted };

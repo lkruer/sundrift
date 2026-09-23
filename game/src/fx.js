@@ -8,7 +8,7 @@
  * points; it is tinted by the sun so it reads warm at golden hour and cool in shade.
  */
 import * as THREE from 'three';
-import { clamp } from './config.js?v=202609230143';
+import { clamp } from './config.js?v=202609230328';
 
 function spriteTexture() {
   const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
@@ -131,6 +131,15 @@ export class Particles {
       a0: 0.05 + 0.1 * strength, drag: 2.2 });
   }
 
+  spray(x, y, z, vx, vz, strength, tint = null) {
+    // road spray off a wet tyre: fine and pale, thrown back and up, gone quickly
+    const k = tint ? 1.1 : 1;
+    this.spawn({ x: x + (Math.random() - 0.5) * 0.3, y: y + 0.12, z: z + (Math.random() - 0.5) * 0.3,
+      vx: vx * 0.25 + (Math.random() - 0.5) * 1.4, vy: 0.5 + Math.random() * 0.9, vz: vz * 0.25 + (Math.random() - 0.5) * 1.4,
+      life: 0.45 + Math.random() * 0.35, s0: 0.3, s1: 1.5, r: 0.72 * k * (tint ? tint.r * 1.4 : 1), g: 0.76 * k * (tint ? tint.g * 1.4 : 1), b: 0.84 * k * (tint ? tint.b * 1.4 : 1),
+      a0: 0.05 + 0.09 * strength, drag: 2.4 });
+  }
+
   sparks(x, y, z, nx, nz, n = 10) {
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, sp = 3 + Math.random() * 7;
@@ -203,5 +212,216 @@ export class ExhaustFlame {
     this.cones.scale.set(1, 1, (0.6 + 1.2 * strength) * f);
     this.mat.opacity = 0.6 * f * strength + 0.2;
     this.light.intensity = 25 * strength * f;
+  }
+}
+
+/**
+ * Cherry petals on the air: a few hundred of them in a box that travels with the camera, falling, swaying and
+ * tumbling, every one placed by the vertex shader from its seed and the clock, so the CPU never touches them
+ * and the whole shower is one draw. A petal's position is a pure function of time, wrapped into the box, and
+ * it shrinks away near the box's faces so the wrap never shows. The car's wind pushes the petals near its path
+ * aside and up as it passes. They are lit like everything else, so they catch the lamps as they drift past.
+ */
+export class Petals {
+  constructor(scene, count = 700) {
+    this.count = count;
+    // one petal: a rounded blade with the notch at its tip, 6 cm long (larger than life, so it reads), in the xy plane
+    const shape = [[0, -0.5], [0.3, -0.08], [0.24, 0.36], [0.09, 0.5], [0, 0.4], [-0.09, 0.5], [-0.24, 0.36], [-0.3, -0.08]];
+    const S = 0.06, nv = shape.length, fan = [];
+    for (let k = 1; k < nv - 1; k++) fan.push(0, k, k + 1);
+    const pos = new Float32Array(count * nv * 3), nor = new Float32Array(count * nv * 3), col = new Float32Array(count * nv * 3), seed = new Float32Array(count * nv * 4);
+    const idx = new (count * nv > 65535 ? Uint32Array : Uint16Array)(count * fan.length);
+    let s = 12345;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const cA = new THREE.Color(0xf6d3de), cB = new THREE.Color(0xf0a6bf), cW = new THREE.Color(0xfbeef2), c = new THREE.Color();
+    for (let i = 0; i < count; i++) {
+      const sd = [rnd(), rnd(), rnd(), rnd()];
+      const pick = rnd();
+      c.copy(pick < 0.5 ? cA : pick < 0.8 ? cB : cW);
+      // a slight cup: the edges lift toward +z, so a tumbling petal flashes light and dark
+      for (let k = 0; k < nv; k++) {
+        const v = (i * nv + k), [x, y] = shape[k];
+        pos[v * 3] = x * S; pos[v * 3 + 1] = y * S; pos[v * 3 + 2] = Math.abs(x) * S * 0.35;
+        nor[v * 3] = -x * 0.4; nor[v * 3 + 1] = 0; nor[v * 3 + 2] = 1;
+        col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b;
+        seed.set(sd, v * 4);
+      }
+      for (let k = 0; k < fan.length; k++) idx[i * fan.length + k] = i * nv + fan[k];
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+    const U = this.u = {
+      uTime: { value: 0 }, uBox: { value: new THREE.Vector3(30, 14, 30) }, uCenter: { value: new THREE.Vector3() },
+      uWind: { value: new THREE.Vector2(0.6, 0.2) }, uCar: { value: new THREE.Vector3(0, -1e4, 0) }, uCarV: { value: new THREE.Vector2() },
+      uEye: { value: new THREE.Vector3() }, uDensity: { value: 1 },
+    };
+    // (no depth written: a petal drawn into the depth buffer gets an ink outline from the cel pass, and at a few
+    // pixels across a petal is all outline, a dark speck)
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0, side: THREE.DoubleSide,
+      emissive: 0x70404f, emissiveIntensity: 1, transparent: true, opacity: 0.95, depthWrite: false });
+    mat.name = 'petals';
+    const ROT = `
+uniform float uTime, uDensity; uniform vec3 uBox, uCenter, uCar, uEye; uniform vec2 uWind, uCarV;
+attribute vec4 aSeed;
+vec3 petalRot(vec3 v, vec4 sd, float t) {
+  float ph = sd.w * 6.2831853;
+  float a = t * (1.6 + 3.4 * fract(sd.w * 13.7)) + ph;
+  vec3 ax = normalize(vec3(sin(ph * 3.1), cos(ph * 1.7), sin(ph * 2.3)) + vec3(0.001));
+  float c = cos(a), s = sin(a);
+  return v * c + cross(ax, v) * s + ax * dot(ax, v) * (1.0 - c);
+}`;
+    mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, U);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\n' + ROT)
+        .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = petalRot(vec3(normal), aSeed, uTime);\n#ifdef USE_TANGENT\nvec3 objectTangent = vec3(tangent.xyz);\n#endif')
+        .replace('#include <begin_vertex>', `
+vec3 transformed;
+{
+  vec4 sd = aSeed;
+  float t = uTime, ph = sd.w * 6.2831853;
+  float fall = 0.45 + 0.5 * fract(sd.w * 7.13);
+  vec3 p = sd.xyz * uBox + vec3(uWind.x * t, -fall * t, uWind.y * t);
+  p.x += sin(t * 1.3 + ph) * 0.7; p.z += cos(t * 1.1 + ph * 1.7) * 0.7; p.y += sin(t * 2.1 + ph * 2.3) * 0.15;
+  vec3 rel = mod(p - uCenter + 0.5 * uBox, uBox) - 0.5 * uBox;
+  vec3 e = 1.0 - smoothstep(0.36 * uBox, 0.5 * uBox, abs(rel));
+  vec3 wp = uCenter + rel;
+  // the car's wind: pushed out from its path and lifted, more the faster it goes
+  vec3 d = wp - uCar;
+  float r2 = dot(d.xz, d.xz), sp = length(uCarV);
+  float push = sp * exp(-r2 / 5.0) * smoothstep(3.0, -0.5, d.y);
+  wp.xz += normalize(d.xz + vec2(0.001)) * push * 0.045 + uCarV * push * 0.004;
+  wp.y += push * 0.03;
+  float near = smoothstep(0.7, 2.2, length(wp - uEye));
+  float on = step(fract(sd.w * 91.7), uDensity);
+  float size = (0.7 + 0.7 * fract(sd.w * 3.3)) * e.x * e.y * e.z * near * on;
+  transformed = wp + petalRot(position * size, sd, t);
+}`);
+    };
+    mat.customProgramCacheKey = () => 'petals';
+    this.mat = mat;
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.frustumCulled = false; this.mesh.castShadow = false; this.mesh.receiveShadow = false;
+    this.mesh.name = 'petals';
+    scene.add(this.mesh);
+    this.t = 0; this.gust = 0;
+  }
+
+  /** @param eye camera position; fx, fz the view's forward on the ground; car { x, y, z, vx, vz }; density 0..1 */
+  update(dt, eye, fx, fz, car, density) {
+    this.t += dt;
+    const U = this.u;
+    U.uTime.value = this.t;
+    U.uEye.value.copy(eye);
+    U.uCenter.value.set(eye.x + fx * 9, eye.y + 2.5, eye.z + fz * 9);
+    // the breeze swings about and gusts now and then
+    this.gust = 0.5 + 0.5 * Math.sin(this.t * 0.23) * Math.sin(this.t * 0.071 + 1.3);
+    U.uWind.value.set(0.35 + 0.9 * this.gust, 0.25 * Math.sin(this.t * 0.05));
+    if (car) { U.uCar.value.set(car.x, car.y, car.z); U.uCarV.value.set(car.vx, car.vz); }
+    U.uDensity.value += (density - U.uDensity.value) * Math.min(1, dt * 2);
+  }
+}
+
+/**
+ * Rain: a few thousand streaks in a box that travels with the camera, placed by the vertex shader from a seed and
+ * the clock like the petals (one draw, nothing on the CPU). Each streak is a thin quad along the fall, turned to
+ * face the eye. A drop is only seen where light catches it, so the shader lights it itself: a cone ahead of the
+ * car for the headlights, and the few real lamp lights near the car, with a faint sky light by day. Additive, no
+ * depth written, so the cel pass never inks it.
+ */
+export class Rain {
+  constructor(scene, count = 2400) {
+    this.count = count;
+    const pos = new Float32Array(count * 4 * 3), corner = new Float32Array(count * 4 * 2), seed = new Float32Array(count * 4 * 4);
+    const idx = new (count * 4 > 65535 ? Uint32Array : Uint16Array)(count * 6);
+    let s = 777;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+    const C = [[-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1]];
+    for (let i = 0; i < count; i++) {
+      const sd = [rnd(), rnd(), rnd(), rnd()];
+      for (let k = 0; k < 4; k++) { const v = i * 4 + k; corner.set(C[k], v * 2); seed.set(sd, v * 4); }
+      idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aCorner', new THREE.BufferAttribute(corner, 2));
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+    const lamps = [], lampCol = [];
+    for (let i = 0; i < 5; i++) { lamps.push(new THREE.Vector3(0, -1e4, 0)); lampCol.push(new THREE.Vector3()); }
+    this.u = {
+      uTime: { value: 0 }, uAmount: { value: 0 }, uBox: { value: new THREE.Vector3(26, 16, 26) }, uCenter: { value: new THREE.Vector3() },
+      uEye: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector2(1.2, 0.4) }, uCar: { value: new THREE.Vector3(0, -1e4, 0) },
+      uCarFwd: { value: new THREE.Vector2(0, 1) }, uHead: { value: 1 }, uSky: { value: new THREE.Vector3(0.1, 0.12, 0.16) },
+      uLamps: { value: lamps }, uLampCol: { value: lampCol },
+    };
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      vertexShader: `
+        uniform float uTime, uAmount, uHead; uniform vec3 uBox, uCenter, uEye, uCar, uSky; uniform vec2 uWind, uCarFwd;
+        uniform vec3 uLamps[5]; uniform vec3 uLampCol[5];
+        attribute vec4 aSeed; attribute vec2 aCorner;
+        varying vec3 vC; varying float vA; varying float vX;
+        void main() {
+          float fall = 8.5 + 3.5 * fract(aSeed.w * 7.1);
+          vec3 vel = vec3(uWind.x, -fall, uWind.y);
+          vec3 p = aSeed.xyz * uBox + vel * uTime;
+          vec3 rel = mod(p - uCenter + 0.5 * uBox, uBox) - 0.5 * uBox;
+          vec3 wp = uCenter + rel;
+          vec3 dir = normalize(vel);
+          vec3 toEye = normalize(uEye - wp);
+          vec3 side = normalize(cross(dir, toEye) + vec3(1e-4, 0.0, 0.0));
+          float len = 0.45 + 0.35 * fract(aSeed.w * 3.7);
+          vec3 pos = wp + dir * (aCorner.y * len) + side * (aCorner.x * 0.014);
+          vec3 e = 1.0 - smoothstep(0.36 * uBox, 0.5 * uBox, abs(rel));
+          float near = smoothstep(0.35, 1.6, length(wp - uEye));
+          float on = step(fract(aSeed.w * 91.7), uAmount);
+          // light that catches the drop
+          vec3 lc = uSky;
+          vec2 dc = wp.xz - uCar.xz; float dl = length(dc);
+          float cone = smoothstep(0.86, 0.97, dot(dc / max(dl, 0.01), uCarFwd)) * smoothstep(48.0, 5.0, dl) * smoothstep(-0.5, 2.5, wp.y - uCar.y + 1.5);
+          lc += vec3(0.85, 0.9, 1.0) * cone * uHead;
+          for (int i = 0; i < 5; i++) { vec3 d = wp - uLamps[i]; lc += uLampCol[i] / (1.0 + dot(d, d) * 0.06); }
+          vC = lc; vA = on * e.x * e.y * e.z * near; vX = aCorner.x * 2.0;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }`,
+      fragmentShader: `
+        varying vec3 vC; varying float vA; varying float vX;
+        void main() { float a = vA * (1.0 - vX * vX); gl_FragColor = vec4(vC, a * 0.55); }`,
+    });
+    this.mesh = new THREE.Mesh(geo, this.mat);
+    this.mesh.frustumCulled = false; this.mesh.name = 'rain'; this.mesh.renderOrder = 4;
+    scene.add(this.mesh);
+    this.t = 0;
+  }
+
+  /**
+   * @param amount 0..1 how hard it rains; eye the camera position; fx, fz the view's forward on the ground;
+   * car { x, y, z, fx, fz } and head (0..1, headlights); lights: the real lamp lights near the car; sky: day light
+   */
+  update(dt, amount, eye, fx, fz, car, head, lights, sky) {
+    this.t += dt;
+    const U = this.u;
+    U.uTime.value = this.t;
+    U.uAmount.value = amount;
+    this.mesh.visible = amount > 0.005;
+    if (!this.mesh.visible) return;
+    U.uEye.value.copy(eye);
+    U.uCenter.value.set(eye.x + fx * 7, eye.y + 3, eye.z + fz * 7);
+    U.uWind.value.set(1.0 + 0.8 * Math.sin(this.t * 0.13), 0.5 * Math.sin(this.t * 0.07 + 1));
+    if (car) { U.uCar.value.set(car.x, car.y, car.z); U.uCarFwd.value.set(car.fx, car.fz); }
+    U.uHead.value = head;
+    U.uSky.value.set(sky, sky * 1.08, sky * 1.2);
+    for (let i = 0; i < 5; i++) {
+      const l = lights[i];
+      if (l && l.intensity > 0) { U.uLamps.value[i].copy(l.position); const k = Math.min(1.2, l.intensity / 300); U.uLampCol.value[i].set(l.color.r * k, l.color.g * k, l.color.b * k); }
+      else U.uLamps.value[i].set(0, -1e4, 0);
+    }
   }
 }

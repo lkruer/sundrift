@@ -1,0 +1,398 @@
+/**
+ * NEO TOKYO: the city along the road, for the city courses (track.city).
+ *
+ * The road is the same ribbon; what changes is everything beside it. Each chunk lines both sides with street-front
+ * buildings (instanced unit boxes, scaled per lot, their windows drawn by the building shader from world position
+ * so a floor is a floor at any size), fixes vertical and horizontal neon signs to their fronts (every sign of a
+ * chunk is one merged mesh over one atlas), and lays the neon's light on the street: a coloured pool on the
+ * pavement and, on a wet road, a long streak down the asphalt, the reflection a wet Tokyo street is made of.
+ * Square corners get zebra crossings, a painted STOP, and a signal on the outside of the turn.
+ *
+ * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
+ */
+import * as THREE from 'three';
+import { clamp, lerp, mulberry32 } from './config.js?v=202609230328';
+import { buildingMaterial } from './buildings.js?v=202609230328';
+import { neonAtlas } from './neon.js?v=202609230328';
+
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+
+// facade colours: concrete, tile, dark glass and the odd painted block
+const FACADES = [0x55565c, 0x6b6a66, 0x7a746a, 0x3c3f47, 0x4a4e57, 0x8a8478, 0x5c5048, 0x2f3440, 0x6e6a74, 0x44474d];
+
+/** The city road: darker asphalt to a concrete gutter, solid white edge lines, the orange no-passing pair. */
+export function cityRoadTexture(half, wall) {
+  const W = 256, H = 1024, LEN = 48;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const rv = document.createElement('canvas'); rv.width = W; rv.height = H;
+  const ctx = cv.getContext('2d'), rctx = rv.getContext('2d');
+  const img = ctx.createImageData(W, H), rimg = rctx.createImageData(W, H);
+  let seed = 11;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const patches = [];
+  for (let k = 0; k < 6; k++) patches.push({ u0: -half + rnd() * (2 * half - 2), du: 0.8 + rnd() * 2.4, v0: rnd() * LEN, dv: 1.5 + rnd() * 5 });
+  const holes = [[half * 0.45, 9], [-half * 0.5, 31]];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = ((x + 0.5) / W) * 2 * wall - wall, au = Math.abs(u), vm = (y / H) * LEN;
+    const grain = (rnd() - 0.5) * 12;
+    let c = [0x2b + grain, 0x2c + grain, 0x31 + grain], rough = 0.58 + 0.06 * rnd();
+    const wear = 1 - 0.07 * Math.exp(-Math.pow((au - half * 0.4) / 0.55, 2));
+    c = c.map((v) => v * wear);
+    for (const p of patches) if (u > p.u0 && u < p.u0 + p.du && vm > p.v0 && vm < p.v0 + p.dv) { c = c.map((v) => v * 0.82); rough = 0.66; }
+    for (const [hu, hv] of holes) { const d = Math.hypot(u - hu, vm - hv); if (d < 0.32) { c = d > 0.27 ? [0x5a, 0x5a, 0x5c] : [0x24, 0x24, 0x27].map((v) => v + ((Math.floor((u - hu) * 18) + Math.floor((vm - hv) * 18)) & 1) * 10); rough = 0.4; } }
+    if (au > wall - 0.32) { c = [0x74 + grain, 0x72 + grain, 0x6d + grain]; rough = 0.8; }                    // the concrete gutter
+    else if (Math.abs(au - (wall - 0.55)) < 0.07) { c = [0xe4, 0xe2, 0xda].map((v) => v + grain * 0.4); rough = 0.5; }  // edge line
+    else if (au > 0.08 && au < 0.22) { c = [0xe8, 0xa4, 0x2a].map((v) => v * (0.92 + 0.08 * rnd())); rough = 0.5; }   // the orange pair
+    const i = (y * W + x) * 4;
+    img.data[i] = clamp(c[0], 0, 255); img.data[i + 1] = clamp(c[1], 0, 255); img.data[i + 2] = clamp(c[2], 0, 255); img.data[i + 3] = 255;
+    const r = clamp(rough * 255, 0, 255);
+    rimg.data[i] = r; rimg.data[i + 1] = r; rimg.data[i + 2] = r; rimg.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0); rctx.putImageData(rimg, 0, 0);
+  const map = new THREE.CanvasTexture(cv); map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = THREE.ClampToEdgeWrapping; map.wrapT = THREE.RepeatWrapping; map.anisotropy = 8;
+  const roughnessMap = new THREE.CanvasTexture(rv); roughnessMap.wrapS = THREE.ClampToEdgeWrapping; roughnessMap.wrapT = THREE.RepeatWrapping;
+  return { map, roughnessMap, len: LEN };
+}
+
+/** A soft round and a long soft streak, for the light the neon throws on the street. */
+function gradientTexture(stretch) {
+  const w = 128, h = stretch ? 512 : 128;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = (x + 0.5) / w * 2 - 1, dy = (y + 0.5) / h * 2 - 1;
+    let a;
+    if (!stretch) { const r = Math.hypot(dx, dy); a = Math.max(0, 1 - r); a = a * a * (3 - 2 * a) * 0.9; }
+    else {
+      // a streak: sharp across, fading along, brightest a third of the way down, broken into ripples
+      const across = Math.exp(-dx * dx * 9), along = Math.max(0, 1 - Math.abs(dy + 0.25) / 1.25);
+      const ripple = 0.72 + 0.28 * Math.sin(dy * 40 + Math.sin(dy * 7) * 3);
+      a = across * along * along * ripple;
+    }
+    const i = (y * w + x) * 4;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = 255; img.data[i + 3] = clamp(a * 255, 0, 255);
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** Zebra crossing paint: bars along the road, across its whole width (u repeats). */
+function zebraTexture() {
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, 128, 64);
+  ctx.fillStyle = 'rgba(236,233,224,0.95)';
+  ctx.fillRect(10, 2, 58, 60);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 8;
+  return t;
+}
+
+/** The city's materials and pools, made once at load (so every program compiles with the rest). */
+export function cityLoad(w, Pool, fontFamily) {
+  w.bldgMat = buildingMaterial(THREE, {});
+  w.bldgMat.userData.tinted = true;
+  const unit = new THREE.BoxGeometry(1, 1, 1);                  // centred: an instance sits at its lot's middle
+  w.pools.bldg = new Pool([{ geometry: unit, material: w.bldgMat, local: new THREE.Matrix4() }], 1400, { tint: true });
+  w.root.add(w.pools.bldg.group);
+  const atlas = neonAtlas(fontFamily);
+  w.neon = atlas;
+  w.neonMat = new THREE.MeshBasicMaterial({ map: atlas.texture, side: THREE.DoubleSide, color: new THREE.Color(1.7, 1.7, 1.7), transparent: false });
+  w.neonMat.name = 'neon';
+  w.neonHousingMat = new THREE.MeshStandardMaterial({ color: 0x1b1c21, roughness: 0.55, metalness: 0.35 });
+  const glowTex = gradientTexture(false), streakTex = gradientTexture(true);
+  w.neonGlowMat = new THREE.MeshBasicMaterial({ map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, opacity: 0.9 });
+  w.streakMat = new THREE.MeshBasicMaterial({ map: streakTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6, opacity: 0.35 });
+  w.signalPoleMat = new THREE.MeshStandardMaterial({ color: 0x5a5e66, roughness: 0.5, metalness: 0.5 });
+  w.signalBoxMat = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.6, metalness: 0.3 });
+  w.signalLit = [0x1ee8a8, 0xffb21e, 0xff3322].map((c) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(2.2) }));
+  w.signalDim = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.3, metalness: 0.2 });
+  w.zebraMat = new THREE.MeshStandardMaterial({ map: zebraTexture(), transparent: true, depthWrite: false, roughness: 0.55,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+  return [w.bldgMat, w.neonMat, w.neonHousingMat, w.neonGlowMat, w.streakMat, w.signalPoleMat, w.signalBoxMat, ...w.signalLit, w.signalDim, w.zebraMat];
+}
+
+/** How wet the street is: the neon streaks come up with it. */
+export function cityWet(w, wet, night) {
+  if (w.streakMat) w.streakMat.opacity = (0.22 + 0.78 * wet) * (0.3 + 0.7 * night);
+  if (w.neonGlowMat) w.neonGlowMat.opacity = 0.9 * (0.35 + 0.65 * night);
+  if (w.bldgMat && w.bldgMat.userData.uNight) w.bldgMat.userData.uNight.value = night;
+}
+
+/**
+ * A mesh of coloured light lying on the street: [x, z, along-x, along-z, width, length, hex] draped on the ground,
+ * or (onRoad) on the road ribbon itself, whose surface can sit a little above the ground under it.
+ */
+function drape(w, ch, list, mat, lift, onRoad = false) {
+  const g = w.ground, t = w.track, N = 6, probe = {};
+  const hAt = (x, z) => { if (!onRoad) return g.height(x, z); g.sample(x, z, 2.2, probe); return t.sample(probe.s).y; };
+  const pos = [], uv = [], col = [], idx = [];
+  const c = new THREE.Color();
+  for (const [cx, cz, ax, az, wid, len, hex] of list) {
+    c.set(hex);
+    const base = pos.length / 3;
+    const bx = az, bz = -ax;                      // across
+    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+      const a = (j / N - 0.5) * len, b = (i / N - 0.5) * wid;
+      const x = cx + ax * a + bx * b, z = cz + az * a + bz * b;
+      pos.push(x, hAt(x, z) + lift, z); uv.push(i / N, j / N); col.push(c.r, c.g, c.b);
+    }
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const a = base + j * (N + 1) + i, b = a + 1, cc = a + N + 1, d = cc + 1;
+      idx.push(a, cc, b, b, cc, d);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(idx); geo.computeBoundingSphere();
+  ch.own.add(geo);
+  const m = new THREE.Mesh(geo, mat); m.renderOrder = 2; m.name = 'neon light';
+  return m;
+}
+
+/** Merge simple geometries (position, normal, uv) into one; each is disposed. */
+function merge(list) {
+  let nv = 0, ni = 0;
+  for (const g of list) { nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = new Uint32Array(ni);
+  let ov = 0, oi = 0;
+  for (const g of list) {
+    const n = g.attributes.position.count;
+    pos.set(g.attributes.position.array, ov * 3);
+    if (g.attributes.normal) nor.set(g.attributes.normal.array, ov * 3);
+    if (g.attributes.uv) uv.set(g.attributes.uv.array, ov * 2);
+    if (g.index) { const a = g.index.array; for (let k = 0; k < a.length; k++) idx[oi++] = a[k] + ov; }
+    else for (let k = 0; k < n; k++) idx[oi++] = ov + k;
+    ov += n; g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  out.computeBoundingSphere();
+  return out;
+}
+
+/** One sign face: a quad through corners a (bottom-left), b (bottom-right), c (top-right), d (top-left) with the atlas cell. */
+function signQuad(list, a, b, c, d, cell, flip) {
+  const g = new THREE.BufferGeometry();
+  const P = [...a, ...b, ...c, ...d];
+  const u0 = flip ? cell.u1 : cell.u0, u1 = flip ? cell.u0 : cell.u1;
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([u0, cell.v0, u1, cell.v0, u1, cell.v1, u0, cell.v1], 2));
+  g.setIndex([0, 1, 2, 0, 2, 3]);
+  g.computeVertexNormals();
+  list.push(g);
+}
+
+/**
+ * The city beside one chunk of road. w is the World; its track, ground, pools and lamps are used directly.
+ */
+export function cityChunk(w, ch) {
+  const t = w.track, g = w.ground, pts = t.pts;
+  const own = ch.c * 2;
+  const rng = mulberry32((w.seed * 911 + ch.c * 7331) >>> 0);
+  const probe = {};
+  const signs = [], housings = [], glows = [], streaks = [], poles = [], boxes = [], lampsOn = [[], [], []], lampsOff = [], zebras = [];
+  const vSigns = w.neon.signs.filter((s) => s.vertical), hSigns = w.neon.signs.filter((s) => !s.vertical);
+  const s0 = pts[ch.i0].s, s1 = pts[ch.i1].s;
+  const at = (s, u) => { const p = t.sample(s); const lx = Math.cos(p.h), lz = -Math.sin(p.h); return [p.x + lx * u, p.z + lz * u, p]; };
+  const clearAt = (x, z, need) => { g.sample(x, z, 2.2, probe); return probe.edge > need && !probe.tunnel; };
+
+  for (const side of [1, -1]) {
+    let s = s0 + rng() * 3;
+    while (s < s1) {
+      const lotW = 7 + rng() * 11;
+      const sm = s + lotW / 2;
+      s += lotW + (rng() < 0.14 ? 2.5 + rng() * 5 : 0.35);             // an alley now and then
+      const p = t.sample(sm);
+      if (p.tunnel || t.nearTunnel(p.s, 12) || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
+      // the inside of a square corner has no room for a lot
+      if (Math.abs(p.k) > 1 / 70 && Math.sign(p.k) === side) continue;
+      const wall = side > 0 ? p.wl : p.wr;
+      const u0 = wall + 2.9;
+      let depth = 10 + rng() * 14;
+      // the footprint must clear every road: the one beside it and any other street behind or across
+      const fits = (dep) => {
+        for (const [ds, du] of [[-0.5, 0], [0.5, 0], [-0.5, 1], [0.5, 1], [0, 1], [0, 0.5]]) {
+          const [x, z] = at(sm + ds * lotW, side * (u0 + du * dep));
+          if (!clearAt(x, z, du === 0 ? 2.2 : 3.0)) return false;
+        }
+        return true;
+      };
+      if (!fits(depth)) { depth = 7; if (!fits(depth)) continue; }
+      const r = rng();
+      const H = r < 0.55 ? 9 + rng() * 14 : r < 0.88 ? 22 + rng() * 22 : 44 + rng() * 40;
+      const [cx, cz] = at(sm, side * (u0 + depth / 2));
+      const gy = g.height(cx, cz) - 0.3;
+      // turned by the heading plus a quarter, the unit box's x runs along the road and its z across it
+      _q.setFromAxisAngle(_up, p.h + Math.PI / 2);
+      _s.set(lotW * 0.985, H + 0.3, depth);
+      _m4.compose(_v.set(cx, gy + (H + 0.3) / 2, cz), _q, _s);
+      w.pools.bldg.add(own, _m4, FACADES[Math.floor(rng() * FACADES.length)]);
+
+      const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side;     // toward the building from the road
+      const fx = Math.sin(p.h), fz = Math.cos(p.h);                     // along the road
+      const [frontX, frontZ] = at(sm, side * u0);
+      const fy = g.height(frontX, frontZ);
+      // a vertical sign standing out from the front at one end of the lot, faces along the street
+      if (rng() < 0.72 && H > 8) {
+        const cell = vSigns[Math.floor(rng() * vSigns.length)];
+        const scale = Math.min(1, (H - 4.2) / cell.h);
+        const sw = cell.w * scale, sh = cell.h * scale;
+        const edge = (rng() < 0.5 ? -1 : 1) * (lotW * 0.5 - 0.7);
+        const bx = frontX + fx * edge, bz = frontZ + fz * edge;
+        const yb = fy + 3.4 + rng() * Math.max(0, H - 4.2 - sh - 3.4) * 0.5, yt = yb + sh;
+        const out0 = -0.15, out1 = -0.15 - sw;                           // from the facade out over the pavement
+        const P = (u, y, d) => [bx + lx * u + fx * d, y, bz + lz * u + fz * d];
+        // (on the left of the road the sign's outer end is on a driver's right, so the cell is mirrored to read)
+        signQuad(signs, P(out1, yb, -0.14), P(out0, yb, -0.14), P(out0, yt, -0.14), P(out1, yt, -0.14), cell, side > 0);
+        signQuad(signs, P(out0, yb, 0.14), P(out1, yb, 0.14), P(out1, yt, 0.14), P(out0, yt, 0.14), cell, side > 0);
+        // the housing: across the road (the sign's width) by the sign's height, thin along the road
+        const hb = new THREE.BoxGeometry(sw + 0.12, sh + 0.18, 0.24);
+        hb.rotateY(p.h); hb.translate(bx + lx * (out0 + out1) / 2, (yb + yt) / 2, bz + lz * (out0 + out1) / 2);
+        housings.push(hb);
+        const gx = bx - lx * (1.2 + sw), gz = bz - lz * (1.2 + sw);
+        glows.push([gx, gz, fx, fz, 7, 7, cell.colour]);
+        // on the road, the sign's reflection: a streak down the asphalt toward the car coming up it
+        const [rx, rz] = at(sm + edge - 5, side * (wall - 1.8 - rng() * 1.5));
+        streaks.push([rx, rz, fx, fz, 1.6 + sw * 0.6, 9 + sh * 0.6, cell.colour]);
+        if (rng() < 0.5) w.lamps.push({ x: gx, y: yb + 1.2, z: gz, c: ch.c, color: cell.colour, power: 110 });
+      }
+      // a lit sign over the shop front, facing the road
+      if (rng() < 0.55) {
+        const cell = hSigns[Math.floor(rng() * hSigns.length)];
+        const sw = Math.min(lotW - 1.2, cell.w), sh = cell.h * (sw / cell.w);
+        const yb = fy + 3.1 + rng() * 0.8, yt = yb + sh;
+        const P = (d, y) => [frontX - lx * 0.06 + fx * d, y, frontZ - lz * 0.06 + fz * d];
+        // seen from the road: left to right is against the road's direction on the left side
+        if (side > 0) signQuad(signs, P(-sw / 2, yb), P(sw / 2, yb), P(sw / 2, yt), P(-sw / 2, yt), cell, false);
+        else signQuad(signs, P(sw / 2, yb), P(-sw / 2, yb), P(-sw / 2, yt), P(sw / 2, yt), cell, false);
+        const [gx, gz] = at(sm, side * (wall + 0.8));
+        glows.push([gx, gz, fx, fz, 6, Math.max(6, sw + 3), cell.colour]);
+      }
+      // vending machines on the pavement now and then
+      if (rng() < 0.2 && w.pools.vending) {
+        const [vx, vz] = at(sm + (rng() - 0.5) * lotW * 0.5, side * (u0 - 0.45));
+        w._put('vending', own, vx, g.height(vx, vz), vz, p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2));
+      }
+    }
+  }
+
+  // square corners: zebra crossings either side of the turn, STOP painted before it, and a signal on the outside
+  // (a corner already under way where the chunk begins belongs to the chunk before; one that runs on past the
+  // chunk's end is followed into the next, on final road only)
+  let i = ch.i0;
+  while (i < ch.i1 && Math.abs(pts[i].k) >= 1 / 45) i++;
+  while (i < ch.i1) {
+    const p = pts[i];
+    if (Math.abs(p.k) < 1 / 45 || p.tunnel) { i++; continue; }
+    let j = i; while (j < t.nFinal - 1 && j < ch.i1 + 90 && Math.abs(pts[j].k) >= 1 / 45) j++;
+    const turn = Math.sign(p.k), outside = -turn;
+    const sa = p.s - 7, sb = pts[Math.min(j, pts.length - 1)].s + 7;
+    for (const sz of [sa, sb]) {
+      if (sz < 4 || t.nearTunnel(sz, 10)) continue;
+      const q = t.sample(sz);
+      zebras.push([q]);
+    }
+    if (sa - 9 > 8 && !t.nearTunnel(sa - 9, 12) && w._roadText) { const m = w._roadText(ch.group, sa - 13, t.half * 0.5, '止まれ'); if (m) ch.own.add(m.geometry); }
+    // the signal: a pole on the outside of the approach, an arm over the road, the lamps facing the car
+    {
+      const q = t.sample(sa - 2);
+      const wall = outside > 0 ? q.wl : q.wr;
+      const lx = Math.cos(q.h) * outside, lz = -Math.sin(q.h) * outside, fx = Math.sin(q.h), fz = Math.cos(q.h);
+      const px = q.x + lx * (wall + 0.9), pz = q.z + lz * (wall + 0.9), py = g.height(px, pz);
+      const pole = new THREE.CylinderGeometry(0.11, 0.13, 6.2, 10); pole.translate(px, py + 3.1, pz); poles.push(pole);
+      const armLen = wall + 0.9 - 2.2;
+      const arm = new THREE.CylinderGeometry(0.07, 0.07, armLen, 8); arm.rotateZ(Math.PI / 2); arm.rotateY(q.h);
+      arm.translate(px - lx * armLen / 2, py + 5.8, pz - lz * armLen / 2); poles.push(arm);
+      const hx = px - lx * armLen, hz = pz - lz * armLen;
+      const box = new THREE.BoxGeometry(1.25, 0.42, 0.3); box.rotateY(q.h); box.translate(hx - fx * 0.05, py + 5.55, hz - fz * 0.05); boxes.push(box);
+      const lit = rng() < 0.62 ? 0 : rng() < 0.5 ? 1 : 2;
+      // left to right as the driver sees it (their left is the road's left): blue-green, amber, red
+      const Lx = Math.cos(q.h), Lz = -Math.sin(q.h);
+      [0.4, 0, -0.4].forEach((d, k) => {
+        const disc = new THREE.CircleGeometry(0.15, 16); disc.rotateY(q.h + Math.PI);
+        disc.translate(hx - fx * 0.21 + Lx * d, py + 5.55, hz - fz * 0.21 + Lz * d);
+        if (k === lit) lampsOn[k].push(disc); else lampsOff.push(disc);
+      });
+    }
+    i = j + 1;
+  }
+
+  const addMesh = (geos, mat, name, shadow = false) => {
+    if (!geos.length) return;
+    const geo = merge(geos); ch.own.add(geo);
+    const m = new THREE.Mesh(geo, mat); m.name = name; m.castShadow = shadow; m.receiveShadow = true;
+    ch.group.add(m);
+  };
+  addMesh(signs, w.neonMat, 'neon signs');
+  addMesh(housings, w.neonHousingMat, 'sign housings');
+  addMesh(poles, w.signalPoleMat, 'signal poles', true);
+  addMesh(boxes, w.signalBoxMat, 'signal boxes', true);
+  lampsOn.forEach((l, k) => addMesh(l, w.signalLit[k], 'signal lamp'));
+  addMesh(lampsOff, w.signalDim, 'signal lamps off');
+  if (glows.length) ch.group.add(drape(w, ch, glows, w.neonGlowMat, 0.06));
+  if (streaks.length) ch.group.add(drape(w, ch, streaks, w.streakMat, 0.04, true));
+  // the crossings: a strip of zebra paint across the road, 4 m along it, on the ribbon itself
+  if (zebras.length) {
+    const pos = [], uv = [], idx = [];
+    for (const [q] of zebras) {
+      const base = pos.length / 3, NS = 2, NU = 8, L = 4.2;
+      const width = 2 * (t.half - 0.2);
+      for (let jj = 0; jj <= NS; jj++) {
+        const qq = t.sample(q.s - L / 2 + (jj / NS) * L), lx = Math.cos(qq.h), lz = -Math.sin(qq.h);
+        for (let ii = 0; ii <= NU; ii++) {
+          const u = (ii / NU - 0.5) * width;
+          pos.push(qq.x + lx * u, qq.y + 0.028, qq.z + lz * u); uv.push((u + width / 2) / 0.9, jj / NS);
+        }
+      }
+      for (let jj = 0; jj < NS; jj++) for (let ii = 0; ii < NU; ii++) {
+        const a = base + jj * (NU + 1) + ii, b = a + 1, c = a + NU + 1, d = c + 1;
+        idx.push(a, c, b, b, c, d);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx); geo.computeVertexNormals(); geo.computeBoundingSphere();
+    ch.own.add(geo);
+    const m = new THREE.Mesh(geo, w.zebraMat); m.renderOrder = 1; m.receiveShadow = true; m.name = 'crossings';
+    ch.group.add(m);
+  }
+}
+
+void lerp;
+
+/**
+ * The far city: a ring of towers round the camera with red lights blinking on the tallest roofs, and Tokyo Tower
+ * three kilometres off in a fixed direction, lit orange. The group travels with the camera like the mountain's
+ * skyline does.
+ */
+export function citySkyBuild(w, L) {
+  const g = new THREE.Group(); g.name = 'city sky';
+  if (!L) return g;
+  const ring = L.citySkyline(THREE, { radius: 2600, count: 180, seed: 7 });
+  g.add(ring);
+  const tower = L.tokyoTower(THREE);
+  const az = 2.3;
+  tower.position.set(Math.sin(az) * 3000, -6, Math.cos(az) * 3000);
+  tower.scale.setScalar(1.35);                                   // a little larger than life, so it reads from the street
+  g.add(tower);
+  g.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isLineSegments) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; } });
+  g.userData = { aviation: ring.userData && ring.userData.aviation, tower };
+  return g;
+}
+
+/** Blink the aviation lights (a slow red pulse, as on a real skyline). */
+export function citySkyUpdate(w, t) {
+  const a = w.citySky && w.citySky.userData.aviation;
+  if (a && a.material) a.material.opacity = 0.35 + 0.65 * Math.max(0, Math.sin(t * 2.1)) ** 2;
+}

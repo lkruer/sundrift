@@ -1,7 +1,7 @@
 /**
  * A render rig, for any Three.js game in this format.
  *
- *     import { createRig } from './rig.js?v=202609230143';
+ *     import { createRig } from './rig.js?v=202609230328';
  *     const rig = createRig(THREE, renderer, scene, { hour: 16.5, azimuth: 250 });
  *     rig.render(camera, dt);        // once a frame, instead of renderer.render(scene, camera)
  *
@@ -338,6 +338,19 @@ export const ATMOS_KEYS = [
 ];
 
 const STOPS = ['horizon', 'low', 'mid', 'high', 'zenith', 'haze', 'below', 'sunGlow'];
+
+/**
+ * (MINIDRIFT) weather: the same row under cloud. Every stop greys toward its own luminance and darkens, the haze
+ * thickens toward grey, and the sun is mostly taken away. oc is 0 (clear) to 1 (heavy rain).
+ */
+function overcastAtm(atm, oc) {
+  const out = { ...atm };
+  const grey = (c, k, dark) => { const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return [0, 1, 2].map((i) => mix(c[i], l * 0.8, k) * (1 - dark)); };
+  for (const s of STOPS) out[s] = grey(atm[s], 0.72 * oc, s === 'sunGlow' ? 0.9 * oc : 0.3 * oc);
+  out.sun = grey(atm.sun, 0.6 * oc, 0);
+  out.intensity = atm.intensity * (1 - 0.78 * oc);
+  return out;
+}
 
 /** The atmosphere at one elevation, interpolated between the two keyframes it sits between. */
 function atmosphereAt(elevation) {
@@ -789,9 +802,10 @@ export function createRig(THREE, renderer, scene, opts = {}) {
    * colour, the haze colour and the bloom threshold are all read off the same atmosphere row, so
    * "late afternoon" is one number and the frame that comes out is coherent.
    */
-  function applyTime() {
+  function applyTime(env = true) {
     sunPos = sunPosition(THREE, { hour: time.hour, azimuth: time.azimuth, elevation: time.elevation, sunrise: o.sunrise, sunset: o.sunset, maxElevation: o.maxElevation });
     atm = atmosphereAt(sunPos.elevation);
+    if (o.overcast > 0) atm = overcastAtm(atm, o.overcast);
     renderer.toneMappingExposure = Number.isFinite(o.exposure) ? o.exposure : atm.exposure;
     for (const s of STOPS) atmosU['uAtm' + s[0].toUpperCase() + s.slice(1)].value.setRGB(atm[s][0], atm[s][1], atm[s][2]);
     atmosU.uAtmSunDir.value.copy(sunPos.direction);
@@ -860,7 +874,7 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     const tm = (v) => { const x = v * (renderer.toneMappingExposure || 1); return Math.min(1, Math.max(0, (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14))); };
     fog.color.setRGB(tm(hz[0]), tm(hz[1]), tm(hz[2]), THREE.SRGBColorSpace);
     fog.near = o.fogStart;
-    fog.far = o.fogStart + 3 / Math.max(1e-6, o.fogDensity) * 0.35;
+    fog.far = (o.fogStart + 3 / Math.max(1e-6, o.fogDensity) * 0.35) * (1 - 0.45 * (o.overcast || 0));
     if (o.background) {
       if (!scene.background || !scene.background.isColor) scene.background = new THREE.Color();
       scene.background.copy(fog.color);
@@ -870,7 +884,9 @@ export function createRig(THREE, renderer, scene, opts = {}) {
 
     // The environment. Rebuilt because its content is the atmosphere, and the atmosphere moved.
     const groundLin = [bounceU.uBounce.value.r * 1.6 + 0.02, bounceU.uBounce.value.g * 1.6 + 0.02, bounceU.uBounce.value.b * 1.6 + 0.02];
-    const next = opts.envMap || buildEnvironment(THREE, renderer, atmosU, groundLin);
+    // (MINIDRIFT) a light update skips this: the game eases the time of day every frame and rebuilds the
+    // environment every few seconds, since a PMREM build is several milliseconds and the sky itself is uniforms
+    const next = env ? (opts.envMap || buildEnvironment(THREE, renderer, atmosU, groundLin)) : null;
     if (next) {
       if (envTex && envTex !== opts.envMap && scene.environment === envTex) envTex.dispose();
       envTex = next;
@@ -1124,9 +1140,12 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     }
   }
 
-  function setTime(next = {}) {
+  /** (MINIDRIFT) cloud cover 0..1; takes effect at the next setTime. */
+  function setOvercast(x) { o.overcast = x; }
+
+  function setTime(next = {}, { env = true } = {}) {
     time = { ...time, ...next };
-    applyTime();
+    applyTime(env);
     if (csm) {
       csm.lightDirection.copy(sunPos.direction).negate();
       csm.updateFrustums();
@@ -1163,6 +1182,6 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     get post() { return post; },
     tier: T, atmos: atmosU, bounce: bounceU, wrapU,
     ready: Promise.all([ready, postReady]),
-    update, render, setTime, refresh, setupMaterial, resize, dispose,
+    update, render, setTime, setOvercast, refresh, setupMaterial, resize, dispose,
   };
 }

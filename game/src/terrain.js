@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230143';
-import { REACH } from './ground.js?v=202609230143';
-import { instanceGroup } from './instancing.js?v=202609230143';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230328';
+import { REACH } from './ground.js?v=202609230328';
+import { instanceGroup } from './instancing.js?v=202609230328';
 
 export const TILE = 96;
 export const LODS = [
@@ -24,10 +24,13 @@ const FAR_SPAN = 3400, FAR_SEG = 136, FAR_RECENTER = 96;
 const tkey = (i, j) => (i + 50000) * 100000 + (j + 50000);
 
 const C = {
-  grass: new THREE.Color(PAL.dryGrass), moss: new THREE.Color(PAL.moss), floor: new THREE.Color(0x3d5233),
+  grass: new THREE.Color(PAL.springGrass), moss: new THREE.Color(PAL.moss), floor: new THREE.Color(0x3d5233), petal: new THREE.Color(0xe9bccb),
   stone: new THREE.Color(PAL.stone), shot: new THREE.Color(0x9c978b), gravel: new THREE.Color(0x77716a),
+  // the city: pavement by the road, dark lots and yards beyond, and the far ground a dull grey
+  pave: new THREE.Color(0x8c8a85), lot: new THREE.Color(0x3b3c41), yard: new THREE.Color(0x4c4b48), cityFar: new THREE.Color(0x26272c),
   deep: new THREE.Color(0x2f4130), far: new THREE.Color(0x33463a),
 };
+const FACADE = [0x55565c, 0x6b6a66, 0x7a746a, 0x3c3f47, 0x4a4e57, 0x8a8478, 0x5c5048, 0x2f3440, 0x6e6a74, 0x44474d];
 const _c = new THREE.Color(), _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
 export class Terrain {
@@ -174,7 +177,7 @@ export class Terrain {
     }
     const geo = this._geometry(tile, seg, H, E, F, S);
     yield;
-    const trees = lod <= 1 ? this._forest(tile, lod, seg, H, E, F) : null;
+    const trees = this.o.city ? this._blocks(tile, lod, seg, H, E, F) : lod <= 1 ? this._forest(tile, lod, seg, H, E, F) : null;
     // swap
     this._dispose(tile);
     const mesh = new THREE.Mesh(geo, this.o.mat);
@@ -198,6 +201,14 @@ export class Terrain {
 
   _colour(x, z, y, ny, edge, flags, lod, out) {
     const f = this.field;
+    if (this.o.city) {
+      const nz = f.vnoise(x / 17, z / 17, 7) * 0.5 + 0.5;
+      out.copy(C.lot).lerp(C.yard, nz * 0.6);
+      // the pavement: a band beyond each wall, where the street fronts stand back from the kerb
+      if (edge > -0.2 && edge < 3.2) out.copy(C.pave).multiplyScalar(0.92 + 0.08 * nz);
+      if (flags & 1) out.lerp(C.pave, 0.3);
+      return out;
+    }
     const nz = f.vnoise(x / 23, z / 23, 7) * 0.5 + 0.5;
     const big = f.vnoise(x / 140, z / 140, 8);
     out.copy(C.grass).lerp(C.moss, clamp(nz * 1.3 - 0.2, 0, 1));
@@ -213,6 +224,12 @@ export class Terrain {
     if (flags & 1) out.lerp(C.gravel, 0.55 + 0.25 * nz);    // the verge: gravel with grass coming through
     else if (edge < 5) out.lerp(C.gravel, 0.3 * (1 - edge / 5));
     if (flags & 2) out.lerp(C.floor, 0.4);
+    // fallen petals: a carpet under the cherry groves, and drifts blown against the verge
+    if (!(flags & 2) && steep < 0.5) {
+      const grove = smoothstep(0.3, 0.62, f.vnoise(x / 70, z / 70, 11));
+      const drift = smoothstep(0.1, 0.55, f.vnoise(x / 4.3, z / 4.3, 13)) * (flags & 1 ? 0.75 : edge < 8 ? 0.45 : 0.18);
+      out.lerp(C.petal, Math.min(0.62, grove * (0.28 + 0.3 * nz) + drift * (0.35 + 0.4 * grove)));
+    }
     return out;
   }
 
@@ -287,13 +304,13 @@ export class Terrain {
     return geo;
   }
 
-  /** The forest on a tile: cedars, with patches of autumn broadleaf and the odd bare tree; clearings between. */
+  /** The forest on a tile: cedars, with groves of cherry in blossom and fresh broadleaf; clearings between. */
   _forest(tile, lod, seg, H, E, F) {
     const f = this.field, P = this.o.parts;
     const n = seg + 3, sp = TILE / seg;
     const rng = mulberry32(((tile.i * 73856093) ^ (tile.j * 19349663) ^ (this.o.seed || 0)) >>> 0);
-    const spacing = (lod === 0 ? 8.2 : 11.5) / (this.o.density || 1);
-    const cedars = [], maples = [], broad = [], bare = [];
+    const spacing = (lod === 0 ? 8.8 : 11.5) / (this.o.density || 1);
+    const cedars = [], sakura = [], broad = [], bare = [];
     const cells = Math.floor(TILE / spacing);
     const step = TILE / cells;
     for (let gz = 0; gz < cells; gz++) for (let gx = 0; gx < cells; gx++) {
@@ -314,10 +331,12 @@ export class Terrain {
       const m = _m4.compose(_v.set(x, y, z), _q, _s).clone();
       const patch = f.vnoise(x / 70, z / 70, 11);
       const pick = rng();
-      if (patch > 0.5 && lod === 0) {
-        if (pick < 0.12) bare.push({ m });
-        else if (pick < 0.55) broad.push({ m, colour: pick < 0.3 ? PAL.mapleGold : PAL.dryGrass });
-        else maples.push({ m, colour: pick < 0.75 ? PAL.mapleOrange : pick < 0.9 ? PAL.mapleRed : PAL.mapleGold });
+      // a grove: mostly cherry in blossom with fresh broadleaf through it (the far ring keeps only the cherry,
+      // so a hillside reads pink in patches from across the valley)
+      if (patch > 0.42 && (lod === 0 || pick < 0.62)) {
+        if (lod === 0 && pick < 0.04) bare.push({ m });
+        else if (lod === 0 && pick < 0.3) broad.push({ m, colour: pick < 0.17 ? PAL.youngLeaf : PAL.leafDeep });
+        else sakura.push({ m, colour: pick < 0.62 ? PAL.sakuraPale : pick < 0.86 ? PAL.sakuraPink : PAL.sakuraWhite });
       } else cedars.push({ m });
     }
     const g = new THREE.Group(); g.name = 'forest';
@@ -325,9 +344,46 @@ export class Terrain {
     // quarter of the frame's triangles
     const cast = false;
     if (cedars.length && P.cedar) g.add(instanceGroup(P.cedar, cedars, { castShadow: cast }));
-    if (maples.length && P.maple) g.add(instanceGroup(P.maple, maples, { castShadow: cast, tint: true }));
+    // (the far ring draws its cherries with the lighter maple, tinted the same: at 200 m nobody can tell, and it
+    // is a third fewer triangles across a whole hillside)
+    const cherry = lod === 0 ? (P.sakura || P.maple) : (P.sakuraFar || P.maple || P.sakura);
+    if (sakura.length && cherry) g.add(instanceGroup(cherry, sakura, { castShadow: cast, tint: true }));
     if (broad.length && P.broadleaf) g.add(instanceGroup(P.broadleaf, broad, { castShadow: cast, tint: true }));
     if (bare.length && P.bare) g.add(instanceGroup(P.bare, bare, { castShadow: cast }));
+    return g;
+  }
+
+  /**
+   * The city behind the street fronts: blocks of buildings on a lot grid wherever the ground is well clear of
+   * every road (the street fronts themselves are the world's), taller where a noise says downtown. One instanced
+   * draw per tile; the building shader draws the windows.
+   */
+  _blocks(tile, lod, seg, H, E, F) {
+    const f = this.field, B = this.o.building;
+    if (!B) return null;
+    const n = seg + 3, sp = TILE / seg;
+    const rng = mulberry32(((tile.i * 73856093) ^ (tile.j * 19349663) ^ ((this.o.seed || 0) + 99)) >>> 0);
+    const lot = lod === 2 ? 24 : 19, cells = Math.floor(TILE / lot), step = TILE / cells;
+    const items = [];
+    for (let gz = 0; gz < cells; gz++) for (let gx = 0; gx < cells; gx++) {
+      const lx = (gx + 0.5) * step, lz = (gz + 0.5) * step;
+      const x = tile.i * TILE + lx, z = tile.j * TILE + lz;
+      const gi = Math.round(lx / sp) + 1, gj = Math.round(lz / sp) + 1;
+      const k = gj * n + gi;
+      const w = step * (0.62 + rng() * 0.3), d = step * (0.62 + rng() * 0.3);
+      if (E[k] < 30 + Math.max(w, d) * 0.5 || F[k]) { rng(); rng(); continue; }
+      if (rng() < 0.08) { rng(); continue; }                                  // a gap: a car park, a yard
+      const down = f.vnoise(x / 260, z / 260, 21) * 0.5 + 0.5;
+      const r = rng();
+      const hgt = (8 + r * r * 34) * (0.7 + down * 1.6) + (r > 0.96 ? 40 + rng() * 60 : 0);
+      const y = Terrain.surf(H, n, sp, lx, lz) - 0.3;
+      _q.setFromAxisAngle(_up, 0); _s.set(w, hgt, d);
+      const m = _m4.compose(_v.set(x, y + hgt / 2, z), _q, _s).clone();
+      items.push({ m, colour: FACADE[Math.floor(rng() * FACADE.length)] });
+    }
+    if (!items.length) return null;
+    const g = instanceGroup([{ geometry: B.geometry, material: B.material, local: new THREE.Matrix4() }], items, { castShadow: false, tint: true });
+    g.name = 'blocks';
     return g;
   }
 
@@ -344,7 +400,8 @@ export class Terrain {
         const sink = 3 + 32 * (1 - smoothstep(340, 560, r));
         pos[v * 3] = x; pos[v * 3 + 1] = f.base(x, z) - sink; pos[v * 3 + 2] = z;
         const nz = f.vnoise(x / 140, z / 140, 8);
-        _c.copy(C.far).lerp(C.deep, smoothstep(-0.3, 0.4, nz) * 0.8).lerp(C.grass, 0.12 * (1 - smoothstep(-0.6, 0, nz)));
+        if (this.o.city) _c.copy(C.cityFar).multiplyScalar(0.85 + 0.3 * (nz * 0.5 + 0.5));
+        else _c.copy(C.far).lerp(C.deep, smoothstep(-0.3, 0.4, nz) * 0.8).lerp(C.grass, 0.12 * (1 - smoothstep(-0.6, 0, nz)));
         col[v * 3] = _c.r; col[v * 3 + 1] = _c.g; col[v * 3 + 2] = _c.b;
       }
       if (j % 34 === 33) yield;

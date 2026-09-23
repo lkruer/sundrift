@@ -1,0 +1,8 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { window.__CENSUS__ = (label) => { const D = window.__DEBUG__, THREE_ = null; const cam = D.chase.cam; cam.updateMatrixWorld(); const fr = new (D.scene.constructor.prototype.constructor === undefined ? Object : Object)(); const m = {}; let total = 0; const f = new (window.__FRUSTUM__ || Object)(); D.scene.traverseVisible((o) => { if (!o.isMesh) return; const g = o.geometry; let t = (g.index ? g.index.count : g.attributes.position.count) / 3; if (o.isInstancedMesh) t *= o.count; let key = o.name || (o.parent && o.parent.name) || (o.material && o.material.name) || 'mesh'; if (o.parent && o.parent.name === 'forest') key = 'forest:' + (o.material.name || ''); if (o.parent && o.parent.parent && o.parent.parent.name === 'forest') key = 'forest'; m[key] = (m[key] || 0) + t; total += t; }); const top = Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, v]) => k + ' ' + Math.round(v / 1000) + 'k'); return { label, total: Math.round(total / 1000) + 'k', rendered: window.__GAME__.tris, top }; }; })()" },
+  { "js": "window.__DEBUG__.teleport(300, 30)" }, { "wait": 1500 }, { "js": "window.__CENSUS__('s300')" },
+  { "js": "window.__DEBUG__.teleport(1000, 30)" }, { "wait": 1500 }, { "js": "window.__CENSUS__('s1000')" },
+  { "js": "window.__DEBUG__.teleport(2300, 30)" }, { "wait": 1500 }, { "js": "window.__CENSUS__('s2300')" }
+]

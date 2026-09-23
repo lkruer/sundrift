@@ -1,0 +1,12 @@
+{
+  "w": 640, "h": 480, "cols": 3,
+  "cars": { "after": "C:/Users/liamk/sundrift/work/cands/car3/after/hero_coupe.js" },
+  "panels": [
+    { "car": "after", "open": true, "p": [2.6, 0.95, 1.75], "t": [0.46, 0.82, 1.78], "fov": 18, "label": "side open" },
+    { "car": "after", "open": true, "p": [1.5, 1.35, 3.0], "t": [0.46, 0.80, 1.85], "fov": 22, "label": "front34 open close" },
+    { "car": "after", "open": true, "p": [0.46, 1.9, 3.1], "t": [0.46, 0.78, 1.9], "fov": 24, "label": "above-front open" },
+    { "car": "after", "open": true, "p": [-0.9, 1.6, 0.3], "t": [0.3, 0.8, 1.8], "fov": 30, "label": "from cabin side" },
+    { "car": "after", "open": true, "p": [0.9, 0.62, 3.6], "t": [0.4, 0.75, 1.8], "fov": 24, "label": "low front" },
+    { "car": "after", "open": true, "cel": true, "p": [-7.2, 1.85, -3.6], "t": [0, 0.8, 0], "fov": 44, "label": "title open" }
+  ]
+}

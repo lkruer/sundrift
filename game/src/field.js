@@ -19,11 +19,13 @@ function hash2(ix, iz, salt, seed) {
 }
 
 export class Field {
-  constructor(seed = 1) {
+  /** flat: a city's ground, nearly level (a gentle rise and fall of a few metres, no roughness). */
+  constructor(seed = 1, { flat = false } = {}) {
     this.seed = seed | 0;
+    this.flat = flat;
     const a = ((hash2(7, 11, 3, this.seed) + 1) * 0.5) * TAU;
     this.U = [Math.cos(a), Math.sin(a)];      // uphill direction in (x, z)
-    this.k = 0.10;                             // mean slope of the mountainside
+    this.k = flat ? 0.004 : 0.10;              // mean slope of the mountainside
   }
 
   /** Smooth value noise in [-1, 1]. */
@@ -40,6 +42,7 @@ export class Field {
   /** The large shape: what the road follows. */
   base(x, z) {
     const along = x * this.U[0] + z * this.U[1];
+    if (this.flat) return this.k * along + 2.2 * this.vnoise(x / 420, z / 420, 1);
     return this.k * along
       + 30 * this.vnoise(x / 560, z / 560, 1)
       + 11 * this.vnoise(x / 190, z / 190, 2)
@@ -48,6 +51,7 @@ export class Field {
 
   /** Small-scale roughness, terrain only. */
   detail(x, z) {
+    if (this.flat) return 0;
     return 1.7 * this.vnoise(x / 36, z / 36, 3) + 0.45 * this.vnoise(x / 10.5, z / 10.5, 4);
   }
 

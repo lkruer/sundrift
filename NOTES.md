@@ -329,3 +329,68 @@ a slightly smaller car, miles per hour, and a little more retro.
 - **Measured** (desktop gate / phone gate): ready 5.5 s / 5.1 s, 60 fps, 0 frames over 34 ms, peak 497 / 380
   draws, peak 1.06 M / 0.76 M triangles. A 1.5 km desktop run through the first tunnel: peak 553 draws, 1.22 M
   triangles, 0 slow frames.
+
+
+## 23 September: a Japan aesthetic, NEO TOKYO, rain, a smooth day
+
+Asked for, in three messages: the Japan aesthetic with cherry blossom; a slightly smaller car, a slightly wider
+road and a more detailed car in the same shape; a CRT border that bends at the edges and corners; a second map, a
+Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn, day and dusk; weather with rain.
+
+- **Blossom.** New recipe-loop assets: a Somei-Yoshino cherry and a weeping cherry, red paper lanterns (chochin)
+  and jizo statues (three candidates each, verify renders, a night render through the game's own cel pass for
+  the lanterns). The forest's autumn patches became cherry groves (the far ring keeps only the cherries, so a
+  hillside reads pink across the valley); the verge is cherry, fresh broadleaf, bamboo, azalea. Blossom holds a
+  little light of its own and is tinted less blue by night than leaves. Petals: a GPU shower of 800 petals in a
+  box that travels with the camera, each placed by the vertex shader from its seed and the clock, tumbling, pushed
+  aside by the car's wind, drawn without depth so the cel pass does not ink a three-pixel petal into a black
+  speck (the first version did). Fallen petals on the asphalt in drifts against the edges, and a petal carpet on
+  the ground under the groves.
+- **Japan.** Cherry avenues (170 m in every 640): trees at an even step both sides and a string of lanterns on
+  timber posts, sagging between them, with a warm pool under each span. A great torii over the road before every
+  shrine (legs down to whatever ground is there, a plaque in gold kanji). Jizo in rows at shrines, at bus stops,
+  at viewpoints. Blue guide signs with kanji over romaji. 徐行 painted before hairpins. Fuji across the valley
+  under a lower moon, drawn unlit in the night's colours. A koto plays an eight-bar tune in the hirajoshi scale
+  over the loop. The title carries 夜桜峠 as a vertical strip with a red seal. The Japanese is drawn with web
+  fonts fetched as subsets of only the characters used, and every canvas checks that its font really draws the
+  glyphs by comparing pixels with the missing-glyph box (comparing widths said "no kanji" on a machine that had
+  them: a Japanese face's box is a full em wide).
+- **The car.** Drawn at 0.62 (was 0.68). A detail pass that kept the outline: working pop-up headlamps, joints
+  of their own that flip up (with a little overshoot) when a run starts at night and fold away by day, the
+  headlights moving up into them; a Japanese number plate (群馬 330 た 86-86) front and rear; split tail lamps
+  with amber and reverse cells; three-piece wheels with sixteen bolts and a valve; fender gills and side
+  markers; burnt titanium tips; a tow strap; a wakaba mark; an omamori on the mirror; shaped wing end plates.
+  34.1 k triangles.
+- **Road.** Half a metre wider each side on every course (the wall too); 0 overlaps over 5 seeds x 30 km x 3.
+- **CRT.** The picture now bends like a tube's: nearly flat in the middle, more toward the edges, most into the
+  corners (a quadratic and a quartic term), with rounded corners, a darkening into the rim and a faint sheen.
+- **Reverse.** The full engine in reverse, fading on the square of the speed toward 45 mph: 18 mph in 1.5 s
+  (was 12). J-turns still come round in 0.77-0.78 s from twice the speed.
+- **Time of day.** Why it was abrupt: the sun was applied at most every 3 s or 0.15 h, and a banked drift moved
+  the clock half an hour in one frame. Now the clock shown eases after the real one, the sun, sky, haze and fill
+  are set whenever the shown hour moves (a few uniforms), and only the environment map (a PMREM build) waits,
+  every 2.5 s. A scripted dawn at 0.28 h/s: every frame 16-17 ms.
+- **Rain.** Spells of clear and rain that come on and clear over seconds, and a road that stays wet a while
+  after. The rain is 2,400 streaks placed by the shader like the petals and lit by the shader itself: a cone for
+  the headlights and the five real lamp lights near the car. Wet road and ground turn dark and glossy (the lamps'
+  pools on them brighten), the sky clouds over (the rig greys and darkens its atmosphere row and takes most of
+  the sun), stars and moon fade, tyres throw spray, grip drops 7 %, and the rain has its own sound.
+- **NEO TOKYO.** A second map on the title. The track generator's ladder laid on a flat field: legs are avenues,
+  switchbacks are the way round a block, S-bends are dog-legs; 0 overlaps over 5 seeds x 12 km x 3 courses.
+  Street fronts, neon, light on the wet street, crossings, signals, 止まれ, white fences, LED street lamps,
+  blocks of buildings behind (their windows drawn by a shader from world position), a skyline with blinking
+  aviation lights and Tokyo Tower, a magenta horizon, rain more often and streets that never quite dry, and the
+  synth arpeggio in place of the koto. Best scores are kept per map.
+- **Triangles, found and cut.** With the real cherries in, a census by object at three spots on the medium
+  pass rendered 1.54-1.63 M triangles (budget 1.5 M). The shared prop pools draw every instance wherever the camera
+  looks (that is the price of a few draws for the whole road): 226 cherries at 1,223 triangles, 237 lanterns at
+  584, 132 lamps at 944. Now an avenue's cherries and lanterns and every street lamp have a near and a far model:
+  a chunk is built with the far ones (a 120-triangle cherry in the same blossom and bark materials, a glowing
+  20-triangle lantern, a 36-triangle lamp) and swaps to the full ones while it is dressed, within 150 m; the far
+  forest ring draws its cherries the same way; shrubs and the near forest are a little thinner. The same three
+  spots now render 0.93-1.23 M.
+- **Measured** (desktop gate / phone gate, 600 m, 0 frames over 34 ms in every run): the pass, ready 7.2 s /
+  6.5 s, peak 590 / 462 draws, 1.18 M / 0.80 M triangles; the pass in a held downpour on the phone, 467 draws,
+  0.81 M; NEO TOKYO, ready 6.8 s / 6.2 s, peak 604 / 478 draws, 0.89 M / 0.82 M triangles, drifts banked through
+  the square corners in both. Ready rose from 5.5 s with the city's atlas and materials (both maps load both).
+  Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.

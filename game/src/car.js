@@ -37,7 +37,7 @@ export const CAR = {
   steerGainMin: 0.72,             // A/D on a straight give this share of the lock a tight corner gets
   holdAngle: 0.62,                // rad: past this the rear finds grip again, so a held slide does not spin
   yawDamp: 0.5,                   // per second, always: a calmer car between slides
-  reverseForce: 0.72, reverseTop: 12,   // reverse gear pull (share of the engine) and top speed, m/s
+  reverseForce: 1.0, reverseTop: 20,    // reverse gear pull (share of the engine) and top speed, m/s (45 mph)
   wallSpin: 0.55,                 // share of a wall hit's yaw kick that is kept: a hit shoves, it rarely spins
   offroadMu: 0.55, offroadDrag: 260,
   wheelRadius: 0.32, track: 1.5,
@@ -165,8 +165,8 @@ export class Car {
     if (this.boost > 0) { Fdrive += P.boostForce * (0.6 + 0.4 * this.throttle); this.boost = Math.max(0, this.boost - h); }
     // in a J-turn the throttle waits for the nose to come round, then pulls away along the line
     if (this.jt) Fdrive *= this.jtRem < 0.7 ? 1 : 0.1;
-    // reverse: a gear with some pull, fading out toward 27 mph, enough to swing a J-turn from
-    if (inp.reverse && this.vF < 1.0) Fdrive = -P.engineForce * P.reverseForce * clamp(1 - Math.max(0, -this.vF) / P.reverseTop, 0, 1);
+    // reverse: a short, strong gear that keeps pulling (the fade is on the square of the speed) toward 45 mph
+    if (inp.reverse && this.vF < 1.0) Fdrive = -P.engineForce * P.reverseForce * clamp(1 - Math.pow(Math.max(0, -this.vF) / P.reverseTop, 2), 0, 1);
     // the brake key is also reverse once the car has stopped, so it must not fight the reverse drive
     const braking = inp.reverse && this.vF < 0.5 ? 0 : this.brake;
     const Fbrake = -Math.sign(this.vF) * braking * P.brakeForce * Math.min(1, Math.abs(this.vF) / 0.6);

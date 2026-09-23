@@ -10,6 +10,10 @@ export const PAL = {
   mapleRed: 0xc7351f, mapleOrange: 0xe07a1a, mapleGold: 0xe8b52a, vermilion: 0xc9402b, timber: 0x7a5a3a,
   roofTile: 0x4a4f5a, pearl: 0xf2f0ea, bronze: 0xb8843a, rubber: 0x1a1a1c, glass: 0x1c2a33,
   lampWarm: 0xffcf7a, tailRed: 0xd11c1c, chromeDark: 0x2b2d31,
+  // spring: cherry blossom and fresh leaves
+  sakuraPale: 0xf6d3de, sakuraPink: 0xf0a6bf, sakuraDeep: 0xdd6f98, sakuraWhite: 0xfbe9ef, cherryBark: 0x3b2a27,
+  youngLeaf: 0x8cbf4f, leafDeep: 0x5f8f3e, springGrass: 0x7a9a3e, azalea: 0xd6408e, azaleaPink: 0xf08cc0,
+  lanternRed: 0xd8342a, lanternGlow: 0xffb070,
 };
 
 /** Road geometry, metres. */
@@ -53,15 +57,15 @@ export const SCORE = {
 };
 
 export const QUALITY = {
-  high:  { pixelRatio: 1.5, shadow: true, smoke: 420, skid: 900, trees: 1.0, far: 900 },
-  phone: { pixelRatio: 1.5, shadow: true, smoke: 200, skid: 500, trees: 0.7, far: 700 },
-  low:   { pixelRatio: 1, shadow: false, smoke: 120, skid: 300, trees: 0.5, far: 600 },
+  high:  { pixelRatio: 1.5, shadow: true, smoke: 420, skid: 900, trees: 1.0, far: 900, petals: 800, rain: 2400 },
+  phone: { pixelRatio: 1.5, shadow: true, smoke: 200, skid: 500, trees: 0.7, far: 700, petals: 450, rain: 1300 },
+  low:   { pixelRatio: 1, shadow: false, smoke: 120, skid: 300, trees: 0.5, far: 600, petals: 250, rain: 700 },
 };
 
 export const MAX_DT = 1 / 20;
 
 /** The car as drawn: a little smaller than the physics body, so the road reads roomy. */
-export const CAR_SCALE = 0.68;
+export const CAR_SCALE = 0.62;
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt));

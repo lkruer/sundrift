@@ -1,0 +1,7 @@
+{ "w": 640, "h": 440, "cols": 3, "checks": true,
+  "cars": { "after": "C:/Users/liamk/sundrift/work/cands/car3/after/hero_coupe.js" },
+  "panels": [
+    { "car": "after", "open": true, "p": [1.5, 1.35, 3.0], "t": [0.46, 0.80, 1.85], "fov": 22 },
+    { "car": "after", "open": true, "p": [2.6, 0.95, 1.75], "t": [0.46, 0.82, 1.78], "fov": 18 },
+    { "car": "after", "open": true, "p": [0.9, 0.62, 3.6], "t": [0.4, 0.75, 1.8], "fov": 24 }
+  ] }

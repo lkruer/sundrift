@@ -1,0 +1,15 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 4000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "window.__DEBUG__.rainNow(0)" },
+  { "js": "window.__DEBUG__.teleport(1200, 0)" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; const c = D.car; const y = D.world.ground.height(c.x, c.z); const az = 2.3; window.__CAM__ = { pos: [c.x, y + 45, c.z], look: [c.x + Math.sin(az) * 400, y + 60, c.z + Math.cos(az) * 400], fov: 60 }; })()" },
+  { "wait": 1500 },
+  { "shot": "N5_tower" },
+  { "js": "(() => { const D = window.__DEBUG__; const c = D.car; const y = D.world.ground.height(c.x, c.z); const az = 2.3 + Math.PI; window.__CAM__ = { pos: [c.x, y + 45, c.z], look: [c.x + Math.sin(az) * 400, y + 40, c.z + Math.cos(az) * 400], fov: 60 }; })()" },
+  { "wait": 1200 },
+  { "shot": "N6_skyline" }
+]

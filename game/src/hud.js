@@ -7,7 +7,7 @@
  * Everything is DOM and SVG, written only when a value changes (the needle, which moves every frame, is one
  * attribute), so a phone is not re-laying out text sixty times a second.
  */
-import { SCORE, clamp, damp } from './config.js?v=202609230143';
+import { SCORE, clamp, damp } from './config.js?v=202609230328';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';

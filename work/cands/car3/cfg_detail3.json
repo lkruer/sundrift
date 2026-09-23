@@ -1,0 +1,12 @@
+{
+  "w": 640, "h": 440, "cols": 3,
+  "cars": { "after": "C:/Users/liamk/sundrift/work/cands/car3/after/hero_coupe.js" },
+  "panels": [
+    { "car": "after", "plateTex": true, "p": [0, 0.75, -3.4], "t": [0, 0.6, -2.0], "fov": 22, "label": "rear plate tex" },
+    { "car": "after", "plateTex": true, "p": [0.55, 0.45, 3.4], "t": [0.35, 0.3, 2.1], "fov": 22, "label": "front plate tex" },
+    { "car": "after", "p": [0.0, 1.25, 0.75], "t": [0.0, 1.15, -0.4], "fov": 30, "label": "mirror close" },
+    { "car": "after", "p": [1.3, 0.42, 1.35], "t": [0.84, 0.40, 1.19], "fov": 24, "label": "valve close" },
+    { "car": "after", "p": [1.8, 0.95, 1.6], "t": [0.82, 0.55, 1.75], "fov": 20, "label": "side marker" },
+    { "car": "after", "p": [2.2, 0.75, 0.2], "t": [0.81, 0.55, 0.58], "fov": 20, "label": "vent close" }
+  ]
+}

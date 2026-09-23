@@ -1,0 +1,18 @@
+[
+  { "wait": 2000 },
+  { "js": "(() => { window.__START__(); return 'started'; })()" },
+  { "wait": 3000 },
+  { "js": "(() => { const s = __DEBUG__.scene; return { popL: s.getObjectByName('popL').rotation.x, popR: s.getObjectByName('popR').rotation.x }; })()" },
+  { "js": "(() => { const c = __DEBUG__.car, r = __DEBUG__.scene.getObjectByName('car'), p = r.position, yaw = c.yaw; const W = (lx, ly, lz) => { const x = lx * 0.62, y = ly * 0.62, z = lz * 0.62; return [p.x + x * Math.cos(yaw) + z * Math.sin(yaw), p.y + y, p.z - x * Math.sin(yaw) + z * Math.cos(yaw)]; }; window.__W__ = W; window.__CAM__ = { pos: W(2.6, 1.5, 5.2), look: W(0.2, 0.75, 1.4), fov: 32 }; return 'front34'; })()" },
+  { "wait": 250 },
+  { "shot": "g3_front34_open" },
+  { "js": "(() => { const W = window.__W__; window.__CAM__ = { pos: W(0.0, 1.1, 5.6), look: W(0.0, 0.7, 1.4), fov: 30 }; return 'front'; })()" },
+  { "wait": 250 },
+  { "shot": "g3_front_open" },
+  { "js": "(() => { const W = window.__W__; window.__CAM__ = { pos: W(4.0, 1.4, 1.8), look: W(0.0, 0.8, 1.2), fov: 32 }; return 'side'; })()" },
+  { "wait": 250 },
+  { "shot": "g3_side_open" },
+  { "js": "(() => { const W = window.__W__; window.__CAM__ = { pos: W(-1.5, 2.4, -4.2), look: W(0.3, 0.8, 1.0), fov: 42 }; return 'rear-over'; })()" },
+  { "wait": 250 },
+  { "shot": "g3_rearover_open" }
+]

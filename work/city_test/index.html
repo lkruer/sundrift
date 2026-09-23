@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NEO TOKYO module test</title>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+  html, body { margin: 0; padding: 0; background: #07060a; overflow: hidden; }
+  canvas#c { display: block; width: 100vw; height: 100vh; }
+  #atlas { display: none; position: absolute; left: 0; top: 0; }
+  #info { position: absolute; left: 8px; bottom: 6px; font: 12px monospace; color: #9a95a8; white-space: pre; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info"></div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

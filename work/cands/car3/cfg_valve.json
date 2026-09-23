@@ -1,0 +1,9 @@
+{
+  "w": 640, "h": 440, "cols": 3,
+  "cars": { "after": "C:/Users/liamk/sundrift/work/cands/car3/after/hero_coupe.js" },
+  "panels": [
+    { "car": "after", "p": [1.45, 0.44, 1.33], "t": [0.84, 0.44, 1.33], "fov": 14, "label": "valve straight" },
+    { "car": "after", "p": [1.35, 0.60, 1.60], "t": [0.84, 0.44, 1.33], "fov": 14, "label": "valve angled" },
+    { "car": "after", "p": [1.9, 0.9, 3.2], "t": [0.46, 0.85, 1.85], "fov": 16, "label": "pod lens", "open": true }
+  ]
+}

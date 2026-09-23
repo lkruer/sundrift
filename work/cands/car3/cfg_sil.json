@@ -1,0 +1,11 @@
+{
+  "w": 560, "h": 560, "cols": 5,
+  "cars": { "before": "C:/Users/liamk/sundrift/work/cands/car3/before/hero_coupe.js", "after": "C:/Users/liamk/sundrift/game/assets/hero_coupe.js" },
+  "panels": [
+    { "diff": ["before", "after"], "view": "front" },
+    { "diff": ["before", "after"], "view": "right" },
+    { "diff": ["before", "after"], "view": "back" },
+    { "diff": ["before", "after"], "view": "left" },
+    { "diff": ["before", "after"], "view": "three-quarter" }
+  ]
+}

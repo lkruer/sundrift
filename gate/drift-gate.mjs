@@ -9,6 +9,8 @@
  *   node gate/drift-gate.mjs game                 desktop: 1280x720, click, keys
  *   node gate/drift-gate.mjs game --phone         phone: 390x844 @3x, real touches, one finger + handbrake thumb
  *   node gate/drift-gate.mjs game --metres=800    how far to drive (default 600)
+ *   node gate/drift-gate.mjs game --city          on the NEO TOKYO map (chosen with a real click on the title)
+ *   node gate/drift-gate.mjs game --rain          in a downpour held for the whole run
  *   node gate/drift-gate.mjs game --out=_gate     where the frames go (default <game>/_gate)
  *   node gate/drift-gate.mjs game --recipe=../404-game-recipe   where puppeteer lives
  *
@@ -61,6 +63,13 @@ const t0 = Date.now();
 await page.goto(URL, { waitUntil: 'load', timeout: 90000 });
 await page.waitForFunction('window.__READY__ === true', { timeout: 120000 }).catch(() => { throw new Error('never signalled __READY__'); });
 const readyS = ((Date.now() - t0) / 1000).toFixed(1);
+// --city: choose NEO TOKYO on the title (a real click on its map button) and wait for the city to build
+if (process.argv.includes('--city')) {
+  await page.click('.map[data-m=city]');
+  await new Promise((r) => setTimeout(r, 400));
+  await page.waitForFunction("!document.getElementById('building').classList.contains('on')", { timeout: 60000 });
+  await new Promise((r) => setTimeout(r, 1500));
+}
 const software = await page.evaluate(() => { try { const gl = document.createElement('canvas').getContext('webgl2'); const d = gl.getExtension('WEBGL_debug_renderer_info'); return /swiftshader|llvmpipe|software/i.test(String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL))); } catch { return false; } });
 
 // ---- start from the REAL control
@@ -69,6 +78,8 @@ if (!box.visible) { console.error('#startb is not visible'); process.exit(1); }
 if (PHONE) await page.touchscreen.tap(box.x, box.y); else await page.mouse.click(box.x, box.y);
 await sleep(600);
 const startGone = await page.evaluate(() => { const e = document.getElementById('title'); return !e.classList.contains('on'); });
+// --rain: hold a downpour for the whole run (the heaviest the game draws)
+if (process.argv.includes('--rain')) await page.evaluate(() => window.__DEBUG__ && window.__DEBUG__.rainNow(1));
 
 const read = () => page.evaluate(() => window.__GAME__ || null);
 
