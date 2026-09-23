@@ -1,0 +1,32 @@
+[
+ {
+  "click": "#startb"
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__, t = D.track; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); D.teleport(2400, 0); })()"
+ },
+ {
+  "wait": 3000
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__, t = D.track, c = D.car, G = D.G; let best = null, bd = 0; for (let s = 0; s < G.s + 2500; s += 20) { if (Math.abs(s - G.s) < 300) continue; const p = t.sample(s); const d = Math.hypot(p.x - c.x, p.z - c.z); if (d > 480 && d < 900 && (!best || Math.abs(d - 600) < Math.abs(bd - 600))) { best = p; bd = d; } } if (!best) return 'none'; window.__CAM__ = { pos: [c.x, D.G.carY + 12, c.z], look: [best.x, best.y, best.z], fov: 26 }; return [Math.round(best.s), Math.round(bd), Math.round(best.y - D.G.carY)]; })()"
+ },
+ {
+  "wait": 1000
+ },
+ {
+  "shot": "G1_farleg_night"
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__; D.G.hour = 11; D.G.hourShown = 11; D.G.lastApplied = -9; })()"
+ },
+ {
+  "wait": 3500
+ },
+ {
+  "shot": "G2_farleg_day"
+ }
+]

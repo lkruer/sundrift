@@ -1,0 +1,12 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 6000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); let best = null, bl = 0; for (let s = 400; s < 3500; s += 10) { let L = 0; while (L < 900 && Math.abs(t.sample(s + L).k) < 0.003) L += 10; if (L > bl) { bl = L; best = s; } } D.teleport(best, 0); return [best, bl]; })()" },
+  { "wait": 3500 },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; const s = Math.sin(c.yaw), co = Math.cos(c.yaw); window.__CAM__ = { pos: [c.x - s * 5, y + 3, c.z - co * 5], look: [c.x + s * 600, y + 8, c.z + co * 600], fov: 22 }; })()" },
+  { "wait": 1000 }, { "shot": "H1_avenue_far" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; const s = Math.sin(c.yaw), co = Math.cos(c.yaw); window.__CAM__ = { pos: [c.x - s * 5, y + 60, c.z - co * 5], look: [c.x + s * 600, y + 20, c.z + co * 600], fov: 40 }; })()" },
+  { "wait": 1000 }, { "shot": "H2_avenue_high" }
+]

@@ -11,7 +11,7 @@
  * tiling noise texture made here once. Nothing in here writes depth, so none of it is inked by the cel pass.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from './config.js?v=202609231752';
+import { clamp, lerp, smoothstep } from './config.js?v=202609232035';
 
 /** Tiling value noise, four octaves in the four channels (4, 8, 16 and 32 cells across). */
 function noiseTexture(size = 128) {
@@ -616,7 +616,9 @@ export class Atmosphere {
       const want = s.carY - 26;
       this.mistY = this.mistY === null ? want : lerp(this.mistY, want, 1 - Math.exp(-dt / 10));
       this.mistY = Math.min(this.mistY, s.carY - 9);
-      M.top = this.mistY; M.density = lerp(0.03, 0.045, rain); M.soft = 14;
+      // (a thing of the night and the dawn: gone by day, and never so thick that the hills beyond it disappear)
+      M.top = this.mistY; M.density = 0.012 * night * night * (1 + 0.5 * rain); M.soft = 18;
+      if (M.density < 0.0004) M.on = 0;
       // the sky's own colour at the horizon (rose at dawn, gold at dusk, white by day), silvered by the moon at
       // night, greyer in the rain
       M.col.copy(s.hazeLin).multiplyScalar(lerp(1.05, 0.35, night)).add(this._c.setRGB(0.06, 0.075, 0.12).multiplyScalar(night))

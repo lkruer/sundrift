@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609231752';
-import { surface } from '../surfaces.js?v=202609231752';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609231752';
-import { Ground } from './ground.js?v=202609231752';
-import { Terrain, LODS } from './terrain.js?v=202609231752';
-import { partsOf, Pool } from './instancing.js?v=202609231752';
+import { ASSET } from '../assetlib.js?v=202609232035';
+import { surface } from '../surfaces.js?v=202609232035';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609232035';
+import { Ground } from './ground.js?v=202609232035';
+import { Terrain, LODS } from './terrain.js?v=202609232035';
+import { partsOf, Pool } from './instancing.js?v=202609232035';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const ASSETS = {
@@ -333,6 +333,17 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this.farMat.name = 'farground';
     this.roadMat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff });
     this.roadMat.name = 'road';
+    // the wet road's highlights from the lamps (and the car's own lights) have a soft ceiling: lit, never blown out.
+    // (on a glossy wet road a street lamp's specular peak ran to many times white and the bloom made it a capsule of
+    // glare; a soft knee keeps its shape and its colour and caps its top)
+    this.roadSpecU = { uSpecKnee: { value: 2.6 } };
+    this.roadMat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, this.roadSpecU);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uSpecKnee;')
+        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee);');
+    };
+    this.roadMat.customProgramCacheKey = () => 'road-spec-knee';
     this.railMat = new THREE.MeshStandardMaterial({ color: PAL.galvanised, roughness: 0.42, metalness: 0.65, side: THREE.DoubleSide });
     // the lining glows faintly sodium-orange: the whole bore is lit by its lamps, not just the stretch round the car
     { const tt = tunnelTexture(); this.tunnelMat = new THREE.MeshStandardMaterial({ map: tt, emissiveMap: tt, emissive: 0xff9448, emissiveIntensity: 0.62, roughness: 0.82, metalness: 0, side: THREE.DoubleSide }); }
@@ -359,7 +370,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this._signFaces();
     this._roadTextMat('徐行');
     this._toriiPlaqueMat();
-    this.bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffc070, emissiveIntensity: 2.1, roughness: 0.6 });
+    // (a lamp head glows, but not so hot that the bloom turns it into a glaring star)
+    this.bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffc070, emissiveIntensity: 1.3, roughness: 0.6 });
     {
       const sz = 128, cv = document.createElement('canvas'); cv.width = cv.height = sz;
       const ctx = cv.getContext('2d');
@@ -431,9 +443,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     // the city (NEO TOKYO): its module is loaded here, and its materials made now so they compile with the rest
     try {
       this.glyphs = drawsGlyphs;
-      this.City = await import('./city.js?v=202609231752');
+      this.City = await import('./city.js?v=202609232035');
       this._cityMats = this.City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
-      const L = await import('./landmarks.js?v=202609231752').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+      const L = await import('./landmarks.js?v=202609232035').catch((e) => { console.warn('landmarks', e && e.message); return null; });
       this.citySky = this.City.citySkyBuild(this, L);
       this.citySky.visible = false;
       this.scene.add(this.citySky);
@@ -1891,9 +1903,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   setWet(w) {
     this._wet = w;
     // (a wet road is glossy enough that a lamp draws a streak on it, not a broad blob)
-    // (not quite a mirror: at 0.2 each street lamp burned a white blob into the wet asphalt; at 0.34 it is a soft
+    // (not quite a mirror: at 0.2 each street lamp burned a white blob into the wet asphalt; at 0.4 it is a soft
     // glow drawn out toward the lens)
-    if (this.roadMat) this.roadMat.roughness = 1 - 0.66 * w;
+    if (this.roadMat) this.roadMat.roughness = 1 - 0.6 * w;
     if (this.groundMat) this.groundMat.roughness = 1 - 0.4 * w;
     this.setNight(this._n ?? 1);
   }
@@ -1901,11 +1913,11 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   setNight(n) {
     this._n = n;
     if (this.city && this.City) this.City.cityWet(this, this._wet || 0, n);
-    const w = this._wet || 0, pool = 1 + 0.45 * w;
+    const w = this._wet || 0, pool = 1 + 0.12 * w;
     if (this.glowMat) this.glowMat.opacity = 0.75 * n * pool;
     if (this.glowCoolMat) this.glowCoolMat.opacity = Math.min(0.78, 0.62 * n * pool);
     if (this.glowLanternMat) this.glowLanternMat.opacity = 0.6 * n * pool;
-    if (this.glowCityMat) this.glowCityMat.opacity = 0.3 * n * (1 + 0.3 * w);
+    if (this.glowCityMat) this.glowCityMat.opacity = 0.26 * n;
     if (this.town) this.town.material.opacity = 0.9 * n;
     if (!this._tinted) {
       this._tinted = [];

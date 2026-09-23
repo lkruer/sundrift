@@ -6,22 +6,22 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609231752';
-import { createRig, detectTier } from '../rig.js?v=202609231752';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609231752';
-import { Car, gearbox } from './car.js?v=202609231752';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609231752';
-import { World, drawsGlyphs } from './world.js?v=202609231752';
-import { ChaseCam } from './camera.js?v=202609231752';
-import { Input } from './input.js?v=202609231752';
-import { Scoring } from './scoring.js?v=202609231752';
-import { Hud } from './hud.js?v=202609231752';
-import { Audio } from './audio.js?v=202609231752';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609231752';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609231752';
-import { Atmosphere } from './atmos.js?v=202609231752';
-import { Debris } from './debris.js?v=202609231752';
-import { makePost } from './post.js?v=202609231752';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609232035';
+import { createRig, detectTier } from '../rig.js?v=202609232035';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609232035';
+import { Car, gearbox } from './car.js?v=202609232035';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609232035';
+import { World, drawsGlyphs } from './world.js?v=202609232035';
+import { ChaseCam } from './camera.js?v=202609232035';
+import { Input } from './input.js?v=202609232035';
+import { Scoring } from './scoring.js?v=202609232035';
+import { Hud } from './hud.js?v=202609232035';
+import { Audio } from './audio.js?v=202609232035';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609232035';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609232035';
+import { Atmosphere } from './atmos.js?v=202609232035';
+import { Debris } from './debris.js?v=202609232035';
+import { makePost } from './post.js?v=202609232035';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -74,12 +74,12 @@ const pops = { list: [], t: 0, open: -1.13, lamp: null };
 // weather: spells of clear and of rain, each coming on and clearing over seconds; the road stays wet a while after
 const W = { rain: 0, target: 0, wet: 0, t: 0, next: 75, raining: false, shownWet: -1 };
 function resetWeather() {
-  W.rain = 0; W.target = 0; W.wet = 0; W.t = 0; W.raining = false; W.next = 45 + Math.random() * 60;
+  W.rain = 0; W.target = 0; W.wet = 0; W.t = 0; W.raining = false; W.next = 110 + Math.random() * 110;
   if (G.map === 'city') {
-    W.raining = Math.random() < 0.55;
-    W.target = W.rain = W.raining ? 0.6 + Math.random() * 0.35 : 0;
+    W.raining = Math.random() < 0.3;
+    W.target = W.rain = W.raining ? 0.45 + Math.random() * 0.35 : 0;
     W.wet = W.raining ? 1 : 0.4;
-    W.next = W.raining ? 60 + Math.random() * 60 : 25 + Math.random() * 40;
+    W.next = W.raining ? 35 + Math.random() * 30 : 90 + Math.random() * 90;
   }
   W.shownWet = -1;
   if (world) { world.setWet(W.wet); W.shownWet = W.wet; }
@@ -88,8 +88,9 @@ function weather(dt, inTunnel) {
   W.t += dt;
   if (W.t > W.next) {
     W.t = 0; W.raining = !W.raining;
-    W.target = W.raining ? 0.55 + Math.random() * 0.45 : 0;
-    W.next = W.raining ? 50 + Math.random() * 60 : 70 + Math.random() * 90;
+    // (showers now and then: a minute or less of rain, then two to four minutes clear)
+    W.target = W.raining ? 0.4 + Math.random() * 0.45 : 0;
+    W.next = W.raining ? 30 + Math.random() * 30 : 120 + Math.random() * 120;
     if (W.raining) hud.onEvent({ type: 'sun', value: 'RAIN' });
   }
   W.rain = damp(W.rain, W.target, W.target > W.rain ? 0.14 : 0.1, dt);
@@ -904,6 +905,9 @@ function step(dt, t0) {
   scoring.update(dt, car, impact, clipping);
   const grant = scoring.takeBoost();
   if (grant > 0) { car.boost = Math.min(SCORE.boostMax, car.boost + grant); chase.kick(0.12); }
+  // a pull on the handbrake cancels a boost (to set up the next corner without it)
+  if (inp.hand && !G.handWas && car.boost > 0.05) { car.boost = 0; audio.sfx && audio.sfx('boostCut'); }
+  G.handWas = !!inp.hand;
   // a clean J-turn scores, and says so
   if (car.jturnDone) {
     car.jturnDone = false;
@@ -1098,19 +1102,25 @@ function airFollow(dt) {
   }
 }
 
-/** The sea of cloud's state and the camera, for the cel pass's height fog. */
-const _m4 = new THREE.Matrix4();
+/** The sea of cloud's state and the camera, for the cel pass's height fog and its motion blur. */
+const _m4 = new THREE.Matrix4(), _vp = new THREE.Matrix4(), _lastCam = new THREE.Vector3(1e9, 0, 0);
 function mistToPass() {
   const U = post.cel.uniforms, M = atmos ? atmos.mist : null;
+  U.uCamPos.value.copy(camera.position);
+  U.uCamRot.value.setFromMatrix4(camera.matrixWorld);
+  const ty = Math.tan((camera.fov * Math.PI) / 360);
+  U.uTanFov.value.set(ty * camera.aspect, ty);
+  // motion blur: the last frame's camera, and none across a cut (a reset, a teleport, the title's first frame)
+  const cut = camera.position.distanceTo(_lastCam) > 12;
+  U.uBlur.value = tier === 'phone' || cut || G.mode !== 'playing' ? 0 : 0.5;
+  U.uPrevVP.value.copy(_vp);
+  _vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  _lastCam.copy(camera.position);
   const on = M && M.on && G.mode !== 'loading' ? 1 : 0;
   U.uMist.value.set(M ? M.top : -1e4, M ? M.density : 0, M ? M.soft : 14, on);
   if (!on) return;
   U.uMistCol.value.copy(M.col).addScalar(M.flash * 0.25);
   U.uMistGlow.value.copy(M.glow); U.uMistFar.value.copy(M.far);
-  U.uCamPos.value.copy(camera.position);
-  U.uCamRot.value.setFromMatrix4(camera.matrixWorld);
-  const ty = Math.tan((camera.fov * Math.PI) / 360);
-  U.uTanFov.value.set(ty * camera.aspect, ty);
   U.uMoonDir.value.copy(night.dir);
   U.uNoise.value = atmos.noise;
   U.uMistT.value = atmos.t;
@@ -1498,21 +1508,26 @@ function lampsFollow() {
   const tunnel = world.inTunnel(G.s);
   if (G.night < 0.02 && !tunnel) { for (const pl of lampLights) pl.intensity = 0; return; }
   let n = 0;
+  // (the lights go to the lamps round a point some way ahead of the car, where the lens is looking, so a lamp's
+  // pool of light comes up well before the car reaches it rather than as it does)
+  const [lfx, lfz] = car.forward();
+  const ax = car.x + lfx * 34, az = car.z + lfz * 34;
   for (let i = 0; i < L.length; i++) {
-    const d = (L[i].x - car.x) ** 2 + (L[i].z - car.z) ** 2;
+    const d = (L[i].x - ax) ** 2 + (L[i].z - az) ** 2;
     if (n < k + 1) { let j = n++; while (j > 0 && pickD[j - 1] > d) { pickD[j] = pickD[j - 1]; pickIdx[j] = pickIdx[j - 1]; j--; } pickD[j] = d; pickIdx[j] = i; }
     else if (d < pickD[k]) { let j = k; while (j > 0 && pickD[j - 1] > d) { pickD[j] = pickD[j - 1]; pickIdx[j] = pickIdx[j - 1]; j--; } pickD[j] = d; pickIdx[j] = i; }
   }
-  const cut = Math.min(75, n > k ? Math.sqrt(pickD[k]) : 75);
+  const cut = Math.min(95, n > k ? Math.sqrt(pickD[k]) : 95);
   for (let j = 0; j < k; j++) {
     const pl = lampLights[j];
     if (j >= n) { pl.intensity = 0; continue; }
     const l = L[pickIdx[j]], d = Math.sqrt(pickD[j]);
-    const fade = 1 - smoothstep(cut * 0.72, cut, d);
+    const fade = 1 - smoothstep(cut * 0.6, cut, d);
     pl.position.set(l.x, l.y, l.z);
     const col = l.color || 0xffa040;
     if (pl.userData.col !== col) { pl.color.setHex(col); pl.userData.col = col; }
-    pl.intensity = (l.tunnel ? 110 : (l.power || 330) * Math.max(G.night, 0.12)) * fade;
+    // (the lamps are dimmer than they were, and dimmer still in the rain, when the wet road throws every one back)
+    pl.intensity = (l.tunnel ? 110 : (l.power || 330) * 0.8 * Math.max(G.night, 0.12) * (1 - 0.3 * W.wet)) * fade;
   }
 }
 

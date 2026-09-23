@@ -19,8 +19,8 @@ export const CAR = {
   maxSteer: 0.58,                 // rad at standstill
   steerFalloff: 0.034,            // per m/s: 0.58 / (1 + 0.034 * 25 m/s) = 0.31 rad at 90 km/h
   steerRate: 7.5,                 // rad/s the wheels move toward the target
-  engineForce: 8200,              // N at low speed, rear wheels
-  engineTop: 64,                  // m/s where engine force has faded to zero (230 km/h)
+  engineForce: 9600,              // N at low speed, rear wheels
+  engineTop: 68,                  // m/s where engine force has faded to zero (245 km/h)
   brakeForce: 10500,
   handbrakeForce: 3300,
   dragCoef: 0.46,                 // N / (m/s)^2 ; terminal about 190 km/h without boost
@@ -37,6 +37,8 @@ export const CAR = {
   steerGainMin: 0.72,             // A/D on a straight give this share of the lock a tight corner gets
   holdAngle: 0.62,                // rad: past this the rear finds grip again, so a held slide does not spin
   lineAssist: 0.75,               // tight bends taken sideways: share of the missing turn the path and nose are helped round by
+  spinFrom: 0.8, spinFull: 1.25,  // drive over the rear tyres' capacity at which they start to spin, and spin freely
+  spinLoss: 0.68,                 // share of the rear's cornering grip a freely spinning tyre loses (at low speed)
   yawDamp: 0.5,                   // per second, always: a calmer car between slides
   reverseForce: 1.0, reverseTop: 20,    // reverse gear pull (share of the engine) and top speed, m/s (45 mph)
   wallSpin: 0.55,                 // share of a wall hit's yaw kick that is kept: a hit shoves, it rarely spins
@@ -77,6 +79,7 @@ export class Car {
     this.jturn = 0;                 // seconds left in which a fast reverse may still swing round
     this.air = false;               // off the ground (a crest taken fast off the road): no tyre does anything
     this._psi = 0;                  // the direction of travel last substep (the line assist's measure of the turn)
+    this._donut = 0; this.spin = 0;   // how much the car is being asked to spin on the spot; how much the rear is spinning
     this.extF = 0; this.extL = 0;   // an outside acceleration in the car's frame, m/s^2: a slope's gravity, a banked road's
     this.jt = 0; this.jtT = 0; this.jtTravel = 0; this.jtRem = 0; this.jturnDone = false;   // a J-turn in progress (its turning sign)
   }
@@ -146,18 +149,24 @@ export class Car {
     // going backwards the wheels get full lock (the speed falloff is for stability going forwards)
     const backing = this.vF < -0.5;
     const steerMax = backing ? P.maxSteer : P.maxSteer / (1 + P.steerFalloff * speed);
-    const assist0 = inp.touch ? P.assistTouch : P.assist;
+    // donuts: at low speed, the throttle floored and the wheel held hard into the way the car is turning, the car is
+    // asked to spin on the spot, so the help that keeps a slide from spinning steps aside
+    const into = Math.abs(this.omega) > 0.3 ? (Math.sign(inp.steer) === Math.sign(this.omega) ? 1 : 0) : 1;
+    const donutT = sstep(0.55, 0.9, inp.throttle) * sstep(0.5, 0.9, Math.abs(inp.steer)) * into * (1 - sstep(7, 10, speed)) * (backing || this.jt ? 0 : 1);
+    this._donut += (donutT - this._donut) * Math.min(1, h * 6);
+    const D = this._donut;
+    const assist0 = (inp.touch ? P.assistTouch : P.assist) * (1 - 0.85 * D);
     // the direction the front axle is actually travelling, relative to the nose; steering the wheels toward it is
     // counter-steer, and doing part of it for the player is what keeps a thumb from spinning the car. Past about
     // 45 degrees of slip the assist takes over almost entirely, which is what gives the car a natural maximum
     // angle instead of a spin when a player keeps the key held into the slide.
     const frontSlipDir = Math.atan2(this.vL + P.a * this.omega, Math.max(Math.abs(this.vF), 0.8));
     const bigSlip = sstep(0.55, 1.0, Math.abs(frontSlipDir));
-    const assist = assist0 + (0.97 - assist0) * bigSlip;
+    const assist = assist0 + (0.97 - assist0) * bigSlip * (1 - D);
     const assistRaw = clamp(frontSlipDir, -P.maxSteer, P.maxSteer) * assist * sstep(1.5, 6, speed) * (this.vF < 0 || this.jt ? 0 : 1);
     // filtered: the assist follows the slide, not every wobble of it, so the front wheels never chatter
     this._assist += (assistRaw - this._assist) * Math.min(1, h * 22);
-    const playerSteer = inp.steer * steerMax * (backing ? 1 : 1 - 0.7 * bigSlip * (Math.sign(inp.steer) === -Math.sign(frontSlipDir) ? 1 : 0));
+    const playerSteer = inp.steer * steerMax * (backing ? 1 : 1 - 0.7 * bigSlip * (1 - D) * (Math.sign(inp.steer) === -Math.sign(frontSlipDir) ? 1 : 0));
     // A and D ask for as much lock as the corner ahead needs: a hairpin gets full lock, a straight a gentler
     // correction. Nothing steers the car when no key is held.
     let gainT = 1;
@@ -177,7 +186,7 @@ export class Car {
 
     // ---- longitudinal forces on the rear (RWD)
     const fade = clamp(1 - Math.pow(Math.max(0, this.vF) / P.engineTop, 2), 0, 1);
-    const antiSpin = 1 - 0.55 * sstep(0.7, 1.1, Math.abs(this.beta));
+    const antiSpin = 1 - 0.55 * sstep(0.7, 1.1, Math.abs(this.beta)) * (1 - D);
     let Fdrive = this.throttle * P.engineForce * fade * antiSpin;
     if (this.boost > 0) { Fdrive += P.boostForce * (0.6 + 0.4 * this.throttle); this.boost = Math.max(0, this.boost - h); }
     // in a J-turn the throttle waits for the nose to come round, then pulls away along the line
@@ -197,6 +206,18 @@ export class Car {
     const FzF = Math.max(0.2 * m * g, m * g * P.b / L - m * ax * P.cgHeight / L);
     const FzR = Math.max(0.2 * m * g, m * g * P.a / L + m * ax * P.cgHeight / L);
 
+    // ---- wheelspin: past what the rear tyres can take, the drive spins them, and a spinning tyre has little left for
+    // cornering: power oversteer out of a slide and, with the wheel held into the turn at low speed, donuts. Only in the
+    // low gears or already sideways (a fast straight spreads the power too thin), and less at speed.
+    {
+      const cap = P.muRear * muScale * FzR * this.handGrip;
+      const demand = Math.max(0, Fdrive) / Math.max(1, cap);
+      const gate = Math.max(1 - sstep(10, 22, speed), sstep(0.1, 0.28, Math.abs(this.beta)) * (1 - 0.5 * sstep(24, 34, speed)), D);
+      // (asked for a donut, the tyres break loose sooner: from a standstill, full lock and the throttle floored)
+      const sf = P.spinFrom - (P.spinFrom - 0.45) * D, sfull = P.spinFull - (P.spinFull - 0.8) * D;
+      this.spin = sstep(sf, sfull, demand) * gate * (this.vF > 0.5 && !this.jt ? 1 : 0);
+    }
+
     // ---- slip angles, in each wheel's own frame, so they hold going backwards as well as forwards: the angle
     // between the way the wheel rolls (either way along its plane) and the way its axle is actually moving.
     // Going forwards the front one is the familiar d - atan(vy / vF); going backwards the steer's sign turns
@@ -210,7 +231,8 @@ export class Car {
 
     // ---- lateral tyre forces (left positive)
     const FmaxF = P.muFront * muScale * FzF;
-    let FmaxR = P.muRear * muScale * FzR * this.handGrip;
+    const capR = P.muRear * muScale * FzR * this.handGrip;      // all the rear has, before the drive takes its share
+    let FmaxR = capR;
     // drift hold: past a comfortable angle the rear finds a little grip back, so a held slide settles instead of
     // spinning; below it, on the throttle, the rear gives a little, so a slide does not die on its own
     {
@@ -219,17 +241,21 @@ export class Car {
       let hold = 0;
       if (aB > P.holdAngle) hold = Math.min(0.35, (aB - P.holdAngle) * 1.1);
       else if (this.throttle > 0.5 && aB > 0.2 && aB < P.holdAngle - 0.15) hold = -0.06 * sstep(0.2, 0.3, aB);
-      FmaxR *= 1 + hold * inDrift;
+      FmaxR *= 1 + hold * inDrift * (1 - D);
     }
     // friction circle on the rear: longitudinal demand eats lateral capacity
-    const used = Math.min(0.97, Math.abs(FxR) * P.circleGain / Math.max(1, FmaxR));
+    const used = Math.min(0.97, Math.abs(FxR) * P.circleGain / Math.max(1, capR));
     FmaxR *= Math.sqrt(1 - used * used);
+    // (and a spinning tyre has little left for cornering)
+    FmaxR *= 1 - P.spinLoss * this.spin * (1 - 0.45 * sstep(12, 26, speed));
     // (in a J-turn the tyres let go a little, so the car swings round its own momentum instead of being yanked)
     if (this.jt) { FmaxR *= 0.6; }
     const FyF = FmaxF * tyre(aF, P) * (this.jt ? 0.6 : 1);
     const FyR = FmaxR * tyre(aR, P);
     // longitudinal forces cannot exceed what the tyre has left either
-    FxR = clamp(FxR, -FmaxR * 1.4, FmaxR * 1.4);
+    // (the drive is limited by the tyre's whole grip, not what is left for cornering; spinning, a little less)
+    // (in a donut most of the power goes into spinning the tyres, not into speed)
+    FxR = clamp(FxR, -capR * 1.25, capR * 1.25) * (1 - 0.12 * this.spin - 0.12 * D * this.spin);
     FxF = clamp(FxF, -FmaxF, FmaxF);
 
     // ---- low speed, and slow reversing: blend toward a kinematic bicycle so the car parks and backs up without
@@ -242,7 +268,8 @@ export class Car {
     // (only once the car is rolling straight: going backwards out of a spin, reverse drives it on and the tyres
     // carry the slide, instead of the kinematic blend stopping it dead)
     const revHeld = inp.reverse && this.vF < -0.15 && !this.jt ? 0.9 * (1 - sstep(0.18, 0.45, Math.abs(this.beta))) * (1 - sstep(1.2, 3.5, Math.abs(this.vL))) : 0;
-    const lowT = Math.max(1 - sstep(0.4, P.lowSpeed, speed), revSlow, revHeld);
+    // (not in a donut: there the car is meant to go round on its spinning tyres, however slowly it moves)
+    const lowT = Math.max((1 - sstep(0.4, P.lowSpeed, speed)) * (1 - 0.75 * D), revSlow, revHeld);
 
     // ---- accelerations in the body frame
     let aFwd = (FxR + FxF * Math.cos(d) - FyF * Math.sin(d) + Fdrag) / m;
@@ -254,6 +281,13 @@ export class Car {
     this.vL += (aLat + this.extL - this.vF * this.omega) * h;
     this.omega += omegaDot * h;
     this._jturnAssist(h, inp);
+    // a donut, held: while the rear tyres spin the car keeps turning, at a rate the throttle sets, and the spinning
+    // tyres keep it moving round rather than letting it scrub to a stop
+    if (D > 0.05 && this.spin > 0.05) {
+      const wT = Math.sign(inp.steer) * (1.7 + 0.8 * clamp(inp.throttle, 0, 1));
+      this.omega += (wT - this.omega) * Math.min(1, h * 2.2) * D * this.spin;
+      if (speed < 3.5) this.vF += (3.5 - speed) * 2.5 * D * h;
+    }
     // yaw damping: a little always; more while a slide is being caught (continuous, so it never twitches on and
     // off); and past about 50 degrees, against the yaw that would take the car further round
     {
@@ -263,7 +297,7 @@ export class Car {
       const recov = clamp(-this._dAB * 1.5, 0, 1) * sstep(0.06, 0.18, aB);
       // (not in a J-turn: there the car is meant to go all the way round, and the catch brings it to rest facing
       // the way it is travelling)
-      const over = this.omega * this.beta < 0 && this.jturn <= 0 ? 4.0 * sstep(0.85, 1.2, aB) : 0;
+      const over = this.omega * this.beta < 0 && this.jturn <= 0 ? 4.0 * sstep(0.85, 1.2, aB) * (1 - D) : 0;
       this.omega *= Math.exp(-(P.yawDamp * (this.jturn > 0 ? 0.3 : 1) + 1.6 * recov * (this.jturn > 0 ? 0.25 : 1) + over) * h);
     }
 

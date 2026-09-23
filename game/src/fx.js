@@ -8,7 +8,7 @@
  * points; it is tinted by the sun so it reads warm at golden hour and cool in shade.
  */
 import * as THREE from 'three';
-import { clamp } from './config.js?v=202609231752';
+import { clamp } from './config.js?v=202609232035';
 
 function spriteTexture() {
   const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
@@ -416,7 +416,7 @@ export class RainSplashes {
           vec3 lc = uSky * 1.6;
           vec2 dc = wp.xz - uCar.xz; float dl = length(dc);
           lc += vec3(0.85, 0.9, 1.0) * smoothstep(0.84, 0.97, dot(dc / max(dl, 0.01), uCarFwd)) * smoothstep(40.0, 4.0, dl) * uHead * 1.4;
-          for (int i = 0; i < 5; i++) { vec3 d = wp - uLamps[i]; lc += uLampCol[i] * 1.3 / (1.0 + dot(d, d) * 0.05); }
+          for (int i = 0; i < 5; i++) { vec3 d = wp - uLamps[i]; lc += uLampCol[i] * 0.8 / (1.0 + dot(d, d) * 0.05); }
           vC = lc * live;
           gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
         }`,
@@ -725,7 +725,7 @@ export class Rain {
           vec2 dc = wp.xz - uCar.xz; float dl = length(dc);
           float cone = smoothstep(0.86, 0.97, dot(dc / max(dl, 0.01), uCarFwd)) * smoothstep(48.0, 5.0, dl) * smoothstep(-0.5, 2.5, wp.y - uCar.y + 1.5);
           lc += vec3(0.85, 0.9, 1.0) * cone * uHead;
-          for (int i = 0; i < 5; i++) { vec3 d = wp - uLamps[i]; lc += uLampCol[i] / (1.0 + dot(d, d) * 0.06); }
+          for (int i = 0; i < 5; i++) { vec3 d = wp - uLamps[i]; lc += uLampCol[i] * 0.55 / (1.0 + dot(d, d) * 0.06); }
           vC = lc; vA = on * e.x * e.y * e.z * near; vX = aCorner.x * 2.0;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         }`,

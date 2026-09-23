@@ -15,7 +15,7 @@
  * sixteen-bar form (A A B A) of four-bar phrases, and every phrase picks one of its section's tunes or leaves the
  * chords to themselves for a while, so it never plays the same way twice.
  */
-import { clamp } from './config.js?v=202609231752';
+import { clamp } from './config.js?v=202609232035';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -575,6 +575,8 @@ export class Audio {
         for (let i = 0; i < 7; i++) setTimeout(() => this.sfx('can', 0.6), 70 + i * 60);
         break;
       case 'can': tone('sine', 1700 + Math.random() * 1100, 1400, 0.11, 0.09); break;
+      case 'boostCut':                        // the boost let go: a short falling hiss
+        noise(0.22, 'bandpass', 2400, 1.2, 0.2, 0.004, 500); break;
       case 'shift':                           // the gearbox: a dull clunk and a click of the linkage
         tone('sine', 150, 80, 0.06, 0.2); noise(0.025, 'bandpass', 2600, 1.4, 0.14); break;
       case 'bag': case 'box':                 // a soft thump, and paper and plastic rustling
@@ -685,9 +687,9 @@ export class Audio {
         const up = [this._key(0), this._key(2), this._key(3), this._key(5), this._key(7)];
         const n = 2 + Math.min(3, e.tier + (e.chain > 1 ? 1 : 0));
         this.chime(up.slice(0, n), t, 0.07, 0.3, 0.16 + 0.03 * e.tier);
-        this.whoosh(0.7 + Math.min(1.6, e.boost) * 0.5);
         break;
       }
+      case 'boost': this.whoosh(0.7 + Math.min(1.6, e.value) * 0.5); break;
       case 'tier': this.chime([this._key(1), this._key(2), this._key(3)].slice(0, e.value + 1), t, 0.06, 0.2, 0.13); break;
       case 'switch': this.chime([this._key(0), this._key(3)], t, 0.06, 0.15, 0.12, 'square'); break;
       case 'clip': this.tick(); break;

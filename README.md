@@ -12,8 +12,8 @@ five seconds, or a giant magnet comes down and carries you back.
   road at every shrine, with jizo in red bibs beside the path. Blue guide signs carry kanji. Fuji stands under
   the moon across the valley. The pass also has sodium lamps, slope lattices and tunnels through the spurs.
   Grass and spring flowers tuft the verges, and a five-storey pagoda stands at every shrine, lanterns glowing
-  under its eaves. Below the road the valleys lie under a sea of cloud (unkai), silver under the moon and rose at dawn, with the
-  ridges and the treetops standing out of it. Fireflies pulse over the verges, thin cloud drifts across the stars,
+  under its eaves. At night and at dawn the nearer valleys below the road lie under a sea of cloud (unkai), silver
+  under the moon and rose at dawn; by day it has burned off. Fireflies pulse over the verges, thin cloud drifts across the stars,
   now and then a shooting star falls, and the moon (or a low sun) throws shafts of light through the trees.
 - **The city.** Grimy street fronts line the road, with rain streaks, roller shutters, air conditioners, fire
   escapes, laundry and roof tanks. Behind every lit window there is a room: shelves in the convenience stores,
@@ -37,8 +37,9 @@ five seconds, or a giant magnet comes down and carries you back.
   in the city, all of it through a little old tape (a slow wow, a low-pass, a long reverb). A pulse-wave 8-bit
   arpeggio comes up under it while a drift is held. Each song is a sixteen-bar form of four-bar phrases, and each
   phrase picks one of its tunes or leaves the chords alone, so it never plays the same way twice.
-- **The frame.** It is drawn as cel bands with ink outlines, halftone shade and scanlines, then shown on a curved
-  CRT whose picture bends at the edges and rounds into the corners, in a 90s console's dithered colour.
+- **The frame.** It is drawn as cel bands with ink outlines, halftone shade and scanlines, with a camera motion blur
+  (the world streaks as the lens swings through a drift; the car stays sharp), then shown on a curved CRT whose
+  picture bends at the edges and rounds into the corners, in a 90s console's dithered colour.
 - **The dash** is a 90s tuner's: a tach with a redline, amber seven-segment mph and score.
 - **The car.** Held in a drift, its tail lamps leave thin red light trails hanging in the air behind it, the way a
   drift anime draws a slide at night; the lamps burn brighter on the brakes. The engine is an inline four built
@@ -101,6 +102,10 @@ A and D ask for as much lock as the corner ahead needs. Nothing steers the car w
 bend (a hairpin, a square corner) a slide that is held gets a hand on the line: where the sliding tyres fall
 short of the bend, the car is helped round the rest of the way and a slide too fast for the bend sheds a little
 speed, so a held drift makes the corner. Tight corners are also wider on their outside.
+
+Power: floor it and the rear tyres break loose, out of a slide or from a standstill: hold full lock and the throttle
+at low speed and the car spins donuts on the spot for as long as you hold them. Boost is earned by a drift and
+comes the moment the slide ends; a pull on the handbrake cancels it, to set up the next corner without it.
 
 Off the road: a countdown comes up under the score. Get back on the road before it runs out; at zero a big red
 horseshoe magnet swoops down, the car clanks onto it, and it is carried back to where it left the road and set

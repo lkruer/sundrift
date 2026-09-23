@@ -1,0 +1,16 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; D.rainNow(0); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); let best = null, bl = 0; for (let s = 400; s < 3000; s += 10) { let L = 0; while (L < 400 && Math.abs(t.sample(s + L).k) < 0.004) L += 10; if (L > bl) { bl = L; best = s; } } D.teleport(best, 0); window.__S__ = best; return [best, bl]; })()" },
+  { "wait": 3000 }, { "shot": "F1_straight" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car; const y = D.G.carY; const s = Math.sin(c.yaw), co = Math.cos(c.yaw); window.__CAM__ = { pos: [c.x - s * 6, y + 2.5, c.z - co * 6], look: [c.x + s * 300, y + 4, c.z + co * 300], fov: 40 }; })()" },
+  { "wait": 800 }, { "shot": "F2_straight_zoom" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car, U = D.track.field.U; const y = D.G.carY; window.__CAM__ = { pos: [c.x, y + 20, c.z], look: [c.x + U[0] * 600, y + 40, c.z + U[1] * 600], fov: 55 }; })()" },
+  { "wait": 800 }, { "shot": "F3_uphill" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car, U = D.track.field.U; const y = D.G.carY; window.__CAM__ = { pos: [c.x, y + 20, c.z], look: [c.x - U[0] * 600, y - 60, c.z - U[1] * 600], fov: 55 }; })()" },
+  { "wait": 800 }, { "shot": "F4_downhill" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 11; D.G.hourShown = 11; D.G.lastApplied = -9; })()" },
+  { "wait": 3500 }, { "shot": "F5_downhill_day" },
+  { "js": "(() => { const D = window.__DEBUG__, c = D.car, U = D.track.field.U; const y = D.G.carY; window.__CAM__ = { pos: [c.x, y + 20, c.z], look: [c.x + U[0] * 600, y + 40, c.z + U[1] * 600], fov: 55 }; })()" },
+  { "wait": 800 }, { "shot": "F6_uphill_day" }
+]

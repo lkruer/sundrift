@@ -396,6 +396,51 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 24 September, evening: power, donuts, boost, glare
+
+- **Motion blur** (the cel pass): each pixel's world position from the depth, through the last frame's camera,
+  gives where it was on the screen; the picture is averaged along that path (six samples, a 180-degree shutter,
+  at most 3% of the screen). Nothing within 9 m (the car, which rides with the lens) is blurred or blurred in, and
+  none across a camera cut. Off on phones. The render time with it on and off: the same within noise.
+- **What looked unrendered in the distance** was mostly the sea of cloud: by day it laid a flat white sheet over the
+  far valley (switching it off showed the rolling hills it hid), and at night a flat pale band that read as a lake.
+  It is now a thing of the night and the dawn only, capped at 60% (never hides what is behind), and it fades out
+  between 500 m and 1.7 km, so it lies in the nearer valleys. And the forest stopped at the second ring of terrain
+  tiles, about 360 m out: the hills beyond were bare and the trees appeared as the tiles came nearer. The third ring
+  (to 560 m) now has a far forest: each tree a cone or a blossom blob in two pools shared by every tile (two draws),
+  on the very cells the near forest uses (each cell now has its own random numbers), with the near trees' own
+  materials, so a tree coming nearer turns into the full model where it stood.
+- **Lamps**: the five real lamp lights go to the lamps round a point 34 m ahead of the car instead of round the car,
+  and fade in over a longer reach, so a lamp's pool of light is up well before the car gets there.
+- **Rain**: showers now, not spells: on the pass 30 to 60 s of rain every two to four minutes (it was 50 to 110 s in
+  every two to four), lighter (40 to 85%); in the city a 30% chance of starting in the rain (was 55%), 35 to 65 s
+  of it, then one and a half to three minutes clear.
+- **Measured under load**: other work on this machine was taking the CPU (a python process near the top of the
+  list), and every build dropped frames: the committed build 2,120 frames in the 45 s probe, this one 2,291. Frame
+  times this round are only comparable build to build, not with earlier rounds.
+
+- **Power and wheelspin** (car.js). The engine gives 17% more (9,600 N, fading to nothing at 245 km/h: 0 to 153 km/h
+  in 8 s where it was 136). The drive was clamped to what the rear had left after cornering, so the throttle could
+  never break the rear loose: out of a drift the car simply straightened, and a donut died on the spot (full lock,
+  full throttle from rest: under one turn in 10 s, the car rolling off in a circle at 117 km/h). Now the drive is
+  limited by the tyre's whole grip, and past what the rear can take it spins the tyres: a spinning tyre loses up to
+  68% of its cornering grip (less at speed), in the low gears or when already sideways, so the power re-breaks
+  traction out of a slide (the slide grows to 26-47 degrees again under full throttle) but never spins the car on a
+  fast straight or in a fast bend. Asked for a donut (low speed, full lock into the turn, the throttle floored) the
+  helpers that stop a spin step aside, the tyres break loose sooner, and the spinning keeps the car going round:
+  3.3 turns in 10 s from rest, and from a handbrake flick. Reversing and J-turns measure as before. The scripted
+  hairpin drifter: at a sensible speed still no wall hits; entered 40% too fast with bang-bang full lock, the extra
+  power carries it wide more often (14 touches in 7 hairpins).
+- **Boost** now comes the moment a slide ends (it used to wait for the 0.8 s grace in which a slide may resume
+  before the points bank; the boost earned is given then, and any more if the slide resumes and grows), with its
+  whoosh; a pull on the handbrake cancels a boost, with a short falling hiss.
+- **The street lamps' glare.** The lamp heads glow less (emissive 2.1 to 1.3), their lights are 20% dimmer and 30%
+  dimmer again in the rain, their pools and the city's no longer brighten in the wet, and the rain catches less of
+  them. The worst of it was not the lamps but their reflections: on the glossy wet road a lamp's specular peak ran to
+  many times white, and the bloom made each one a capsule of glare (found by switching each source off in turn). The
+  road's direct specular now has a soft ceiling (x / (1 + 2.6x), in its own shader hook): a lamp still streaks down
+  the wet asphalt, lit, never blown out. The neon's wet-road streaks top out at 60% of what they were.
+
 ## 24 September: tight corners, the city's trash, rain, detail
 
 - **NEO TOKYO, in detail** (a sub-agent, on the city's files). Rooms behind every lit window: buildings.js looks

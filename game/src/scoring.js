@@ -11,7 +11,7 @@
  * Every consequence is emitted as an event ({ type, value }) so the HUD and the audio can react without
  * this file knowing either exists.
  */
-import { SCORE, clamp } from './config.js?v=202609231752';
+import { SCORE, clamp } from './config.js?v=202609232035';
 
 export class Scoring {
   constructor() {
@@ -69,7 +69,7 @@ export class Scoring {
       }
       if (slip > SCORE.minSlip && speed > SCORE.minSpeed && car.surface > 0.3) {
         this.active = true;
-        this.points = 0; this.time = 0; this.endTimer = 0; this.tier = 0;
+        this.points = 0; this.time = 0; this.endTimer = 0; this.tier = 0; this.boostGiven = 0;
         this.dir = Math.sign(car.beta);
         this.chain = this.chainTimer > 0 ? this.chain + 1 : 1;
         this.mult = 1 + Math.min(4, (this.chain - 1) * 0.5);
@@ -108,6 +108,8 @@ export class Scoring {
       const tier = this.tierOf(this.points);
       if (tier > this.tier) { this.tier = tier; this.emit('tier', tier); }
     } else {
+      // the boost comes the moment the slide ends (the points still bank after the grace, in case it resumes)
+      if (this.endTimer === 0) this.giveBoost();
       this.endTimer += dt;
       if (this.endTimer > SCORE.endGrace) this.bank();
     }
@@ -124,15 +126,25 @@ export class Scoring {
     this.active = false;
     if (banked > 0) {
       this.total += banked;
-      const boost = clamp(banked * SCORE.boostPerPoint, 0.35, SCORE.boostMax);
-      this.boostGrant += boost;
+      this.giveBoost();
+      const boost = this.boostGiven;
       this.stats.longest = Math.max(this.stats.longest, this.time);
       this.stats.biggest = Math.max(this.stats.biggest, banked);
       this.emit('bank', banked, { tier: this.tier, boost, chain: this.chain, mult: this.mult });
       if (this.total > this.best) this.best = this.total;
     }
     this.chainTimer = SCORE.chainGrace;
-    this.points = 0; this.mult = 1; this.time = 0; this.tier = 0; this.endTimer = 0;
+    this.points = 0; this.mult = 1; this.time = 0; this.tier = 0; this.endTimer = 0; this.boostGiven = 0;
+  }
+
+  /** The boost the drift so far has earned, less what it has already been given. */
+  giveBoost() {
+    if (this.points <= 0) return;
+    const due = clamp(this.points * SCORE.boostPerPoint, 0.35, SCORE.boostMax) - (this.boostGiven || 0);
+    if (due < 0.05) return;
+    this.boostGiven = (this.boostGiven || 0) + due;
+    this.boostGrant += due;
+    this.emit('boost', due);
   }
 
   /** Seconds of boost granted since the last call. */

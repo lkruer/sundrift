@@ -1,0 +1,7 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__, G = D.G, t = D.track; D.rainNow(0); D.teleport(1500, 90); window.__AUTOPILOT__ = (dt) => { const c = D.car, n = t.nearest(c.x, c.z, G.idx), ahead = t.sample(G.s + 10 + c.speed * 0.6); let e = ahead.h - c.yaw; e = Math.atan2(Math.sin(e), Math.cos(e)); const k = Math.abs(t.sample(G.s + 25).k); const target = k > 0.03 ? 14 : k > 0.012 ? 20 : 30; const steer = Math.max(-1, Math.min(1, e * 2.4 - n.u * 0.12)); return { throttle: c.speed < target ? 1 : 0, brake: c.speed > target + 4 ? 1 : 0, steer, hand: 0, reverse: false, touch: false }; }; window.__POP__ = []; window.__ONFRAME__ = () => { const W = D.world; window.__POP__.push([Math.round(G.s), W.stats.chunks, W.stats.near, W.job ? W.job.c : -1]); }; })()" },
+  { "wait": 2500 }, { "shot": "P01" }, { "wait": 700 }, { "shot": "P02" }, { "wait": 700 }, { "shot": "P03" }, { "wait": 700 }, { "shot": "P04" }, { "wait": 700 }, { "shot": "P05" }, { "wait": 700 }, { "shot": "P06" },
+  { "js": "(() => { const P = window.__POP__; const jobs = P.filter((x) => x[3] >= 0).length; return { frames: P.length, framesWithJob: jobs, first: P[0], last: P[P.length - 1] }; })()" }
+]

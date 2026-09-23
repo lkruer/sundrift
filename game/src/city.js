@@ -11,13 +11,13 @@
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202609231752';
-import { buildingMaterial } from './buildings.js?v=202609231752';
-import { neonAtlas } from './neon.js?v=202609231752';
-import { cityPropMaterials, lotProps, parkingProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609231752';
-import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet } from './citydetail.js?v=202609231752';
-import { railSkip } from './citytrain.js?v=202609231752';
-import { carsLoad, parkCar } from './citycars.js?v=202609231752';
+import { clamp, lerp, mulberry32 } from './config.js?v=202609232035';
+import { buildingMaterial } from './buildings.js?v=202609232035';
+import { neonAtlas } from './neon.js?v=202609232035';
+import { cityPropMaterials, lotProps, parkingProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609232035';
+import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet } from './citydetail.js?v=202609232035';
+import { railSkip } from './citytrain.js?v=202609232035';
+import { carsLoad, parkCar } from './citycars.js?v=202609232035';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
@@ -168,7 +168,8 @@ export function cityLoad(w, Pool, fontFamily) {
 
 /** How wet the street is: the neon streaks come up with it. */
 export function cityWet(w, wet, night) {
-  if (w.streakMat) w.streakMat.opacity = (0.22 + 0.78 * wet) * (0.3 + 0.7 * night);
+  // (the signs' streaks on a wet road: bright, not blinding; at full strength they were the brightest thing on screen)
+  if (w.streakMat) w.streakMat.opacity = (0.2 + 0.42 * wet) * (0.3 + 0.7 * night);
   if (w.neonGlowMat) w.neonGlowMat.opacity = 0.9 * (0.35 + 0.65 * night);
   if (w.bldgMat && w.bldgMat.userData.uNight) w.bldgMat.userData.uNight.value = night;
   if (w.bldgMat && w.bldgMat.userData.uWet) w.bldgMat.userData.uWet.value = wet;

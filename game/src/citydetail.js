@@ -34,8 +34,8 @@
  * Nothing here stands on the road or in the first 1.3 m of pavement.
  */
 import * as THREE from 'three';
-import { mulberry32 } from './config.js?v=202609231752';
-import { railLoad, railChunk, railUpdate, railSkip } from './citytrain.js?v=202609231752';
+import { mulberry32 } from './config.js?v=202609232035';
+import { railLoad, railChunk, railUpdate, railSkip } from './citytrain.js?v=202609232035';
 
 const TAU = Math.PI * 2;
 const POLE_U = 1.35;             // the utility poles stand this far past the road's edge (the kerb zone, 1.3 m, stays clear)

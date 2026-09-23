@@ -28,12 +28,14 @@ const Cel = {
     uMist: { value: new THREE.Vector4(-1e4, 0.03, 14, 0) }, uMistCol: { value: new THREE.Color() }, uMistGlow: { value: new THREE.Color() }, uMistFar: { value: new THREE.Color() },
     uCamPos: { value: new THREE.Vector3() }, uCamRot: { value: new THREE.Matrix3() }, uTanFov: { value: new THREE.Vector2(1, 1) },
     uMoonDir: { value: new THREE.Vector3(0, 1, 0) }, uNoise: { value: null }, uMistT: { value: 0 },
+    uPrevVP: { value: new THREE.Matrix4() }, uBlur: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed, uVig, uHit, uCA;
     uniform vec3 uShaft, uShaftCol;
     uniform vec4 uMist; uniform vec3 uMistCol, uMistGlow, uMistFar, uCamPos, uMoonDir; uniform mat3 uCamRot; uniform vec2 uTanFov; uniform sampler2D uNoise; uniform float uMistT;
+    uniform mat4 uPrevVP; uniform float uBlur;
     // how much cloud lies between height y and the cloud's top: a ramp over soft metres, then solid
     float mistG(float y, float top, float soft) { float d = top - y; return d <= 0.0 ? 0.0 : d < soft ? d * d / (2.0 * soft) : d - 0.5 * soft; }
     varying vec2 vUv;
@@ -44,11 +46,35 @@ const Cel = {
     void main(){
       vec2 px = 1.0 / uRes;
       vec3 c = texture2D(tDiffuse, vUv).rgb;
+      // motion blur: where this pixel was on the screen a frame ago (its world position from the depth, through the
+      // last frame's camera), and the picture averaged along the way it moved, half a frame's worth (a 180-degree
+      // shutter). The car rides with the lens, so nothing within 9 m is blurred and nothing that near is blurred in.
+      if (uBlur > 0.001) {
+        float dB = lin(vUv);
+        vec3 wdB = uCamRot * vec3((vUv * 2.0 - 1.0) * uTanFov, -1.0);
+        vec4 pc = uPrevVP * vec4(uCamPos + wdB * dB, 1.0);
+        vec2 vel = (vUv - (pc.xy / max(pc.w, 1e-4) * 0.5 + 0.5)) * uBlur * smoothstep(8.0, 14.0, dB);
+        float vl = length(vel * vec2(uRes.x / uRes.y, 1.0));
+        if (vl > 0.03) vel *= 0.03 / vl;
+        if (vl > 0.0015 && pc.w > 0.0) {
+          vec3 acc = c; float wsum = 1.0;
+          float jit = hash(gl_FragCoord.xy * 0.37 + fract(uTime * 3.0)) - 0.5;
+          for (int i = 1; i <= 6; i++) {
+            float t = (float(i) + jit) / 6.0 - 0.5;
+            vec2 uv2 = clamp(vUv - vel * t * 2.0, 0.001, 0.999);
+            float ok = step(8.0, lin(uv2));
+            acc += texture2D(tDiffuse, uv2).rgb * ok; wsum += ok;
+          }
+          c = acc / wsum;
+        }
+      }
       // a tube's colour fringe: red and blue slip apart toward the edges of the frame
       if (uCA > 0.0) {
+        // (as a difference from the centre, so a blurred colour keeps its blur)
         vec2 fr = (vUv - 0.5) * uCA * dot(vUv - 0.5, vUv - 0.5) * 4.0;
-        c.r = texture2D(tDiffuse, vUv + fr).r;
-        c.b = texture2D(tDiffuse, vUv - fr).b;
+        vec3 c0 = texture2D(tDiffuse, vUv).rgb;
+        c.r += texture2D(tDiffuse, vUv + fr).r - c0.r;
+        c.b += texture2D(tDiffuse, vUv - fr).b - c0.b;
       }
       // speed: the edges of the frame smear toward the centre, the way a drift anime draws speed
       vec2 toC = vUv - vec2(0.5, 0.42);
@@ -96,10 +122,11 @@ const Cel = {
         vec2 hit = mix(uCamPos.xz, P.xz, tt);
         float nz = dot(texture2D(uNoise, hit / 420.0 + uMistT * vec2(0.0016, 0.0007)), vec4(0.5, 0.27, 0.15, 0.08));
         nz += 0.35 * (dot(texture2D(uNoise, hit / 130.0 - uMistT * vec2(0.003, 0.0045)), vec4(0.4, 0.3, 0.2, 0.1)) - 0.5);
-        float top = uMist.x + (nz - 0.5) * 16.0;
+        float top = uMist.x + (nz - 0.5) * 30.0;
         float L = length(P - uCamPos), dy = y0 - y1;
         float amt = abs(dy) > 0.05 ? abs(mistG(y1, top, uMist.z) - mistG(y0, top, uMist.z)) * L / abs(dy) : clamp((top - y0) / uMist.z, 0.0, 1.0) * L;
-        float tau = min(uMist.y * amt * (0.55 + 0.9 * nz), 30.0);
+        // (in the nearer valleys, not the far ones: a sheet across the far valley floor reads as a flat lake)
+        float tau = min(uMist.y * amt * (0.55 + 0.9 * nz), 0.9) * (1.0 - smoothstep(500.0, 1700.0, L));
         float T = exp(-tau);
         vec3 mc = uMistCol * (0.68 + 0.7 * nz) + uMistGlow * pow(max(0.0, dot(normalize(wd), uMoonDir)), 5.0);
         // (the far sea of cloud takes the haze, as everything far does, so it meets the sky without a line)

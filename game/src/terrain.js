@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609231752';
-import { REACH } from './ground.js?v=202609231752';
-import { instanceGroup } from './instancing.js?v=202609231752';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609232035';
+import { REACH } from './ground.js?v=202609232035';
+import { instanceGroup, Pool } from './instancing.js?v=202609232035';
 
 export const TILE = 96;
 export const LODS = [
@@ -48,6 +48,33 @@ export class Terrain {
     this.far = null; this.farAt = null; this.farJob = null;
     this.cx = 0; this.cz = 0;
     this.stats = { built: 0, ms: 0 };
+    this.nextId = 1;
+    this._farForest();
+  }
+
+  /**
+   * The far forest: on the third ring of tiles (out to 560 m), where the trees used to stop and the hills went bare,
+   * each tree is a single cone (a cedar) or a single blob (a cherry), in two pools shared by every tile: two draws.
+   * They stand on the very cells the near forest uses (per-cell random numbers), with the near trees' own
+   * materials, so a tree coming nearer turns into the full model where it stood.
+   */
+  _farForest() {
+    const P = this.o.parts; if (!P || this.o.city) return;
+    const foliageOf = (parts, re) => parts && parts.find((p) => re.test(p.material.name));
+    const ced = foliageOf(P.cedar, /foliage/), chr = foliageOf(P.sakuraFar || P.maple || P.sakura, /foliage_tinted|foliage/);
+    if (!ced || !chr) return;
+    const size = (parts) => { const b = new THREE.Box3(), t = new THREE.Box3(); for (const p of parts) { p.geometry.computeBoundingBox(); t.copy(p.geometry.boundingBox).applyMatrix4(p.local); b.union(t); } return b; };
+    const cb = size(P.cedar), kb = size(P.sakuraFar || P.maple || P.sakura);
+    const cH = cb.max.y - cb.min.y, cR = Math.max(cb.max.x - cb.min.x, cb.max.z - cb.min.z) * 0.42;
+    const cone = new THREE.ConeGeometry(cR, cH * 0.86, 6, 1); cone.translate(0, cb.min.y + cH * 0.14 + cH * 0.43, 0);
+    const kW = Math.max(kb.max.x - kb.min.x, kb.max.z - kb.min.z), kH = kb.max.y - kb.min.y;
+    const blob = new THREE.IcosahedronGeometry(0.5, 0); blob.scale(kW * 0.95, kH * 0.62, kW * 0.95); blob.translate(0, kb.min.y + kH * 0.62, 0);
+    const I = new THREE.Matrix4();
+    this.farTrees = {
+      cedar: new Pool([{ geometry: cone, material: ced.material, local: I }], 7000),
+      cherry: new Pool([{ geometry: blob, material: chr.material, local: I }], 4000, { tint: true }),
+    };
+    for (const p of Object.values(this.farTrees)) this.root.add(p.group);
   }
 
   /** Forget every tile (a new course). */
@@ -55,6 +82,10 @@ export class Terrain {
     if (ground) { this.ground = ground; this.field = ground.field; }
     for (const t of this.tiles.values()) this._dispose(t);
     this.tiles.clear();
+    if (this.farTrees) for (const p of Object.values(this.farTrees)) p.clear();
+    // (a map with no forest has no far forest; the pass builds it again if it had none)
+    if (this.o.city && this.farTrees) { for (const p of Object.values(this.farTrees)) this.root.remove(p.group); this.farTrees = null; }
+    else if (!this.o.city && !this.farTrees) this._farForest();
     this.job = null; this.farJob = null; this.farAt = null;
     if (this.far) { this.root.remove(this.far); this.far.geometry.dispose(); this.far = null; }
   }
@@ -105,6 +136,7 @@ export class Terrain {
       const r = this.job.it.next();
       if (r.done) this.job = null;
     }
+    if (this.farTrees) for (const p of Object.values(this.farTrees)) { p.flush(); for (const part of p.parts) part.im.visible = p.n > 0; }
     // the far mesh follows the car in steps
     if (!this.farAt || Math.hypot(x - this.farAt[0], z - this.farAt[1]) > FAR_RECENTER) {
       if (!this.farJob) {
@@ -155,6 +187,7 @@ export class Terrain {
 
   _dispose(t) {
     if (t.mesh) { this.root.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh = null; }
+    if (t.farId && this.farTrees) { for (const p of Object.values(this.farTrees)) p.removeOwner(t.farId); t.farId = 0; }
     if (t.trunks && this.o.colliders) { this.o.colliders.drop('tile' + t.i + ',' + t.j); t.trunks = null; }
     if (t.trees) { this.root.remove(t.trees); t.trees.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); t.trees = null; }
   }
@@ -181,6 +214,7 @@ export class Terrain {
     const trees = this.o.city ? this._blocks(tile, lod, seg, H, E, F) : lod <= 1 ? this._forest(tile, lod, seg, H, E, F) : null;
     // swap
     this._dispose(tile);
+    if (!this.o.city && lod === 2 && this.farTrees) this._forest(tile, lod, seg, H, E, F);
     const mesh = new THREE.Mesh(geo, this.o.mat);
     mesh.receiveShadow = true; mesh.castShadow = false;
     mesh.name = 'tile';
@@ -312,12 +346,16 @@ export class Terrain {
   _forest(tile, lod, seg, H, E, F) {
     const f = this.field, P = this.o.parts;
     const n = seg + 3, sp = TILE / seg;
-    const rng = mulberry32(((tile.i * 73856093) ^ (tile.j * 19349663) ^ (this.o.seed || 0)) >>> 0);
+    const far = lod >= 2;
     const spacing = (lod === 0 ? 8.8 : 11.5) / (this.o.density || 1);
-    const cedars = [], sakura = [], broad = [], bare = [], trunks = (this._trunks = []);
+    const cedars = [], sakura = [], broad = [], bare = [], trunks = (this._trunks = far ? null : []);
     const cells = Math.floor(TILE / spacing);
     const step = TILE / cells;
+    let farId = 0;
+    if (far) { farId = tile.farId = this.nextId++; }
     for (let gz = 0; gz < cells; gz++) for (let gx = 0; gx < cells; gx++) {
+      // (each cell its own random numbers, so a tree stands on the same spot at every level of detail)
+      const rng = mulberry32(((tile.i * 73856093) ^ (tile.j * 19349663) ^ (gx * 83492791) ^ (gz * 29765729) ^ (this.o.seed || 0) ^ (lod === 0 ? 0x5bd1e995 : 0)) >>> 0);
       const lx = (gx + 0.15 + rng() * 0.7) * step, lz = (gz + 0.15 + rng() * 0.7) * step;
       const x = tile.i * TILE + lx, z = tile.j * TILE + lz;
       const gi = Math.round(lx / sp) + 1, gj = Math.round(lz / sp) + 1;
@@ -332,10 +370,15 @@ export class Terrain {
       const y = Terrain.surf(H, n, sp, lx, lz) - 0.35;
       const ry = rng() * Math.PI * 2, sc = 0.72 + rng() * 0.6;
       _q.setFromAxisAngle(_up, ry); _s.set(sc, sc, sc);
-      const m = _m4.compose(_v.set(x, y, z), _q, _s).clone();
-      trunks.push([x, z, 0.36 * sc, y]);
+      const m = far ? _m4.compose(_v.set(x, y, z), _q, _s) : _m4.compose(_v.set(x, y, z), _q, _s).clone();
       const patch = f.vnoise(x / 70, z / 70, 11);
       const pick = rng();
+      if (far) {
+        if (patch > 0.42 && pick < 0.62) this.farTrees.cherry.add(farId, m, pick < 0.3 ? PAL.sakuraPale : pick < 0.5 ? PAL.sakuraPink : PAL.sakuraWhite);
+        else this.farTrees.cedar.add(farId, m);
+        continue;
+      }
+      trunks.push([x, z, 0.36 * sc, y]);
       // a grove: mostly cherry in blossom with fresh broadleaf through it (the far ring keeps only the cherry,
       // so a hillside reads pink in patches from across the valley)
       if (patch > 0.42 && (lod === 0 || pick < 0.62)) {
@@ -344,6 +387,7 @@ export class Terrain {
         else sakura.push({ m, colour: pick < 0.62 ? PAL.sakuraPale : pick < 0.86 ? PAL.sakuraPink : PAL.sakuraWhite });
       } else cedars.push({ m });
     }
+    if (far) return null;
     const g = new THREE.Group(); g.name = 'forest';
     // the forest casts no shadow: at night the moon's tree shadows barely read, and drawing a forest twice was a
     // quarter of the frame's triangles
