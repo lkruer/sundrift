@@ -15,7 +15,7 @@
  * sixteen-bar form (A A B A) of four-bar phrases, and every phrase picks one of its section's tunes or leaves the
  * chords to themselves for a while, so it never plays the same way twice.
  */
-import { clamp } from './config.js?v=202609232035';
+import { clamp } from './config.js?v=202609232110';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };

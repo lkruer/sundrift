@@ -34,6 +34,7 @@ export const CAR = {
   boostForce: 6200,
   assist: 0.62,                   // counter-steer assist, 0..1, added to the player's steer at slip
   assistTouch: 0.78,
+  assistYield: 2.0,               // how fast a key held into the turn takes the counter-steer help away (x the key)
   steerGainMin: 0.72,             // A/D on a straight give this share of the lock a tight corner gets
   holdAngle: 0.62,                // rad: past this the rear finds grip again, so a held slide does not spin
   lineAssist: 0.75,               // tight bends taken sideways: share of the missing turn the path and nose are helped round by
@@ -157,23 +158,31 @@ export class Car {
     const D = this._donut;
     const assist0 = (inp.touch ? P.assistTouch : P.assist) * (1 - 0.85 * D);
     // the direction the front axle is actually travelling, relative to the nose; steering the wheels toward it is
-    // counter-steer, and doing part of it for the player is what keeps a thumb from spinning the car. Past about
-    // 45 degrees of slip the assist takes over almost entirely, which is what gives the car a natural maximum
-    // angle instead of a spin when a player keeps the key held into the slide.
+    // counter-steer, and doing part of it for the player is what keeps a thumb from spinning the car. With no key
+    // held (or a key held the catch's way) the assist has the wheel, more of it the deeper the slide; past about 45
+    // degrees it has almost all of it, which gives a held slide a natural maximum angle instead of a spin.
     const frontSlipDir = Math.atan2(this.vL + P.a * this.omega, Math.max(Math.abs(this.vF), 0.8));
     const bigSlip = sstep(0.55, 1.0, Math.abs(frontSlipDir));
     const assist = assist0 + (0.97 - assist0) * bigSlip * (1 - D);
     const assistRaw = clamp(frontSlipDir, -P.maxSteer, P.maxSteer) * assist * sstep(1.5, 6, speed) * (this.vF < 0 || this.jt ? 0 : 1);
     // filtered: the assist follows the slide, not every wobble of it, so the front wheels never chatter
     this._assist += (assistRaw - this._assist) * Math.min(1, h * 22);
-    const playerSteer = inp.steer * steerMax * (backing ? 1 : 1 - 0.7 * bigSlip * (1 - D) * (Math.sign(inp.steer) === -Math.sign(frontSlipDir) ? 1 : 0));
+    // but the player's hands win: a key held INTO the turn (against the catch) takes the help away in proportion
+    // (a key held half way or more: all of it), so the wheels go where the key says. (The assist used to keep the
+    // wheel and cut the key to a third in a deep slide: the wheels pointed against the key held into the turn.)
+    // Spinning is then held off by the rear's grip past the comfortable angle and the yaw damping past 50 degrees.
+    const intoTurn = inp.steer !== 0 && Math.sign(inp.steer) === -Math.sign(frontSlipDir);
+    const yield_ = intoTurn && !backing ? Math.min(1, Math.abs(inp.steer) * P.assistYield) : 0;
+    const playerSteer = inp.steer * steerMax * (backing ? 1 : 1 - 0.25 * bigSlip * (1 - D) * (intoTurn ? 1 : 0));
     // A and D ask for as much lock as the corner ahead needs: a hairpin gets full lock, a straight a gentler
     // correction. Nothing steers the car when no key is held.
     let gainT = 1;
     const LN = inp.line;
     if (LN && speed > 4 && !backing && this.jturn <= 0) gainT = clamp(Math.abs(LN.curv) * 30 + P.steerGainMin, P.steerGainMin, 1.0);
     this._gain += (gainT - this._gain) * Math.min(1, h * 4);
-    const target = clamp(playerSteer * this._gain + this._assist, -P.maxSteer, P.maxSteer);
+    let target = clamp(playerSteer * this._gain + this._assist * (1 - yield_), -P.maxSteer, P.maxSteer);
+    // (and whatever else is going on, a key held firmly never has the wheels pointing the other way)
+    if (Math.abs(inp.steer) > 0.25 && !backing && target * Math.sign(inp.steer) < 0) target = 0;
     this.steer += clamp(target - this.steer, -P.steerRate * h, P.steerRate * h);
     const d = this.steer;
 

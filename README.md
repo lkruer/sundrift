@@ -98,7 +98,9 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 
 Drift: tap the handbrake into a corner (or lift and turn), steer into the slide, hold it with the throttle.
 The car does part of the counter-steer for you (more on a phone), holds a slide at a comfortable angle, and
-A and D ask for as much lock as the corner ahead needs. Nothing steers the car when no key is held. In a tight
+A and D ask for as much lock as the corner ahead needs. Nothing steers the car when no key is held, and the help
+never overrides you: steer into the turn and the wheels go where you steer, the counter-steer stepping aside as
+the key goes down. In a tight
 bend (a hairpin, a square corner) a slide that is held gets a hand on the line: where the sliding tyres fall
 short of the bend, the car is helped round the rest of the way and a slide too fast for the bend sheds a little
 speed, so a held drift makes the corner. Tight corners are also wider on their outside.

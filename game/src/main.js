@@ -6,22 +6,22 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609232035';
-import { createRig, detectTier } from '../rig.js?v=202609232035';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609232035';
-import { Car, gearbox } from './car.js?v=202609232035';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609232035';
-import { World, drawsGlyphs } from './world.js?v=202609232035';
-import { ChaseCam } from './camera.js?v=202609232035';
-import { Input } from './input.js?v=202609232035';
-import { Scoring } from './scoring.js?v=202609232035';
-import { Hud } from './hud.js?v=202609232035';
-import { Audio } from './audio.js?v=202609232035';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609232035';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609232035';
-import { Atmosphere } from './atmos.js?v=202609232035';
-import { Debris } from './debris.js?v=202609232035';
-import { makePost } from './post.js?v=202609232035';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609232110';
+import { createRig, detectTier } from '../rig.js?v=202609232110';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609232110';
+import { Car, gearbox } from './car.js?v=202609232110';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609232110';
+import { World, drawsGlyphs } from './world.js?v=202609232110';
+import { ChaseCam } from './camera.js?v=202609232110';
+import { Input } from './input.js?v=202609232110';
+import { Scoring } from './scoring.js?v=202609232110';
+import { Hud } from './hud.js?v=202609232110';
+import { Audio } from './audio.js?v=202609232110';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609232110';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609232110';
+import { Atmosphere } from './atmos.js?v=202609232110';
+import { Debris } from './debris.js?v=202609232110';
+import { makePost } from './post.js?v=202609232110';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');

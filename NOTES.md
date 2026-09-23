@@ -396,6 +396,21 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 24 September, night: the wheel is the player's
+
+- **The counter-steer assist no longer overrides the player.** In a deep slide the assist (which steers the front
+  wheels toward the way the car is travelling, the catch that keeps a thumb from spinning the car) grew to 97% and
+  cut a key held into the turn to a third, so the wheels pointed against the key: measured in the car sim, a drift
+  with the key held into the turn had the wheels pointing the other way 42% of the time on keys and 48% on touch,
+  by up to 19 degrees. Now a key held into the turn takes the help away in proportion (half a key or more: all of
+  it; P.assistYield), the key is cut by at most a quarter in a deep slide, and a key held firmly never has the
+  wheels pointing the other way: 0% on both, and still no spin (the rear's grip past the comfortable angle and the
+  yaw damping past 50 degrees hold it). With no key held, or a key held the catch's way, the help is all there, as
+  before (a flicked slide let go of is caught exactly as it was). Donuts, J-turns and reversing measure as before;
+  hairpins at a sensible speed: no wall hits; entered 40% too fast with full lock: 8 touches in 7 (it was 14,
+  because full lock now turns the car). The owner may later want EASY left as it was and HARD with lesser assists:
+  the knobs are all in car.js CAR (assist, assistTouch, assistYield, lineAssist), so a per-course override is small.
+
 ## 24 September, evening: power, donuts, boost, glare
 
 - **Motion blur** (the cel pass): each pixel's world position from the depth, through the last frame's camera,
