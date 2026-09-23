@@ -37,8 +37,8 @@ export const SCORE = {
   minSpeed: 6.0,         // m/s before a slide counts
   minSlip: 0.15,         // rad, drift begins
   endSlip: 0.11,         // rad, drift ends below this for endGrace seconds
-  endGrace: 0.7,
-  chainGrace: 2.2,       // seconds between drifts that keep the chain alive
+  endGrace: 0.8,
+  chainGrace: 2.6,       // seconds between drifts that keep the chain alive
   rate: 2.2,             // points per second per (km/h * angle factor * multiplier)
   multStep: 0.5,         // multiplier gained per multEvery seconds of continuous drift
   multEvery: 1.4,
@@ -49,7 +49,7 @@ export const SCORE = {
   boostMax: 3.4,
   clipDist: 0.55,        // metres from the rail that count as a clip
   clipBonus: 250,
-  crashSpeed: 6.0,       // m/s of lateral impact that drops the held drift
+  crashSpeed: 8.0,       // m/s of lateral impact that drops the held drift
 };
 
 export const QUALITY = {
@@ -61,7 +61,7 @@ export const QUALITY = {
 export const MAX_DT = 1 / 20;
 
 /** The car as drawn: a little smaller than the physics body, so the road reads roomy. */
-export const CAR_SCALE = 0.75;
+export const CAR_SCALE = 0.68;
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt));

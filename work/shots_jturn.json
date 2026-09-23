@@ -1,0 +1,14 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.teleport(300); window.__REC__ = []; window.__ONFRAME__ = () => { const c = D.car; window.__REC__.push([Math.round(c.yaw * 57.2958), +c.vF.toFixed(1), c.jt]); }; })()" },
+  { "keys": ["KeyS"], "ms": 3200 },
+  { "shot": "J0_reversing" },
+  { "keys": ["KeyA", "KeyW"], "ms": 350 },
+  { "shot": "J1_swinging" },
+  { "keys": ["KeyW"], "ms": 700 },
+  { "shot": "J2_round" },
+  { "keys": ["KeyW"], "ms": 1200 },
+  { "shot": "J3_away" },
+  { "js": "(() => { const r = window.__REC__; const out = []; for (let i = 0; i < r.length; i += 12) out.push(r[i]); return { score: Math.round(window.__DEBUG__.scoring.total), samples: out }; })()" }
+]

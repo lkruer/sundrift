@@ -88,6 +88,7 @@
   @keyframes glow { 0%,100% { filter:brightness(1);} 50% { filter:brightness(1.18);} }
   .keys { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; color:var(--dim); letter-spacing:.06em; }
   .keys div { white-space:nowrap; }
+  .keys .tip { color:var(--amber); opacity:.75; }
   kbd { display:inline-block; min-width:24px; padding:1px 6px; border:1px solid rgba(246,239,226,.4); border-bottom-width:2px; border-radius:4px;
         font-family:"Share Tech Mono",monospace; font-size:12px; color:var(--ink); background:rgba(0,0,0,.3); margin-right:3px; text-align:center; }
   body.touch .keys.k { display:none; } body:not(.touch) .keys.f { display:none; }
@@ -247,7 +248,7 @@
 
 <div id="hud">
   <div id="combo"><div class="lab">COMBO</div><div><span class="x">×</span><span id="combon" class="num">0</span></div><div class="chain"><i id="chainf"></i></div>
-    <div id="distbox"><div class="lab">DIST KM</div><svg id="dist7" class="seg"></svg></div></div>
+    <div id="distbox"><div class="lab">DIST MI</div><svg id="dist7" class="seg"></svg></div></div>
   <div id="scorebox"><div class="lab">SCORE</div><svg id="score7" class="seg glow"></svg></div>
   <div id="drift"><span id="driftpts" class="num">0</span><span id="mult" class="num">×1.0</span><div id="tier"></div></div>
   <div id="clockbox"><div class="lab">TIME</div><svg id="clock7" class="seg glow"></svg></div>
@@ -256,7 +257,7 @@
     <svg class="tach" id="tach" viewBox="0 0 200 204" aria-hidden="true"></svg>
     <svg id="gear" class="seg glow"></svg>
     <svg id="spd7" class="seg glow"></svg>
-    <div class="kmh">KM/H</div>
+    <div class="kmh">MPH</div>
     <div id="lamps"><span class="lamp" id="lampdrift">DRIFT</span><span class="lamp" id="lampclip">CLIP</span><span class="lamp" id="lampboost">BOOST</span></div>
   </div>
   <div id="angle"><div class="rail"><div id="anglef"></div></div><div class="lab"><span>L</span><span id="angledeg">0°</span><span>R</span></div></div>
@@ -285,8 +286,8 @@
     <div class="sect">PAINT <span id="paintname">PEARL WHITE</span></div>
     <div class="swatches" id="swatches"></div>
     <button class="start" id="startb"><span>START</span></button>
-    <div class="keys k"><div><kbd>W</kbd><kbd>S</kbd>gas · brake</div><div><kbd>A</kbd><kbd>D</kbd>steer</div><div><kbd>SPACE</kbd>handbrake</div><div><kbd>ESC</kbd>pause</div><div>wheel · zoom</div></div>
-    <div class="keys f"><div>left thumb: hold to drive, slide to steer</div><div>right thumb: handbrake</div></div>
+    <div class="keys k"><div><kbd>W</kbd><kbd>S</kbd>gas · brake · reverse</div><div><kbd>A</kbd><kbd>D</kbd>steer</div><div><kbd>SPACE</kbd>handbrake</div><div><kbd>ESC</kbd>pause</div><div>wheel · zoom</div><div class="tip">back up fast, full lock, gas: J-TURN</div></div>
+    <div class="keys f"><div>left thumb: hold to drive, slide to steer</div><div>pull down: brake, reverse</div><div>right thumb: handbrake</div></div>
   </div>
   <div id="building">BUILDING THE PASS</div>
   <div class="credit">CHAIN DRIFTS · BANK SCORE · EARN BOOST</div>
@@ -300,6 +301,6 @@
   <div class="stats" id="pstats"></div>
 </div>
 
-<script type="module" src="./src/main.js?v=202609222305"></script>
+<script type="module" src="./src/main.js?v=202609230143"></script>
 </body>
 </html>

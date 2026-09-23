@@ -279,3 +279,53 @@ with paint (white by default) and a pause menu, more retro, softer headlights, a
   after the cel bands so halos stay round. A faint tube colour fringe at the frame's edges.
 - **Measured on commit after this section** (desktop gate / phone gate): ready 5.3 s / 4.4 s, 60 fps, peak
   463 / 367 draws, peak 1.30 M / 0.91 M triangles, 0 console errors, drifts banked every run.
+
+
+## 22 September, late: reverse and J-turns, leeway, tunnels, miles
+
+Asked for: a reverse good enough for clean J-turns, more leeway and easier smooth driving, a tunnel overhaul,
+a slightly smaller car, miles per hour, and a little more retro.
+
+- **Reverse.** Before: the tyre slip angles assumed forward travel, so the whole reverse range was handed to a
+  kinematic blend, and the reverse gear pulled 0.45 of the engine and cut out at 5 m/s. A reversing car could
+  not slide, so a J-turn could not happen. Now the slip angles are measured in each wheel's own frame (valid
+  both ways), the gear pulls 0.72 of the engine up to 12 m/s (27 mph) with full lock available, and while the
+  reverse gear is held the car follows its wheels at any speed with the lateral g capped. `work/reverse_test.mjs`:
+  backing up at 12-20 mph on the gear, a 0.12 s tap on the wheel turns the car 7-9 degrees, a 1 s hold 65, and
+  it stops turning when the wheel is let go. (The first version left fast reversing to the tyres: a 0.5 s hold at
+  20 mph ended 117 degrees round, and any tap over 0.12 s started a J-turn nobody asked for.)
+- **J-turn.** Let the reverse gear go above about 10 mph with the wheel past 70 % and it starts: the tyres let go
+  a little, the drive waits until the nose is within 40 degrees of the direction of travel, and the yaw is
+  steered to bring the car round to face the way it is moving, then settled. `work/jturn_test.mjs`, ten
+  variants (steer only, with gas, with a handbrake tap, left and right, 14-20 mph): round and driving forward in
+  0.80-0.83 s, within 7 degrees of the reverse heading. In the game, scripted keys: about 175 degrees in a
+  second, then away at 16 m/s. A clean one pays 500 with a J-TURN! toast (the first build lost the bonus: the
+  flag was cleared a substep before the game read it). The camera looks along the direction of travel while
+  backing up fast (so the car's face is in frame and the road behind it is visible) and swings round with it;
+  the old 2.2 rad snap is gone.
+- **Leeway.** Walls from the centre line: easy 6.3 to 6.9 m, medium 5.5 to 6.1, hard 4.9 to 5.4 (the
+  generator's clearance grows with them: still 0 overlaps and 0 squeezes over 5 seeds x 30 km x 3 courses). The
+  edge line counts as asphalt, and the gravel to the wall keeps 0.88 of the grip (was 0.7 for 0.9 m, then 0.35).
+  A wall hit keeps 55 % of its yaw kick and scrubs less speed; a held drift drops only at 8 m/s into a wall (was
+  6); a drift survives 0.8 s straight (was 0.7) and chains within 2.6 s (was 2.2). The wheel eases over a
+  little slower (7.2 per s, was 9), the lock falls off a touch more with speed, yaw is always lightly damped
+  (0.5 per s, was 0.35), and the rear has a little more grip (1.33, was 1.30) and gives less of it to the
+  throttle (circle gain 0.46, was 0.50).
+- **Tunnels.** The bore is 1.5 m wider than the road each side: kerb, walkway, a tiled wall, and a 20-segment
+  arch, 6.45 m to the crown, lined with a 1024 x 512 canvas texture (kerb, walkway, seven courses of tile, a green
+  band, the arch with water stains). Fittings are merged per material per chunk: sodium lamps every 3 m (a real
+  lamp light every 12 m), cable trays, amber reflectors every 6 m, green exit signs every 60 m, alarm cabinets
+  and red lamps every 50 m, jet fan pairs every 120 m. Each portal is a concrete face with a bore-shaped hole,
+  a hood ring, a coping, a lamp, wing walls stepping down the hill, and a nameplate in kanji and romaji (eight
+  names, romaji alone where the font has no kanji). A height field cannot overhang, so the terrain was a sheet
+  across each mouth and the bore looked black from outside: the terrain now leaves the cells that straddle a
+  mouth open, and the portal face hides the cut. Inside, the lining glows sodium orange, the headlights drop to
+  40 %, and the engine and tyres go through a short feedback echo.
+- **Car and units.** Drawn at 0.68 scale (was 0.75). Speed in mph, distance in miles, reverse and J-turn hints
+  on the title screen.
+- **Retro.** One more pass, last, in display space: a barrel curve (0.045) with rounded corners, colour cut to
+  32 levels a channel with a 4 x 4 Bayer dither, and a 6 % aperture grille (off above 1.6 device pixels per CSS
+  pixel, where it would moire). Scanlines 0.075 (was 0.06).
+- **Measured** (desktop gate / phone gate): ready 5.5 s / 5.1 s, 60 fps, 0 frames over 34 ms, peak 497 / 380
+  draws, peak 1.06 M / 0.76 M triangles. A 1.5 km desktop run through the first tunnel: peak 553 draws, 1.22 M
+  triangles, 0 slow frames.

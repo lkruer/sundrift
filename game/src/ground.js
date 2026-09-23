@@ -12,8 +12,8 @@
  *
  * Pure maths, no Three.js: the terrain tiles, the props, the camera and the tests all ask this one function.
  */
-import { clamp, smoothstep } from './config.js?v=202609222305';
-import { CELL, ckey } from './track.js?v=202609222305';
+import { clamp, smoothstep } from './config.js?v=202609230143';
+import { CELL, ckey } from './track.js?v=202609230143';
 
 export const CUT = 1.25;          // steepest cut face: rise per metre (51 degrees)
 export const FILL = 0.8;          // steepest embankment (39 degrees)
@@ -30,7 +30,7 @@ export class Ground {
     this.track = track;
     this.field = track.field;
     this.tubeHalf = track.tubeHalf;
-    this.tubeTop = track.tubeHalf * (1 + 2.4 / 4.05);   // the lining's crown above the road (walls scale with the portal)
+    this.tubeTop = 2.4 + 4.05;                           // the lining's crown: walls 2.4 m, an arch 4.05 m high
     this.out = { h: 0, edge: 99, flat: false, tunnel: false, natural: 0 };
   }
 
@@ -49,7 +49,8 @@ export class Ground {
     let N = base;
     if (t.tunnels.length) { const sp = this.spur(x, z); if (sp > N) N = sp; }
     out.natural = N;
-    out.flat = false; out.tunnel = false; out.edge = 99; out.s = 0;
+    out.flat = false; out.tunnel = false; out.edge = 99; out.s = 0; out.mouth = false;
+    const mouths = t.tunnels.length ? this._mouths() : null;
 
     let U = Infinity, L = -Infinity, eU = 0, eL = 0;
     let exactD = Infinity, exactY = 0, tunnelD = Infinity, minE = Infinity;
@@ -79,6 +80,12 @@ export class Ground {
         const w = left ? a.wl + (b.wl - a.wl) * tt : a.wr + (b.wr - a.wr) * tt;
         const edge = d - w;
         if (edge < out.edge) { out.edge = edge; out.s = a.s + (b.s - a.s) * tt; }
+        // the mouth of a tunnel: a heightfield cannot overhang, so the ground there would be a sheet across the
+        // opening; the terrain leaves these cells open, and the portal face hides the cut
+        if (mouths && d < this.tubeHalf + 0.8) {
+          const sm = a.s + (b.s - a.s) * tt;
+          for (let q = 0; q < mouths.length; q += 2) if (sm > mouths[q] && sm < mouths[q + 1]) { out.mouth = true; break; }
+        }
         if (a.tunnel && b.tunnel) {
           // the tunnel: the ground is at least the roof over the lining, falling away beside it
           const foot = this.tubeHalf + 1.2;
@@ -125,6 +132,16 @@ export class Ground {
     }
     out.h = h;
     return out;
+  }
+
+  /** Stretches of road (by distance along it) at the two mouths of every final tunnel. */
+  _mouths() {
+    const t = this.track;
+    if (this._mouthN === t.nFinalF && this._mouthList) return this._mouthList;
+    const m = [];
+    for (const tn of t.tunnels) if (tn.fi < t.nFinalF) m.push(tn.s0 - 4.5, tn.s0 + 3, tn.s1 - 3, tn.s1 + 4.5);
+    this._mouthN = t.nFinalF; this._mouthList = m;
+    return m;
   }
 
   /** The hill a tunnel runs through: a flat-topped spur over the bore, steep at the portals. */

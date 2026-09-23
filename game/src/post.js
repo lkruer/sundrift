@@ -22,7 +22,7 @@ const Cel = {
   uniforms: {
     tDiffuse: { value: null }, tDepth: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uNear: { value: 0.4 }, uFar: { value: 4500 }, uTime: { value: 0 },
-    uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.06 }, uSpeed: { value: 0 },
+    uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.075 }, uSpeed: { value: 0 },
     uVig: { value: 0 }, uHit: { value: 0 }, uCA: { value: 0.006 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
@@ -89,7 +89,33 @@ const Cel = {
     }`,
 };
 
-export function makePost(renderer, scene, camera, { bloom = true, width, height, fringe = true }) {
+/**
+ * The tube, last, in display space: a slight barrel curve with rounded corners, colour cut to 32 levels a channel
+ * with an ordered dither (the grain of a 90s console's output), and a faint aperture grille.
+ */
+const Retro = {
+  uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uCurve: { value: 0.045 }, uLevels: { value: 32 }, uMask: { value: 0.06 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uLevels, uMask;
+    varying vec2 vUv;
+    float bayer2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+    float bayer4(vec2 a) { return bayer2(0.5 * a) * 0.25 + bayer2(a); }
+    void main(){
+      vec2 c = vUv * 2.0 - 1.0;
+      vec2 uv = vUv + c * dot(c, c) * uCurve * 0.5;
+      vec2 edge = smoothstep(vec2(0.0), vec2(0.012), uv) * smoothstep(vec2(0.0), vec2(0.012), 1.0 - uv);
+      if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+      vec3 col = texture2D(tDiffuse, uv).rgb;
+      col = floor(col * uLevels + bayer4(gl_FragCoord.xy)) / uLevels;
+      float m = mod(gl_FragCoord.x, 3.0);
+      vec3 mask = vec3(m < 1.0 ? 1.0 : 1.0 - uMask, (m >= 1.0 && m < 2.0) ? 1.0 : 1.0 - uMask, m >= 2.0 ? 1.0 : 1.0 - uMask);
+      col *= mask * (1.0 + uMask * 0.6);
+      gl_FragColor = vec4(col * edge.x * edge.y, 1.0);
+    }`,
+};
+
+export function makePost(renderer, scene, camera, { bloom = true, width, height, fringe = true, tube = true }) {
   const pr = renderer.getPixelRatio();
   const w = Math.floor(width * pr), h = Math.floor(height * pr);
   const sceneRT = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(w, h), depthBuffer: true });
@@ -106,8 +132,10 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height,
   let bloomPass = null;
   if (bloom) { bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.45, 1.35); composer.addPass(bloomPass); }
   composer.addPass(new OutputPass());
+  let retro = null;
+  if (tube) { retro = new ShaderPass(Retro); retro.uniforms.uRes.value.set(w, h); retro.uniforms.uMask.value = pr > 1.6 ? 0.0 : 0.06; composer.addPass(retro); }
   return {
-    composer, cel, bloomPass, sceneRT,
+    composer, cel, bloomPass, sceneRT, retro,
     render(dt) {
       renderer.setRenderTarget(sceneRT);
       renderer.render(scene, camera);
@@ -123,6 +151,7 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height,
       cel.uniforms.uRes.value.set(w2, h2);
       cel.uniforms.tDepth.value = sceneRT.depthTexture;
       if (bloomPass) bloomPass.setSize(w2, h2);
+      if (retro) retro.uniforms.uRes.value.set(w2, h2);
     },
   };
 }

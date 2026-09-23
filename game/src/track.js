@@ -13,8 +13,8 @@
  *
  * Pure maths, no Three.js: the game, the physics sim and the gate share it.
  */
-import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609222305';
-import { Field } from './field.js?v=202609222305';
+import { mulberry32, clamp, lerp, smoothstep } from './config.js?v=202609230143';
+import { Field } from './field.js?v=202609230143';
 
 const TAU = Math.PI * 2;
 const wrap = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
@@ -29,7 +29,7 @@ const SET_ROTATION = ['busstop', 'tunnel', 'conbini', 'vista', 'shrine', 'tunnel
 export const DIFFS = {
   easy: {
     key: 'easy', label: 'EASY', blurb: 'Wide road, flowing sweepers', salt: 101,
-    half: 5.0, wall: 6.3, gmax: 0.07,
+    half: 5.0, wall: 6.9, gmax: 0.07,
     leg: [360, 700], hairpinR: [30, 40], approach: [30, 50],
     sweeperR: [70, 150], sweeperAng: [0.35, 0.9], essR: [55, 95], essAng: [0.4, 0.75],
     kinkR: [110, 220], kinkAng: [0.15, 0.35], straight: [60, 130], ramp: [18, 28],
@@ -37,7 +37,7 @@ export const DIFFS = {
   },
   medium: {
     key: 'medium', label: 'MEDIUM', blurb: 'The pass: hairpins and S-bends', salt: 202,
-    half: 4.4, wall: 5.5, gmax: 0.085,
+    half: 4.4, wall: 6.1, gmax: 0.085,
     leg: [190, 380], hairpinR: [16, 22], approach: [22, 40],
     sweeperR: [42, 110], sweeperAng: [0.45, 1.15], essR: [30, 58], essAng: [0.6, 1.1],
     kinkR: [70, 160], kinkAng: [0.2, 0.5], straight: [40, 100], ramp: [12, 20],
@@ -45,7 +45,7 @@ export const DIFFS = {
   },
   hard: {
     key: 'hard', label: 'HARD', blurb: 'Narrow, tight, relentless', salt: 303,
-    half: 3.9, wall: 4.9, gmax: 0.10,
+    half: 3.9, wall: 5.4, gmax: 0.10,
     leg: [120, 240], hairpinR: [11.5, 15], approach: [16, 30],
     sweeperR: [30, 80], sweeperAng: [0.6, 1.45], essR: [22, 42], essAng: [0.7, 1.3],
     kinkR: [50, 110], kinkAng: [0.3, 0.6], straight: [25, 65], ramp: [9, 15],
@@ -62,7 +62,7 @@ export class Track {
     this.rng = mulberry32((seed * 31 + this.D.salt) >>> 0);
     this.step = 2;
     this.half = this.D.half; this.wall = this.D.wall;
-    this.tubeHalf = this.half + 0.6;
+    this.tubeHalf = this.half + 1.5;          // the bore: the road, a kerb and a walkway each side
     this.clear = 2 * this.wall + 9;            // how close two unrelated stretches of road may come, centre to centre
     this.pts = []; this.features = []; this.markers = []; this.tunnels = []; this.pads = [];
     this.squeezes = 0;                          // features committed without full clearance (should stay 0)
@@ -392,7 +392,7 @@ export class Track {
       this.markers.push({ s: ts0, kind: 'tunnel', side: 0, s1: ts1, fi });
       for (let i = i0; i <= i1; i++) {
         const p = this.pts[i];
-        if (p.s >= ts0 - 1 && p.s <= ts1 + 1) { p.tunnel = true; p.wl = p.wr = this.tubeHalf - 0.15; }
+        if (p.s >= ts0 - 1 && p.s <= ts1 + 1) { p.tunnel = true; p.wl = p.wr = this.half + 0.55; }   // the kerbs
       }
     } else if (fi === 0) {
       this._placeSet('shrine', 34, i0, i1);

@@ -10,7 +10,7 @@
  * It is kept above the ground so a hairpin cut into the mountain can never put it inside the rock.
  */
 import * as THREE from 'three';
-import { CAM, clamp, damp, smoothstep } from './config.js?v=202609222305';
+import { CAM, clamp, damp, smoothstep } from './config.js?v=202609230143';
 
 const TAU = Math.PI * 2;
 function wrapA(d) { while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; return d; }
@@ -32,7 +32,7 @@ export class ChaseCam {
   }
 
   snap(car, y) {
-    this.dir = car.yaw; this.dirVel = 0;
+    this.dir = car.yaw; this.dirVel = 0; this.rev = 0;
     this.yS = y; this.lift = 0; this.roll = 0; this.distS = CAM.dist;
     this.init = true;
     this._place(car, 1);
@@ -51,12 +51,16 @@ export class ChaseCam {
     const [fx, fz] = car.forward();
     const [lx, lz] = car.left();
     const vx = fx * car.vF + lx * car.vL, vz = fz * car.vF + lz * car.vL;
-    const velDir = speed > 2 && car.vF > 0 ? Math.atan2(vx, vz) : car.yaw;     // reversing: stay behind the car
-    const blend = CAM.yawBlend * smoothstep(2, 9, speed);
-    const want = car.yaw + wrapA(velDir - car.yaw) * blend;
+    // how much the camera looks along the direction of travel rather than the nose: in a drift, a share of it;
+    // reversing slowly, none (it stays behind the car, the way you back up); reversing fast, all of it, so a
+    // J-turn is seen from behind the car's motion with the car swinging round in front of the lens
+    const travel = speed > 1.5 ? Math.atan2(vx, vz) : car.yaw;
+    this.rev = damp(this.rev || 0, car.vF < 0 ? smoothstep(3, 7, -car.vF) : 0, car.vF < -3 ? 2.5 : 0.9, dt);
+    const fwdBlend = car.vF > 0 ? CAM.yawBlend * smoothstep(2, 9, speed) : 0;
+    const blend = fwdBlend + (1 - fwdBlend) * this.rev;
+    const want = car.yaw + wrapA(travel - car.yaw) * blend;
     // the heading follows on a critically damped spring: no lag that depends on the frame time, no overshoot
     const w = 6.0 + speed * 0.05;
-    const err = wrapA(want - this.dir);
     const k = w * w, c = 2 * w;
     // integrate in small steps so a long frame cannot destabilise it
     let rem = dt;
@@ -66,7 +70,6 @@ export class ChaseCam {
       this.dirVel += (k * e - c * this.dirVel) * h;
       this.dir += this.dirVel * h;
     }
-    if (Math.abs(err) > 2.2) { this.dir = want; this.dirVel = 0; }             // a spin: do not orbit the long way
 
     this.yS = damp(this.yS, y, 12, dt);
     const aspectK = this.cam.aspect < 1 ? 1 + 0.55 * (1 - this.cam.aspect) : 1;

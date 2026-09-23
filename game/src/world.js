@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609222305';
-import { surface } from '../surfaces.js?v=202609222305';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222305';
-import { Ground } from './ground.js?v=202609222305';
-import { Terrain, LODS } from './terrain.js?v=202609222305';
-import { partsOf, Pool } from './instancing.js?v=202609222305';
+import { ASSET } from '../assetlib.js?v=202609230143';
+import { surface } from '../surfaces.js?v=202609230143';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230143';
+import { Ground } from './ground.js?v=202609230143';
+import { Terrain, LODS } from './terrain.js?v=202609230143';
+import { partsOf, Pool } from './instancing.js?v=202609230143';
 
 const ASSETS = {
   cedar: './assets/cedar_tree.js', maple: './assets/maple_tree.js', boulder: './assets/boulder.js',
@@ -83,6 +83,49 @@ function roadTexture(half, wall) {
   map.wrapS = THREE.ClampToEdgeWrapping; map.wrapT = THREE.RepeatWrapping; map.anisotropy = 8;
   const roughnessMap = new THREE.CanvasTexture(rv); roughnessMap.wrapS = THREE.ClampToEdgeWrapping; roughnessMap.wrapT = THREE.RepeatWrapping;
   return { map, roughnessMap, len: LEN };
+}
+
+/**
+ * The bore's lining, across (u) and 12 m along (v): the kerb face, the walkway, cream tiles with a painted band
+ * at their top, and the concrete arch with its panel joint and water stains; mirrored about the crown.
+ */
+function tunnelTexture() {
+  const W = 1024, H = 512;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  let seed = 23;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const band = (u0, u1, fill) => { for (const [a, b] of [[u0, u1], [1 - u1, 1 - u0]]) { ctx.fillStyle = fill; ctx.fillRect(a * W, 0, (b - a) * W, H); } };
+  band(0, 0.035, '#e6e2d8');                                   // the kerb face, painted white
+  band(0.035, 0.1, '#8b8983');                                 // walkway
+  band(0.1, 0.43, '#d6cdb4');                                  // the tiles
+  band(0.415, 0.43, '#2f5a47');                                // a green band along their top
+  band(0.43, 0.57, '#6d6b67');                                 // the arch
+  // tiles: 0.3 m courses up the wall, 0.6 m along, grout lines and a little variation, grime near the foot
+  const tileU0 = 0.105, tileU1 = 0.415, courses = 7, perV = 20;
+  for (const mir of [false, true]) {
+    for (let c = 0; c < courses; c++) for (let r = 0; r < perV; r++) {
+      const a = tileU0 + (tileU1 - tileU0) * (c / courses), b = tileU0 + (tileU1 - tileU0) * ((c + 1) / courses);
+      const x0 = (mir ? 1 - b : a) * W, x1 = (mir ? 1 - a : b) * W;
+      const y0 = (r / perV) * H, y1 = ((r + 1) / perV) * H;
+      const k = 0.93 + rnd() * 0.1 - (c === 0 ? 0.12 : c === 1 ? 0.05 : 0);
+      ctx.fillStyle = `rgb(${214 * k | 0},${205 * k | 0},${180 * k | 0})`;
+      ctx.fillRect(x0 + 1.5, y0 + 1.5, x1 - x0 - 3, y1 - y0 - 3);
+    }
+  }
+  // kerb joints, walkway joints every 3 m, the arch's panel joint and its water stains
+  ctx.fillStyle = 'rgba(30,30,30,0.5)';
+  for (let r = 0; r < 4; r++) { const y = (r / 4) * H; ctx.fillRect(0.035 * W, y, 0.065 * W, 2); ctx.fillRect(0.9 * W, y, 0.065 * W, 2); }
+  ctx.fillStyle = 'rgba(20,20,20,0.55)'; ctx.fillRect(0.43 * W, 0, 0.14 * W, 3);
+  for (let i = 0; i < 26; i++) {
+    const x = (0.43 + rnd() * 0.14) * W, y = rnd() * H, len = 20 + rnd() * 90;
+    const gr = ctx.createLinearGradient(x, y, x, y + len);
+    gr.addColorStop(0, 'rgba(40,38,34,0.35)'); gr.addColorStop(1, 'rgba(40,38,34,0)');
+    ctx.fillStyle = gr; ctx.fillRect(x, y, 2 + rnd() * 5, len);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  return t;
 }
 
 /**
@@ -211,8 +254,19 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this.roadMat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, color: 0xffffff });
     this.roadMat.name = 'road';
     this.railMat = new THREE.MeshStandardMaterial({ color: PAL.galvanised, roughness: 0.42, metalness: 0.65, side: THREE.DoubleSide });
-    this.tunnelMat = new THREE.MeshStandardMaterial({ color: 0x55555c, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
-    this.tunnelLampMat = new THREE.MeshStandardMaterial({ color: 0xffe2b0, emissive: 0xffb45a, emissiveIntensity: 2.4, roughness: 0.5 });
+    // the lining glows faintly sodium-orange: the whole bore is lit by its lamps, not just the stretch round the car
+    { const tt = tunnelTexture(); this.tunnelMat = new THREE.MeshStandardMaterial({ map: tt, emissiveMap: tt, emissive: 0xff9448, emissiveIntensity: 0.62, roughness: 0.82, metalness: 0, side: THREE.DoubleSide }); }
+    this.tunnelMat.name = 'bore';
+    this.tunnelLampMat = new THREE.MeshStandardMaterial({ color: 0xffe2b0, emissive: 0xffa84a, emissiveIntensity: 2.6, roughness: 0.5 });
+    this.fixMetalMat = new THREE.MeshStandardMaterial({ color: 0x3b3d42, roughness: 0.55, metalness: 0.5 });
+    this.signGreenMat = new THREE.MeshStandardMaterial({ color: 0x3ad082, emissive: 0x20c46a, emissiveIntensity: 1.7, roughness: 0.5 });
+    this.signRedMat = new THREE.MeshStandardMaterial({ color: 0xff3a24, emissive: 0xff2a18, emissiveIntensity: 2.4, roughness: 0.5 });
+    this.reflectorMat = new THREE.MeshStandardMaterial({ color: 0xffb030, emissive: 0xff9a20, emissiveIntensity: 1.5, roughness: 0.4 });
+    this.tunnelGlowMat = new THREE.MeshBasicMaterial({ color: 0xff9a40, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, opacity: 0.55 });
+    this.portalMat = new THREE.MeshStandardMaterial({ color: 0xa29e95, roughness: 0.92, metalness: 0 });
+    this.copingMat = new THREE.MeshStandardMaterial({ color: 0x4a4f5a, roughness: 0.8, metalness: 0 });
+    this._plateMat(['霧峰', 'KIRIMINE']);                          // one plate made now, so its program compiles with the rest
     this.wireMat = new THREE.LineBasicMaterial({ color: 0x15161a });
     this.bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff1d0, emissive: 0xffc070, emissiveIntensity: 2.1, roughness: 0.6 });
     {
@@ -500,72 +554,234 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     return m;
   }
 
-  /** The tunnel lining, its ceiling lamps and its portals, for the samples of this chunk that are inside one. */
+  /**
+   * A tunnel, as a Japanese mountain road has them: kerbs with amber reflectors, a raised walkway each side,
+   * cream-tiled lower walls with a painted band, a concrete arch, a continuous row of sodium lamps along each
+   * springline, cable trays, green exit signs, red alarm lamps, jet fans hung in pairs from the crown, and the
+   * lamps' orange light lying along the walkways. Portals of any tunnel that starts or ends in this chunk too.
+   */
   _tunnel(ch) {
     const t = this.track, pts = t.pts;
     const inside = [];
     for (let i = ch.i0; i <= ch.i1; i++) if (pts[i].tunnel) inside.push(i);
-    const grp = new THREE.Group();
-    // portals of tunnels that start or end in this chunk
+    const grp = new THREE.Group(); grp.name = 'tunnel';
     for (const tn of t.tunnels) {
       if (tn.fi >= t.nFinalF) continue;
-      for (const [s, flip] of [[tn.s0 - 1.2, Math.PI], [tn.s1 + 1.2, 0]]) {
+      for (const [s, flip] of [[tn.s0 - 1.0, Math.PI], [tn.s1 + 1.0, 0]]) {
         const i = t.index(s); if (i < ch.i0 || i >= ch.i1) continue;
         const p = t.sample(s);
-        const sc = t.tubeHalf / 4.05;
-        this._put('portal', ch.c * 2, p.x, p.y - 0.05, p.z, p.h + flip, sc);
+        const portal = this._portal(tn, ch);
+        portal.position.set(p.x, p.y, p.z); portal.rotation.y = p.h + flip;
+        grp.add(portal);
+        const out = flip ? -1 : 1, fx = Math.sin(p.h) * out, fz = Math.cos(p.h) * out;
+        this.lamps.push({ x: p.x + fx * 2.5, y: p.y + 7.4, z: p.z + fz * 2.5, c: ch.c });
       }
     }
     if (inside.length < 2) return grp.children.length ? grp : null;
-    const R = t.tubeHalf, wallH = 2.4 * (t.tubeHalf / 4.05);
-    const prof = [[-R, -0.2], [-R, wallH]];
-    for (let k = 1; k < 12; k++) { const a = Math.PI - (k / 12) * Math.PI; prof.push([Math.cos(a) * R, wallH + Math.sin(a) * R]); }
-    prof.push([R, wallH], [R, -0.2]);
-    const cols = prof.length, n = inside.length;
-    const pos = new Float32Array(n * cols * 3), uv = new Float32Array(n * cols * 2);
-    const idx = [];
-    for (let k = 0; k < n; k++) {
-      const p = pts[inside[k]];
-      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
-      for (let j = 0; j < cols; j++) {
-        const [u, h] = prof[j], o = k * cols + j;
-        pos[o * 3] = p.x + lx * u; pos[o * 3 + 1] = p.y + h; pos[o * 3 + 2] = p.z + lz * u;
-        uv[o * 2] = j / (cols - 1) * 4; uv[o * 2 + 1] = p.s / 4;
-      }
-      if (k < n - 1 && inside[k + 1] === inside[k] + 1) for (let j = 0; j < cols - 1; j++) {
-        const a = k * cols + j, b = a + 1, c2 = a + cols, d = c2 + 1;
-        idx.push(a, b, c2, b, d, c2);
+    const W = t.tubeHalf, K = t.half + 0.55, H0 = 2.4, RV = 4.05;
+
+    // the bore: strips of the section, each with its own vertices so the corners stay crisp; texU is where the
+    // point sits on the lining texture (kerb, walkway, tiles, band, arch; mirrored about 0.5)
+    const strips = [];
+    for (const side of [1, -1]) {
+      const m = (v) => (side > 0 ? v : 1 - v);
+      strips.push([[side * K, -0.12, m(0.0)], [side * K, 0.22, m(0.035)]]);                   // kerb face
+      strips.push([[side * K, 0.22, m(0.035)], [side * (W - 0.02), 0.22, m(0.1)]]);           // walkway
+      strips.push([[side * W, 0.22, m(0.105)], [side * W, H0, m(0.43)]]);                     // tiled wall
+    }
+    const arch = [];
+    for (let k = 0; k <= 20; k++) { const a = (k / 20) * Math.PI; arch.push([Math.cos(a) * W, H0 + Math.sin(a) * RV, 0.43 + 0.14 * (k / 20)]); }
+    strips.push(arch);
+    const n = inside.length;
+    const pos = [], uv = [], idx = [];
+    for (const st of strips) {
+      const base = pos.length / 3, cols = st.length;
+      for (let k = 0; k < n; k++) {
+        const p = pts[inside[k]];
+        const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+        for (const [u, y, tu] of st) { pos.push(p.x + lx * u, p.y + y, p.z + lz * u); uv.push(tu, p.s / 12); }
+        if (k < n - 1) for (let j = 0; j < cols - 1; j++) {
+          const a = base + k * cols + j, b = a + 1, c2 = a + cols, d = c2 + 1;
+          idx.push(a, b, c2, b, d, c2);
+        }
       }
     }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
     ch.own.add(g);
     // it casts: the moon has no business lighting the inside of a tunnel through the hill
-    const m = new THREE.Mesh(g, this.tunnelMat); m.receiveShadow = true; m.castShadow = true; m.name = 'tube';
-    grp.add(m);
-    // two rows of sodium lamps high on the walls, every 8 m
-    const lamp = new THREE.BoxGeometry(0.3, 0.14, 1.1);
-    const lp = [];
-    for (let k = 0; k < n; k += 4) {
-      const p = pts[inside[k]];
+    const bore = new THREE.Mesh(g, this.tunnelMat); bore.receiveShadow = true; bore.castShadow = true; bore.name = 'bore';
+    grp.add(bore);
+
+    // the fittings, merged by material
+    const sets = { metal: [], lamp: [], green: [], red: [], amber: [] };
+    const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+    const G = this._tunnelGeo || (this._tunnelGeo = {
+      housing: box(0.34, 0.16, 1.2), lens: box(0.24, 0.05, 1.05), tray: box(0.3, 0.07, 2.06), refl: box(0.04, 0.09, 0.13),
+      exit: box(0.05, 0.32, 0.78), cabinet: box(0.18, 0.72, 0.56), alarm: box(0.09, 0.13, 0.13), bracket: box(0.08, 0.6, 0.08),
+      fan: new THREE.CylinderGeometry(0.5, 0.5, 3.4, 16, 1).rotateX(Math.PI / 2),
+    });
+    const m4 = new THREE.Matrix4(), rq = new THREE.Quaternion(), rx = new THREE.Quaternion(), fwd = new THREE.Vector3(0, 0, 1);
+    const put = (set, geo, p, u, y, roll = 0) => {
+      const [x, z] = this._at(p, u);
+      rq.setFromAxisAngle(_up, p.h); rx.setFromAxisAngle(fwd, roll); rq.multiply(rx);
+      m4.compose(_v.set(x, p.y + y, z), rq, _s.set(1, 1, 1));
+      sets[set].push(geo.clone().applyMatrix4(m4));
+    };
+    const sA = pts[inside[0]].s, sB = pts[inside[n - 1]].s;
+    const at = (s) => t.sample(s);
+    for (let s = Math.ceil(sA / 3) * 3; s <= sB; s += 3) {                     // lamps: a continuous row each side
+      const p = at(s);
       for (const side of [1, -1]) {
-        const a = Math.PI / 2 - side * 0.62;
-        const u = Math.cos(a) * (R - 0.08), h = wallH + Math.sin(a) * (R - 0.08);
-        const [x, z] = this._at(p, u);
-        const mm = new THREE.Matrix4().compose(_v.set(x, p.y + h, z), _q.setFromAxisAngle(_up, p.h), _s.set(1, 1, 1));
-        const gg = lamp.clone().applyMatrix4(mm); lp.push(gg);
+        put('metal', G.housing, p, side * (W - 0.3), H0 + 0.62, side * 0.55);
+        put('lamp', G.lens, p, side * (W - 0.36), H0 + 0.53, side * 0.55);
       }
-      if (k % 8 === 0) this.lamps.push({ x: p.x, y: p.y + wallH + R * 0.8, z: p.z, c: ch.c, tunnel: true });
+      if (Math.round(s) % 12 === 0) this.lamps.push({ x: p.x, y: p.y + H0 + 1.9, z: p.z, c: ch.c, tunnel: true });
     }
-    if (lp.length) {
-      const merged = mergeGeos(lp);
+    for (let k = 0; k < n - 1; k++) {                                              // cable trays along each wall
+      const p = t.sample((pts[inside[k]].s + pts[inside[k + 1]].s) / 2);
+      for (const side of [1, -1]) put('metal', G.tray, p, side * (W - 0.17), 2.2);
+    }
+    for (let s = Math.ceil(sA / 6) * 6; s <= sB; s += 6) {                      // amber reflectors on the kerbs
+      const p = at(s);
+      for (const side of [1, -1]) put('amber', G.refl, p, side * (K - 0.01), 0.1);
+    }
+    for (let s = Math.ceil((sA - 30) / 60) * 60 + 30; s <= sB; s += 60) {       // exit signs, alternating
+      if (s < sA) continue;
+      const p = at(s), side = Math.round(s / 60) % 2 ? 1 : -1;
+      put('green', G.exit, p, side * (W - 0.04), 2.0);
+    }
+    for (let s = Math.ceil((sA - 12) / 50) * 50 + 12; s <= sB; s += 50) {       // alarm cabinets and their red lamps
+      if (s < sA) continue;
+      const p = at(s);
+      for (const side of [1, -1]) { put('metal', G.cabinet, p, side * (W - 0.1), 1.2); put('red', G.alarm, p, side * (W - 0.05), 1.78); }
+    }
+    for (let s = Math.ceil((sA - 40) / 120) * 120 + 40; s <= sB; s += 120) {    // jet fans, in pairs under the crown
+      if (s < sA) continue;
+      const p = at(s);
+      for (const u of [1.25, -1.25]) {
+        put('metal', G.fan, p, u, H0 + RV - 0.95);
+        for (const dz of [-1.1, 1.1]) put('metal', G.bracket, t.sample(s + dz), u, H0 + RV - 0.3);
+      }
+    }
+    const mats = { metal: this.fixMetalMat, lamp: this.tunnelLampMat, green: this.signGreenMat, red: this.signRedMat, amber: this.reflectorMat };
+    for (const k of Object.keys(sets)) {
+      if (!sets[k].length) continue;
+      const merged = mergeGeos(sets[k]);
       ch.own.add(merged);
-      const lm = new THREE.Mesh(merged, this.tunnelLampMat); lm.name = 'tubelamps';
-      grp.add(lm);
+      const mesh = new THREE.Mesh(merged, mats[k]); mesh.name = 'tunnel-' + k;
+      if (k === 'metal') { mesh.castShadow = false; mesh.receiveShadow = true; }
+      grp.add(mesh);
+    }
+
+    // the sodium light lying along the walkways and the edges of the road
+    {
+      const gp = [], gc = [], gi = [];
+      const cols = [[-1.8, 0.03, 0], [0, 0.03, 0.85], [0.02, 0.25, 0.85], [W - K - 0.05, 0.25, 0.55]];
+      for (const side of [1, -1]) {
+        const base = gp.length / 3;
+        for (let k = 0; k < n; k++) {
+          const p = pts[inside[k]];
+          const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+          for (const [du, y, a] of cols) { const u = side * (K + du); gp.push(p.x + lx * u, p.y + y, p.z + lz * u); gc.push(1, 1, 1, a); }
+          if (k < n - 1) for (let j = 0; j < cols.length - 1; j++) {
+            const a = base + k * cols.length + j, b = a + 1, c2 = a + cols.length, d = c2 + 1;
+            gi.push(a, c2, b, b, c2, d);
+          }
+        }
+      }
+      const gg = new THREE.BufferGeometry();
+      gg.setAttribute('position', new THREE.Float32BufferAttribute(gp, 3));
+      gg.setAttribute('color', new THREE.Float32BufferAttribute(gc, 4));
+      gg.setIndex(gi); gg.computeBoundingSphere();
+      ch.own.add(gg);
+      const glow = new THREE.Mesh(gg, this.tunnelGlowMat); glow.renderOrder = 2; glow.name = 'tunnel-glow';
+      grp.add(glow);
     }
     return grp;
+  }
+
+  /**
+   * A portal: a concrete face round the bore with a bell-mouth hood, a tiled coping, the tunnel's name plate, and
+   * wing walls stepping down into the cutting. Built at the origin facing +Z (the way out of the tunnel).
+   */
+  _portal(tn, ch) {
+    const t = this.track, W = t.tubeHalf, H0 = 2.4, RV = 4.05;
+    const g = new THREE.Group(); g.name = 'portal';
+    const top = H0 + RV + 1.8, side = W + 1.7;
+    const arc = (sh, w, rv, from, to, steps = 24) => {
+      for (let k = 0; k <= steps; k++) { const a = from + (to - from) * (k / steps); sh.lineTo(Math.cos(a) * w, H0 + Math.sin(a) * rv); }
+    };
+    const own = (geo) => { ch.own.add(geo); return geo; };
+    // the face: a wall with the bore's shape cut out of its foot
+    const face = new THREE.Shape();
+    face.moveTo(-side, -0.3); face.lineTo(-W, -0.3); face.lineTo(-W, H0);
+    arc(face, W, RV, Math.PI, 0);
+    face.lineTo(W, -0.3); face.lineTo(side, -0.3); face.lineTo(side, top); face.lineTo(-side, top); face.closePath();
+    const fm = new THREE.Mesh(own(new THREE.ExtrudeGeometry(face, { depth: 1.0, bevelEnabled: false, curveSegments: 4 })), this.portalMat);
+    fm.position.z = -1.0; g.add(fm);
+    // the hood ring, 0.6 m wide, standing 0.45 m proud
+    const hood = new THREE.Shape();
+    hood.moveTo(-W - 0.6, -0.3); hood.lineTo(-W - 0.6, H0);
+    arc(hood, W + 0.6, RV + 0.6, Math.PI, 0);
+    hood.lineTo(W + 0.6, -0.3); hood.lineTo(W, -0.3); hood.lineTo(W, H0);
+    arc(hood, W, RV, 0, Math.PI);
+    hood.lineTo(-W, -0.3); hood.closePath();
+    const hm = new THREE.Mesh(own(new THREE.ExtrudeGeometry(hood, { depth: 0.45, bevelEnabled: false, curveSegments: 4 })), this.portalMat);
+    g.add(hm);
+    // coping
+    const cop = new THREE.Mesh(own(new THREE.BoxGeometry(2 * side + 0.3, 0.42, 1.25)), this.copingMat);
+    cop.position.set(0, top + 0.21, -0.45); g.add(cop);
+    // the name plate over the hood
+    const names = [['霧峰', 'KIRIMINE'], ['紅葉', 'MOMIJI'], ['月見', 'TSUKIMI'], ['天狗', 'TENGU'], ['星降', 'HOSHIFURI'], ['白樺', 'SHIRAKABA'], ['狐塚', 'KITSUNEZUKA'], ['雷鳥', 'RAICHO']];
+    const nm = names[(t.tunnels.indexOf(tn) + (t.seed % 5)) % names.length];
+    const plate = new THREE.Mesh(own(new THREE.BoxGeometry(3.4, 0.86, 0.12)), [this.copingMat, this.copingMat, this.copingMat, this.copingMat, this._plateMat(nm), this.copingMat]);
+    plate.position.set(0, H0 + RV + 0.95, 0.07); g.add(plate);
+    // a lamp over the mouth, lighting the face and the plate
+    const lamp = new THREE.Mesh(own(new THREE.BoxGeometry(0.9, 0.14, 0.3)), this.tunnelLampMat); lamp.position.set(0, H0 + RV + 1.55, 0.35); g.add(lamp);
+    // wing walls, flaring out toward the road and stepping down
+    for (const sgn of [1, -1]) {
+      const wing = new THREE.Group();
+      wing.position.set(sgn * side, 0, 0); wing.rotation.y = sgn * 0.42;
+      for (let k = 0; k < 4; k++) {
+        const h = Math.max(1.4, top - 1.0 - k * 1.5);
+        const seg = new THREE.Mesh(own(new THREE.BoxGeometry(0.6, h, 1.8)), this.portalMat);
+        seg.position.set(sgn * 0.3, h / 2 - 0.3, 0.9 + k * 1.8); wing.add(seg);
+        const cap = new THREE.Mesh(own(new THREE.BoxGeometry(0.7, 0.14, 1.8)), this.copingMat);
+        cap.position.set(sgn * 0.3, h - 0.23, 0.9 + k * 1.8); wing.add(cap);
+      }
+      g.add(wing);
+    }
+    g.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; o.castShadow = true; } });
+    return g;
+  }
+
+  /** The name plate's face: the tunnel's name in kanji over its reading, white on dark enamel. */
+  _plateMat([kanji, romaji]) {
+    this._plates = this._plates || new Map();
+    let m = this._plates.get(romaji);
+    if (m) return m;
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#1f2a33'; ctx.fillRect(0, 0, 512, 128);
+    ctx.strokeStyle = 'rgba(230,226,214,0.85)'; ctx.lineWidth = 5; ctx.strokeRect(8, 8, 496, 112);
+    ctx.fillStyle = '#ece8dc'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // a system without a Japanese font draws boxes for kanji: then the reading alone, larger
+    ctx.font = '600 58px "Yu Mincho", "Hiragino Mincho ProN", "MS Mincho", "Noto Serif JP", serif';
+    const kw = ctx.measureText(kanji + 'トンネル').width, tofu = ctx.measureText('͸͹΀΁΂΃').width;
+    if (Math.abs(kw - tofu) > 2) {
+      ctx.fillText(kanji + 'トンネル', 256, 54);
+      ctx.font = '26px "Share Tech Mono", monospace'; ctx.fillText(romaji + ' TUNNEL', 256, 100);
+    } else {
+      ctx.font = '44px "Share Tech Mono", monospace'; ctx.fillText(romaji, 256, 50);
+      ctx.font = '26px "Share Tech Mono", monospace'; ctx.fillText('TUNNEL', 256, 96);
+    }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    m = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.35, roughness: 0.4, metalness: 0.2 });
+    this._plates.set(romaji, m);
+    return m;
   }
 
   /** Street lamps every 30 m, on the outside of a bend, alternating on the straights; each with its light on the ground. */
@@ -921,7 +1137,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       }
     }
     const box = new THREE.BoxGeometry(1, 1, 1);
-    for (const m of [this.tunnelMat, this.tunnelLampMat, this.glowMat, this.glowCoolMat, this.bulbMat, this.groundMat, this.farMat, this.roadMat, this.railMat]) {
+    for (const m of [this.tunnelMat, this.tunnelLampMat, this.glowMat, this.glowCoolMat, this.bulbMat, this.groundMat, this.farMat, this.roadMat, this.railMat,
+      this.fixMetalMat, this.signGreenMat, this.signRedMat, this.reflectorMat, this.portalMat, this.copingMat, [...this._plates.values()][0]]) {
       const x = new THREE.Mesh(box, m); x.position.y = -500; x.castShadow = true; stage.add(x);
     }
     { const l = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -500, 0), new THREE.Vector3(1, -500, 0)]), this.wireMat); stage.add(l); }

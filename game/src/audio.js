@@ -10,7 +10,7 @@
  * is a scheduled 128 bpm loop in A minor pentatonic: kick, hat, snare, a filtered saw bass, a chord pad and
  * a delayed arpeggio that only joins while a drift is held.
  */
-import { clamp } from './config.js?v=202609222305';
+import { clamp } from './config.js?v=202609230143';
 
 const NOTES = { A2: 110, C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196, A3: 220, C4: 261.63, D4: 293.66, E4: 329.63, G4: 392, A4: 440, C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880 };
 // four bars: Am, F, C, G, as bass roots and pad triads
@@ -41,8 +41,24 @@ export class Audio {
     this.comp.threshold.value = -14; this.comp.knee.value = 18; this.comp.ratio.value = 4; this.comp.attack.value = 0.004; this.comp.release.value = 0.18;
     this.master.connect(this.comp); this.comp.connect(ctx.destination);
     this.noiseBuf = this._noise(2.0);
+    // the tunnel's echo: a short feedback delay the engine and the tyres are sent into while the car is inside
+    this.echoIn = ctx.createGain(); this.echoIn.gain.value = 0;
+    this.echoDelay = ctx.createDelay(0.5); this.echoDelay.delayTime.value = 0.09;
+    this.echoFb = ctx.createGain(); this.echoFb.gain.value = 0.45;
+    this.echoLP = ctx.createBiquadFilter(); this.echoLP.type = 'lowpass'; this.echoLP.frequency.value = 2200;
+    this.echoIn.connect(this.echoDelay); this.echoDelay.connect(this.echoLP); this.echoLP.connect(this.echoFb); this.echoFb.connect(this.echoDelay);
+    this.echoLP.connect(this.master);
     this._engine(); this._tyres(); this._wind(); this._musicBus();
+    for (const g of [this.engGain, this.raspGain, this.turboGain, this.screechGain]) if (g) g.connect(this.echoIn);
     this.ready = true;
+  }
+
+  /** Inside a tunnel (0..1): the echo comes up, and the wind drops. */
+  setTunnel(x) {
+    if (!this.ctx || this._tunnel === x) return;
+    this._tunnel = x;
+    const t = this.ctx.currentTime;
+    this.echoIn.gain.setTargetAtTime(x * 0.75, t, 0.12);
   }
 
   _noise(seconds) {

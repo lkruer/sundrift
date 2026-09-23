@@ -6,19 +6,19 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609222305';
-import { createRig, detectTier } from '../rig.js?v=202609222305';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609222305';
-import { Car, gearbox } from './car.js?v=202609222305';
-import { Track, DIFFS } from './track.js?v=202609222305';
-import { World } from './world.js?v=202609222305';
-import { ChaseCam } from './camera.js?v=202609222305';
-import { Input } from './input.js?v=202609222305';
-import { Scoring } from './scoring.js?v=202609222305';
-import { Hud } from './hud.js?v=202609222305';
-import { Audio } from './audio.js?v=202609222305';
-import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609222305';
-import { makePost } from './post.js?v=202609222305';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609230143';
+import { createRig, detectTier } from '../rig.js?v=202609230143';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, smoothstep } from './config.js?v=202609230143';
+import { Car, gearbox } from './car.js?v=202609230143';
+import { Track, DIFFS } from './track.js?v=202609230143';
+import { World } from './world.js?v=202609230143';
+import { ChaseCam } from './camera.js?v=202609230143';
+import { Input } from './input.js?v=202609230143';
+import { Scoring } from './scoring.js?v=202609230143';
+import { Hud } from './hud.js?v=202609230143';
+import { Audio } from './audio.js?v=202609230143';
+import { SkidMarks, Particles, ExhaustFlame } from './fx.js?v=202609230143';
+import { makePost } from './post.js?v=202609230143';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -376,7 +376,7 @@ function setPaused(on) {
     G.mode = 'paused';
     $('pause').classList.add('on');
     const st = scoring.stats;
-    $('pstats').textContent = `${DIFFS[G.diff].label}   SCORE ${Math.round(scoring.total).toLocaleString('en-US')}   ${(G.dist / 1000).toFixed(1)} KM   ${st.drifts} DRIFTS`;
+    $('pstats').textContent = `${DIFFS[G.diff].label}   SCORE ${Math.round(scoring.total).toLocaleString('en-US')}   ${(G.dist / 1609.344).toFixed(1)} MI   ${st.drifts} DRIFTS`;
     audio.pause && audio.pause(true);
   } else if (!on && G.mode === 'paused') {
     $('pause').classList.remove('on');
@@ -525,7 +525,9 @@ function step(dt, t0) {
   const n = track.nearest(car.x, car.z, G.idx);
   G.idx = n.i; G.s = n.s; G.u = n.u; G.roadH = n.h;
   const au = Math.abs(n.u);
-  const surface = au < track.half ? 1 : au < track.half + 0.9 ? 0.7 : 0.35;
+  // grip: full on the asphalt and its edge line, most of it on the gravel shoulder, which is there to be used
+  const w = n.u >= 0 ? n.wl : n.wr;
+  const surface = au < track.half + 0.35 ? 1 : au < w + 0.1 ? 0.88 : 0.65;
   inp.line = { curv: track.sample(G.s + 12 + car.speed * 0.55).k };
   car.step(dt, inp, surface);
 
@@ -563,6 +565,13 @@ function step(dt, t0) {
   scoring.update(dt, car, impact, clipping);
   const grant = scoring.takeBoost();
   if (grant > 0) { car.boost = Math.min(SCORE.boostMax, car.boost + grant); chase.kick(0.12); }
+  // a clean J-turn scores, and says so
+  if (car.jturnDone) {
+    car.jturnDone = false;
+    scoring.total += 500;
+    const e = { type: 'jturn', value: 500 };
+    hud.onEvent(e); audio.onEvent && audio.onEvent(e); chase.kick(0.15);
+  }
   for (const e of scoring.drain()) {
     hud.onEvent(e); audio.onEvent(e);
     if (e.type === 'bank') { G.hour += e.value / 6000; if (scoring.total > (G.best[G.diff] || 0)) { G.best[G.diff] = scoring.total; store.set('best.' + G.diff, Math.round(scoring.total)); } }
@@ -592,6 +601,11 @@ function step(dt, t0) {
   const gb = gearbox(car.vF, car.throttle, G.gear);
   G.gear = gb;
   audio.update(dt, car, gb.rpm, scoring.active, boost01, surface);
+  const inTun = !!track.inTunnel(G.s);
+  if (audio.setTunnel) audio.setTunnel(inTun ? 1 : 0);
+  // in a tunnel the sodium lamps are the light: the headlights drop back so the bore stays orange
+  G.tunnelK = damp(G.tunnelK || 0, inTun || track.nearTunnel(G.s + 25, 0) ? 1 : 0, 3, dt);
+  for (const hl of headlights) hl.intensity = 2.6 * G.night * (1 - 0.6 * G.tunnelK);
   const t1 = performance.now();
 
   // ---- camera, world

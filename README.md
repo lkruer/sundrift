@@ -6,27 +6,31 @@ score and boost, clip the guardrail without touching it, and every banked drift 
 **The look:** a playable 90s drift anime. Sodium street lamps and concrete slope lattices on a touge at night,
 tunnels through the spurs, a convenience store glowing on its lot, towns in the valley below, and the whole
 frame drawn as cel bands with ink outlines, halftone shade and a tube's scanlines by one post pass over the
-recipe's lighting rig. The dash is a 90s tuner's: a tach with a redline, amber seven-segment speed and score.
+recipe's lighting rig, then shown on a slightly curved tube with a 90s console's dithered colour. The dash is a
+90s tuner's: a tach with a redline, amber seven-segment mph and score.
 
 **Play:** https://lkruer.github.io/sundrift/game/ (phone or laptop; one finger on a phone, WASD and Space on a
 keyboard). Pick a course and a paint on the title screen, or just press START.
 
 Built for the [404 game jam 001](https://github.com/404-Repo/404-game-jam) with the
-[404 game recipe](https://github.com/404-Repo/404-game-recipe): every 3D object in the game is Three.js code
-generated through the recipe's loop (a written form brief, three independent candidates per object, a
-four-sided verify render, a choice made by eye), and there is not one mesh file, texture file or audio file
-in the shipped folder. The road markings, the ground grain, the slope lattice, the particle sprite and every
-sound are made at load time.
+[404 game recipe](https://github.com/404-Repo/404-game-recipe): every 3D object in the game is Three.js code.
+The car and the props came through the recipe's loop (a written form brief, three independent candidates per
+object, a four-sided verify render, a choice made by eye); the road, terrain, rails and tunnels are built
+procedurally. There is not one mesh file, texture file or audio file in the shipped folder. The road
+markings, the ground grain, the slope lattice, the tunnel tiles, the particle sprite and every sound are made
+at load time.
 
 ## Courses
 
 The difference between them is the road.
 
-| | road | corners |
-|---|---|---|
-| EASY | 10 m of asphalt | long legs, wide switchbacks, flowing sweepers |
-| MEDIUM | 8.8 m | the pass: hairpins and S-bends |
-| HARD | 7.8 m | short legs, tight hairpins, relentless |
+| | road | wall to wall | corners |
+|---|---|---|---|
+| EASY | 10 m of asphalt | 13.8 m | long legs, wide switchbacks, flowing sweepers |
+| MEDIUM | 8.8 m | 12.2 m | the pass: hairpins and S-bends |
+| HARD | 7.8 m | 10.8 m | short legs, tight hairpins, relentless |
+
+The gravel between the edge line and the wall keeps most of its grip: running wide costs a little, not the run.
 
 Each is one fixed, endless course (same seed every run), so best scores compare.
 
@@ -41,10 +45,15 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 | camera zoom | mouse wheel, `+` / `-` | |
 | mute | `M` | the note button |
 | reverse | hold `S` when stopped | pull the finger down |
+| J-turn | reverse fast, full lock, then `W` | pull down, slide over, push up |
 
 Drift: tap the handbrake into a corner (or lift and turn), steer into the slide, hold it with the throttle.
 The car does part of the counter-steer for you (more on a phone), holds a slide at a comfortable angle, and
 A and D ask for as much lock as the corner ahead needs. Nothing steers the car when no key is held.
+
+J-turn: back up past about 10 mph, throw the wheel to full lock and get on the gas. The nose swings out, the
+car comes round to face the way it is travelling and pulls away; the camera looks where you are going while
+you reverse and swings round with the car. A clean one scores 500.
 
 ## How the world is made
 
@@ -57,7 +66,9 @@ A and D ask for as much lock as the corner ahead needs. Nothing steers the car w
   camera ask this one function, so nothing floats and nothing is buried.
 - `game/src/terrain.js`: that ground as tiles in three levels of detail, a far mesh to the horizon, the forest.
 - `game/src/world.js`: the road chunks chosen by distance from the car, the rails where the ground falls away,
-  the lamps, the set pieces, and every repeated prop as one shared instanced pool.
+  the lamps, the set pieces, the tunnels (a tiled bore with walkways, sodium lamps every 3 m, cable trays,
+  reflectors, exit signs, alarm cabinets, jet fans, and a named portal at each end), and every repeated prop
+  as one shared instanced pool.
 
 ## What is in the repo
 
@@ -86,8 +97,8 @@ node ../sundrift/gate/drift-gate.mjs ../sundrift/game --recipe=. --phone   # pho
 ## The one hard rule
 
 Every 3D object is Three.js code from constructors and operations. The road, terrain, guardrail beam and
-tunnel lining are built procedurally in `game/src/`; every placed or instanced object is a module under
-`game/assets/` written through the recipe loop. `harness/ship.mjs` from the recipe flags nothing in this folder.
+tunnels (bore, fittings and portals) are built procedurally in `game/src/`; the car and every other placed or
+instanced object is a module under `game/assets/` written through the recipe loop. `harness/ship.mjs` from the recipe flags nothing in this folder.
 
 ## Credits
 

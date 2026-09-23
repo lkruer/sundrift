@@ -7,7 +7,7 @@
  * Everything is DOM and SVG, written only when a value changes (the needle, which moves every frame, is one
  * attribute), so a phone is not re-laying out text sixty times a second.
  */
-import { SCORE, clamp, damp } from './config.js?v=202609222305';
+import { SCORE, clamp, damp } from './config.js?v=202609230143';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -158,6 +158,7 @@ export class Hud {
       case 'bump': this.hitFlash = Math.max(this.hitFlash, 0.5); break;
       case 'sun': this.toast(e.value, ''); break;
       case 'best': this.toast('NEW BEST!', 'good', true); break;
+      case 'jturn': this.toast('J-TURN!  +' + fmt(e.value), 'good', true); break;
     }
   }
 
@@ -188,9 +189,9 @@ export class Hud {
     el.chainf.style.transform = `scaleX(${chainFrac.toFixed(3)})`;
 
     // the cluster
-    const kmh = Math.round(car.kmh);
-    this.speed.set(String(kmh));
-    const g = car.vF < -0.3 ? 'r' : (kmh < 2 && car.throttle < 0.1 ? 'n' : String(gb.gear + 1));
+    const mph = Math.round(car.kmh / 1.609344);
+    this.speed.set(String(mph));
+    const g = car.vF < -0.3 ? 'r' : (mph < 2 && car.throttle < 0.1 ? 'n' : String(gb.gear + 1));
     this.gear.set(g);
     this.rpm = damp(this.rpm, gb.rpm, 16, dt);
     const deg = (135 + 270 * clamp(this.rpm, 0, 9200) / 9000).toFixed(1);
@@ -226,7 +227,7 @@ export class Hud {
     // clock and distance
     const hh = Math.floor(hour) % 24, mm = Math.floor((hour % 1) * 60);
     this.clock.set(String(hh).padStart(2, '0') + String(mm).padStart(2, '0'));
-    this.dist.set(String(Math.floor(dist / 100)).padStart(2, '0'));
+    this.dist.set(String(Math.floor(dist / 160.9344)).padStart(2, '0'));   // miles, one decimal
 
     // the vignette and the hit flash are drawn by the post pass (main reads these two)
     this.hitFlash = Math.max(0, this.hitFlash - dt * 2.2);

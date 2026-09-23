@@ -130,7 +130,7 @@ export class Input {
     const k = this.keys;
     const t = this.t;
     let steerKey = (k.has('KeyA') || k.has('ArrowLeft') ? 1 : 0) - (k.has('KeyD') || k.has('ArrowRight') ? 1 : 0);
-    const rate = steerKey !== 0 ? 9 : 14;
+    const rate = steerKey !== 0 ? 7.2 : 12;              // a key eases the wheel over (0.14 s to full lock) and back
     this.kSteer += Math.max(-rate * dt, Math.min(rate * dt, steerKey - this.kSteer));
     if (Math.abs(this.kSteer) < 0.01 && steerKey === 0) this.kSteer = 0;
     const gasKey = k.has('KeyW') || k.has('ArrowUp');

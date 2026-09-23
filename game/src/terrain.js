@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609222305';
-import { REACH } from './ground.js?v=202609222305';
-import { instanceGroup } from './instancing.js?v=202609222305';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609230143';
+import { REACH } from './ground.js?v=202609230143';
+import { instanceGroup } from './instancing.js?v=202609230143';
 
 export const TILE = 96;
 export const LODS = [
@@ -168,7 +168,7 @@ export class Terrain {
       for (let i = 0; i < n; i++) {
         g.sample(x0 + i * sp, z0 + j * sp, verge, s);
         const k = j * n + i;
-        H[k] = s.h; E[k] = s.edge; F[k] = (s.flat ? 1 : 0) | (s.tunnel ? 2 : 0); S[k] = s.s;
+        H[k] = s.h; E[k] = s.edge; F[k] = (s.flat ? 1 : 0) | (s.tunnel ? 2 : 0) | (s.mouth ? 4 : 0); S[k] = s.s;
       }
       if (j % rowsPerStep === rowsPerStep - 1) yield;
     }
@@ -253,14 +253,25 @@ export class Terrain {
     }
     const idx = new (total > 65535 ? Uint32Array : Uint16Array)(seg * seg * 6 + per * 6);
     let o = 0;
+    // at a tunnel mouth, a cell that would stretch from the road up to the hill over the bore stays open: it
+    // is the sheet a heightfield would hang across the opening (see ground.js); the portal face hides the cut
+    const flag = (v) => F[(Math.floor(v / row) + 1) * n + (v % row) + 1];
+    const mouth = (v) => (flag(v) & 4) !== 0;
+    const straddles = (a, b, c, d) => {
+      if (!(mouth(a) || mouth(b) || mouth(c) || mouth(d))) return false;
+      const t = (flag(a) & 2) + (flag(b) & 2) + (flag(c) & 2) + (flag(d) & 2);
+      return t > 0 && t < 8;
+    };
     for (let j = 0; j < seg; j++) for (let i = 0; i < seg; i++) {
       const a = j * row + i, b = a + 1, c = a + row, d = c + 1;
+      if (straddles(a, b, c, d)) continue;
       idx[o++] = a; idx[o++] = c; idx[o++] = b;
       idx[o++] = b; idx[o++] = c; idx[o++] = d;
     }
     for (let p = 0; p < per; p++) {
       const q = (p + 1) % per;
       const tp = perim[p], tq = perim[q], bp = V + p, bq = V + q;
+      if ((mouth(tp) || mouth(tq)) && ((flag(tp) & 2) !== (flag(tq) & 2))) continue;
       idx[o++] = tp; idx[o++] = tq; idx[o++] = bp;
       idx[o++] = tq; idx[o++] = bq; idx[o++] = bp;
     }
@@ -271,7 +282,7 @@ export class Terrain {
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.setAttribute('wall', new THREE.BufferAttribute(wall, 1));
     geo.setAttribute('wallS', new THREE.BufferAttribute(wallS, 1));
-    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.setIndex(new THREE.BufferAttribute(idx.subarray(0, o), 1));
     geo.computeBoundingSphere();
     return geo;
   }
