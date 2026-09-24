@@ -113,6 +113,7 @@ export class Hud {
       lampdrift: $('lampdrift'), lampclip: $('lampclip'), lampboost: $('lampboost'), angle: $('angle'), angledeg: $('angledeg'),
       anglecl: $('anglecl'), anglecr: $('anglecr'), anglehot: $('anglehot'),
       scorebox: $('scorebox'), scorelab: $('scorelab'), sflash: $('sflash'), bank: $('bank'), coach: $('coach'), pause: $('pause'),
+      clockbox: $('clockbox'), clockadd: $('clockadd'),
       boostbar: $('boostbar'),
     };
     this.el.bankb = this.el.bank && this.el.bank.querySelector('b');
@@ -160,13 +161,13 @@ export class Hud {
       el.driftpts.textContent = '+1,234'; el.mult.textContent = '×2.0'; el.tier.textContent = 'GREAT'; el.tier.className = 't2';
       this._showToast('WARM', 'good', true, 'COMBO ×2', 1); this._showToast('WARM', 'bad', false, '', 1);   // (the first leaves: its exit too)
       this.smash('SMASH!', 1234, 2);                  // (the smash popup and its glow, drawn once here too)
-      this._bankFly(1234, 2); this._punch('mult'); this._punch('tier'); this._punch('combo');
+      this._bankFly(1234, 2); this._punch('mult'); this._punch('tier'); this._punch('combo'); this._clockAdd(1234);
       play(el.angledeg, [{ transform: 'scale(1.8)' }, { transform: 'scale(1)' }], 320, POP);
       play(el.boostbar, [{ transform: 'scale(1.14)' }, { transform: 'scale(1)' }], 320, POP);
       // (each started where it is plainly on screen, not at its invisible first frame or in its delay: a harness presses
       // START the moment the title is up, and the very first frame of the title has to draw every look)
       const seek = (e, ms) => { if (e && e._anim) try { e._anim.currentTime = ms; } catch {} };
-      seek(el.bank, 150); seek(el.scorebox, 565); seek(el.sflash, 556); seek(el.smash, 200);
+      seek(el.bank, 150); seek(el.scorebox, 565); seek(el.sflash, 556); seek(el.smash, 200); seek(el.clockadd, 400); seek(el.clockbox, 140);
       for (const e of [el.mult, el.tier, el.combon, el.angledeg, el.boostbar]) seek(e, 90);
       for (const t of el.toasts.children) if (t.getAnimations) for (const a of t.getAnimations()) try { a.currentTime = 140; } catch {}
       this._angleTo(55); el.anglehot.style.opacity = '1';
@@ -175,7 +176,7 @@ export class Hud {
       this.leds.forEach((l) => l.classList.add('on'));
     } else {
       el.driftpts.textContent = ''; el.tier.textContent = '';
-      for (const e of [el.bank, el.scorebox, el.sflash, el.mult, el.tier, el.combon, el.smash, el.angledeg, el.boostbar]) if (e && e._anim) { e._anim.cancel(); e._anim = null; }
+      for (const e of [el.bank, el.scorebox, el.sflash, el.mult, el.tier, el.combon, el.smash, el.angledeg, el.boostbar, el.clockadd, el.clockbox]) if (e && e._anim) { e._anim.cancel(); e._anim = null; }
       el.toasts.textContent = ''; this.cur = null; this.queue = [];
       el.anglehot.style.opacity = '0'; el.angledeg.style.color = ''; this._hot = false; this.lastAngle = ''; this.lastDeg = -1;
       el.scorelab.classList.remove('best');
@@ -276,6 +277,19 @@ export class Hud {
   }
 
   /** The punches: the multiplier as it climbs, the tier as it goes up, the combo as it grows. */
+  /**
+   * The clock is the score: a banked drift pushes the hour on (a minute for every hundred points, main.js), and says so
+   * here, the minutes flying off the clock as it rolls forward, so the find is seen and not only read about.
+   */
+  _clockAdd(points) {
+    const el = this.el, min = Math.round(points / 100);
+    if (!el.clockadd || min < 1) return;
+    el.clockadd.textContent = '+' + (min < 60 ? min + ' MIN' : Math.floor(min / 60) + ':' + String(min % 60).padStart(2, '0'));
+    play(el.clockadd, [{ opacity: 0, transform: 'translate(14px, 4px) scale(0.8)' }, { opacity: 1, transform: 'translate(0, 0) scale(1.08)', offset: 0.14 },
+      { opacity: 1, transform: 'translate(-4px, -2px) scale(1)', offset: 0.7 }, { opacity: 0, transform: 'translate(-12px, -10px) scale(0.96)' }], 1700, 'ease-out');
+    play(el.clockbox, [{ transform: 'scale(1)' }, { transform: 'scale(1.12)', offset: 0.3 }, { transform: 'scale(1)' }], 480, 'ease-out');
+  }
+
   _punch(which) {
     const el = this.el;
     if (which === 'mult') play(el.mult, [{ transform: 'scale(1.7)' }, { transform: 'scale(1)' }], 300, POP);
@@ -317,7 +331,8 @@ export class Hud {
   _coach(dt) {
     if (this.coached || this._coachGone || !this.el.coach) return;
     this.run.t += dt;
-    const want = this.run.t > 2.4 && this.run.t < 30;
+    // (not before nine seconds in: the title has already said how, and the first seconds of a run are the road's)
+    const want = this.run.t > 9 && this.run.t < 36;
     if (want === !!this._coachOn) return;
     this._coachOn = want;
     if (want) {
@@ -345,6 +360,7 @@ export class Hud {
       case 'angle': this.toast('BIG ANGLE!', 't3', false, '', 1); play(el.angledeg, [{ transform: 'scale(1.8)' }, { transform: 'scale(1)' }], 320, POP); break;
       case 'bank': {
         this._bankFly(e.value, e.tier);
+        this._clockAdd(e.value);
         // a bigger drift is called out by its tier, with the combo it was part of
         const word = SCORE.tierNames[e.tier] || '';
         if (word) this.toast(word + ' DRIFT!', 't' + e.tier, e.tier >= 2, e.chain > 1 ? 'COMBO ×' + e.chain : '', 2);

@@ -39,8 +39,11 @@ const PAINTS = [
 const SEED = 20260921;
 const START_S = 8;
 
+// A run starts just after sunset, the sky still warm and the lamps already lit: the first drifts carry it on into the
+// night (the clock is the score), so the find is on screen from the first minute; at 20:36 the night had already fallen
+const START_HOUR = 18.2;
 const G = {
-  mode: 'loading', hour: 20.6, hourShown: 0, fps: 60, frameAvg: 1 / 60, s: 0, u: 0, idx: 0, dist: 0, lastS: 0, night: 0,
+  mode: 'loading', hour: START_HOUR, hourShown: 0, fps: 60, frameAvg: 1 / 60, s: 0, u: 0, idx: 0, dist: 0, lastS: 0, night: 0,
   diff: store.get('diff', 'easy') === 'hard' ? 'hard' : 'easy',
   map: store.get('map', 'mountain') === 'city' ? 'city' : 'mountain',
   paint: clamp(Number(store.get('paint', 0)) || 0, 0, PAINTS.length - 1),
@@ -500,7 +503,7 @@ function markMap() {
   const tate = document.querySelector('#title .tate');
   if (tate) { tate.textContent = G.map === 'city' ? 'ネオ東京' : '夜桜峠'; tate.classList.toggle('city', G.map === 'city'); }
   document.body.classList.toggle('city', G.map === 'city');
-  const tag = $('tagline'); if (tag) tag.textContent = G.map === 'city' ? 'NEON STREETS · ENDLESS' : 'NIGHT TOUGE · ENDLESS';
+  const tag = $('tagline'); if (tag) tag.textContent = G.map === 'city' ? 'NEON STREETS · DRIFT UNTIL DAWN' : 'NIGHT TOUGE · DRIFT UNTIL DAWN';
   refreshBests();
 }
 
@@ -605,7 +608,7 @@ function startGame() {
   if (night.hero) night.hero.intensity = 0;
   hud.warm(false); courseOut.update(null);
   scoring.reset(); hud.reset();
-  G.hour = 20.6; G.dist = 0; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
+  G.hour = START_HOUR; G.dist = 0; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
   resetWeather();
   G.playT = 0; G.longFrames = 0; G.worstFrame = 0;
   const p = track.sample(G.s || START_S);
@@ -640,7 +643,7 @@ function saveBest() {
 function restartRun() {
   saveBest();
   scoring.reset(); hud.reset();
-  G.hour = 20.6; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
+  G.hour = START_HOUR; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
   resetWeather();
   resetCarToStart();
   world.prime(car.x, car.z, START_S);

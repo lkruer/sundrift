@@ -1,0 +1,17 @@
+[
+  { "wait": 3000 },
+  { "click": "#startb" },
+  { "wait": 800 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 18.2; D.G.hourShown = 18.2; D.G.sunApplied = false; })()" },
+  { "keys": ["KeyW"], "ms": 3500 },
+  { "shot": "h1820" },
+  { "js": "(() => { const D = window.__DEBUG__; D.teleport(0, 0); D.G.hour = 18.4; D.G.hourShown = 18.4; })()" },
+  { "keys": ["KeyW"], "ms": 3500 },
+  { "shot": "h1840" },
+  { "js": "(() => { const D = window.__DEBUG__; D.teleport(0, 0); D.G.hour = 18.6; D.G.hourShown = 18.6; })()" },
+  { "keys": ["KeyW"], "ms": 3500 },
+  { "shot": "h1860" },
+  { "js": "(() => { const D = window.__DEBUG__; D.teleport(0, 0); D.G.hour = 20.6; D.G.hourShown = 20.6; })()" },
+  { "keys": ["KeyW"], "ms": 3500 },
+  { "shot": "h2060" }
+]

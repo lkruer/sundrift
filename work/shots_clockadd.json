@@ -1,0 +1,12 @@
+[
+  { "wait": 3000 },
+  { "js": "window.__TITLE_AT__ = window.__DEBUG__.G.hour" },
+  { "shot": "T0_title" },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.hud.onEvent({ type: 'bank', value: 1840, tier: 2, chain: 3 }); D.G.hour += 1840 / 6000; return [window.__TITLE_AT__, D.G.hour]; })()" },
+  { "wait": 220 },
+  { "shot": "T1_bank" },
+  { "wait": 700 },
+  { "shot": "T2_bank_later" }
+]
