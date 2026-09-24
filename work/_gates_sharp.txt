@@ -1,0 +1,27 @@
+--- gate 
+ready           6.8 s
+drifts banked   6  at metres 233, 238, 424, 516, 524, 552
+score           1307
+peak draws      552   peak tris 992,622   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- gate --phone
+ready           6.5 s
+drifts banked   1  at metres 387
+score           593
+peak draws      429   peak tris 704,799   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+--- gate --city
+ready           6.9 s
+drifts banked   18  at metres 236, 236, 238, 238, 239, 242, 242, 286, 294, 294, 399, 516, 517, 518, 520, 531, 533, 534
+score           7718
+peak draws      600   peak tris 802,465   median fps 60
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- gate --city --phone
+ready           6.5 s
+drifts banked   21  at metres 144, 145, 145, 146, 148, 151, 152, 227, 240, 241, 242, 251, 295, 510, 513, 516, 526, 526, 527, 527, 528
+score           5741
+peak draws      482   peak tris 679,577   median fps 60
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.

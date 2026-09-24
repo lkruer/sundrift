@@ -45,7 +45,7 @@
  * and every replacement here keeps the chunk it replaces, so the rig's own patches still find theirs.
  */
 import * as THREE from 'three';
-import { roomAtlas, ROOM_KINDS } from './rooms.js?v=202609242150';
+import { roomAtlas, ROOM_KINDS } from './rooms.js?v=202609242220';
 
 export const FLOOR_H = 3.4;    // metres floor to floor
 export const BAY_W = 2.6;      // target bay width (fitted per face)

@@ -396,6 +396,29 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 24 September, night: the type as sharp as the screen
+
+Asked for: "the UI and HUD are still a little blurry and look low definition. fix and submit".
+
+- **Why it was soft.** The picture is drawn at the tier's pixel ratio (the rig's: 1 on a phone, 1.5 on a desktop),
+  and the HUD and the menus were laid into it at that resolution: on a 3x phone the browser then enlarged the whole
+  frame, type and all, three times (the page's own type, before, had been drawn at 3x). On a desktop at 1.5x the HUD's
+  canvas budget (1.2 million pixels) was below the screen's 2 million and it was enlarged again. And the tube's colour
+  steps (the ordered dither) and its aperture grille went over the type, with its glow and its extra scanlines.
+- **The fix.** The tube's last pass now draws at the screen's own pixel ratio (up to 2x, within 5.5 million pixels)
+  while the picture and every other pass stay at the tier's (the composer's buffers at the picture's ratio; only the
+  last pass draws into the finer canvas, reading the picture a little enlarged); the HUD's canvas matches it (1.5
+  million pixels on a phone, 5.6 on a desktop); the dither is applied to the picture before the type is laid in, the
+  grille skips the type, the glow is a third lighter and the type's extra scanlines are almost gone (0.1 to 0.015).
+  The scene's own pixel sums (the road studs, the rain's pixel floor, the fireflies) read the picture's height now,
+  not the canvas's. On a 3x phone: picture 390 x 844, tube and type 780 x 1688.
+- **What it costs.** An A/B on the phone profile under 4x CPU throttling, the screen's pixel ratio switched between 1
+  and 3 every two seconds: 31.8 ms of JS a frame either way; the extra work is the GPU's (a 1.3 million pixel pass
+  and canvas copy on a phone).
+- **Measured.** The drift gate: pass desktop 6 banked, pass phone 1 then 5 (the gate wants 2; this bot's count runs
+  from 1 to 20), city 18, city phone 21; 0 slow frames and a median 60 fps in every run. The phone turned on its side
+  and back: 780 x 1688 to 1688 x 780 and back, no GL errors. The crash hunt, twice: clean.
+
 ## 24 September, evening: less pixelated, a smaller angle meter, a thinner border, the menus on the TV
 
 Asked for (after the entry went in): the HUD a little less pixelated while still retro; the steering angle meter

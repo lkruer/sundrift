@@ -11,7 +11,7 @@
  * made once and parked out of sight.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from './config.js?v=202609242150';
+import { clamp, lerp, smoothstep } from './config.js?v=202609242220';
 
 export const COURSE_OUT_S = 5;
 

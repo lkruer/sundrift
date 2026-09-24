@@ -6,23 +6,23 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609242150';
-import { createRig, detectTier } from '../rig.js?v=202609242150';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242150';
-import { Car, gearbox } from './car.js?v=202609242150';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609242150';
-import { World, drawsGlyphs } from './world.js?v=202609242150';
-import { ChaseCam } from './camera.js?v=202609242150';
-import { Input } from './input.js?v=202609242150';
-import { Scoring } from './scoring.js?v=202609242150';
-import { Hud } from './hud.js?v=202609242150';
-import { PageTV } from './pagetv.js?v=202609242150';
-import { Audio } from './audio.js?v=202609242150';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609242150';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242150';
-import { Atmosphere } from './atmos.js?v=202609242150';
-import { Debris } from './debris.js?v=202609242150';
-import { makePost } from './post.js?v=202609242150';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609242220';
+import { createRig, detectTier } from '../rig.js?v=202609242220';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242220';
+import { Car, gearbox } from './car.js?v=202609242220';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609242220';
+import { World, drawsGlyphs } from './world.js?v=202609242220';
+import { ChaseCam } from './camera.js?v=202609242220';
+import { Input } from './input.js?v=202609242220';
+import { Scoring } from './scoring.js?v=202609242220';
+import { Hud } from './hud.js?v=202609242220';
+import { PageTV } from './pagetv.js?v=202609242220';
+import { Audio } from './audio.js?v=202609242220';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609242220';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242220';
+import { Atmosphere } from './atmos.js?v=202609242220';
+import { Debris } from './debris.js?v=202609242220';
+import { makePost } from './post.js?v=202609242220';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -70,7 +70,13 @@ const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.3, 45
 scene.add(camera);
 // the camera goes in at creation, so the rig builds its shadow cascades as soon as they load, before any shader compiles
 const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 60, fogDensity: 0.00095, exposure: 1.05, post: false, camera });
-const post = makePost(renderer, scene, camera, { bloom: tier !== 'phone', fringe: tier !== 'phone', width: innerWidth, height: innerHeight });
+// The picture is drawn at the tier's pixel ratio (the rig's: 1 on a phone, 1.5 on a desktop), the costly part; the
+// tube's last pass, which lays in the HUD and the menus, runs at the screen's own (up to 2x, within 5.5 million
+// pixels), so their type is as sharp as the screen can show it and not a 1x picture enlarged 3x by a phone
+const PR_SCENE = renderer.getPixelRatio();
+const uiRatio = () => Math.max(PR_SCENE, Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(5.5e6 / Math.max(1, innerWidth * innerHeight))));
+renderer.setPixelRatio(uiRatio());
+const post = makePost(renderer, scene, camera, { bloom: tier !== 'phone', fringe: tier !== 'phone', width: innerWidth, height: innerHeight, prScene: PR_SCENE });
 renderer.info.autoReset = false;
 // a lost and restored context gets back what three restores for itself, but not the environment map the rig built, which
 // would stay black until the sky next changed: build the light of the hour again
@@ -755,7 +761,7 @@ function frame(now) {
   // a debug camera for inspecting the world from anywhere (set window.__CAM__ = { pos: [x,y,z], look: [x,y,z], fov })
   if (window.__CAM__) { const c = window.__CAM__; camera.position.set(...c.pos); camera.up.set(0, 1, 0); camera.lookAt(...c.look); if (c.fov && camera.fov !== c.fov) { camera.fov = c.fov; camera.updateProjectionMatrix(); } }
   // the road studs light up where the car is pointing
-  if (car && world) { const [sfx, sfz] = car.forward(); world.setStudView(car.x, carRoot ? carRoot.position.y : 0, car.z, sfx, sfz, G.night, renderer.domElement.height); }
+  if (car && world) { const [sfx, sfz] = car.forward(); world.setStudView(car.x, carRoot ? carRoot.position.y : 0, car.z, sfx, sfz, G.night, post.sceneRT.height); }
   // rain, lit by the headlights and the lamps near the car
   if (rain && car && G.mode !== 'paused') {
     camera.getWorldDirection(_fwd);
@@ -767,7 +773,7 @@ function frame(now) {
     const wetAir = W.rain * (1 - (G.tunnelK || 0));
     // (by day a drop is a pale sliver of the grey sky; the size of a pixel at a metre, so no streak is drawn thinner)
     rain.update(dt, wetAir, camera.position, _fwd.x / hh, _fwd.z / hh, _carAt, G.night, lampLights, 0.05 + 0.72 * (1 - G.night), _camVel,
-      2 * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, renderer.domElement.height));
+      2 * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, post.sceneRT.height));
     // the rain landing on the road ahead, the rain further off, the headlights' beams in it, and drops on the lens
     if (track) splashes.update(dt, wetAir, splashSpot);
     _rainCol.copy(rig.fog.color).multiplyScalar(0.5 + 0.9 * (1 - G.night)).addScalar(0.05);
@@ -1171,7 +1177,7 @@ function airFollow(dt) {
   _air.viewYaw = Math.atan2(_look.x, _look.z);
   _air.groundY = G.carY ?? pa.y; _air.carY = G.carY ?? pa.y;
   _air.night = G.night ?? 1; _air.rain = W.rain; _air.tunnel = G.tunnelK || 0; _air.spot = fireflySpot;
-  atmos.flies.u.uScale.value = renderer.domElement.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
+  atmos.flies.u.uScale.value = post.sceneRT.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
   const th = atmos.update(dt, _air);
   if (th && audio && G.mode === 'playing') audio.thunder && audio.thunder(th.delay, th.k);
   // the flash lights the sky, the haze on every far thing, and the world
@@ -1620,6 +1626,7 @@ function lampsFollow() {
 // ---------------------------------------------------------------- resize
 function resize() {
   const w = innerWidth, h = innerHeight;
+  renderer.setPixelRatio(uiRatio());
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
   post.resize(w, h);

@@ -182,13 +182,13 @@ const Retro = {
     tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uCurve: { value: 0.022 }, uEdge: { value: 0.055 }, uCorner: { value: 0.03 }, uZoom: { value: 0.966 },
     uLevels: { value: 32 }, uMask: { value: 0.06 }, uLens: { value: 0 }, uTime: { value: 0 }, uFlow: { value: 0 },
-    uScan: { value: 0.036 }, uHudScan: { value: 0.1 },
-    tHud: { value: null }, uHudOn: { value: 0 }, uHudSize: { value: new THREE.Vector2(4, 4) }, uHudScale: { value: 2 },
+    uScan: { value: 0.036 }, uHudScan: { value: 0.015 }, uPx: { value: 1 },
+    tHud: { value: null }, uHudOn: { value: 0 }, uHudSize: { value: new THREE.Vector2(4, 4) }, uHudScale: { value: 1 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uZoom, uLevels, uMask, uLens, uTime, uFlow;
-    uniform float uScan, uHudScan, uHudOn, uHudScale; uniform sampler2D tHud; uniform vec2 uHudSize;
+    uniform float uScan, uHudScan, uHudOn, uHudScale, uPx; uniform sampler2D tHud; uniform vec2 uHudSize;
     varying vec2 vUv;
     // the OSD's texel under p, square and crisp, softened only over the last screen pixel at its edges
     vec4 hudAt(vec2 p) {
@@ -257,22 +257,26 @@ const Retro = {
         col *= 1.0 - 0.06 * m * (1.0 - m);
         col += vec3(0.07) * m * smoothstep(0.75, 1.0, dot(normalize(lr.xy + 1e-5), vec2(0.55, -0.83)));
       } else col = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
-      // the on-screen display (premultiplied), under the same glass: a drop on the lens bends it too, a little
+      // (the tube's patterns keep to the picture's own pixels: this pass may run finer than the picture, for the type)
+      vec2 fc = gl_FragCoord.xy * uPx;
+      // the picture's colour cut to 32 levels a channel with an ordered dither, the grain of a 90s console's output
+      col = floor(col * uLevels + bayer4(fc)) / uLevels;
+      // the on-screen display (premultiplied), under the same glass and bent by it, laid in after the colour steps and
+      // kept out of the grille, so the type stays as sharp as the screen can show it; its light bleeds a touch round it
       float hudA = 0.0;
       if (uHudOn > 0.5) {
-        vec2 hp = clamp(uv + lro * 0.5, 0.0, 1.0), ht = 1.0 / uHudSize;
+        vec2 hp = clamp(uv + lro * 0.3, 0.0, 1.0), go = 1.5 / (uHudSize * max(uPx, 0.25));
         vec4 h = hudAt(hp);
-        vec3 glow = texture2D(tHud, hp + vec2(ht.x * 1.5, 0.0)).rgb + texture2D(tHud, hp - vec2(ht.x * 1.5, 0.0)).rgb
-                  + texture2D(tHud, hp + vec2(0.0, ht.y * 1.2)).rgb + texture2D(tHud, hp - vec2(0.0, ht.y * 1.2)).rgb;
-        col = col * (1.0 - h.a) + h.rgb + glow * 0.075 * (1.0 - h.a);
+        vec3 glow = texture2D(tHud, hp + vec2(go.x, 0.0)).rgb + texture2D(tHud, hp - vec2(go.x, 0.0)).rgb
+                  + texture2D(tHud, hp + vec2(0.0, go.y * 0.8)).rgb + texture2D(tHud, hp - vec2(0.0, go.y * 0.8)).rgb;
+        col = col * (1.0 - h.a) + h.rgb + glow * 0.05 * (1.0 - h.a);
         hudA = h.a;
       }
-      // the scanlines: faint over the picture, deeper through the display's bright type
-      col *= 1.0 - (uScan + uHudScan * hudA) * (0.5 + 0.5 * sin(gl_FragCoord.y * 1.5708));
-      col = floor(col * uLevels + bayer4(gl_FragCoord.xy)) / uLevels;
-      float m = mod(gl_FragCoord.x, 3.0);
+      // the scanlines, faint over everything; the aperture grille over the picture
+      col *= 1.0 - (uScan + uHudScan * hudA) * (0.5 + 0.5 * sin(fc.y * 1.5708));
+      float m = mod(fc.x, 3.0);
       vec3 mask = vec3(m < 1.0 ? 1.0 : 1.0 - uMask, (m >= 1.0 && m < 2.0) ? 1.0 : 1.0 - uMask, m >= 2.0 ? 1.0 : 1.0 - uMask);
-      col *= mask * (1.0 + uMask * 0.6);
+      col *= mix(mask * (1.0 + uMask * 0.6), vec3(1.0), hudA);
       // set back behind the glass: darker into the rim, and a faint cold sheen along it, brightest top left
       float rim = -d / side;                               // distance in from the edge, in the screen's shorter side
       col *= 0.68 + 0.32 * smoothstep(0.0, 0.018, rim);
@@ -282,8 +286,13 @@ const Retro = {
     }`,
 };
 
-export function makePost(renderer, scene, camera, { bloom = true, width, height, fringe = true, tube = true }) {
-  const pr = renderer.getPixelRatio();
+/**
+ * prScene: the pixel ratio the picture is drawn at (the costly part: 1 on a phone, 1.5 on a desktop). The renderer's
+ * own pixel ratio can be higher: only the last pass, the tube, draws at it, reading the picture a little enlarged and
+ * laying in the HUD and the menus at the screen's own sharpness.
+ */
+export function makePost(renderer, scene, camera, { bloom = true, width, height, fringe = true, tube = true, prScene = renderer.getPixelRatio() }) {
+  const pr = prScene;
   const w = Math.floor(width * pr), h = Math.floor(height * pr);
   // (a GPU that cannot draw into half floats gets 8-bit buffers: a little more banding in the glow, but a picture, where
   // a half-float target it cannot draw into is black. Every desktop and recent phone has one of the two)
@@ -291,6 +300,9 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height,
   const type = ext.has('EXT_color_buffer_half_float') || ext.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType;
   const sceneRT = new THREE.WebGLRenderTarget(w, h, { type, depthTexture: new THREE.DepthTexture(w, h), depthBuffer: true });
   const composer = type === THREE.HalfFloatType ? new EffectComposer(renderer) : new EffectComposer(renderer, new THREE.WebGLRenderTarget(w, h, { type }));
+  // (its buffers at the picture's resolution, whatever the canvas's is)
+  composer.setPixelRatio(pr); composer.setSize(width, height);
+  const ui = () => [Math.floor(width * renderer.getPixelRatio()), Math.floor(height * renderer.getPixelRatio())];
   // the cel pass reads the scene's own target: the frame used to be copied into the composer's buffer first (a
   // TexturePass), a whole extra full-screen pass and render() call a frame for an identical picture. (A null texture
   // name keeps the pass from pointing tDiffuse at the composer's buffer.)
@@ -307,7 +319,13 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height,
   if (bloom) { bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.45, 1.35); composer.addPass(bloomPass); }
   composer.addPass(new OutputPass());
   let retro = null;
-  if (tube) { retro = new ShaderPass(Retro); retro.uniforms.uRes.value.set(w, h); retro.uniforms.uMask.value = pr > 1.6 ? 0.0 : 0.06; composer.addPass(retro); }
+  if (tube) {
+    retro = new ShaderPass(Retro);
+    const [uw, uh] = ui();
+    retro.uniforms.uRes.value.set(uw, uh); retro.uniforms.uPx.value = w / Math.max(1, uw);
+    retro.uniforms.uMask.value = pr > 1.6 ? 0.0 : 0.06;
+    composer.addPass(retro);
+  }
   return {
     composer, cel, bloomPass, sceneRT, retro,
     render(dt) {
@@ -319,15 +337,15 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height,
       composer.render(dt);
     },
     resize(width2, height2) {
-      const p = renderer.getPixelRatio();
-      const w2 = Math.floor(width2 * p), h2 = Math.floor(height2 * p);
+      const w2 = Math.floor(width2 * pr), h2 = Math.floor(height2 * pr);
+      width = width2; height = height2;
       sceneRT.setSize(w2, h2);
       composer.setSize(width2, height2);
       cel.uniforms.uRes.value.set(w2, h2);
       cel.uniforms.tDiffuse.value = sceneRT.texture;
       cel.uniforms.tDepth.value = sceneRT.depthTexture;
       if (bloomPass) bloomPass.setSize(w2, h2);
-      if (retro) retro.uniforms.uRes.value.set(w2, h2);
+      if (retro) { const [uw, uh] = ui(); retro.uniforms.uRes.value.set(uw, uh); retro.uniforms.uPx.value = w2 / Math.max(1, uw); }
     },
   };
 }

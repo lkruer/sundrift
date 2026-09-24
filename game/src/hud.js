@@ -20,7 +20,7 @@
  * fly off the clock it moved. On a phone that can (Android), a short buzz goes with the big moments.
  */
 import * as THREE from 'three';
-import { SCORE, clamp, damp } from './config.js?v=202609242150';
+import { SCORE, clamp, damp } from './config.js?v=202609242220';
 
 const $ = (id) => document.getElementById(id);
 // the slide angle past which a drift scores the most: scoring.js's angle factor tops out at 1.5 x 0.55 rad, 47 degrees
@@ -86,9 +86,10 @@ const SEG_PATHS = (() => {
   return out;
 })();
 const SKEW = Math.tan(7 * Math.PI / 180);
-// the most pixels the OSD's canvas may have: a phone half a million (1.2 canvas px to its CSS px: sharp, and sent to
-// the GPU thirty times a second without costing a phone its frame), a desktop 1.2 million (1280 x 720 at full size)
-const HUD_PIXELS = { phone: 0.5e6, desktop: 1.2e6 };
+// the most pixels the OSD's canvas may have: the tube's last pass draws at the screen's own resolution (up to 2x, main.js)
+// and the canvas matches it, so the type is sharp (a 390 x 844 phone at 2x is 1.3 million; a 1440 x 900 laptop at 2x
+// 5.2 million)
+const HUD_PIXELS = { phone: 1.5e6, desktop: 5.6e6 };
 
 const outBack = (p) => { const c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
 /** A punch: s0 at the start, settling on 1 with a little overshoot. */
