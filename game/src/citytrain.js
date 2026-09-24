@@ -314,10 +314,13 @@ export function railChunk(w, ch, D) {
       }
       // taller buildings behind the line keep the skyline (where the ground is clear of any other road)
       const probe = {};
-      for (let s = a0 + 4; s < a1 - 4;) {
-        const bw = 10 + r() * 8, sm = s + bw / 2;
+      // (each chunk fills its own part of the line and no more: a building run on into the next chunk shared a front
+      // with that chunk's first one, and the two z-fought)
+      const b0 = a0 > st.s0 ? a0 + 0.25 : a0 + 4, b1 = a1 < st.s1 ? a1 - 0.25 : a1 - 4;
+      for (let s = b0; s < b1 - 6;) {
+        const bw = Math.min(10 + r() * 8, b1 - s), sm = s + bw / 2;
         s += bw + 0.4;
-        if (sm > a1 - 2) break;
+        if (bw < 6) break;
         const dep = 9 + r() * 6, a = at(sm, 2.9 + DEPTH + 1.2 + dep / 2);
         g.sample(a.x, a.z, 2.2, probe);
         const b = at(sm, 2.9 + DEPTH + 1.2 + dep);
@@ -331,6 +334,19 @@ export function railChunk(w, ch, D) {
       if (se < s0 || se >= s1) continue;
       const dep = DEPTH + 3.4, a = at(se + dir * (STATION / 2 - 0.5), 2.9 + dep / 2);
       building(a.x, g.height(a.x, a.z), a.z, a.p.h, STATION, 22 + r() * 14, dep, FAC[Math.floor(r() * FAC.length)]);
+      // its name over the entrance, on a white board facing the street (each end of the line its own station)
+      const cells = w.signCells && w.signCells.station;
+      if (D.boards && cells) {
+        const f = at(se + dir * (STATION / 2 - 0.5), 2.9 - 0.06), c = cells[(st.i * 2 + (dir > 0 ? 1 : 0)) % cells.length], bw = 7.2, bh = 1.8;
+        const y = g.height(f.x, f.z) + 4.35 + bh / 2;
+        const q = new THREE.PlaneGeometry(bw, bh), uv = q.attributes.uv;
+        for (let i = 0; i < uv.count; i++) uv.setXY(i, c[0] + uv.getX(i) * (c[2] - c[0]), c[1] + uv.getY(i) * (c[3] - c[1]));
+        q.rotateY(Math.atan2(-f.lx, -f.lz)); q.translate(f.x, y, f.z);
+        D.boards.push(q);
+        // (its frame behind it, against the wall: w across the road, d along it)
+        D.housings.push(box2(f.x + f.lx * 0.04, y - bh / 2 - 0.06, f.z + f.lz * 0.04, f.p.h, 0.05, bh + 0.12, bw + 0.2));
+        D.glows.push([f.x - f.lx * 1.6, f.z - f.lz * 1.6, f.fx, f.fz, 5, 9, 0xe8f2ff]);
+      }
       w.detail.stats.stations = (w.detail.stats.stations || 0) + 1;
     }
   }

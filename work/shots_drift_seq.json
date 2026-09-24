@@ -1,0 +1,19 @@
+[
+  { "wait": 3000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 22; D.G.hourShown = 21.9; D.rainNow(0); const t = D.track; const f = t.features.filter((q) => q.type === 'hairpin' && t.pts[q.i0].s > 400)[0]; let kmax = 0; for (let i = f.i0; i <= f.i1; i++) kmax = Math.max(kmax, Math.abs(t.pts[i].k)); let ie = f.i0; while (ie < f.i1 && Math.abs(t.pts[ie].k) < 0.6 * kmax) ie++; let ix = ie; while (ix < f.i1 && Math.abs(t.pts[ix].k) > 0.3 * kmax) ix++; window.__SE__ = t.pts[ie].s; window.__SX__ = t.pts[ix].s; window.__KD__ = Math.sign(t.pts[ie].k); D.teleport(window.__SE__ - 50, 70); return [window.__SE__, window.__SX__, window.__KD__, Math.round(1 / kmax)]; })()" },
+  { "wait": 800 },
+  { "js": "(() => { const D = window.__DEBUG__, G = D.G, t = D.track, car = D.car; const sE = window.__SE__, sX = window.__SX__, kd = window.__KD__; let T = 0, flick = -1; window.__LOG__ = []; window.__AUTOPILOT__ = (dt) => { T += dt; const n = t.nearest(car.x, car.z, G.idx); const ahead = t.sample(G.s + 8 + car.speed * 0.5); let e = ahead.h - car.yaw; e = Math.atan2(Math.sin(e), Math.cos(e)); if (flick < 0 && G.s > sE - 12) flick = T; const inF = flick >= 0 && T - flick < 0.3; const inBend = flick >= 0 && G.s < sX + 4; const steer = inBend ? kd : Math.max(-1, Math.min(1, e * 2.2 - n.u * 0.08)); if (Math.floor(T * 5) !== Math.floor((T - dt) * 5)) window.__LOG__.push([+T.toFixed(1), Math.round(car.beta * 57.3), Math.round(car.kmh), +n.u.toFixed(1)]); return { throttle: inF ? 0.3 : (flick < 0 ? (car.speed < 20 ? 1 : 0) : 1), brake: 0, steer, hand: inF ? 1 : 0, reverse: false, touch: false }; }; })()" },
+  { "wait": 1700 },
+  { "shot": "D1" },
+  { "wait": 400 },
+  { "shot": "D2" },
+  { "wait": 400 },
+  { "shot": "D3" },
+  { "wait": 400 },
+  { "shot": "D4" },
+  { "wait": 600 },
+  { "shot": "D5" },
+  { "js": "(() => { window.__AUTOPILOT__ = null; return window.__LOG__; })()" }
+]

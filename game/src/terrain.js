@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609232326';
-import { REACH } from './ground.js?v=202609232326';
-import { instanceGroup, Pool } from './instancing.js?v=202609232326';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609240354';
+import { REACH } from './ground.js?v=202609240354';
+import { instanceGroup, Pool } from './instancing.js?v=202609240354';
 
 export const TILE = 96;
 export const LODS = [
@@ -287,8 +287,17 @@ export class Terrain {
       this._colour(x, z, y, ny, E[k], F[k], 0, _c);
       col[v * 3] = _c.r; col[v * 3 + 1] = _c.g; col[v * 3 + 2] = _c.b;
       uv[v * 2] = x / 7; uv[v * 2 + 1] = z / 7;
-      // slope protection on a steep face near the road (a cutting, or the face between two legs)
+      // slope protection on a steep face near the road (a cutting, or the face between two legs); not on a face that
+      // looks along the road (the end of the hill over a tunnel): the lattice is laid out by distance along the road,
+      // and there that runs down the slope, which stretched its beams into long pale scribbles across the hill
       wall[v] = (F[k] & 3) ? 0 : smoothstep(0.42, 0.58, 1 - ny * ny) * (1 - smoothstep(14, 24, E[k]));
+      if (wall[v] > 0) {
+        // (one-sided differences, the smaller: the nearest road can change between two legs, and S jumps there)
+        const one = (a, b) => (Math.abs(a) < Math.abs(b) ? a : b);
+        const sx = one(S[k + 1] - S[k], S[k] - S[k - 1]), sz = one(S[k + n] - S[k], S[k] - S[k - n]);
+        const ls = Math.hypot(sx, sz), lh = Math.hypot(nx, nz);
+        if (ls > 1e-3 && lh > 1e-3) wall[v] *= 1 - smoothstep(0.5, 0.8, Math.abs(sx * nx + sz * nz) / (ls * lh));
+      }
       wallS[v] = S[k];                               // along the lattice: the distance along the road beside it
     }
     // the perimeter, walked once round, and a skirt hanging from it
@@ -310,12 +319,16 @@ export class Terrain {
     let o = 0;
     // at a tunnel mouth, a cell that would stretch from the road up to the hill over the bore stays open: it
     // is the sheet a heightfield would hang across the opening (see ground.js); the portal face hides the cut
+    // (only where the cell really hangs from the road up to the hill: along the bore's sides, where the hill meets the
+    // ground beside it at much the same height, an open cell was a trench beside the portal that showed the lining's
+    // back glowing orange from any higher road)
     const flag = (v) => F[(Math.floor(v / row) + 1) * n + (v % row) + 1];
     const mouth = (v) => (flag(v) & 4) !== 0;
+    const Y = (v) => pos[v * 3 + 1];
     const straddles = (a, b, c, d) => {
       if (!(mouth(a) || mouth(b) || mouth(c) || mouth(d))) return false;
       const t = (flag(a) & 2) + (flag(b) & 2) + (flag(c) & 2) + (flag(d) & 2);
-      return t > 0 && t < 8;
+      return t > 0 && t < 8 && Math.max(Y(a), Y(b), Y(c), Y(d)) - Math.min(Y(a), Y(b), Y(c), Y(d)) > 2.5;
     };
     for (let j = 0; j < seg; j++) for (let i = 0; i < seg; i++) {
       const a = j * row + i, b = a + 1, c = a + row, d = c + 1;
@@ -326,7 +339,7 @@ export class Terrain {
     for (let p = 0; p < per; p++) {
       const q = (p + 1) % per;
       const tp = perim[p], tq = perim[q], bp = V + p, bq = V + q;
-      if ((mouth(tp) || mouth(tq)) && ((flag(tp) & 2) !== (flag(tq) & 2))) continue;
+      if ((mouth(tp) || mouth(tq)) && ((flag(tp) & 2) !== (flag(tq) & 2)) && Math.abs(Y(tp) - Y(tq)) > 2.5) continue;
       idx[o++] = tp; idx[o++] = tq; idx[o++] = bp;
       idx[o++] = tq; idx[o++] = bq; idx[o++] = bp;
     }
@@ -342,11 +355,37 @@ export class Terrain {
     return geo;
   }
 
+  /**
+   * The view from each viewpoint lay-by near a tile: a wedge of the hillside below it opening out from the lay-by's
+   * edge, clear of trees, so a viewpoint looks out over the valley (the forest grew right up to its railing, and
+   * the view was a wall of cedar trunks). [cx, cz, outward x, z, forward x, z, half width]
+   */
+  _views(tile) {
+    const t = this.ground.track, out = [];
+    const mx = (tile.i + 0.5) * TILE, mz = (tile.j + 0.5) * TILE;
+    for (const m of t.markers) {
+      if (m.kind !== 'vista' || m.fi >= t.nFinalF) continue;
+      const p = t.sample(m.s + m.len * 0.45), lx = Math.cos(p.h) * m.side, lz = -Math.sin(p.h) * m.side;
+      const u = m.wlay + 1 + m.depth, cx = p.x + lx * u, cz = p.z + lz * u;
+      if (Math.hypot(cx - mx, cz - mz) > 260) continue;
+      out.push([cx, cz, lx, lz, Math.sin(p.h), Math.cos(p.h), m.len * 0.5 + 6]);
+    }
+    return out;
+  }
+
   /** The forest on a tile: cedars, with groves of cherry in blossom and fresh broadleaf; clearings between. */
   _forest(tile, lod, seg, H, E, F) {
     const f = this.field, P = this.o.parts;
     const n = seg + 3, sp = TILE / seg;
     const far = lod >= 2;
+    const views = this._views(tile);
+    const inView = (x, z) => {
+      for (const [cx, cz, ox, oz, fx, fz, hw] of views) {
+        const dx = x - cx, dz = z - cz, along = dx * ox + dz * oz;
+        if (along > -3 && along < 130 && Math.abs(dx * fx + dz * fz) < hw + along * 0.7) return true;
+      }
+      return false;
+    };
     const spacing = (lod === 0 ? 8.8 : 11.5) / (this.o.density || 1);
     const cedars = [], sakura = [], broad = [], bare = [], trunks = (this._trunks = far ? null : []);
     const cells = Math.floor(TILE / spacing);
@@ -366,7 +405,7 @@ export class Terrain {
       if (sx * sx + sz * sz > 0.8) { rng(); rng(); rng(); continue; }
       const big = f.vnoise(x / 140, z / 140, 8);
       const dens = smoothstep(-0.55, 0.05, big);
-      if (rng() > dens) { rng(); rng(); continue; }
+      if (rng() > dens || (views.length && inView(x, z))) { rng(); rng(); continue; }
       const y = Terrain.surf(H, n, sp, lx, lz) - 0.35;
       const ry = rng() * Math.PI * 2, sc = 0.72 + rng() * 0.6;
       _q.setFromAxisAngle(_up, ry); _s.set(sc, sc, sc);
@@ -392,7 +431,8 @@ export class Terrain {
     // the forest casts no shadow: at night the moon's tree shadows barely read, and drawing a forest twice was a
     // quarter of the frame's triangles
     const cast = false;
-    if (cedars.length && P.cedar) g.add(instanceGroup(P.cedar, cedars, { castShadow: cast }));
+    // (the second ring's cedars are the plain-coned middle model: nobody can see a drooping rim at 250 m)
+    if (cedars.length && P.cedar) g.add(instanceGroup(lod === 0 ? P.cedar : (P.cedarMid || P.cedar), cedars, { castShadow: cast }));
     // (the far ring draws its cherries with the lighter maple, tinted the same: at 200 m nobody can tell, and it
     // is a third fewer triangles across a whole hillside)
     const cherry = lod === 0 ? (P.sakura || P.maple) : (P.sakuraFar || P.maple || P.sakura);

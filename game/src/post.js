@@ -22,7 +22,7 @@ const Cel = {
   uniforms: {
     tDiffuse: { value: null }, tDepth: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uNear: { value: 0.4 }, uFar: { value: 4500 }, uTime: { value: 0 },
-    uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.075 }, uSpeed: { value: 0 },
+    uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.075 }, uSpeed: { value: 0 }, uLift: { value: 0 },
     uVig: { value: 0 }, uHit: { value: 0 }, uCA: { value: 0.006 },
     uShaft: { value: new THREE.Vector3(0.5, 0.5, 0) }, uShaftCol: { value: new THREE.Color(1, 1, 1) },
     uMist: { value: new THREE.Vector4(-1e4, 0.03, 14, 0) }, uMistCol: { value: new THREE.Color() }, uMistGlow: { value: new THREE.Color() }, uMistFar: { value: new THREE.Color() },
@@ -32,7 +32,7 @@ const Cel = {
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed, uVig, uHit, uCA;
+    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed, uVig, uHit, uCA, uLift;
     uniform vec3 uShaft, uShaftCol;
     uniform vec4 uMist; uniform vec3 uMistCol, uMistGlow, uMistFar, uCamPos, uMoonDir; uniform mat3 uCamRot; uniform vec2 uTanFov; uniform sampler2D uNoise; uniform float uMistT;
     uniform mat4 uPrevVP; uniform float uBlur;
@@ -103,6 +103,9 @@ const Cel = {
       float l = luma(tm);
       float steps = 6.0;
       float q = floor(l * steps + 0.5) / steps;
+      // by day the darkest band is the first step up, not black: a face in shade keeps its colour (at night the dark is
+      // the picture, and stays as it is)
+      q = max(q, uLift * step(0.012, l) * 0.5 / steps);
       float band = mix(l, q, 0.55 * uBands * (1.0 - sky));
       vec3 col = c * (band + 0.006) / (l + 0.006);
       // halftone dots in the shade, the way printed shade is drawn
@@ -193,7 +196,7 @@ const Retro = {
         float r = (0.08 + 0.3 * pow(hs(id + 9.1), 2.0)) * smoothstep(0.0, 0.06, ph) * (1.0 - smoothstep(0.55, 1.0, ph));
         vec2 d = f - c; float l = length(d) / max(r, 1e-4);
         float m = on * (1.0 - smoothstep(0.8, 1.0, l)) * step(0.001, r);
-        acc += vec3(-d * 0.05 * m, m);
+        acc += vec3(-d * 0.03 * m, m);
       }
       {
         float cw = 0.045, col = floor(q.x / cw), h = hs(vec2(col, 11.0));
@@ -229,9 +232,10 @@ const Retro = {
         vec3 lr = lensRain(uv);
         float m = clamp(lr.z, 0.0, 1.0);
         col = texture2D(tDiffuse, clamp(uv + lr.xy, 0.0, 1.0)).rgb;
-        // a drop darkens a little at its rim and catches a glint up on its left
-        col *= 1.0 - 0.14 * m * (1.0 - m);
-        col += vec3(0.16) * m * smoothstep(0.6, 1.0, dot(normalize(lr.xy + 1e-5), vec2(0.55, -0.83)));
+        // a drop darkens a touch at its rim and catches a small glint up on its left (stronger, every drop read as a
+        // grey ball sitting in the scene)
+        col *= 1.0 - 0.06 * m * (1.0 - m);
+        col += vec3(0.07) * m * smoothstep(0.75, 1.0, dot(normalize(lr.xy + 1e-5), vec2(0.55, -0.83)));
       } else col = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
       col = floor(col * uLevels + bayer4(gl_FragCoord.xy)) / uLevels;
       float m = mod(gl_FragCoord.x, 3.0);

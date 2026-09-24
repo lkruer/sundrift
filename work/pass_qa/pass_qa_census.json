@@ -1,0 +1,8 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.G.hour = 22; D.G.hourShown = 22; D.G.lastApplied = -9; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); window.__CENSUS__ = (label) => { const g = window.__GAME__; const m = {}; let total = 0; D.scene.traverseVisible((o) => { if (!o.isMesh && !o.isPoints && !o.isLineSegments) return; const geo = o.geometry; let t = (geo.index ? geo.index.count : geo.attributes.position.count) / 3; if (geo.drawRange && geo.drawRange.count < Infinity) t = Math.min(t, geo.drawRange.count / 3); if (o.isInstancedMesh) t *= o.count; if (o.isInstancedBufferGeometry || geo.isInstancedBufferGeometry) t *= geo.instanceCount; let key = o.name || (o.material && o.material.name) || 'mesh'; let p = o.parent; while (p && !['forest','road','terrain','atmosphere'].includes(p.name) && p.parent) p = p.parent; key = (p ? p.name : '') + ':' + key + ':' + ((o.material && o.material.name) || ''); m[key] = (m[key] || 0) + t; total += t; }); const top = Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 18).map(([k, v]) => k + ' ' + Math.round(v / 1000) + 'k'); return { label, draws: g.draws, rendered: Math.round(g.tris / 1000) + 'k', total: Math.round(total / 1000) + 'k', top }; }; })()" },
+  { "js": "window.__DEBUG__.teleport(3000, 0); 1" }, { "wait": 2600 }, { "js": "window.__CENSUS__('s3000')" },
+  { "js": "window.__DEBUG__.teleport(4000, 0); 1" }, { "wait": 2600 }, { "js": "window.__CENSUS__('s4000')" },
+  { "js": "window.__DEBUG__.teleport(2264, 0); 1" }, { "wait": 2600 }, { "js": "window.__CENSUS__('s2264')" }
+]

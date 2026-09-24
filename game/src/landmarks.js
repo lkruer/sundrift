@@ -520,6 +520,23 @@ export function citySkyline(T = THREE, { radius = 2600, count = 180, seed = 7 } 
     body: new T.MeshBasicMaterial({ map: sheet, vertexColors: true, fog: false }),
     lights: new T.MeshBasicMaterial({ vertexColors: true, fog: false }),
   };
+  // the sheet is drawn for the night: by day it left the far towers dark with their windows lit. uDay (0 night .. 1
+  // day) turns them pale, their windows darker glass, half into the haze (uHaze, the fog's colour), as a far city is
+  const uDay = { value: 0 }, uHaze = { value: new T.Color(0.62, 0.66, 0.74) };
+  mats.body.onBeforeCompile = (sh) => {
+    sh.uniforms.uDay = uDay; sh.uniforms.uHaze = uHaze;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uDay;\nuniform vec3 uHaze;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      if (uDay > 0.001) {
+        vec3 sk = texture2D(map, vMapUv).rgb;
+        float lit = smoothstep(0.03, 0.15, max(sk.r, max(sk.g, sk.b)));
+        vec3 dayC = mix(vec3(0.58, 0.6, 0.66), vec3(0.24, 0.28, 0.35), 0.3 + 0.35 * lit) * vColor.rgb;
+        diffuseColor.rgb = mix(diffuseColor.rgb, mix(dayC, uHaze, 0.45), uDay);
+      }`);
+  };
+  mats.body.customProgramCacheKey = () => 'city-skyline-day1';
+  g.userData.day = uDay; g.userData.haze = uHaze;
   const mb = new T.Mesh(body.geometry(), mats.body); mb.name = 'skyline towers';
   const ml = new T.Mesh(lights.geometry(), mats.lights); ml.name = 'skyline lights';
   for (const m of [mb, ml]) { m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; g.add(m); }

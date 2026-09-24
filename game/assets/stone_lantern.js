@@ -5,7 +5,8 @@
 // line. It has a 0.06 m eave edge and a closed soffit. The fire box is one indexed
 // BufferGeometry: a cube whose four side faces each carry a frame, four recess
 // walls and a recessed back, 0.16 m square and 0.03 m deep. Pillar, bead, slabs
-// and moss band are primitives; the finial is a faceted icosahedron ball.
+// and moss band are primitives; the finial is a faceted icosahedron ball. (The recesses' backs were made the fire
+// box's window, in their own warm material, in the game's polish pass: a lit lantern at the shrine by night.)
 // Kasuga lantern, 1.8 m tall, 0.78 m across the eaves.
 export default function (THREE) {
   const g = new THREE.Group();
@@ -14,6 +15,9 @@ export default function (THREE) {
   stone.name = 'stone';
   const moss = new THREE.MeshStandardMaterial({ color: 0x5f7a3a, roughness: 0.9, metalness: 0, flatShading: true });
   moss.name = 'foliage';
+  // the light in the fire box, seen through its four windows (the game lights it at night)
+  const fire = new THREE.MeshStandardMaterial({ color: 0x3a2c20, emissive: 0xffb070, emissiveIntensity: 1.0, roughness: 0.9, metalness: 0 });
+  fire.name = 'firebox';
 
   const add = (geo, m, x = 0, y = 0, z = 0) => {
     const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); g.add(mesh); return mesh;
@@ -36,7 +40,7 @@ export default function (THREE) {
   // --- fire box: a 0.42 m cube from 0.90 to 1.32 with a recessed panel on each side face.
   //     Each face is laid out in its own (u, v, n) frame with u x v = n, so the same
   //     counter-clockwise loops face outward on every side.
-  const fp = [], fi = [];
+  const fp = [], fi = [], wi = [];
   const H = 0.21, A = 0.08, D = 0.03, YC = 1.11;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const face = (o, u, v, n, recess) => {
@@ -53,7 +57,7 @@ export default function (THREE) {
       fi.push(b + k, b + kn, b + 4 + kn, b + k, b + 4 + kn, b + 4 + k);             // frame
       fi.push(b + 4 + k, b + 4 + kn, b + 8 + kn, b + 4 + k, b + 8 + kn, b + 8 + k);   // recess wall
     }
-    fi.push(b + 8, b + 9, b + 10, b + 8, b + 10, b + 11);                             // recess back
+    wi.push(b + 8, b + 9, b + 10, b + 8, b + 10, b + 11);                             // recess back: the window
   };
   face(V(0, YC, H), V(1, 0, 0), V(0, 1, 0), V(0, 0, 1), true);         // +z
   face(V(0, YC, -H), V(0, 1, 0), V(1, 0, 0), V(0, 0, -1), true);       // -z
@@ -62,6 +66,7 @@ export default function (THREE) {
   face(V(0, YC + H, 0), V(0, 0, 1), V(1, 0, 0), V(0, 1, 0), false);    // top
   face(V(0, YC - H, 0), V(1, 0, 0), V(0, 0, 1), V(0, -1, 0), false);   // bottom
   built(fp, fi, stone);
+  built(fp, wi, fire);
 
   // --- roof: eight rays (odd k = corners at 45 degrees, even k = mid-edges), six rings
   //     down a concave curve r = R t^1.7, y = 0.34 (1 - t) plus an upturn that is 0.09 on

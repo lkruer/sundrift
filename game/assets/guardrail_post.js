@@ -1,7 +1,7 @@
 // guardrail_post — WINNER (candidate B): profile route. The C-channel is one ExtrudeGeometry of a C-shaped Shape
 // swept up the height (no bevel), the base plate is an extruded chamfered rectangle, the spacer is an
-// extruded I-section (so its flanges read from the sides), the reflector and the four anchor bolts are
-// LatheGeometry (a domed lens, hex bolt heads with 6 lathe segments).
+// extruded I-section (so its flanges read from the sides), the reflector is a LatheGeometry (a domed lens). (The four
+// hex anchor bolts the candidate had were dropped in the polish pass for triangles; see below.)
 export default function (THREE) {
   const g = new THREE.Group();
   const M = (color, o = {}, name) => {
@@ -35,15 +35,14 @@ export default function (THREE) {
   // base plate: chamfered 0.16 x 0.12 rectangle, centred under the post + spacer footprint (world z 0.03)
   const plate = poly([[-0.06, -0.09], [0.06, -0.09], [0.08, -0.07], [0.08, 0.01], [0.06, 0.03], [-0.06, 0.03], [-0.08, 0.01], [-0.08, -0.07]]);
   put(extrude(plate, 0.02), galv, [0, 0, 0], [-Math.PI / 2, 0, 0]);
-  // hex anchor bolts: 6-segment lathe of a bolt-head profile
-  const bolt = new THREE.LatheGeometry([V2(0, 0), V2(0.013, 0), V2(0.013, 0.014), V2(0, 0.014)], 6);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) put(bolt, dark, [sx * 0.065, 0.02, 0.03 + sz * 0.045]);
+  // (the four hex anchor bolts, 1.3 cm heads, were cut in the game's polish pass: a post is instanced every four metres
+  // of rail, and they were 144 of its triangles, a pixel from the chase camera at best)
   // spacer block 0.10 x 0.14 x 0.08 as an I-section extruded toward the road (+Z)
   const iSec = poly([[-0.05, -0.07], [0.05, -0.07], [0.05, -0.045], [0.016, -0.045], [0.016, 0.045], [0.05, 0.045],
     [0.05, 0.07], [-0.05, 0.07], [-0.05, 0.045], [-0.016, 0.045], [-0.016, -0.045], [-0.05, -0.045]]);
   put(extrude(iSec, 0.08), galv, [0, 0.55, 0.03]);
-  // reflector: lathe of a shallow domed lens, 0.07 dia, axis turned to +Z
-  const lens = new THREE.LatheGeometry([V2(0, 0), V2(0.035, 0), V2(0.035, 0.005), V2(0.022, 0.011), V2(0, 0.012)], 10);
+  // reflector: lathe of a shallow domed lens, 0.07 dia, axis turned to +Z (eight sides: it reads as a round dot)
+  const lens = new THREE.LatheGeometry([V2(0, 0), V2(0.035, 0), V2(0.035, 0.005), V2(0.022, 0.011), V2(0, 0.012)], 8);
   put(lens, red, [0, 0.66, 0.03], [Math.PI / 2, 0, 0]);
 
   // ground and centre by measuring vertices

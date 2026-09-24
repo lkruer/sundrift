@@ -8,7 +8,7 @@
  * points; it is tinted by the sun so it reads warm at golden hour and cool in shade.
  */
 import * as THREE from 'three';
-import { clamp } from './config.js?v=202609232326';
+import { clamp } from './config.js?v=202609240354';
 
 function spriteTexture() {
   const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
@@ -142,9 +142,11 @@ export class Particles {
     geo.setAttribute('psize', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage));
     this.mat = new THREE.ShaderMaterial({
       uniforms: { uTex: { value: spriteTexture() }, uScale: { value: 400 } },
+      // (a puff almost at the lens would fill the picture with a flat grey disc: they thin away in the last few metres)
       vertexShader: `attribute float psize; attribute vec4 color; varying vec4 vC; uniform float uScale;
-        void main(){ vC = color; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = psize * uScale / -mv.z; gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `uniform sampler2D uTex; varying vec4 vC; void main(){ vec4 t = texture2D(uTex, gl_PointCoord); gl_FragColor = vec4(vC.rgb, vC.a * t.a); }`,
+        void main(){ vC = color; vec4 mv = modelViewMatrix * vec4(position,1.0); vC.a *= smoothstep(0.5, 1.8, -mv.z); gl_PointSize = psize * uScale / -mv.z; gl_Position = projectionMatrix * mv; }`,
+      // (each puff lit from above and shaded under, so a cloud of them has body: flat puffs banded into flat shapes)
+      fragmentShader: `uniform sampler2D uTex; varying vec4 vC; void main(){ vec4 t = texture2D(uTex, gl_PointCoord); gl_FragColor = vec4(vC.rgb * (0.78 + 0.34 * (1.0 - gl_PointCoord.y)), vC.a * t.a); }`,
       transparent: true, depthWrite: false,
     });
     this.points = new THREE.Points(geo, this.mat);
@@ -169,7 +171,7 @@ export class Particles {
     for (let i = 0; i < n; i++) this.spawn({
       x: x + (Math.random() - 0.5) * 0.3, y: y + 0.1, z: z + (Math.random() - 0.5) * 0.3,
       vx: vx * 0.35 + (Math.random() - 0.5) * 1.2, vy: 0.9 + Math.random() * 1.3, vz: vz * 0.35 + (Math.random() - 0.5) * 1.2,
-      life: 0.9 + Math.random() * 0.7, s0: 0.35, s1: 1.3 + strength * 0.7,
+      life: 0.9 + Math.random() * 0.7, s0: 0.3, s1: 1.1 + strength * 0.6,
       r: warm.r, g: warm.g, b: warm.b, a0: 0.10 + 0.13 * strength, drag: 1.6,
     });
   }
@@ -187,8 +189,8 @@ export class Particles {
     const k = tint ? 1.1 : 1;
     this.spawn({ x: x + (Math.random() - 0.5) * 0.3, y: y + 0.12, z: z + (Math.random() - 0.5) * 0.3,
       vx: vx * 0.25 + (Math.random() - 0.5) * 1.4, vy: 0.5 + Math.random() * 0.9, vz: vz * 0.25 + (Math.random() - 0.5) * 1.4,
-      life: 0.45 + Math.random() * 0.35, s0: 0.3, s1: 1.5, r: 0.72 * k * (tint ? tint.r * 1.4 : 1), g: 0.76 * k * (tint ? tint.g * 1.4 : 1), b: 0.84 * k * (tint ? tint.b * 1.4 : 1),
-      a0: 0.05 + 0.09 * strength, drag: 2.4 });
+      life: 0.45 + Math.random() * 0.35, s0: 0.4, s1: 2.2, r: 0.62 * k * (tint ? tint.r * 1.4 : 1), g: 0.66 * k * (tint ? tint.g * 1.4 : 1), b: 0.74 * k * (tint ? tint.b * 1.4 : 1),
+      a0: 0.03 + 0.06 * strength, drag: 2.4 });
   }
 
   sparks(x, y, z, nx, nz, n = 10) {
@@ -200,8 +202,9 @@ export class Particles {
   }
 
   flame(x, y, z, bx, bz, strength) {
-    this.spawn({ x, y, z, vx: bx * 6 + (Math.random() - 0.5), vy: 0.3 + Math.random() * 0.5, vz: bz * 6 + (Math.random() - 0.5),
-      life: 0.12 + Math.random() * 0.12 * strength, s0: 0.45, s1: 0.12, r: 1.0, g: 0.55 + 0.4 * Math.random(), b: 0.15, a0: 0.9, drag: 4 });
+    // a spit of burning fuel off the end of the pipe: small, quick, thrown back
+    this.spawn({ x, y, z, vx: bx * 8 + (Math.random() - 0.5), vy: 0.3 + Math.random() * 0.5, vz: bz * 8 + (Math.random() - 0.5),
+      life: 0.08 + Math.random() * 0.08 * strength, s0: 0.22, s1: 0.06, r: 1.0, g: 0.7 + 0.25 * Math.random(), b: 0.3, a0: 0.85, drag: 5 });
   }
 
   update(dt) {
@@ -254,7 +257,8 @@ export class ExhaustFlame {
     this.t = 0;
   }
   set(x, y, z) { this.group.position.set(x, y, z); }
-  update(dt, strength) {
+  /** strength 0..1; light how much of the flame's light falls on the road (a pop's is only a flash). */
+  update(dt, strength, light = 1) {
     this.t += dt;
     const on = strength > 0.02;
     this.cones.visible = on;
@@ -262,7 +266,7 @@ export class ExhaustFlame {
     const f = 0.7 + 0.3 * Math.sin(this.t * 61) * Math.sin(this.t * 37 + 1);
     this.cones.scale.set(1, 1, (0.6 + 1.2 * strength) * f);
     this.mat.opacity = 0.6 * f * strength + 0.2;
-    this.light.intensity = 25 * strength * f;
+    this.light.intensity = 25 * strength * f * light;
   }
 }
 
@@ -402,18 +406,21 @@ export class RainSplashes {
     g.instanceCount = n;
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
     this.u = { ...rainU, uNow: { value: 0 }, uLife: { value: this.life }, uAmount: { value: 0 } };
+    // (premultiplied like the rain: a glint of light on the black road by night; by day a faint pale ring, where added
+    // they were bright white hoops all over the road)
     const mat = new THREE.ShaderMaterial({
-      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      uniforms: this.u, transparent: true, depthWrite: false, fog: false,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
       vertexShader: `
-        uniform float uNow, uLife, uHead; uniform vec3 uCar, uSky; uniform vec2 uCarFwd; uniform vec3 uLamps[5]; uniform vec3 uLampCol[5];
+        uniform float uNow, uLife, uHead, uDay; uniform vec3 uCar, uSky; uniform vec2 uCarFwd; uniform vec3 uLamps[5]; uniform vec3 uLampCol[5];
         attribute vec4 aAt; varying vec2 vP; varying float vK; varying vec3 vC;
         void main() {
           float age = (uNow - aAt.w) / uLife;
           float live = step(0.0, age) * step(age, 1.0);
-          float r = 0.05 + 0.2 * sqrt(clamp(age, 0.0, 1.0));
+          float r = 0.04 + 0.13 * sqrt(clamp(age, 0.0, 1.0));
           vec3 wp = aAt.xyz + vec3(position.x * r, 0.0, position.z * r) * live;
           vP = position.xz; vK = age;
-          vec3 lc = uSky * 1.6;
+          vec3 lc = uSky * mix(1.6, 1.0, uDay);
           vec2 dc = wp.xz - uCar.xz; float dl = length(dc);
           lc += vec3(0.85, 0.9, 1.0) * smoothstep(0.84, 0.97, dot(dc / max(dl, 0.01), uCarFwd)) * smoothstep(40.0, 4.0, dl) * uHead * 1.4;
           for (int i = 0; i < 5; i++) { vec3 d = wp - uLamps[i]; lc += uLampCol[i] * 0.8 / (1.0 + dot(d, d) * 0.05); }
@@ -421,13 +428,14 @@ export class RainSplashes {
           gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
         }`,
       fragmentShader: `
-        uniform float uAmount; varying vec2 vP; varying float vK; varying vec3 vC;
+        uniform float uAmount, uDay; varying vec2 vP; varying float vK; varying vec3 vC;
         void main() {
           float d = length(vP);
-          float ring = smoothstep(0.62, 0.86, d) * (1.0 - smoothstep(0.86, 1.0, d));
+          float ring = smoothstep(0.66, 0.86, d) * (1.0 - smoothstep(0.86, 1.0, d));
           float dot0 = (1.0 - smoothstep(0.0, 0.35, d)) * (1.0 - smoothstep(0.0, 0.18, vK));
           float fade = (1.0 - vK) * (1.0 - vK);
-          gl_FragColor = vec4(vC * (ring * fade * 0.55 + dot0 * 0.8) * uAmount, 1.0);
+          float k = (ring * fade * 0.5 + dot0 * 0.7) * uAmount * mix(1.0, 0.3, uDay);
+          gl_FragColor = vec4(vC * k, k * mix(0.1, 1.0, uDay));
         }`,
     });
     this.mesh = new THREE.Mesh(g, mat);
@@ -464,23 +472,30 @@ export class RainSplashes {
 export class RainCurtain {
   constructor(scene) {
     const g = new THREE.CylinderGeometry(42, 42, 60, 64, 1, true);
-    this.u = { uTime: { value: 0 }, uAmount: { value: 0 }, uCol: { value: new THREE.Color(0.2, 0.22, 0.28) } };
+    this.u = { uTime: { value: 0 }, uAmount: { value: 0 }, uCol: { value: new THREE.Color(0.2, 0.22, 0.28) }, uDay: { value: 0 } };
+    // Fine streaks (a column every ten centimetres, each a few short dashes falling at its own speed, most of them dark)
+    // over a faint veil, the whole of it thicker and thinner in slow gusts: at 900 even columns of long dashes it read as a
+    // barcode across the sky by day. Premultiplied, like the near rain: glints by night, a pale veil by day.
     const mat = new THREE.ShaderMaterial({
-      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide, fog: false,
+      uniforms: this.u, transparent: true, depthWrite: false, side: THREE.BackSide, fog: false,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
       vertexShader: 'varying vec3 vL; void main(){ vL = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: `
-        uniform float uTime, uAmount; uniform vec3 uCol; varying vec3 vL;
+        uniform float uTime, uAmount, uDay; uniform vec3 uCol; varying vec3 vL;
         float h1(float n) { return fract(sin(n * 127.1) * 43758.5453); }
         void main() {
           float a = atan(vL.z, vL.x) / 6.2831853 + 0.5;
-          float col = floor(a * 900.0), f = fract(a * 900.0);
-          float sp = 0.9 + 0.8 * h1(col), ph = h1(col + 17.0);
           float y = vL.y / 60.0 + 0.5;
-          float d = fract(y * (5.0 + 4.0 * h1(col + 3.0)) + uTime * sp + ph);
-          float streak = smoothstep(0.0, 0.05, d) * (1.0 - smoothstep(0.05, 0.4, d)) * (1.0 - smoothstep(0.2, 0.5, abs(f - 0.5)));
-          float on = step(0.45, h1(col + 41.0));
-          float band = smoothstep(0.0, 0.2, y) * (1.0 - smoothstep(0.55, 1.0, y));
-          gl_FragColor = vec4(uCol * streak * on * band * uAmount, 1.0);
+          float col = floor(a * 2600.0), f = fract(a * 2600.0);
+          float sp = 1.1 + 1.3 * h1(col), ph = h1(col + 17.0);
+          float d = fract(y * (10.0 + 8.0 * h1(col + 3.0)) + uTime * sp + ph);
+          float streak = smoothstep(0.0, 0.04, d) * (1.0 - smoothstep(0.04, 0.2, d)) * (1.0 - smoothstep(0.15, 0.5, abs(f - 0.5)));
+          streak *= step(0.62, h1(col + 41.0));
+          // gusts: the rain comes in sheets that drift round, never an even grid
+          float gust = 0.45 + 0.55 * smoothstep(-0.6, 0.9, sin(a * 37.0 + uTime * 0.6 + sin(a * 11.0 - uTime * 0.23) * 2.3));
+          float band = smoothstep(0.02, 0.25, y) * (1.0 - smoothstep(0.42, 0.9, y));
+          float k = uAmount * band * (mix(0.02, 0.07, uDay) * gust + streak * gust * mix(0.9, 0.22, uDay));
+          gl_FragColor = vec4(uCol * k, k * mix(0.1, 1.0, uDay));
         }`,
     });
     this.mesh = new THREE.Mesh(g, mat);
@@ -488,8 +503,8 @@ export class RainCurtain {
     scene.add(this.mesh);
   }
 
-  update(dt, amount, eye, colour) {
-    this.u.uTime.value += dt; this.u.uAmount.value = amount;
+  update(dt, amount, eye, colour, day = 0) {
+    this.u.uTime.value += dt; this.u.uAmount.value = amount; this.u.uDay.value = day;
     this.mesh.visible = amount > 0.02;
     if (!this.mesh.visible) return;
     this.mesh.position.set(eye.x, eye.y + 12, eye.z);
@@ -695,11 +710,16 @@ export class Rain {
       uEye: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector2(1.2, 0.4) }, uCar: { value: new THREE.Vector3(0, -1e4, 0) },
       uCarFwd: { value: new THREE.Vector2(0, 1) }, uHead: { value: 1 }, uSky: { value: new THREE.Vector3(0.1, 0.12, 0.16) },
       uLamps: { value: lamps }, uLampCol: { value: lampCol }, uCamVel: { value: new THREE.Vector3() },
+      uDay: { value: 0 }, uPx: { value: 0.0015 },
     };
+    // Premultiplied: by night a drop is only the light it catches (it adds, the way lit rain glitters), by day it is a
+    // pale sliver of water laid over what is behind it (lighter than the trees, a touch darker than a bright sky). Drawn
+    // added by day as well, the rain was a sheet of glowing white scratches.
     this.mat = new THREE.ShaderMaterial({
-      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      uniforms: this.u, transparent: true, depthWrite: false, fog: false,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
       vertexShader: `
-        uniform float uTime, uAmount, uHead; uniform vec3 uBox, uCenter, uEye, uCar, uSky, uCamVel; uniform vec2 uWind, uCarFwd;
+        uniform float uTime, uAmount, uHead, uPx; uniform vec3 uBox, uCenter, uEye, uCar, uSky, uCamVel; uniform vec2 uWind, uCarFwd;
         uniform vec3 uLamps[5]; uniform vec3 uLampCol[5];
         attribute vec4 aSeed; attribute vec2 aCorner;
         varying vec3 vC; varying float vA; varying float vX;
@@ -709,16 +729,21 @@ export class Rain {
           vec3 p = aSeed.xyz * uBox + vel * uTime;
           vec3 rel = mod(p - uCenter + 0.5 * uBox, uBox) - 0.5 * uBox;
           vec3 wp = uCenter + rel;
-          // the streak lies along the drop's motion as the lens sees it: at speed the rain rakes back past the camera
-          vec3 rv = vel - uCamVel * 0.75;
+          // the streak lies along the drop's motion as the lens sees it: at speed it leans back toward the lens, but only
+          // so far (fully raked, every drop near the lens became a long bar swinging round with the camera in a drift)
+          vec3 rv = vel - uCamVel * 0.4;
           vec3 dir = normalize(rv);
-          vec3 toEye = normalize(uEye - wp);
+          vec3 toEye = uEye - wp; float dist = length(toEye); toEye /= max(dist, 1e-3);
           vec3 side = normalize(cross(dir, toEye) + vec3(1e-4, 0.0, 0.0));
           float heavy = step(0.82, fract(aSeed.w * 5.3));
-          float len = (0.45 + 0.35 * fract(aSeed.w * 3.7)) * (0.7 + length(rv) * 0.045);
-          vec3 pos = wp + dir * (aCorner.y * len) + side * (aCorner.x * (0.013 + 0.012 * heavy));
+          float len = (0.4 + 0.3 * fract(aSeed.w * 3.7)) * (0.75 + min(length(rv), 30.0) * 0.03);
+          // never thinner than about a pixel: a streak thinner than that shimmers as it crosses the pixels, so a far one is
+          // drawn a pixel wide and fainter by as much
+          float w = 0.011 + 0.01 * heavy, wd = max(w, uPx * dist);
+          vec3 pos = wp + dir * (aCorner.y * len) + side * (aCorner.x * wd);
           vec3 e = 1.0 - smoothstep(0.36 * uBox, 0.5 * uBox, abs(rel));
-          float near = smoothstep(0.35, 1.6, length(wp - uEye));
+          // (the drops right in front of the lens would be long bars across the picture: they thin away before it)
+          float near = smoothstep(0.9, 2.6, dist);
           float on = step(fract(aSeed.w * 91.7), uAmount);
           // light that catches the drop
           vec3 lc = uSky;
@@ -726,12 +751,17 @@ export class Rain {
           float cone = smoothstep(0.86, 0.97, dot(dc / max(dl, 0.01), uCarFwd)) * smoothstep(48.0, 5.0, dl) * smoothstep(-0.5, 2.5, wp.y - uCar.y + 1.5);
           lc += vec3(0.85, 0.9, 1.0) * cone * uHead;
           for (int i = 0; i < 5; i++) { vec3 d = wp - uLamps[i]; lc += uLampCol[i] * 0.55 / (1.0 + dot(d, d) * 0.06); }
-          vC = lc; vA = on * e.x * e.y * e.z * near; vX = aCorner.x * 2.0;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          vC = lc; vA = on * e.x * e.y * e.z * near * (w / wd); vX = aCorner.x * 2.0;
+          gl_Position = projectionMatrix * viewMatrix * vec4(pos, 1.0);
         }`,
       fragmentShader: `
+        uniform float uDay;
         varying vec3 vC; varying float vA; varying float vX;
-        void main() { float a = vA * (1.0 - vX * vX); gl_FragColor = vec4(vC, a * 0.6); }`,
+        void main() {
+          float a = vA * (1.0 - vX * vX);
+          float k = a * mix(0.6, 0.45, uDay);
+          gl_FragColor = vec4(vC * k, k * mix(0.1, 1.0, uDay));
+        }`,
     });
     this.mesh = new THREE.Mesh(geo, this.mat);
     this.mesh.frustumCulled = false; this.mesh.name = 'rain'; this.mesh.renderOrder = 4;
@@ -743,11 +773,13 @@ export class Rain {
    * @param amount 0..1 how hard it rains; eye the camera position; fx, fz the view's forward on the ground;
    * car { x, y, z, fx, fz } and head (0..1, headlights); lights: the real lamp lights near the car; sky: day light
    */
-  update(dt, amount, eye, fx, fz, car, head, lights, sky, camVel = null) {
+  update(dt, amount, eye, fx, fz, car, head, lights, sky, camVel = null, px = 0) {
     this.t += dt;
     const U = this.u;
     U.uTime.value = this.t;
     if (camVel) U.uCamVel.value.copy(camVel);
+    if (px > 0) U.uPx.value = px;
+    U.uDay.value = Math.min(1, Math.max(0, 1 - head));
     U.uAmount.value = amount;
     this.mesh.visible = amount > 0.005;
     if (!this.mesh.visible) return;

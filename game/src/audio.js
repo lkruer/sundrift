@@ -20,7 +20,7 @@
  * wheels over the rail joints, and a crossing's chirp for the blind as the car passes a signal. Each is placed where it
  * is: quieter, duller and wetter (a street's own reverb) the further off, and panned to its side.
  */
-import { clamp, smoothstep } from './config.js?v=202609232326';
+import { clamp, smoothstep } from './config.js?v=202609240354';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -88,6 +88,9 @@ const lcg = (s) => (Math.imul(s, 1664525) + 1013904223) >>> 0;
 // crossing by one sings while its walkers go: from just after the cars' red until the walkers' light starts to blink
 const walking = (clock, ph) => { const u = ((clock + ph * 22) % 22 + 22) % 22; return u >= 14 && u < 19.5; };
 
+// the things the car knocks over (their sounds are in sfx), whose chain rings a bell
+const KNOCKS = new Set(['pole', 'bollard', 'shrub', 'lamp', 'chevron', 'warn', 'mirror', 'vending', 'bag', 'box', 'crate', 'crates', 'cone', 'aboard', 'bike']);
+
 export class Audio {
   constructor() {
     this.ctx = null; this.ready = false;
@@ -95,6 +98,18 @@ export class Audio {
     try { this.muted = localStorage.getItem('minidrift.mute') === '1'; } catch {}
     this.rpm = 900; this.throttle = 0; this.lastThrottle = 0; this.lastRpm = 900;
     this.music = { on: true, next: 0, step: 0, tempo: 128, intensity: 0 };
+    // the menus' buttons click: a mouse on the press, a finger on the release (a browser lets a page make sound from a
+    // finger only once it lifts). The first click wakes the sound; nothing plays on the title but these
+    const ui = (e) => {
+      if ((e.pointerType === 'mouse') !== (e.type === 'pointerdown')) return;
+      const b = e.target && e.target.closest ? e.target.closest('button') : null;
+      if (!b) return;
+      this.unlock();
+      this.sfx(b.id === 'startb' ? 'uiStart' : b.id === 'quitb' ? 'uiBack' : b.matches('.map, .diff, .sw') ? 'uiSel' : 'ui');
+    };
+    addEventListener('pointerdown', ui, true); addEventListener('pointerup', ui, true);
+    // a new best is the HUD's to notice (main.js hands it only the HUD); it says so with a window event
+    addEventListener('minidrift:best', () => this.onEvent({ type: 'best' }));
   }
 
   /** Create everything on the first real gesture; browsers refuse audio before one. */
@@ -578,12 +593,31 @@ export class Audio {
       const g = this._gain(0); o.connect(g); g.connect(out);
       this._env(g, t, a, dur, peak * k, 0, 0.04); o.start(t); o.stop(t + dur + a + 0.1);
     };
+    // a chain of knocks (inside 1.8 s, as the score chains them) rings a small bell a step higher with each one
+    if (KNOCKS.has(name)) {
+      this._knockN = t - (this._knockT ?? -9) < 1.8 ? (this._knockN || 1) + 1 : 1; this._knockT = t;
+      if (this._knockN > 1) this._bellHit(t + 0.03, this._key(Math.min(8, this._knockN + 1)), 0.07, 0.35);
+    }
     switch (name) {
+      // the menus: a soft click; a choice made (two notes up, in the music's key); START (a sweep up into the key's
+      // chord); back to the title (two notes down)
+      case 'ui': noise(0.02, 'bandpass', 3200, 1.2, 0.3); tone('sine', 1250, 900, 0.04, 0.16); break;
+      case 'uiSel':
+        noise(0.016, 'bandpass', 3400, 1.2, 0.22);
+        this._note(t, this._key(2), 'triangle', 0.08, 0.13); this._note(t + 0.05, this._key(4), 'triangle', 0.12, 0.13); break;
+      case 'uiStart': {
+        const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(880, t + 0.3);
+        const f = c.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 6; f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(4200, t + 0.3);
+        const g = this._gain(0); o.connect(f); f.connect(g); g.connect(out); this._env(g, t, 0.02, 0.3, 0.07, 0, 0.05); o.start(t); o.stop(t + 0.45);
+        for (const fr of this._tonic(1).concat(this._tonic(2)[0])) this._note(t + 0.28, fr, 'coin', 0.55, 0.075, 0.004);
+        break;
+      }
+      case 'uiBack': this._note(t, this._key(4), 'triangle', 0.07, 0.13); this._note(t + 0.05, this._key(1), 'triangle', 0.1, 0.13); break;
       case 'pole': case 'bollard':            // a plastic post: a crack and a hollow tok
         noise(0.08, 'bandpass', 1500, 1.3, 0.55); tone('triangle', 460, 170, 0.13, 0.4); break;
       case 'shrub':                           // a bush going flat: a soft whump and a rustle
         noise(0.24, 'lowpass', 520, 0.7, 0.5); noise(0.4, 'bandpass', 3400, 0.8, 0.2, 0.02); break;
-      case 'lamp': case 'chevron': case 'mirror': {   // steel: a crack, then a bell of partials
+      case 'lamp': case 'chevron': case 'warn': case 'mirror': {   // steel: a crack, then a bell of partials
         noise(0.05, 'highpass', 2600, 0.7, 0.45);
         for (const [f, p, d] of [[392, 0.24, 1.2], [1046, 0.15, 0.85], [1733, 0.1, 0.6], [2598, 0.06, 0.45]]) tone('sine', f * (0.97 + Math.random() * 0.06), f * 0.98, d, p);
         if (name === 'lamp') { tone('square', 130, 55, 0.3, 0.07); noise(0.34, 'highpass', 5200, 0.5, 0.14, 0.01); }
@@ -697,24 +731,110 @@ export class Audio {
   }
   tick() { if (this.ready) this.chime([this._key(1), this._key(3)], this.ctx.currentTime, 0.05, 0.12, 0.12, 'sine'); }
 
-  /** React to scoring events. */
+  /**
+   * One note at time t: an oscillator (through a low-pass at lp Hz, if given), gliding to f1 if given, dying over dur.
+   * type 'coin' is the one-shots' own wave (_coin): one oscillator where a layered sound would take three and a filter.
+   */
+  _note(t, f, type, dur, vol, a = 0.003, f1 = 0, lp = 0) {
+    const c = this.ctx, o = c.createOscillator();
+    if (type === 'coin') o.setPeriodicWave(this._coin()); else o.type = type;
+    o.frequency.setValueAtTime(f, t);
+    if (f1) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    const g = this._gain(0);
+    if (lp) { const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = lp; o.connect(fl); fl.connect(g); } else o.connect(g);
+    g.connect(this.master);
+    this._env(g, t, a, dur, vol, 0, 0.04); o.start(t); o.stop(t + a + dur + 0.1);
+  }
+
+  /** Filtered noise at time t (a click, a hiss, a riser if f1 is given). */
+  _hiss(t, dur, type, f, q, vol, a = 0.002, f1 = 0) {
+    const c = this.ctx, s = c.createBufferSource(); s.buffer = this.noiseBuf;
+    const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
+    if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = this._gain(0); s.connect(fl); fl.connect(g); g.connect(this.master);
+    this._env(g, t, a, dur, vol, 0, 0.04); s.start(t, Math.random()); s.stop(t + a + dur + 0.1);
+  }
+
+  /**
+   * The rewards' voice, made once: a bright, soft-cornered square with its octave in it, the 8-bit colour of the drift
+   * arpeggio. (A score's notes used to be a square through a filter, a triangle and a sine each: building sixty audio
+   * nodes at once took 5 ms of the frame a drift banked in.)
+   */
+  _coin() {
+    if (!this._coinW) {
+      const im = new Float32Array([0, 1, 0.42, 0.3, 0.1, 0.15, 0, 0.07]), re = new Float32Array(im.length);
+      this._coinW = this.ctx.createPeriodicWave(re, im);
+    }
+    return this._coinW;
+  }
+
+  /** A small bell: a sine and two inharmonic partials that die first (the clip's ting, a smash chain's ding, a landing). */
+  _bellHit(t, f, vol, dur = 0.5) {
+    for (const [mul, v, k] of [[1, 1, 1], [2.76, 0.4, 0.45], [5.4, 0.16, 0.2]]) this._note(t, f * mul, 'sine', dur * k, vol * v, 0.002);
+  }
+
+  /**
+   * A banked drift, the cash-in: a soft thump for weight, a quick run of 8-bit notes up the music's own scale (more of
+   * them for a bigger drift, and a step higher for every drift the combo has chained), the key's chord under a GREAT or
+   * an INSANE one, and a bell on the top note as the points land in the score (hud.js flies them in over 0.47 s).
+   */
+  _cashIn(t, tier, chain, points = 1e9) {
+    const s0 = Math.min(4, Math.max(0, chain - 1)), n = 3 + Math.min(3, tier), v = 1 + 0.28 * Math.min(3, tier);
+    // (a slide of a few points, a wiggle, gets two soft notes: the full cash-in is for a drift)
+    if (points < 100) { this._note(t, this._key(s0), 'coin', 0.08, 0.1, 0.002); this._note(t + 0.045, this._key(s0 + 2), 'coin', 0.1, 0.1, 0.002); return; }
+    this._note(t, 150, 'sine', 0.18, 0.3 * v, 0.004, 70);
+    for (let i = 0; i < n; i++) this._note(t + i * 0.045, this._key(s0 + i), 'coin', 0.14, 0.2 * v, 0.002);
+    if (tier >= 2) this._tonic(0).forEach((f) => this._note(t + 0.02, f, 'triangle', 0.7, 0.07 * v, 0.012));
+    if (tier >= 3) this._hiss(t, 0.5, 'highpass', 6000, 0.6, 0.08, 0.12);
+    // (the bell is made as the points land, not now: the frame the drift banks in has enough to build)
+    const top = this._key(s0 + n - 1);
+    setTimeout(() => { if (this.ready) this._bellHit(this.ctx.currentTime + 0.01, top, 0.17 * v, 0.6); }, 455);
+  }
+
+  /** The combo growing (a new drift inside the chain, or, brighter, a switch): two notes up, a step higher each time. */
+  _step(t, chain, wave = 'triangle') {
+    const i = Math.min(7, Math.max(0, chain - 1)), v = wave === 'coin' ? 0.24 : 0.18;
+    this._note(t, this._key(i), wave, 0.07, v);
+    this._note(t + 0.05, this._key(i + 2), wave, 0.1, v);
+  }
+
+  /** A new best: the key's chord broken upward to the octave, held, a bell over it. */
+  _fanfare(t) {
+    const [a, b, c] = this._tonic(1), top = a * 2;
+    [a, b, c, top].forEach((f, i) => {
+      const len = i === 3 ? 0.9 : 0.14;
+      this._note(t + i * 0.09, f, 'coin', len, 0.17, 0.003);
+    });
+    [a, b, c].forEach((f) => this._note(t + 0.27, f / 2, 'triangle', 1.0, 0.06, 0.02));
+    this._bellHit(t + 0.27, top * 2, 0.09, 0.8);
+  }
+
+  /** React to scoring events (and a new best, which the HUD announces with a window event 'minidrift:best'). */
   onEvent(e) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     switch (e.type) {
-      case 'bank': {
-        const up = [this._key(0), this._key(2), this._key(3), this._key(5), this._key(7)];
-        const n = 2 + Math.min(3, e.tier + (e.chain > 1 ? 1 : 0));
-        this.chime(up.slice(0, n), t, 0.07, 0.3, 0.16 + 0.03 * e.tier);
+      case 'bank': this._cashIn(t, e.tier || 0, e.chain || 1, e.value || 0); break;
+      case 'boost': this.whoosh(0.7 + Math.min(1.6, e.value) * 0.5); break;
+      case 'start': if (e.value > 1) this._step(t, e.value); break;
+      case 'switch': this._step(t, e.value, 'coin'); this._hiss(t, 0.14, 'bandpass', 1800, 1.4, 0.14, 0.01, 4200); break;
+      // the multiplier climbing: a short blip a step higher each time, under everything
+      case 'mult': this._note(t, this._key(Math.min(9, Math.round((e.value - 1) * 2))), 'sine', 0.07, 0.1, 0.002); break;
+      case 'tier': {
+        [this._key(3), this._key(5), this._key(7), this._key(9)].slice(0, e.value + 1).forEach((f, i) => {
+          this._note(t + i * 0.055, f, 'coin', 0.15, 0.21, 0.002);
+        });
+        if (e.value >= 3) this._hiss(t, 0.35, 'bandpass', 1200, 1.1, 0.1, 0.2, 7000);
         break;
       }
-      case 'boost': this.whoosh(0.7 + Math.min(1.6, e.value) * 0.5); break;
-      case 'tier': this.chime([this._key(1), this._key(2), this._key(3)].slice(0, e.value + 1), t, 0.06, 0.2, 0.13); break;
-      case 'switch': this.chime([this._key(0), this._key(3)], t, 0.06, 0.15, 0.12, 'square'); break;
-      case 'clip': this.tick(); break;
+      case 'clip': this._hiss(t, 0.015, 'highpass', 5000, 0.7, 0.14); this._bellHit(t, this._key(4), 0.19, 0.55); break;
+      // a big angle held: a rising shing and a bell at the top of the scale
+      case 'angle': this._hiss(t, 0.28, 'bandpass', 1800, 2.2, 0.16, 0.03, 9000); this._bellHit(t + 0.08, this._key(5), 0.16, 0.5); break;
       case 'crash': this.impact(12); { const [a] = this._tonic(-2); this.chime([a * 1.5, a], t, 0.12, 0.35, 0.14, 'sawtooth'); } break;
       case 'bump': this.impact(e.value); break;
       case 'sun': { const [a, , c2] = this._tonic(-1); this.chime([a, c2, a * 2], t, 0.16, 0.6, 0.1, 'sine'); break; }
+      case 'best': this._fanfare(t); break;
+      case 'jturn': this.whoosh(0.8); this._note(t + 0.05, this._key(0), 'triangle', 0.12, 0.1); this._note(t + 0.13, this._key(4), 'triangle', 0.3, 0.1); break;
     }
   }
 

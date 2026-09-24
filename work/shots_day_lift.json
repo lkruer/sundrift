@@ -1,0 +1,16 @@
+[
+  { "wait": 3000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 12.5; D.G.hourShown = 12.4; D.rainNow(0); D.teleport(40, 0); })()" },
+  { "wait": 3500 },
+  { "js": "(() => { window.__HOLD__ = setInterval(() => { window.__DEBUG__.post.cel.uniforms.uLift.value = 0; }, 4); })()" },
+  { "wait": 400 },
+  { "shot": "L0_nolift" },
+  { "js": "(() => { clearInterval(window.__HOLD__); })()" },
+  { "wait": 400 },
+  { "shot": "L1_lift" },
+  { "js": "(() => { const D = window.__DEBUG__; D.teleport(2260, 0); })()" },
+  { "wait": 3000 },
+  { "shot": "L2_lift_vista" }
+]

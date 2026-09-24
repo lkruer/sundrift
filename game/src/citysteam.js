@@ -11,7 +11,7 @@
  *     steamWeather(w, wet, night);                // the weather and the hour
  */
 import * as THREE from 'three';
-import { mulberry32 } from './config.js?v=202609232326';
+import { mulberry32 } from './config.js?v=202609240354';
 
 // puffs per emitter, by kind (a phone draws fewer)
 const PUFFS = [7, 5, 8], PUFFS_PHONE = [4, 3, 5];
@@ -84,13 +84,14 @@ export function steamLoad(w) {
         vec4 mvPosition = viewMatrix * vec4(wp, 1.0);
         gl_Position = projectionMatrix * mvPosition;
         vUv = aCorner * 0.5 + 0.5;
-        // in quickly and out slowly; thicker on a cold wet night; never a grey wall in the lens's face
+        // in quickly and out slowly; thicker on a cold wet night; never a grey wall in the lens's face (a manhole's
+        // column beside the car read as a solid white pillar in the rain: thinner, and thinning from 8 m in)
         float a = smoothstep(0.0, 0.1, age) * (1.0 - smoothstep(0.35, 1.0, age));
-        a *= (kind < 0.5 ? 0.42 : kind < 1.5 ? 0.4 : 0.15) * (0.6 + 0.4 * uWet);
-        a *= smoothstep(1.5, 5.0, -mvPosition.z);
+        a *= (kind < 0.5 ? 0.3 : kind < 1.5 ? 0.4 : 0.15) * (0.6 + 0.4 * uWet);
+        a *= smoothstep(2.0, 8.0, -mvPosition.z);
         vA = a;
-        // lit by the light beside it at night, plain grey-white by day
-        vCol = mix(vec3(0.62, 0.63, 0.66), vec3(0.2, 0.2, 0.24) + aTint * 0.6, uNight);
+        // lit by the light beside it at night (not a lamp itself), plain grey-white by day
+        vCol = mix(vec3(0.62, 0.63, 0.66), vec3(0.15, 0.15, 0.18) + aTint * 0.46, uNight);
         #include <fog_vertex>
       }`,
     fragmentShader: /* glsl */`

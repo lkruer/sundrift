@@ -1,0 +1,8 @@
+[
+  { "wait": 3000 },
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__, G = D.G, t = D.track, car = D.car, sc = () => D.scoring; const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a)); let T = 0, next = 0, want = { gas: true, left: false, right: false, hand: false, brake: false }, handUntil = 0, handCool = 0; window.__LOG__ = []; let banks = 0, last = 0; window.__AUTOPILOT__ = (dt) => { T += dt; if (T >= next) { next = T + 0.085; const slip = car.beta * 180 / Math.PI, kmh = car.kmh; const headErr = wrap((G.roadH ?? t.pts[G.idx].h) - car.yaw); const k0 = t.sample(G.s + 22).k; const cmd = headErr * 1.3 - G.u * 0.12 + k0 * 9; const k = Math.abs(k0); const vmax = k > 0.002 ? Math.sqrt(11 / k) * 3.6 : 999; const tooFast = kmh > vmax * 1.15; const tight = k > 1 / 32 && kmh > 42; if (tight && T > handCool) { handUntil = T + 0.38; handCool = T + 3.2; } want = { gas: !tooFast, brake: tooFast && Math.abs(slip) < 15, hand: T < handUntil, left: cmd > 0.05, right: cmd < -0.05 }; if (Math.abs(slip) > 38) { want.left = slip > 0; want.right = slip < 0; } const s = sc(); if (s.total > last) { banks++; last = s.total; } if (Math.floor(T * 4) !== Math.floor((T - 0.085) * 4)) window.__LOG__.push([+T.toFixed(1), Math.round(G.s), Math.round(kmh), Math.round(slip), want.left ? 'L' : want.right ? 'R' : '-', want.hand ? 'H' : '', s.active ? 1 : 0, +cmd.toFixed(2), banks]); } const steer = want.left ? 0.94 : want.right ? -0.94 : 0; return { throttle: want.gas && !want.brake ? 1 : 0, brake: want.brake ? 1 : 0, steer, hand: want.hand ? 1 : 0, reverse: false, touch: true }; }; })()" },
+  { "wait": 26000 },
+  { "js": "(() => { window.__AUTOPILOT__ = null; return window.__LOG__.map((r) => r.join(' ')).join(' | '); })()" }
+]

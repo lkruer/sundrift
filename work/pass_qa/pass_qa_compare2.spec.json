@@ -1,0 +1,13 @@
+{ "setup": { "hour": 12.5, "rain": 0 },
+  "shots": [
+    { "name": "21_rail_end_day", "s": 1510, "wait": 3500, "cam": [1535, -4.5, 1.3, 1541, -7.6, 0.55, 55] },
+    { "name": "22_warn_sign_hairpin_day", "s": 985 },
+    { "name": "23_vista_railing_day", "s": 2264, "cam": [2250, -3, 3, 2276, 10, 1, 60] },
+    { "name": "24_hut_day", "s": 5700, "cam": [5696, 5, 2.5, 5716, -14, 2, 60] },
+    { "name": "25_conbini_day", "s": 1470, "cam": [1452, 4, 3, 1478, -14, 2, 60] },
+    { "name": "26_busstop_day", "s": 470, "cam": [462, -4, 2.5, 486, 11, 1.5, 60] },
+    { "name": "27_tunnel_hill_lattice_night", "s": 3240, "hour": 22, "wait": 3600, "cam": [3250, 0, 4, 3283, 0, 5, 60] },
+    { "name": "28_wayside_shrine_night", "s": 4195, "cam": [4187, 2, 1.8, 4195, -9.8, 0.9, 60] },
+    { "name": "29_shrine_lantern_night", "s": 40, "js": "__Q__.prop('lantern', 0, 4, 1.5, 1.2)" },
+    { "name": "30_vending_roadside_night", "s": 860, "cam": [868, 3, 1.8, 875, 8.5, 1.0, 55] }
+  ] }

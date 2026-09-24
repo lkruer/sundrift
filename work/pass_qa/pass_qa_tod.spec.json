@@ -1,0 +1,20 @@
+{ "setup": { "hour": 12.5, "rain": 0 },
+  "shots": [
+    { "name": "D01_day_s8", "s": 8, "hour": 12.5, "wait": 3600 },
+    { "name": "D02_day_s520", "s": 520 },
+    { "name": "D03_day_s1100", "s": 1100 },
+    { "name": "D04_day_s2630", "s": 2630 },
+    { "name": "D05_day_s3000", "s": 3000 },
+    { "name": "D06_day_s5200", "s": 5200 },
+    { "name": "D07_day_portal", "s": 860, "cam": [870, 0, 4, 906, 0, 5, 60] },
+    { "name": "G01_gold_s8", "s": 8, "hour": 17.2, "wait": 3600 },
+    { "name": "G02_gold_s1100", "s": 1100 },
+    { "name": "G03_gold_s3000", "s": 3000 },
+    { "name": "G04_gold_s5200", "s": 5200 },
+    { "name": "K01_dusk_s8", "s": 8, "hour": 18.4, "wait": 3600 },
+    { "name": "K02_dusk_s2630", "s": 2630 },
+    { "name": "K03_dusk_s5200", "s": 5200 },
+    { "name": "A01_dawn_s8", "s": 8, "hour": 5.6, "wait": 3600 },
+    { "name": "A02_dawn_s1470", "s": 1470 },
+    { "name": "A03_dawn_s5200", "s": 5200 }
+  ] }

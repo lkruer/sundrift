@@ -1,0 +1,137 @@
+[
+ {
+  "click": "#startb"
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "js": "window.__Q__ = { at(s, u, dy) { const t = __DEBUG__.track, p = t.sample(s); return [p.x + Math.cos(p.h) * u, p.y + dy, p.z - Math.sin(p.h) * u]; },\n  cam(s, u, dy, ls, lu, ldy, fov) { window.__CAM__ = { pos: this.at(s, u, dy), look: this.at(ls, lu, ldy), fov: fov || 60 }; },\n  hour(h) { const G = __DEBUG__.G; G.hour = h; G.hourShown = h; G.lastApplied = -9; },\n  // a free camera looking at the k-th instance (nearest the car first) of a pool, from dist metres, dy up, turned by ang\n  prop(name, k, dist, dy, ang, fov) { const D = __DEBUG__, P = D.world.pools[name], c = D.car; if (!P || !P.n) return 'none'; const L = []; for (let i = 0; i < P.n; i++) { const b = P.base; L.push([Math.hypot(b[i * 16 + 12] - c.x, b[i * 16 + 14] - c.z), b[i * 16 + 12], b[i * 16 + 13], b[i * 16 + 14]]); } L.sort((a, b) => a[0] - b[0]); const q = L[Math.min(k, L.length - 1)]; const t = D.track, n = t.nearest(q[1], q[3], D.G.idx); const r = t.sample(n.s); const a = r.h + (ang || 0); window.__CAM__ = { pos: [q[1] - Math.sin(a) * dist + Math.cos(r.h) * 0, q[2] + dy, q[3] - Math.cos(a) * dist], look: [q[1], q[2] + (dy > 3 ? 0 : 0.8), q[3]], fov: fov || 50 }; return name + ' at ' + q.slice(1).map(Math.round).join(',') + ' s' + Math.round(n.s) + ' u' + n.u.toFixed(1); },\n  // a free camera in front of the first pool instance whose tint's red channel is in [r0, r1) (the warn sign's kind)\n  kind(name, r0, r1, dist, dy) { const D = __DEBUG__, P = D.world.pools[name]; if (!P) return 'none'; for (let i = 0; i < P.n; i++) { const r = P.col[i * 3]; if (r < r0 || r >= r1) continue; const b = P.base, x = b[i * 16 + 12], y = b[i * 16 + 13], z = b[i * 16 + 14]; const fx = b[i * 16 + 8], fz = b[i * 16 + 10]; const l = Math.hypot(fx, fz) || 1; window.__CAM__ = { pos: [x + fx / l * dist, y + dy, z + fz / l * dist], look: [x, y + 2.2, z], fov: 40 }; return name + ' kind ' + r.toFixed(3) + ' at ' + [x, y, z].map(Math.round).join(','); } return 'no kind'; },\n  // a free camera in front of the first chevron mirrored (sx < 0) or not\n  chev(mirrored, dist, dy) { const D = __DEBUG__, P = D.world.pools[mirrored === 'M' ? 'chevronM' : 'chevron']; mirrored = mirrored === true; if (!P) return 'none'; for (let i = 0; i < P.n; i++) { const b = P.base; const det = b[i * 16] * b[i * 16 + 10] - b[i * 16 + 2] * b[i * 16 + 8]; if ((det < 0) !== mirrored) continue; const x = b[i * 16 + 12], y = b[i * 16 + 13], z = b[i * 16 + 14]; const fx = b[i * 16 + 8], fz = b[i * 16 + 10]; const l = Math.hypot(fx, fz) || 1; window.__CAM__ = { pos: [x + fx / l * dist, y + dy, z + fz / l * dist], look: [x, y + 1.2, z], fov: 40 }; return 'chevron det ' + det.toFixed(2); } return 'none found'; },\n  stat(n) { const g = window.__GAME__; return n + ' draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; } }; 1"
+ },
+ {
+  "js": "(() => { const D = __DEBUG__; D.rainNow(0); __Q__.hour(12.5); window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); })()"
+ },
+ {
+  "js": "__DEBUG__.teleport(1510, 0); __Q__.cam(1535,-4.5,1.3,1541,-7.6,0.55,55); 1"
+ },
+ {
+  "wait": 3500
+ },
+ {
+  "shot": "21_rail_end_day"
+ },
+ {
+  "js": "__Q__.stat('21_rail_end_day')"
+ },
+ {
+  "js": "__DEBUG__.teleport(985, 0); window.__CAM__ = null; 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "22_warn_sign_hairpin_day"
+ },
+ {
+  "js": "__Q__.stat('22_warn_sign_hairpin_day')"
+ },
+ {
+  "js": "__DEBUG__.teleport(2264, 0); __Q__.cam(2250,-3,3,2276,10,1,60); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "23_vista_railing_day"
+ },
+ {
+  "js": "__Q__.stat('23_vista_railing_day')"
+ },
+ {
+  "js": "__DEBUG__.teleport(5700, 0); __Q__.cam(5696,5,2.5,5716,-14,2,60); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "24_hut_day"
+ },
+ {
+  "js": "__Q__.stat('24_hut_day')"
+ },
+ {
+  "js": "__DEBUG__.teleport(1470, 0); __Q__.cam(1452,4,3,1478,-14,2,60); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "25_conbini_day"
+ },
+ {
+  "js": "__Q__.stat('25_conbini_day')"
+ },
+ {
+  "js": "__DEBUG__.teleport(470, 0); __Q__.cam(462,-4,2.5,486,11,1.5,60); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "26_busstop_day"
+ },
+ {
+  "js": "__Q__.stat('26_busstop_day')"
+ },
+ {
+  "js": "__Q__.hour(22); __DEBUG__.teleport(3240, 0); __Q__.cam(3250,0,4,3283,0,5,60); 1"
+ },
+ {
+  "wait": 3600
+ },
+ {
+  "shot": "27_tunnel_hill_lattice_night"
+ },
+ {
+  "js": "__Q__.stat('27_tunnel_hill_lattice_night')"
+ },
+ {
+  "js": "__DEBUG__.teleport(4195, 0); __Q__.cam(4187,2,1.8,4195,-9.8,0.9,60); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "28_wayside_shrine_night"
+ },
+ {
+  "js": "__Q__.stat('28_wayside_shrine_night')"
+ },
+ {
+  "js": "__DEBUG__.teleport(40, 0); window.__CAM__ = null; 1"
+ },
+ {
+  "js": "__Q__.prop('lantern', 0, 4, 1.5, 1.2)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "29_shrine_lantern_night"
+ },
+ {
+  "js": "__Q__.stat('29_shrine_lantern_night')"
+ },
+ {
+  "js": "__DEBUG__.teleport(860, 0); __Q__.cam(868,3,1.8,875,8.5,1,55); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "30_vending_roadside_night"
+ },
+ {
+  "js": "__Q__.stat('30_vending_roadside_night')"
+ }
+]

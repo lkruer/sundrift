@@ -10,7 +10,7 @@
  * It is kept above the ground so a hairpin cut into the mountain can never put it inside the rock.
  */
 import * as THREE from 'three';
-import { CAM, clamp, damp, smoothstep } from './config.js?v=202609232326';
+import { CAM, clamp, damp, smoothstep } from './config.js?v=202609240354';
 
 const TAU = Math.PI * 2;
 function wrapA(d) { while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; return d; }
@@ -95,11 +95,13 @@ export class ChaseCam {
     this.oK = damp(this.oK, this.oHeld || Math.abs(this.oYaw) + Math.abs(this.oPitch) > 0.08 ? 1 : 0, 7, dt);
     this.yS = damp(this.yS, y, 12, dt);
     const aspectK = this.cam.aspect < 1 ? 1 + 0.55 * (1 - this.cam.aspect) : 1;
-    this.distS = damp(this.distS, (CAM.dist + speed * 0.012 + boost01 * 0.35) * aspectK * zoom * (1 + 0.9 * (this.cineK || 0)), 3, dt);
+    // a deep slide pulls the lens back a little and opens the view, so the car's angle and the bend both fit the frame
+    this.slideK = damp(this.slideK || 0, car.vF > 3 ? smoothstep(0.2, 0.7, Math.abs(car.beta)) * smoothstep(6, 12, speed) : 0, 2.2, dt);
+    this.distS = damp(this.distS, (CAM.dist + speed * 0.012 + boost01 * 0.35 + this.slideK * 0.35) * aspectK * zoom * (1 + 0.9 * (this.cineK || 0)), 3, dt);
     this.zoom = zoom;
     this._place(car, dt, groundAt);
 
-    const fovT = CAM.fov + CAM.fovSpeed * smoothstep(5, 45, speed) + CAM.fovBoost * boost01;
+    const fovT = CAM.fov + CAM.fovSpeed * smoothstep(5, 45, speed) + CAM.fovBoost * boost01 + 3 * this.slideK;
     this.fov = damp(this.fov, fovT, 4, dt);
     this.shake *= Math.exp(-5 * dt);
     this.roll = damp(this.roll, clamp(-accL * CAM.roll * 0.1, -0.045, 0.045) + (this.bank || 0) * 0.5, 4, dt);

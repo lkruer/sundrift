@@ -46,6 +46,14 @@ export const CAR = {
   offroadMu: 0.55, offroadDrag: 260,
   wheelRadius: 0.32, track: 1.5,
   lowSpeed: 2.5,                  // below this the model blends toward kinematic
+  // the drift, held (see _sub): the angle a slide is steered toward, in radians, from the player's hands, and how hard:
+  // the key held into the turn holds it (driftInto, and deeper with the throttle: driftThrottle), a key against it
+  // closes it, the handbrake throws it wide; a small correction (under driftDead of the key) holds nothing
+  driftThrottle: 0.48, driftInto: 0.28, driftAgainst: 0.5, driftHand: 0.22, driftMaxAngle: 0.9, driftDead: 0.3,
+  driftK: 12, driftD: 5, driftMax: 6.5,
+  handKick: 3.2,                  // rad/s^2 of yaw a handbrake pull with the wheel over adds, so the tail comes out at once
+  powerOver: 0.32,                // share of the rear's grip that lets go, cornering at the limit on the throttle
+  driftCarry: 0.65,               // share of the speed a held drift's scrub would take that the throttle keeps
 };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -85,6 +93,7 @@ export class Car {
     this.jt = 0; this.jtT = 0; this.jtTravel = 0; this.jtRem = 0; this.jturnDone = false;   // a J-turn in progress (its turning sign)
     // a J-turn may start; off the gear but still held to the wheels; the flick's hold; the wheel while on the gear
     this._jtOk = false; this._revCoast = false; this._jtHold = 0; this._revSteer = 0; this._revWas = false;
+    this._into = 0; this.drifting = 0;      // how much the key is holding the slide (eased), and how much of a drift this is
   }
 
   get speed() { return Math.hypot(this.vF, this.vL); }
@@ -109,6 +118,7 @@ export class Car {
     this.beta = this.alphaR = this.alphaF = 0; this.slipRear = this.slipFront = 0;
     this._assist = 0; this._gain = 1; this._dAB = 0; this._prevAB = 0; this.jturn = 0; this.jt = 0; this.jturnDone = false;
     this._jtOk = false; this._revCoast = false; this._jtHold = 0; this._revSteer = 0; this._revWas = false;
+    this._into = 0; this.drifting = 0;
     this.air = false; this.extF = 0; this.extL = 0;
   }
 
@@ -245,15 +255,31 @@ export class Car {
     const FmaxF = P.muFront * muScale * FzF;
     const capR = P.muRear * muScale * FzR * this.handGrip;      // all the rear has, before the drive takes its share
     let FmaxR = capR;
-    // drift hold: past a comfortable angle the rear finds a little grip back, so a held slide settles instead of
+    // a drift proper: well sideways, going forwards at speed, not a donut, not a J-turn. Its angle is the controller's
+    // (below, after the yaw damping); the grip tricks that used to hold a slide give way to it
+    const aB0 = Math.abs(this.beta);
+    // (from six degrees or so, where a lift-off or a feint has the tail moving; at high speed from ten or more, so the
+    // little slips of quick corrections on a fast sweeper stay the tyres' own and are never grown into a weave)
+    const hiV = sstep(26, 34, speed);
+    const wDrift = sstep(0.1 + 0.07 * hiV, 0.2 + 0.1 * hiV, aB0) * sstep(7, 11, speed) * (this.vF > 2 && !this.jt && this.jturn <= 0 ? 1 : 0) * (1 - D);
+    this.drifting = wDrift;
+    // drift hold: past a comfortable angle the rear finds a little grip back, so a slow slide settles instead of
     // spinning; below it, on the throttle, the rear gives a little, so a slide does not die on its own
     {
-      const aB = Math.abs(this.beta);
-      const inDrift = sstep(0.14, 0.3, aB) * sstep(6, 11, speed) * (this.vF > 0 && this.jturn <= 0 ? 1 : 0);
+      const inDrift = sstep(0.14, 0.3, aB0) * sstep(6, 11, speed) * (this.vF > 0 && this.jturn <= 0 ? 1 : 0);
       let hold = 0;
-      if (aB > P.holdAngle) hold = Math.min(0.35, (aB - P.holdAngle) * 1.1);
-      else if (this.throttle > 0.5 && aB > 0.2 && aB < P.holdAngle - 0.15) hold = -0.06 * sstep(0.2, 0.3, aB);
-      FmaxR *= 1 + hold * inDrift * (1 - D);
+      if (aB0 > P.holdAngle) hold = Math.min(0.35, (aB0 - P.holdAngle) * 1.1);
+      else if (this.throttle > 0.5 && aB0 > 0.2 && aB0 < P.holdAngle - 0.15) hold = -0.06 * sstep(0.2, 0.3, aB0);
+      FmaxR *= 1 + hold * inDrift * (1 - D) * (1 - wDrift);
+    }
+    // power over: cornering at the limit on the throttle with the wheel held into the bend, the rear lets go and the car
+    // steps into a slide, the way a powerful rear-drive car does in the low gears (without it only the handbrake could
+    // start a drift); not in the high ones, where the engine cannot overpower the tyres and a quick correction on a
+    // fast sweeper must stay a correction
+    {
+      const latG = Math.abs(this.accL) / (g * P.muRear * muScale);
+      const po = clamp(inp.throttle, 0, 1) * sstep(0.72, 0.98, latG) * sstep(0.5, 0.9, Math.abs(inp.steer)) * sstep(9, 14, speed) * (1 - sstep(19, 26, speed)) * (this.vF > 0 && !this.jt ? 1 : 0) * (1 - D);
+      FmaxR *= 1 - P.powerOver * po;
     }
     // friction circle on the rear: longitudinal demand eats lateral capacity
     const used = Math.min(0.97, Math.abs(FxR) * P.circleGain / Math.max(1, capR));
@@ -303,6 +329,16 @@ export class Car {
     // ---- accelerations in the body frame
     let aFwd = (FxR + FxF * Math.cos(d) - FyF * Math.sin(d) + Fdrag) / m;
     let aLat = (FyF * Math.cos(d) + FyR) / m;
+    // a held drift carries its speed: on the throttle the tyres dragged sideways take less of it than they would, so a
+    // long slide is a thing to hold rather than a way to slow down (lift and the scrub is all there). Only along the
+    // way the car is going, so the line it makes is the tyres' own
+    if (wDrift > 0.001 && inp.throttle > 0.05 && speed > 1) {
+      const along = (aFwd * this.vF + aLat * this.vL) / speed;
+      if (along < 0) {
+        const give = -along * P.driftCarry * wDrift * clamp(inp.throttle, 0, 1);
+        aFwd += give * this.vF / speed; aLat += give * this.vL / speed;
+      }
+    }
     let omegaDot = (P.a * FyF * Math.cos(d) - P.b * FyR) / P.izz;
 
     this.accF = aFwd; this.accL = aLat;
@@ -326,14 +362,38 @@ export class Car {
       const recov = clamp(-this._dAB * 1.5, 0, 1) * sstep(0.06, 0.18, aB);
       // (not in a J-turn: there the car is meant to go all the way round, and the catch brings it to rest facing
       // the way it is travelling)
-      const over = this.omega * this.beta < 0 && this.jturn <= 0 ? 4.0 * sstep(0.85, 1.2, aB) * (1 - D) : 0;
-      this.omega *= Math.exp(-(P.yawDamp * (this.jturn > 0 ? 0.3 : 1) + 1.6 * recov * (this.jturn > 0 ? 0.25 : 1) + over) * h);
+      const over = this.omega * this.beta < 0 && this.jturn <= 0 ? 4.0 * sstep(P.driftMaxAngle + 0.05, P.driftMaxAngle + 0.4, aB) * (1 - D) : 0;
+      this.omega *= Math.exp(-(P.yawDamp * (this.jturn > 0 ? 0.3 : 1) + 1.6 * recov * (this.jturn > 0 ? 0.25 : 1) * (1 - wDrift) + over) * h);
+    }
+    // ---- the drift, held: well sideways, its angle is steered toward the one the hands ask for. The throttle opens it
+    // (lift and it closes, the rear finding its grip), the key held into the turn opens it further, a key against the
+    // slide closes it, and the handbrake throws it wide. The tyres still carry the car and make its line; this only
+    // settles the angle where the player puts it, so a slide lasts as long as it is asked for and ends when it is let
+    // go (it used to unwind on its own a second and a half in, whatever the hands did), and never runs on to a spin.
+    if (wDrift > 0.001) {
+      const aB = Math.abs(this.beta), sgn = this.beta < 0 ? 1 : -1;     // the way the nose turns to open the slide
+      const into = clamp((inp.steer * sgn - P.driftDead) / (1 - P.driftDead), 0, 1), against = clamp(-inp.steer * sgn, 0, 1);
+      // (the key's hold on the slide lets go over half a second, so a keyboard's taps keep a drift alive, and letting
+      // the key go brings the car straight without a lurch)
+      this._into += (into - this._into) * Math.min(1, h * (into > this._into ? 8 : 2.2));
+      const thr = clamp(inp.throttle, 0, 1);
+      const target = clamp(this._into * (P.driftInto + P.driftThrottle * thr) - P.driftAgainst * against + (inp.hand ? P.driftHand : 0), 0, P.driftMaxAngle);
+      // (on grass or gravel the hands have less of it: the slide is looser there)
+      const u = clamp((target - aB) * P.driftK - this._dAB * P.driftD, -P.driftMax * muScale, P.driftMax * muScale);
+      this.omega += sgn * u * wDrift * h;
+    } else this._into = 0;
+    // a handbrake pull with the wheel over at speed kicks the tail out at once (the grip it takes away swings the car
+    // round too, but only after the wheel has come over, which read as half a second of nothing)
+    if (inp.hand && !this.jt && this.vF > 6 && Math.abs(inp.steer) > 0.2 && Math.abs(this.beta) < 0.5) {
+      this.omega += Math.sign(inp.steer) * P.handKick * clamp(Math.abs(inp.steer) * 1.5, 0, 1) * sstep(6, 12, speed) * h;
     }
 
     if (lowT > 0) {
       // (rolling straight it holds the car to its wheels; sliding or spinning, never faster than tyres could: the
       // blend steadies a slow car, it does not stop a slide or a spin dead)
-      const capW = (4 + 42 * straight) * h, capV = (3 + 44 * straight) * h;
+      // (its full hold only once the car is really straight: coming out of a slide it takes the last of it gently)
+      const st3 = straight * straight * straight;
+      const capW = (4 + 42 * st3) * h, capV = (3 + 44 * st3) * h;
       this.omega += clamp((omegaKin - this.omega) * lowT * Math.min(1, h * 30), -capW, capW);
       this.vL -= clamp(this.vL * lowT * Math.min(1, h * 25), -capV, capV);
     }

@@ -6,12 +6,31 @@
  *
  * Everything is DOM and SVG, written only when a value changes (the needle, which moves every frame, is one
  * attribute), so a phone is not re-laying out text sixty times a second.
+ *
+ * The rewards: a banked drift flashes where the live count was and flies up into the score, which pulses as it lands
+ * and only then rolls up; a bigger drift gets its tier called out (NICE, GREAT, INSANE DRIFT!); the multiplier, the
+ * tier and the combo punch as they climb; past the angle that scores the most the angle meter burns pink. Every one
+ * of those is a Web Animation of transform and opacity (the compositor runs it; nothing is restyled or laid out
+ * mid-drift, which is what stalled the browser before), and every look is drawn once at the title (warm) so its
+ * raster pipeline is compiled before a run. On a phone that can (Android), a short buzz goes with the big moments.
  */
-import { SCORE, clamp, damp } from './config.js?v=202609232326';
+import { SCORE, clamp, damp } from './config.js?v=202609240354';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
+// the slide angle past which a drift scores the most: scoring.js's angle factor tops out at 1.5 x 0.55 rad, 47 degrees
+const MAX_ANGLE = 47;
+// an overshoot, for the punches
+const POP = 'cubic-bezier(.2,1.7,.4,1)';
+
+/** Restart a short animation on el (transform and opacity only), dropping the one it was running. */
+function play(el, frames, ms, easing = 'ease-out', delay = 0) {
+  if (!el || !el.animate) return null;
+  if (el._anim) el._anim.cancel();
+  el._anim = el.animate(frames, { duration: ms, easing, delay });
+  return el._anim;
+}
 
 const SEGS = { 0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg', '-': 'g', ' ': '', r: 'eg', n: 'ceg', P: 'abefg' };
 
@@ -91,8 +110,12 @@ export class Hud {
     this.el = {
       hud: $('hud'), drift: $('drift'), driftpts: $('driftpts'), mult: $('mult'), tier: $('tier'), combon: $('combon'), chainf: $('chainf'),
       toasts: $('toasts'), perf: $('perf'), btns: $('hbtns'),
-      lampdrift: $('lampdrift'), lampclip: $('lampclip'), lampboost: $('lampboost'), angle: $('angle'), anglef: $('anglef'), angledeg: $('angledeg'),
+      lampdrift: $('lampdrift'), lampclip: $('lampclip'), lampboost: $('lampboost'), angle: $('angle'), angledeg: $('angledeg'),
+      anglecl: $('anglecl'), anglecr: $('anglecr'), anglehot: $('anglehot'),
+      scorebox: $('scorebox'), scorelab: $('scorelab'), sflash: $('sflash'), bank: $('bank'), coach: $('coach'), pause: $('pause'),
+      boostbar: $('boostbar'),
     };
+    this.el.bankb = this.el.bank && this.el.bank.querySelector('b');
     this.score = new Seg7($('score7'), 8);
     this.speed = new Seg7($('spd7'), 3);
     this.gear = new Seg7($('gear'), 1);
@@ -103,10 +126,22 @@ export class Hud {
     this.leds = [];
     for (let i = 0; i < 12; i++) { const l = document.createElement('i'); if (i >= 9) l.classList.add('hi'); leds.appendChild(l); this.leds.push(l); }
     this.shown = 0; this.lastPts = -1; this.lastMult = -1; this.lastTier = -1; this.lastCombo = -1; this.lastLeds = -1;
-    this.rpm = 900; this.lastNeedle = ''; this.clipT = 0; this.hitFlash = 0; this.vignette = 0; this.lastAngle = '';
+    this.rpm = 900; this.lastNeedle = ''; this.clipT = 0; this.hitFlash = 0; this.vignette = 0; this.lastAngle = ''; this.lastDeg = -1;
     this.perfOn = new URLSearchParams(location.search).has('perf') || new URLSearchParams(location.search).has('prof');
     if (this.perfOn) this.el.perf.classList.add('on');
     this.score.set(''); this.speed.set('0'); this.gear.set('n'); this.clock.set('0000'); this.dist.set('0');
+    // the callout showing ({ el, t, prio }) and the ones waiting their turn
+    this.cur = null; this.queue = [];
+    this.holdScore = 0;                  // the score's roll waits for the banked points to fly in
+    this.canBuzz = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+    this._buzzT = 0;
+    try { this.coached = localStorage.getItem('minidrift.drifted') === '1'; } catch { this.coached = false; }
+    this.run = { t: 0, smashN: 0, smashLast: 0, newBest: false, best0: 0 };
+    this.scoring = null;
+    // the run card on the pause screen is filled in the moment the pause opens (main.js adds the class)
+    if (this.el.pause && typeof MutationObserver !== 'undefined') {
+      new MutationObserver(() => { if (this.el.pause.classList.contains('on')) this.fillCard(); }).observe(this.el.pause, { attributes: true, attributeFilter: ['class'] });
+    }
   }
 
   show(on) { this.el.hud.classList.toggle('on', on); this.el.btns.classList.toggle('on', on); }
@@ -114,63 +149,246 @@ export class Hud {
   /**
    * Draw every effect the HUD will ever use, once, nearly invisibly, while the title is up: the browser compiles
    * a raster shader the first time it draws a blurred text shadow or a glow, and doing that mid-drift was a
-   * 100 ms stall at the first slide of the first run.
+   * 100 ms stall at the first slide of the first run. The punches and the cash-in are played here too, at the scale
+   * they reach in a run, and so are the angle meter's burn and the score's flash.
    */
   warm(on) {
     const el = this.el;
     el.hud.classList.toggle('warm', on);
     for (const e of [el.drift, el.angle, el.lampdrift, el.lampclip, el.lampboost]) e.classList.toggle('on', on);
     if (on) {
-      el.driftpts.textContent = '+1,234'; el.mult.textContent = '×2.0'; el.tier.textContent = 'GREAT'; el.tier.className = 't3';
-      this.toast('WARM', 'good', true); this.toast('WARM', 'bad'); this.toast('WARM');
+      el.driftpts.textContent = '+1,234'; el.mult.textContent = '×2.0'; el.tier.textContent = 'GREAT'; el.tier.className = 't2';
+      this._showToast('WARM', 'good', true, 'COMBO ×2', 1); this._showToast('WARM', 'bad', false, '', 1);   // (the first leaves: its exit too)
       this.smash('SMASH!', 1234, 2);                  // (the smash popup and its glow, drawn once here too)
+      this._bankFly(1234, 2); this._punch('mult'); this._punch('tier'); this._punch('combo');
+      play(el.angledeg, [{ transform: 'scale(1.8)' }, { transform: 'scale(1)' }], 320, POP);
+      play(el.boostbar, [{ transform: 'scale(1.14)' }, { transform: 'scale(1)' }], 320, POP);
+      // (each started where it is plainly on screen, not at its invisible first frame or in its delay: a harness presses
+      // START the moment the title is up, and the very first frame of the title has to draw every look)
+      const seek = (e, ms) => { if (e && e._anim) try { e._anim.currentTime = ms; } catch {} };
+      seek(el.bank, 150); seek(el.scorebox, 565); seek(el.sflash, 556); seek(el.smash, 200);
+      for (const e of [el.mult, el.tier, el.combon, el.angledeg, el.boostbar]) seek(e, 90);
+      for (const t of el.toasts.children) if (t.getAnimations) for (const a of t.getAnimations()) try { a.currentTime = 140; } catch {}
+      this._angleTo(55); el.anglehot.style.opacity = '1';
+      el.scorelab.classList.add('best');
+      el.coach.innerHTML = '<b>DRIFT</b> WARM'; el.coach.style.opacity = '1';
       this.leds.forEach((l) => l.classList.add('on'));
     } else {
       el.driftpts.textContent = ''; el.tier.textContent = '';
-      if (el.smash) { clearTimeout(this._smashT); el.smash.classList.remove('on', 'pop'); }
+      for (const e of [el.bank, el.scorebox, el.sflash, el.mult, el.tier, el.combon, el.smash, el.angledeg, el.boostbar]) if (e && e._anim) { e._anim.cancel(); e._anim = null; }
+      el.toasts.textContent = ''; this.cur = null; this.queue = [];
+      el.anglehot.style.opacity = '0'; el.angledeg.style.color = ''; this._hot = false; this.lastAngle = ''; this.lastDeg = -1;
+      el.scorelab.classList.remove('best');
+      el.coach.style.opacity = '0'; this._coachOn = false;
       this.leds.forEach((l) => l.classList.remove('on'));
       this._drifting = this._clip = this._boosting = this._slide = false; this.lastLeds = 0; this.lastTier = -1;
     }
   }
 
-  reset() { this.shown = 0; this.score.set(''); this.lastCombo = -1; }
-
-  /** The smash counter: one label, punched in on every hit, the chain and its points under it. */
-  smash(label, total, n) {
-    let el = this.el.smash;
-    if (!el) { el = this.el.smash = document.createElement('div'); el.id = 'smash'; this.el.hud.appendChild(el); }
-    el.innerHTML = `<b>${label}</b><span>${n > 1 ? 'SMASH ×' + n + '   ' : ''}+${fmt(total)}</span>`;
-    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop', 'on');
-    clearTimeout(this._smashT); this._smashT = setTimeout(() => el.classList.remove('on'), 1500);
+  /** A new run (or back to the title): the score from zero, the run's own records cleared, the course's best as it stands. */
+  reset() {
+    this.shown = 0; this.score.set(''); this.lastCombo = -1; this.holdScore = 0;
+    // (nothing from the last run carries over: its callouts, its cash-in, its smash counter)
+    for (const e of [this.el.bank, this.el.scorebox, this.el.sflash, this.el.smash]) if (e && e._anim) { e._anim.cancel(); e._anim = null; }
+    if (this.cur && this.cur.el.isConnected) this.cur.el.remove();
+    this.cur = null; this.queue = [];
+    this.run = { t: 0, smashN: 0, smashLast: 0, newBest: false, best0: this._storedBest() };
+    this._coachOn = false; this._coachGone = false;
+    if (this.el.coach) this.el.coach.style.opacity = '0';
+    if (this.el.scorelab) { this.el.scorelab.textContent = 'SCORE'; this.el.scorelab.classList.remove('best'); }
   }
 
-  toast(text, cls = '', big = false) {
+  /** The best kept for the course picked on the title (main.js keeps it under minidrift.best.<city.>easy|hard). */
+  _storedBest() {
+    try {
+      const m = document.querySelector('.map.sel'), d = document.querySelector('.diff.sel');
+      const key = (m && m.dataset.m === 'city' ? 'city.' : '') + (d ? d.dataset.d : 'easy');
+      return Number(localStorage.getItem('minidrift.best.' + key)) || 0;
+    } catch { return 0; }
+  }
+
+  /**
+   * A short buzz on a phone that can (Android; iOS has no vibration for the web), never more than one in 0.2 s, and only
+   * in a run the player has touched (before a first tap the browser refuses it and says so in the console).
+   */
+  buzz(p) {
+    if (!this.canBuzz || !document.body.classList.contains('touch') || !document.body.classList.contains('playing')) return;
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    const now = performance.now();
+    if (now - this._buzzT < 200) return;
+    this._buzzT = now;
+    try { navigator.vibrate(p); } catch {}
+  }
+
+  /** The smash counter: one label, punched in on every hit, the chain and its points under it, just above the car. */
+  smash(label, total, n) {
+    let el = this.el.smash;
+    if (!el) {
+      el = this.el.smash = document.createElement('div'); el.id = 'smash'; el.innerHTML = '<b></b><span></span>';
+      el._b = el.firstChild; el._s = el.lastChild; this.el.hud.appendChild(el);
+    }
+    el._b.textContent = label;
+    el._s.textContent = (n > 1 ? 'SMASH ×' + n + ' · ' : '') + '+' + fmt(total);
+    play(el, [
+      { opacity: 1, transform: 'translate(-50%,0) rotate(-11deg) scale(1.75)', easing: 'cubic-bezier(.2,1.5,.45,1)' },
+      { opacity: 1, transform: 'translate(-50%,0) rotate(-4deg) scale(1)', offset: 0.2 },
+      { opacity: 1, transform: 'translate(-50%,0) rotate(-4deg) scale(1)', offset: 0.8 },
+      { opacity: 0, transform: 'translate(-50%,-10px) rotate(-4deg) scale(.96)' },
+    ], 1700, 'linear');
+    // (the card counts what was knocked over; a chain's total grows with each hit)
+    this.run.smashN++; this.run.smashLast = total;
+    this.buzz(12);
+  }
+
+  /**
+   * A callout in the lane above the road, one at a time, so two never pile up over the road or the smash counter. prio
+   * decides who gives way while a callout is fresh (its first 0.65 s): a more important one cuts in (the other leaves
+   * quickly), an equally important one (2 and up) waits its turn, a lesser one is dropped (its sound and its lamp still
+   * say it). 3: a new best, a crash; 2: a banked drift's tier, a J-turn; 1: a clip, a switch, the course; 0: the weather.
+   * sub is a smaller second line (the points, the combo).
+   */
+  toast(text, cls = '', big = false, sub = '', prio = 1) {
+    const cur = this.cur;
+    if (cur && cur.el.isConnected && performance.now() - cur.t < 650 && prio <= cur.prio) {
+      if (prio >= 2 && this.queue.length < 3) this.queue.push([text, cls, big, sub, prio]);
+      return;
+    }
+    this._showToast(text, cls, big, sub, prio);
+  }
+
+  _showToast(text, cls, big, sub, prio) {
+    const cur = this.cur;
+    // (the one showing leaves quickly; one already fading just goes)
+    if (cur && cur.el.isConnected) { if (performance.now() - cur.t < 1000) cur.el.classList.add('out'); else cur.el.remove(); }
     const t = document.createElement('div');
     t.className = 'toast' + (cls ? ' ' + cls : '') + (big ? ' big' : '');
-    t.textContent = text;
-    const n = this.el.toasts.childElementCount;
-    t.style.top = (n % 3) * 44 + 'px';
+    if (sub) { const b = document.createElement('b'), s = document.createElement('span'); b.textContent = text; s.textContent = sub; t.append(b, s); }
+    else t.textContent = text;
     this.el.toasts.appendChild(t);
-    setTimeout(() => t.remove(), 1300);
+    this.cur = { el: t, t: performance.now(), prio };
+    setTimeout(() => t.remove(), 1400);
+  }
+
+  /** The next queued callout, once the one showing has had its moment. */
+  _nextToast() {
+    if (!this.queue.length || (this.cur && this.cur.el.isConnected && performance.now() - this.cur.t < 650)) return;
+    this._showToast(...this.queue.shift());
+  }
+
+  /** The punches: the multiplier as it climbs, the tier as it goes up, the combo as it grows. */
+  _punch(which) {
+    const el = this.el;
+    if (which === 'mult') play(el.mult, [{ transform: 'scale(1.7)' }, { transform: 'scale(1)' }], 300, POP);
+    else if (which === 'tier') play(el.tier, [{ opacity: 0, transform: 'scale(2.2) rotate(-7deg)' }, { opacity: 1, transform: 'scale(.94) rotate(0deg)', offset: 0.55 }, { opacity: 1, transform: 'scale(1)' }], 420, 'ease-out');
+    else if (which === 'combo') play(el.combon, [{ transform: 'scale(1.9)' }, { transform: 'scale(1)' }], 340, POP);
+  }
+
+  /** The cash-in: the banked points flash where the live count was, then fly up into the score, which pulses as they land. */
+  _bankFly(v, tier) {
+    const el = this.el;
+    if (!el.bank) return;
+    el.bankb.textContent = '+' + fmt(v);
+    el.bank.className = tier ? 't' + tier : '';
+    // (it lands at 0.47 s: the score pulses and starts to roll then, and audio.js rings its bell then)
+    play(el.bank, [
+      { opacity: 0, transform: 'translateY(6px) scale(1.5)', easing: 'cubic-bezier(.2,1.4,.4,1)' },
+      { opacity: 1, transform: 'translateY(0) scale(1)', offset: 0.2 },
+      { opacity: 1, transform: 'translateY(0) scale(1.03)', offset: 0.44, easing: 'cubic-bezier(.5,0,.8,.6)' },
+      { opacity: 0, transform: 'translateY(-60px) scale(.45)' },
+    ], 700, 'linear');
+    this.holdScore = performance.now() + 470;
+    // (a slide of a few points, a wiggle, only flies in; the score's pulse and flash are for a drift)
+    if (v < 100) return;
+    play(el.scorebox, [{ transform: 'translateX(-50%) scale(1)' }, { transform: 'translateX(-50%) scale(1.1)', offset: 0.28 }, { transform: 'translateX(-50%) scale(1)' }], 340, 'ease-out', 470);
+    play(el.sflash, [{ opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 0 }], 640, 'ease-out', 460);
+  }
+
+  /** The angle meter: uncover the side the car slides to, from the middle out, a fraction of 70 degrees. */
+  _angleTo(d) {
+    const f = Math.round(Math.min(70, Math.abs(d)) / 70 * 200) / 200;
+    const key = f + (d > 0 ? 'r' : 'l');
+    if (key === this.lastAngle) return;
+    this.lastAngle = key;
+    this.el.anglecr.style.transform = `scaleX(${d > 0 ? 1 - f : 1})`;
+    this.el.anglecl.style.transform = `scaleX(${d > 0 ? 1 : 1 - f})`;
+  }
+
+  /** First run only (until a drift has been banked once, ever): how to drift, a moment after the start. */
+  _coach(dt) {
+    if (this.coached || this._coachGone || !this.el.coach) return;
+    this.run.t += dt;
+    const want = this.run.t > 2.4 && this.run.t < 30;
+    if (want === !!this._coachOn) return;
+    this._coachOn = want;
+    if (want) {
+      this.el.coach.innerHTML = document.body.classList.contains('touch')
+        ? '<b>DRIFT</b> TAP THE HANDBRAKE INTO A CORNER<span class="br"> AND STEER INTO THE SLIDE</span>'
+        : '<b>DRIFT</b> TAP <b>SPACE</b> INTO A CORNER · STEER INTO THE SLIDE · HOLD <b>W</b>';
+    } else this._coachGone = true;
+    this.el.coach.style.opacity = want ? '1' : '0';
+  }
+
+  _coachDone() {
+    if (this._coachOn) { this._coachOn = false; this.el.coach.style.opacity = '0'; }
+    this._coachGone = true;
   }
 
   onEvent(e) {
+    const el = this.el;
     switch (e.type) {
+      case 'start': if (e.value > 1) this._punch('combo'); this._coachDone(); break;
+      case 'mult': this._punch('mult'); break;
+      // the boost a slide has earned, the moment it ends: the bar that just filled punches
+      case 'boost': play(el.boostbar, [{ transform: 'scale(1.14)' }, { transform: 'scale(1)' }], 320, POP); break;
+      case 'tier': this._punch('tier'); break;
+      // a slide held past the angle that scores the most: said once a drift, and the degrees punch
+      case 'angle': this.toast('BIG ANGLE!', 't3', false, '', 1); play(el.angledeg, [{ transform: 'scale(1.8)' }, { transform: 'scale(1)' }], 320, POP); break;
       case 'bank': {
-        const tierWord = SCORE.tierNames[e.tier] || '';
-        this.toast(`+${fmt(e.value)}${e.chain > 1 ? `  ×${e.chain}` : ''}`, 'good', e.tier >= 2);
-        if (tierWord) setTimeout(() => this.toast(tierWord + ' DRIFT', e.tier >= 3 ? 'bad' : ''), 260);
+        this._bankFly(e.value, e.tier);
+        // a bigger drift is called out by its tier, with the combo it was part of
+        const word = SCORE.tierNames[e.tier] || '';
+        if (word) this.toast(word + ' DRIFT!', 't' + e.tier, e.tier >= 2, e.chain > 1 ? 'COMBO ×' + e.chain : '', 2);
+        if (e.value >= 100) this.buzz(e.tier >= 3 ? [26, 40, 26, 40, 50] : e.tier === 2 ? [20, 40, 24] : e.tier === 1 ? 18 : 10);
+        if (!this.coached) { this.coached = true; try { localStorage.setItem('minidrift.drifted', '1'); } catch {} }
         break;
       }
-      case 'tier': this.toast(SCORE.tierNames[e.value] || '', e.value >= 3 ? 'bad' : ''); break;
-      case 'switch': this.toast('SWITCH!', 'good'); break;
-      case 'clip': this.toast(`CLIP +${fmt(e.value)}`, ''); this.clipT = 0.9; break;
-      case 'crash': this.toast(`CRASH  -${fmt(e.value)}`, 'bad', true); this.hitFlash = 1; break;
+      case 'switch': this._punch('combo'); this.toast('SWITCH!', 'good', false, '', 1); break;
+      case 'clip': this.toast('CLIP!', 'clip', false, '+' + fmt(e.value), 1); this.clipT = 0.9; this.buzz(14); break;
+      case 'crash': this.toast('CRASH', 'bad', true, '-' + fmt(e.value) + ' LOST', 3); this.hitFlash = 1; this.buzz(70); break;
       case 'bump': this.hitFlash = Math.max(this.hitFlash, 0.5); break;
-      case 'sun': this.toast(e.value, ''); break;
-      case 'best': this.toast('NEW BEST!', 'good', true); break;
-      case 'jturn': this.toast('J-TURN!  +' + fmt(e.value), 'good', true); break;
+      case 'sun': this.toast(e.value, 'calm', false, '', 0); break;
+      case 'best': {
+        this.run.newBest = true;
+        this.toast('NEW BEST!', 't2', true, '', 3);
+        el.scorelab.textContent = 'NEW BEST'; el.scorelab.classList.add('best');
+        play(el.sflash, [{ opacity: 0 }, { opacity: 1, offset: 0.12 }, { opacity: 0.85, offset: 0.6 }, { opacity: 0 }], 1300, 'ease-out');
+        play(el.scorebox, [{ transform: 'translateX(-50%) scale(1)' }, { transform: 'translateX(-50%) scale(1.14)', offset: 0.25 }, { transform: 'translateX(-50%) scale(1)' }], 460, 'ease-out');
+        this.buzz([30, 50, 30, 50, 80]);
+        // (main.js hands a new best to the HUD alone; the sound hears of it from this)
+        dispatchEvent(new CustomEvent('minidrift:best'));
+        break;
+      }
+      case 'jturn': this.toast('J-TURN!', 'good', true, '+' + fmt(e.value), 2); this.buzz([20, 30, 30]); break;
     }
+  }
+
+  /** The run so far, on the pause screen: the course, the score against the best, and the run's records. */
+  fillCard() {
+    const s = this.scoring;
+    if (!s) return;
+    const st = s.stats, set = (id, v, hi) => { const e = $(id); if (e) { e.textContent = v; if (hi !== undefined) e.classList.toggle('hi', hi); } };
+    const m = document.querySelector('.map.sel span'), d = document.querySelector('.diff.sel b');
+    set('pc-course', (m ? m.textContent : '') + (d ? ' · ' + d.textContent : ''));
+    set('pc-score', fmt(s.total), this.run.newBest);
+    set('pc-bestl', this.run.newBest ? 'NEW BEST' : 'BEST', this.run.newBest);
+    // (a new best shows by how much it beat the old one)
+    set('pc-best', this.run.newBest ? (this.run.best0 > 0 ? '+' + fmt(s.total - this.run.best0) : fmt(s.total)) : this.run.best0 > 0 ? fmt(this.run.best0) : '—', this.run.newBest);
+    set('pc-drifts', String(st.drifts));
+    set('pc-big', fmt(st.biggest));
+    set('pc-long', st.longest.toFixed(1) + ' s');
+    set('pc-clips', String(st.clips));
+    set('pc-smash', String(this.run.smashN));
+    set('pc-dist', (st.distance / 1609.344).toFixed(1) + ' MI');
   }
 
   /**
@@ -178,8 +396,12 @@ export class Hud {
    */
   update(dt, s, car, gb, hour, dist, boostLeft, boostMax, perf) {
     const el = this.el;
-    this.shown = this.shown + (s.total - this.shown) * Math.min(1, dt * 9);
-    if (Math.abs(this.shown - s.total) < 1) this.shown = s.total;
+    this.scoring = s;
+    // the score rolls up to the total, once the banked points have flown into it
+    if (performance.now() >= this.holdScore || s.total < this.shown) {
+      this.shown = this.shown + (s.total - this.shown) * Math.min(1, dt * 9);
+      if (Math.abs(this.shown - s.total) < 1) this.shown = s.total;
+    }
     const sc = Math.round(this.shown);
     this.score.set(sc > 0 ? String(sc) : '0');
 
@@ -187,8 +409,10 @@ export class Hud {
     const active = s.active && s.points > 1;
     el.drift.classList.toggle('on', active);
     if (active) {
-      const p = Math.round(s.points);
-      if (p !== this.lastPts) { el.driftpts.textContent = '+' + fmt(p); this.lastPts = p; }
+      // (the count is redrawn at most twenty times a second: its outline and glow are redrawn with it, and digits that
+      // change every frame are harder to read than ones that tick)
+      const p = Math.round(s.points), now = performance.now();
+      if (p !== this.lastPts && (now - (this._ptsT || 0) > 48 || !this._drifting)) { el.driftpts.textContent = '+' + fmt(p); this.lastPts = p; this._ptsT = now; }
       if (s.mult !== this.lastMult) { el.mult.textContent = '×' + s.mult.toFixed(1); this.lastMult = s.mult; }
       if (s.tier !== this.lastTier) { el.tier.textContent = SCORE.tierNames[s.tier] || ''; el.tier.className = 't' + s.tier; this.lastTier = s.tier; }
     } else this.lastTier = -1;
@@ -220,25 +444,25 @@ export class Hud {
     const clip = this.clipT > 0;
     if (clip !== this._clip) { this._clip = clip; el.lampclip.classList.toggle('on', clip); }
 
-    // drift angle
+    // drift angle: the meter, the degrees, and past the angle that scores the most, the burn
     const slide = Math.abs(car.beta) > 0.1 && car.speed > 5;
-    if (slide !== this._slide) { this._slide = slide; el.angle.classList.toggle('on', slide); }
+    if (slide !== this._slide) { this._slide = slide; el.angle.classList.toggle('on', slide); if (slide) this._coachDone(); }   // (a slide: the coach has done its job, and its place is the meter's)
     if (slide) {
-      const d = clamp(car.beta * 180 / Math.PI, -70, 70);
-      const w = (Math.abs(d) / 70 * 50).toFixed(1);
-      const key = w + (d > 0 ? 'r' : 'l');
-      if (key !== this.lastAngle) {
-        this.lastAngle = key;
-        el.anglef.style.width = w + '%';
-        el.anglef.style.left = d > 0 ? '50%' : (50 - Number(w)) + '%';
-        el.angledeg.textContent = Math.round(Math.abs(d)) + '°';
-      }
+      const d = clamp(car.beta * 180 / Math.PI, -70, 70), a = Math.abs(d);
+      this._angleTo(d);
+      const dg = Math.round(a);
+      if (dg !== this.lastDeg) { this.lastDeg = dg; el.angledeg.textContent = dg + '°'; }
+      const hot = a >= MAX_ANGLE;
+      if (hot !== !!this._hot) { this._hot = hot; el.anglehot.style.opacity = hot ? '1' : '0'; el.angledeg.style.color = hot ? '#ff6fae' : ''; }
     }
 
     // clock and distance
     const hh = Math.floor(hour) % 24, mm = Math.floor((hour % 1) * 60);
     this.clock.set(String(hh).padStart(2, '0') + String(mm).padStart(2, '0'));
     this.dist.set(String(Math.floor(dist / 160.9344)).padStart(2, '0'));   // miles, one decimal
+
+    this._coach(dt);
+    this._nextToast();
 
     // the vignette and the hit flash are drawn by the post pass (main reads these two)
     this.hitFlash = Math.max(0, this.hitFlash - dt * 2.2);

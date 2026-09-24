@@ -1,0 +1,11 @@
+{ "setup": { "hour": 22, "rain": 0, "hard": true },
+  "shots": [
+    { "name": "HD01_s1300", "s": 1300, "wait": 3000 },
+    { "name": "HD02_s1700", "s": 1700 },
+    { "name": "HD03_s2100", "s": 2100 },
+    { "name": "HD04_s2500", "s": 2500 },
+    { "name": "HD05_s2900", "s": 2900 },
+    { "name": "HD06_s3300", "s": 3300 },
+    { "name": "HD07_hairpin_day", "s": 1412, "hour": 12.5, "wait": 3600 },
+    { "name": "HD08_s2100_day", "s": 2100 }
+  ] }

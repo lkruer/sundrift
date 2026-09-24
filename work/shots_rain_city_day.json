@@ -1,0 +1,13 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 4000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 12.5; D.G.hourShown = 12.4; D.rainNow(0.75); D.teleport(600, 0); })()" },
+  { "wait": 3500 },
+  { "keys": ["KeyW"], "ms": 3000 },
+  { "shot": "C1_city_day_rain" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 22; D.G.hourShown = 21.9; D.teleport(1200, 30); })()" },
+  { "keys": ["KeyW"], "ms": 3000 },
+  { "shot": "C2_city_night_rain" }
+]

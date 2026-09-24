@@ -1,0 +1,21 @@
+[
+  { "wait": 3000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 12.5; D.G.hourShown = 12.4; D.rainNow(0.75); D.teleport(600, 0); })()" },
+  { "wait": 3500 },
+  { "shot": "R1_day_still" },
+  { "keys": ["KeyW"], "ms": 3500 },
+  { "shot": "R2_day_drive_a" },
+  { "wait": 120 },
+  { "shot": "R3_day_drive_b" },
+  { "js": "(() => { const D = window.__DEBUG__; const c = D.car; const y = D.world.ground.height(c.x, c.z); const f = [Math.sin(c.yaw), Math.cos(c.yaw)]; window.__CAM__ = { pos: [c.x - f[0] * 2 + f[1] * 6, y + 1.5, c.z - f[1] * 2 - f[0] * 6], look: [c.x + f[0] * 20, y + 2, c.z + f[1] * 20], fov: 60 }; })()" },
+  { "wait": 900 },
+  { "shot": "R4_day_side" },
+  { "js": "(() => { window.__CAM__ = null; const D = window.__DEBUG__; D.G.hour = 22; D.G.hourShown = 21.9; D.teleport(900, 30); })()" },
+  { "keys": ["KeyW"], "ms": 3000 },
+  { "shot": "R5_night_drive" },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 17.8; D.G.hourShown = 17.7; D.teleport(1300, 30); })()" },
+  { "keys": ["KeyW"], "ms": 3000 },
+  { "shot": "R6_dusk_drive" }
+]

@@ -1,0 +1,10 @@
+{ "setup": { "hour": 22, "rain": 0.8 },
+  "shots": [
+    { "name": "R01_rain_night_s520", "s": 520, "wait": 3400 },
+    { "name": "R02_rain_night_s1100", "s": 1100 },
+    { "name": "R03_rain_night_s2630", "s": 2630 },
+    { "name": "R04_rain_night_conbini", "s": 1470, "cam": [1460, 5, 2.5, 1484, -16, 2, 60] },
+    { "name": "R05_rain_day_s520", "s": 520, "hour": 12.5, "wait": 3600 },
+    { "name": "R06_rain_day_s3000", "s": 3000 },
+    { "name": "R07_rain_dusk_s2630", "s": 2630, "hour": 18.0, "wait": 3600 }
+  ] }

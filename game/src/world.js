@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609232326';
-import { surface } from '../surfaces.js?v=202609232326';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609232326';
-import { Ground } from './ground.js?v=202609232326';
-import { Terrain, LODS } from './terrain.js?v=202609232326';
-import { partsOf, Pool } from './instancing.js?v=202609232326';
+import { ASSET } from '../assetlib.js?v=202609240354';
+import { surface } from '../surfaces.js?v=202609240354';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609240354';
+import { Ground } from './ground.js?v=202609240354';
+import { Terrain, LODS } from './terrain.js?v=202609240354';
+import { partsOf, Pool } from './instancing.js?v=202609240354';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const ASSETS = {
@@ -37,9 +37,9 @@ const ASSETS = {
 const SURFACED = new Set(['boulder', 'post', 'pole', 'lamp', 'mirror', 'chevron', 'torii', 'lantern', 'portal', 'hut', 'vending', 'upole', 'conbini', 'busstop', 'jizo', 'pagoda']);
 // pool capacities: what the whole visible road can hold at once
 const CAPS = {
-  lamp: 320, post: 1400, pole: 500, chevron: 120, mirror: 40, boulder: 300, upole: 160,
+  lamp: 320, post: 1400, pole: 500, chevron: 120, chevronM: 120, mirror: 40, boulder: 300, upole: 160,
   maple: 300, broadleaf: 500, shrub: 1600, bamboo: 160, bare: 120, sakura: 700, weeping: 24,
-  torii: 8, lantern: 24, hut: 12, vending: 90, conbini: 6, busstop: 8, portal: 8, chochin: 700, jizo: 40,
+  torii: 24, lantern: 48, hut: 12, vending: 90, conbini: 6, busstop: 8, portal: 8, chochin: 700, jizo: 72,
   grass: 3600, flowers: 1000, pagoda: 6,
 };
 /**
@@ -48,7 +48,7 @@ const CAPS = {
  * kg (how far it flies, how much the car feels it); box takes the template's own footprint.
  */
 const COLL = {
-  pole: { kind: 'knock', r: 0.13, m: 4 }, chevron: { kind: 'knock', r: 0.16, m: 9 }, mirror: { kind: 'knock', r: 0.14, m: 11 },
+  pole: { kind: 'knock', r: 0.13, m: 4 }, chevron: { kind: 'knock', r: 0.16, m: 9 }, chevronM: { kind: 'knock', r: 0.16, m: 9 }, mirror: { kind: 'knock', r: 0.14, m: 11 }, warn: { kind: 'knock', r: 0.12, m: 8 },
   lamp: { kind: 'knock', r: 0.17, m: 60 }, vending: { kind: 'knock', box: true, m: 220 }, bollard: { kind: 'knock', r: 0.13, m: 7 },
   bag: { kind: 'knock', r: 0.3, m: 3 }, crate: { kind: 'knock', r: 0.24, m: 5 }, crates: { kind: 'knock', r: 0.26, m: 9 },
   box: { kind: 'knock', r: 0.24, m: 2 }, cone: { kind: 'knock', r: 0.18, m: 2 }, aboard: { kind: 'knock', r: 0.3, m: 6 }, bike: { kind: 'knock', r: 0.42, m: 16 },
@@ -95,7 +95,7 @@ function roadTexture(half, wall) {
   const asphalt = [0x3a, 0x3b, 0x40], gravel = [0x86, 0x80, 0x75], line = [0xe8, 0xe4, 0xda];
   let seed = 7;
   const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  // a few repair patches: darker, smoother rectangles
+  // a few repair patches: a shade darker than the asphalt round them
   const patches = [];
   for (let k = 0; k < 5; k++) patches.push({ u0: -half + rnd() * (2 * half - 2), du: 1 + rnd() * 2.2, v0: rnd() * LEN, dv: 2 + rnd() * 6 });
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -106,9 +106,15 @@ function roadTexture(half, wall) {
     if (au > half) { c = gravel.map((v) => v + grain * 1.8); rough = 0.96; }
     else {
       const wear = 1 - 0.08 * Math.exp(-Math.pow((au - half * 0.36) / 0.5, 2));       // darker tyre tracks
-      c = asphalt.map((v) => (v + grain) * wear);
-      rough = 0.55 + 0.08 * Math.sin(x * 0.11 + y * 0.05) * Math.sin(y * 0.09) - 0.05 * (1 - wear) * 6;
-      for (const p of patches) if (u > p.u0 && u < p.u0 + p.du && vm > p.v0 && vm < p.v0 + p.dv) { c = c.map((v) => v * 0.8); rough = 0.7; }
+      // (a fine grain only: on asphalt this dark, a full one scattered every band edge the cel pass draws across the
+      // road into salt and pepper, and a low sun's sheen turned the tyre tracks into two ragged black lanes)
+      c = asphalt.map((v) => (v + grain * 0.4) * wear);
+      // an even sheen: any wave in it drew the lamps' reflections as wobbling puddles at night and the sun's as black
+      // camouflage blotches by day, once the cel pass banded them
+      rough = 0.55;
+      // (the patches only darken: a patch of its own roughness cut a square notch out of every highlight, and at
+      // 0.8 the cel bands turned it into a black hole in the road by day)
+      for (const p of patches) if (u > p.u0 && u < p.u0 + p.du && vm > p.v0 && vm < p.v0 + p.dv) c = c.map((v) => v * 0.9);
       const onEdge = Math.abs(au - (half - 0.25)) < 0.075;
       const onCentre = au < 0.07 && (vm % 12) < 4.0;
       if (onEdge || onCentre) { c = line.map((v) => v * (onCentre ? 0.93 : 1) + grain * 0.5); rough = 0.62; }
@@ -167,14 +173,108 @@ function tunnelTexture() {
   ctx.fillStyle = 'rgba(30,30,30,0.5)';
   for (let r = 0; r < 4; r++) { const y = (r / 4) * H; ctx.fillRect(0.035 * W, y, 0.065 * W, 2); ctx.fillRect(0.9 * W, y, 0.065 * W, 2); }
   ctx.fillStyle = 'rgba(20,20,20,0.55)'; ctx.fillRect(0.43 * W, 0, 0.14 * W, 3);
+  // (faint: at 35% the cel bands cut each stain into a black blot on the crown, like a bat hanging there)
   for (let i = 0; i < 26; i++) {
     const x = (0.43 + rnd() * 0.14) * W, y = rnd() * H, len = 20 + rnd() * 90;
     const gr = ctx.createLinearGradient(x, y, x, y + len);
-    gr.addColorStop(0, 'rgba(40,38,34,0.35)'); gr.addColorStop(1, 'rgba(40,38,34,0)');
+    gr.addColorStop(0, 'rgba(40,38,34,0.14)'); gr.addColorStop(1, 'rgba(40,38,34,0)');
     ctx.fillStyle = gr; ctx.fillRect(x, y, 2 + rnd() * 5, len);
   }
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  return t;
+}
+
+/**
+ * A portal's concrete, as it comes out of the forms: 3.6 m square, plywood panels 1.8 m by 0.9 m (each poured a shade
+ * different), their joints, the form-tie holes in rows, and a few soft weather stains. Mapped in metres (see _portal).
+ */
+function formworkTexture() {
+  const S = 512, P = S / 3.6, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const ctx = cv.getContext('2d');
+  let seed = 31;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  // (kept light and close in value: the map darkens the concrete's own colour, and the ink pass draws hard edges)
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 2; c++) {
+    const x0 = (c * 1.8 + (r % 2 ? 0.9 : 0)) % 3.6, v = 226 + rnd() * 26;
+    ctx.fillStyle = `rgb(${v | 0},${v - 3 | 0},${v - 8 | 0})`;
+    for (const dx of [0, -3.6]) ctx.fillRect((x0 + dx) * P, r * 0.9 * P, 1.8 * P, 0.9 * P);      // (and its wrap)
+  }
+  for (let i = 0; i < 1400; i++) { const v = 200 + rnd() * 55; ctx.fillStyle = `rgba(${v | 0},${v | 0},${v - 6 | 0},0.18)`; ctx.fillRect(rnd() * S, rnd() * S, 2, 2); }
+  // the joints: every lift, and the panel ends staggered course to course
+  ctx.fillStyle = 'rgba(96,92,86,0.55)';
+  for (let r = 0; r <= 4; r++) ctx.fillRect(0, r * 0.9 * P - 1, S, 2);
+  for (let r = 0; r < 4; r++) for (const x of [0, 1.8, 3.6]) ctx.fillRect(((x + (r % 2 ? 0.9 : 0)) % 3.6 || x) * P - 1, r * 0.9 * P, 2, 0.9 * P);
+  // tie holes, two rows to a panel
+  ctx.fillStyle = 'rgba(70,66,60,0.7)';
+  for (let r = 0; r < 4; r++) for (let k = 0; k < 8; k++) for (const dy of [0.22, 0.68]) {
+    ctx.beginPath(); ctx.arc(((k + 0.5) * 0.45) * P, (r * 0.9 + dy) * P, 2.6, 0, Math.PI * 2); ctx.fill();
+  }
+  // weather: faint streaks running down from the lifts
+  for (let i = 0; i < 14; i++) {
+    const x = rnd() * S, y = Math.floor(rnd() * 4) * 0.9 * P, len = 30 + rnd() * 90;
+    const gr = ctx.createLinearGradient(0, y, 0, y + len);
+    gr.addColorStop(0, 'rgba(90,86,78,0.28)'); gr.addColorStop(1, 'rgba(90,86,78,0)');
+    ctx.fillStyle = gr; ctx.fillRect(x, y, 3 + rnd() * 6, len);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  return t;
+}
+
+/**
+ * The yellow warning diamonds of a Japanese mountain road, carried by their pictures alone: a bend right and left,
+ * a winding road (first left, first right), falling rocks, deer. Six faces in the top row and the bottom row of a 4 x 2 atlas,
+ * the sheet steel of a post and a sign's back in the last cell. Each face is drawn a quarter turn round, so it
+ * stands upright on a square board turned 45 degrees.
+ */
+export const WARN = { right: 0, left: 1, rocks: 2, deer: 3, windLeft: 4, windRight: 5 };
+function warnTexture() {
+  const C = 256, cv = document.createElement('canvas'); cv.width = 4 * C; cv.height = 2 * C;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#8e9296'; ctx.fillRect(3 * C, C, C, C);                     // the steel
+  const arrowHead = (x, y, a) => {                                             // a head pointing along angle a
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.beginPath(); ctx.moveTo(26, 0); ctx.lineTo(-10, -26); ctx.lineTo(-10, 26); ctx.closePath(); ctx.fill(); ctx.restore();
+  };
+  const faces = [
+    (m) => { ctx.lineWidth = 21; ctx.beginPath(); ctx.moveTo(-14 * m, 64); ctx.lineTo(-14 * m, 6); ctx.quadraticCurveTo(-14 * m, -30, 26 * m, -30); ctx.stroke(); arrowHead(34 * m, -30, m > 0 ? 0 : Math.PI); },
+    null,
+    () => {                                                                    // a cliff on the right, rocks falling off it
+      ctx.beginPath(); ctx.moveTo(66, -66); ctx.lineTo(66, 66); ctx.lineTo(16, 66); ctx.lineTo(30, 26); ctx.lineTo(20, -6); ctx.lineTo(36, -40); ctx.closePath(); ctx.fill();
+      for (const [x, y, r] of [[-6, -34, 12], [-28, 2, 10], [-4, 30, 15]]) {
+        ctx.beginPath(); for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2, q = r * (0.8 + 0.3 * ((k * 37) % 5) / 5); ctx.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q); } ctx.closePath(); ctx.fill();
+      }
+      ctx.fillRect(-66, 60, 82, 7);
+    },
+    () => {                                                                    // a deer in mid-leap
+      ctx.save(); ctx.translate(-4, 6); ctx.rotate(-0.18);
+      ctx.beginPath(); ctx.ellipse(0, 0, 36, 15, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.lineCap = 'round'; ctx.lineWidth = 10;
+      const ln = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); };
+      ln([[26, -6], [38, -30]]);                                               // the neck
+      ctx.beginPath(); ctx.ellipse(46, -36, 12, 7, 0.35, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 5; ln([[38, -40], [30, -62], [22, -70]]); ln([[32, -56], [42, -66]]); ln([[42, -42], [44, -64], [54, -72]]);
+      ctx.lineWidth = 9; ln([[24, 8], [44, 24], [64, 20]]); ln([[18, 10], [34, 32], [54, 40]]);   // forelegs, reaching
+      ln([[-26, 8], [-46, 22], [-68, 18]]); ln([[-20, 10], [-34, 34], [-56, 44]]);                 // hind legs, pushing off
+      ln([[-34, -6], [-44, -16]]);                                                                // the tail
+      ctx.restore();
+    },
+    (m) => { ctx.lineWidth = 19; ctx.beginPath(); ctx.moveTo(10 * m, 66); ctx.bezierCurveTo(-46 * m, 40, 44 * m, 4, 4 * m, -20); ctx.bezierCurveTo(-12 * m, -34, -4 * m, -40, -2 * m, -42); ctx.stroke(); arrowHead(-2 * m, -46, -Math.PI / 2); },
+    null,
+  ];
+  for (let k = 0; k < 6; k++) {
+    const x0 = (k % 4) * C, y0 = k < 4 ? 0 : C;
+    // the yellow board, its black rim inside a thin yellow margin
+    ctx.fillStyle = '#f2c21b'; ctx.fillRect(x0, y0, C, C);
+    ctx.strokeStyle = '#141414'; ctx.lineWidth = 12; ctx.strokeRect(x0 + 14, y0 + 14, C - 28, C - 28);
+    ctx.save(); ctx.translate(x0 + C / 2, y0 + C / 2); ctx.rotate(Math.PI / 4); ctx.fillStyle = ctx.strokeStyle = '#141414';
+    const f = faces[k] || faces[k - 1];
+    f(faces[k] ? 1 : -1);
+    ctx.restore();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   return t;
 }
 
@@ -260,6 +360,9 @@ export class World {
         if (!o.isMesh || !o.material || !o.material.color) return;
         const hex = o.material.color.getHex();
         if (hex === PAL.tailRed || hex === PAL.laneWhite) { o.material = o.material.clone(); o.material.emissive.set(hex); o.material.emissiveIntensity = hex === PAL.tailRed ? 0.9 : 0.35; }
+        // a chevron board is retroreflective sheeting: it keeps a little of its yellow when the sun is behind it (lit
+        // only by the sky it went dark brown under the cel bands, the one sign on the bend nobody could read)
+        if (name === 'chevron' && hex === PAL.mapleGold) { o.material = o.material.clone(); o.material.emissive.set(hex); o.material.emissiveIntensity = 0.28; }
       });
     }
     // the shop and the machines are the brightest things on a night pass: their panels glow for the bloom
@@ -268,6 +371,13 @@ export class World {
       tpl.traverse((o) => { if (o.isMesh && o.material && o.material.emissive && o.material.emissiveIntensity > 0.5) { o.material = o.material.clone(); o.material.emissiveIntensity = 2.6; } });
     }
     for (const k of names) this.parts[k] = partsOf(this.templates[k]);
+    // the paper lanterns, the pagoda's and the stone lanterns' fire boxes come on toward dusk (setNight): lit at noon
+    // they read as orange plastic, and by day a paper lantern is red paper
+    this._lit = [];
+    for (const name of ['chochin', 'pagoda', 'lantern']) for (const p of this.parts[name] || []) {
+      const m = p.material;
+      if (m.emissive && /lantern|firebox/.test(m.name) && !this._lit.some((l) => l.mat === m)) this._lit.push({ mat: m, base: m.emissiveIntensity });
+    }
     this.foot = {};
     for (const k of names) { const b = new THREE.Box3().setFromObject(this.templates[k]); this.foot[k] = [(b.max.x - b.min.x) / 2, (b.max.z - b.min.z) / 2, b.max.y - b.min.y]; }
     // the far forest's cherry: the same blossom and bark materials on a hundred-odd triangles (five flattened
@@ -282,6 +392,28 @@ export class World {
       this.parts.sakuraFar = [];
       if (fol) this.parts.sakuraFar.push({ geometry: mergeGeos(clouds.map((g) => g.index ? g.toNonIndexed() : g)), material: fol.material, local: new THREE.Matrix4() });
       if (bark) this.parts.sakuraFar.push({ geometry: mergeGeos([trunk]), material: bark.material, local: new THREE.Matrix4() });
+    }
+    // the forest's second ring (200 to 360 m): a cedar of its four tiers as plain seven-sided cones over a stub of
+    // trunk, sixty triangles for the full tree's three hundred (a quarter of the frame's triangles were cedars
+    // too far off for their drooping, scalloped rims to show)
+    if (this.parts.cedar && this.parts.cedar.length === 2) {
+      const [fol] = this.parts.cedar;
+      const tiers = [];
+      [[4.5, 3.5, 7.5, 0.4], [3.6, 6.5, 10.1, 0.35], [2.8, 9.5, 12.1, 0.3], [1.4, 11.5, 14.0, 0.22]].forEach(([w, y0, y1, d], k) => {
+        const g = new THREE.ConeGeometry(w * 0.48, y1 - y0 + d * 0.5, 7, 1, false, k * 0.3);
+        g.translate(0, (y0 - d * 0.5 + y1) / 2, 0);
+        tiers.push(g.toNonIndexed());
+      });
+      // (its stub of trunk in the foliage's own dark green, one draw a tile instead of two: at that range the trunk
+      // is a pixel wide under the lowest tier, only there so the tree does not float)
+      const stub = new THREE.CylinderGeometry(0.2, 0.26, 4.2, 5, 1, true); stub.translate(0, 2.1, 0);
+      this.parts.cedarMid = [{ geometry: mergeGeos([...tiers, stub.toNonIndexed()]), material: fol.material, local: fol.local.clone() }];
+    }
+    // the chevron that points the other way: its own geometry, mirrored and its faces wound again (placed as an
+    // instance scaled by -1, every face was inside out: the board showed the back of its slab, lit from behind)
+    if (this.parts.chevron) {
+      this.parts.chevronM = this.parts.chevron.map((p) => ({ geometry: mirrorX(p.geometry, p.local), material: p.material, local: new THREE.Matrix4() }));
+      this.foot.chevronM = this.foot.chevron;
     }
     // the lamp's head: the far end of its arm, found from the template rather than assumed
     {
@@ -336,14 +468,36 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     // the wet road's highlights from the lamps (and the car's own lights) have a soft ceiling: lit, never blown out.
     // (on a glossy wet road a street lamp's specular peak ran to many times white and the bloom made it a capsule of
     // glare; a soft knee keeps its shape and its colour and caps its top)
-    this.roadSpecU = { uSpecKnee: { value: 2.6 } };
+    // uFold: where the road is wider than its texture (a hairpin's outside, a lay-by), the texture's u is folded to
+    // and fro across the gravel band (x: on, y: the band's inner edge in u) instead of clamped to its last column,
+    // which smeared a column of grit and fallen petals into long streaks down the widened part; the city keeps the
+    // clamp (x 0)
+    this.roadSpecU = { uSpecKnee: { value: 7 }, uFold: { value: new THREE.Vector2(0, 0.9) } };
     this.roadMat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.roadSpecU);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform float uSpecKnee;')
-        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee);');
+        .replace('#include <common>', `#include <common>
+uniform float uSpecKnee;
+uniform vec2 uFold;
+vec2 roadUv(vec2 uv) {
+  if (uFold.x < 0.5) return vec2(clamp(uv.x, 0.0, 1.0), uv.y);
+  float e = max(uv.x - 1.0, -uv.x);
+  if (e <= 0.0) return uv;
+  float b = 1.0 - uFold.y - 0.008, t = b - abs(mod(e, 2.0 * b) - b);
+  return vec2(uv.x > 0.5 ? 1.0 - t : t, uv.y);
+}`)
+        .replace('#include <map_fragment>', `#ifdef USE_MAP
+  diffuseColor *= texture2D(map, roadUv(vMapUv));
+#endif`)
+        .replace('#include <roughnessmap_fragment>', `float roughnessFactor = roughness;
+#ifdef USE_ROUGHNESSMAP
+  roughnessFactor *= texture2D(roughnessMap, roadUv(vRoughnessMapUv)).g;
+#endif`)
+        // (and a lamp's highlight on the road within a few metres of the lens is let go: that close, on a wet road, it
+        // spread into a great white pill beside the car that the cel pass inked round like a solid thing)
+        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee) * smoothstep(3.0, 10.0, length(vViewPosition));');
     };
-    this.roadMat.customProgramCacheKey = () => 'road-spec-knee';
+    this.roadMat.customProgramCacheKey = () => 'road-spec-knee-fold-near';
     this.railMat = new THREE.MeshStandardMaterial({ color: PAL.galvanised, roughness: 0.42, metalness: 0.65, side: THREE.DoubleSide });
     // the lining glows faintly sodium-orange: the whole bore is lit by its lamps, not just the stretch round the car
     { const tt = tunnelTexture(); this.tunnelMat = new THREE.MeshStandardMaterial({ map: tt, emissiveMap: tt, emissive: 0xff9448, emissiveIntensity: 0.62, roughness: 0.82, metalness: 0, side: THREE.DoubleSide }); }
@@ -355,7 +509,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this.reflectorMat = new THREE.MeshStandardMaterial({ color: 0xffb030, emissive: 0xff9a20, emissiveIntensity: 1.5, roughness: 0.4 });
     this.tunnelGlowMat = new THREE.MeshBasicMaterial({ color: 0xff9a40, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, opacity: 0.55 });
-    this.portalMat = new THREE.MeshStandardMaterial({ color: 0xa29e95, roughness: 0.92, metalness: 0 });
+    // the portal's concrete shows its forms; by day it keeps a little light of its own (setNight): a face turned
+    // from the sun went flat black under the cel bands, where real concrete in the shade still reads grey
+    { const fw = formworkTexture(); this.portalMat = new THREE.MeshStandardMaterial({ color: 0xa29e95, map: fw, emissive: 0x8f8a80, emissiveMap: fw, emissiveIntensity: 0, roughness: 0.92, metalness: 0 }); }
     this.copingMat = new THREE.MeshStandardMaterial({ color: 0x4a4f5a, roughness: 0.8, metalness: 0 });
     this._plateMat(['霧峰', 'KIRIMINE']);                          // one plate made now, so its program compiles with the rest
     this.wireMat = new THREE.LineBasicMaterial({ color: 0x15161a });
@@ -383,6 +539,19 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       this.glowCoolMat = this.glowMat.clone(); this.glowCoolMat.color.set(0xd8ecff);
       this.glowLanternMat = this.glowMat.clone(); this.glowLanternMat.color.set(0xff7050);
       this.glowCityMat = this.glowMat.clone(); this.glowCityMat.color.set(0xc6d8ff);
+      // a pool's part on the asphalt (aRoad, see _glows) comes up with distance: near the car the lamps' own lights
+      // make the pools on the road, and beyond their reach (about 90 m ahead) these carry the string on
+      for (const m of [this.glowMat, this.glowCoolMat, this.glowLanternMat, this.glowCityMat]) {
+        m.onBeforeCompile = (shader) => {
+          shader.vertexShader = shader.vertexShader
+            .replace('#include <common>', '#include <common>\nattribute float aRoad;\nvarying float vRoadFade;')
+            .replace('#include <project_vertex>', '#include <project_vertex>\n  vRoadFade = mix(1.0, smoothstep(55.0, 100.0, -mvPosition.z), aRoad);');
+          shader.fragmentShader = shader.fragmentShader
+            .replace('#include <common>', '#include <common>\nvarying float vRoadFade;')
+            .replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.a *= vRoadFade;');
+        };
+        m.customProgramCacheKey = () => 'glow-road-fade';
+      }
       // road studs: retroreflectors drawn as points of light, a fixed few pixels across however far, bright where
       // the headlights point (a retroreflector sends the beam straight back, so it shines from far beyond the
       // beam's own reach) and dim elsewhere; additive and depth-tested but not depth-written, so never inked
@@ -417,6 +586,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       });
       this.studMat.name = 'studs';
     }
+    this._warnSigns();
+    this._kitMaterials();
     // the shared pools
     if (this.parts.sakuraFar) this.pools.sakuraFar = new Pool(this.parts.sakuraFar, 700, { tint: true });
     if (this.parts.chochin) {
@@ -443,9 +614,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     // the city (NEO TOKYO): its module is loaded here, and its materials made now so they compile with the rest
     try {
       this.glyphs = drawsGlyphs;
-      this.City = await import('./city.js?v=202609232326');
+      this.City = await import('./city.js?v=202609240354');
       this._cityMats = this.City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
-      const L = await import('./landmarks.js?v=202609232326').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+      const L = await import('./landmarks.js?v=202609240354').catch((e) => { console.warn('landmarks', e && e.message); return null; });
       this.citySky = this.City.citySkyBuild(this, L);
       this.citySky.visible = false;
       this.scene.add(this.citySky);
@@ -470,8 +641,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     if (this.citySky) this.citySky.visible = this.city;
     if (this.roadMat.map) { this.roadMat.map.dispose(); this.roadMat.roughnessMap.dispose(); }
     this.roadMat.map = rt.map; this.roadMat.roughnessMap = rt.roughnessMap; this.roadMat.needsUpdate = true;
+    this.roadSpecU.uFold.value.set(this.city ? 0 : 1, (track.half + track.wall) / (2 * track.wall));
     this.texLen = rt.len;
-    const tp = { cedar: this.parts.cedar, maple: this.parts.maple, broadleaf: this.parts.broadleaf, bare: this.parts.bare, sakura: this.parts.sakura || null, sakuraFar: this.parts.sakuraFar || null };
+    const tp = { cedar: this.parts.cedar, cedarMid: this.parts.cedarMid || null, maple: this.parts.maple, broadleaf: this.parts.broadleaf, bare: this.parts.bare, sakura: this.parts.sakura || null, sakuraFar: this.parts.sakuraFar || null };
     const building = this.city ? { geometry: this.pools.bldg.parts[0].im.geometry, material: this.bldgMat } : null;
     const colliders = { add: (o, list) => this.addTrees(o, list), drop: (o) => this.dropTrees(o) };
     if (!this.terrain) this.terrain = new Terrain({ scene: this.scene, ground: this.ground, mat: this.groundMat, farMat: this.farMat, parts: tp, density: this.q.trees, seed: track.seed, city: this.city, building, colliders });
@@ -709,12 +881,16 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     ch.rails = this._railPlan(ch);
     this._hardLines(ch);
     const rail = this._rails(ch); if (rail) ch.group.add(rail);
+    yield;
     const tube = this._tunnel(ch); if (tube) ch.group.add(tube);
+    yield;
+    const portals = this._portals(ch); if (portals) ch.group.add(portals);
     yield;
     this._lampsFor(ch);
     this._setPieces(ch);
     this._avenueFor(ch);
     this._signsFor(ch);
+    this._roadside(ch);
     this._studs(ch);
     if (this.city) yield* this.City.cityChunk(this, ch);
     this.root.add(ch.group);
@@ -736,7 +912,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         const u = us[j], o = k * per + j;
         const dy = Math.abs(u) < half ? 0.012 * (1 - Math.abs(u) / half) : 0;
         pos[o * 3] = p.x + lx * u; pos[o * 3 + 1] = p.y + dy - u * tb; pos[o * 3 + 2] = p.z + lz * u;
-        uv[o * 2] = (clamp(u, -TW, TW) + TW) / (2 * TW); uv[o * 2 + 1] = v;
+        // (past the wall, where a hairpin or a lay-by widens the road, u runs on beyond the texture: the shader
+        // folds it back into the gravel band rather than smearing the texture's edge column across it)
+        uv[o * 2] = (u + TW) / (2 * TW); uv[o * 2 + 1] = v;
         nor[o * 3] = lx * sb; nor[o * 3 + 1] = cb; nor[o * 3 + 2] = lz * sb;
       }
       for (let e = 0; e < 2; e++) {
@@ -802,17 +980,23 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     const prof = [[0, 0.45], [0.07, 0.49], [0.07, 0.535], [0, 0.575], [0, 0.615], [0.07, 0.655], [0.07, 0.70], [0, 0.74]];
     const cols = prof.length;
     const pos = [], idx = [];
+    // where a run really ends (not at the chunk's edge, where the next chunk carries it on) the beam curls away from the
+    // road round a quarter circle, the rounded end piece a Japanese guardrail has, instead of stopping as a bare cut
+    const CURL = [[0.4, 0.11], [0.69, 0.4], [0.8, 0.8]];
     for (const side of [1, -1]) {
       const a = ch.rails[side];
       let run = [];
       const flush = () => {
         if (run.length >= 2) {
           const base = pos.length / 3;
-          run.forEach((i, k) => {
-            const p = pts[i]; const w = (side > 0 ? p.wl : p.wr) - 0.12;
+          const ring = run.map((i) => ({ p: pts[i], f: 0 }));
+          if (run[0] > ch.i0) for (const [d, f] of CURL) ring.unshift({ p: t.sample(pts[run[0]].s - d), f });
+          if (run[run.length - 1] < ch.i1) for (const [d, f] of CURL) ring.push({ p: t.sample(pts[run[run.length - 1]].s + d), f });
+          ring.forEach(({ p, f }, k) => {
+            const w = (side > 0 ? p.wl : p.wr) - 0.12 + f;
             const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side;
             for (const [du, h] of prof) { const uu = w - du; pos.push(p.x + lx * uu, p.y + h, p.z + lz * uu); }
-            if (k < run.length - 1) for (let j = 0; j < cols - 1; j++) {
+            if (k < ring.length - 1) for (let j = 0; j < cols - 1; j++) {
               const o = base + k * cols + j, b = o + 1, c2 = o + cols, d = c2 + 1;
               if (side > 0) idx.push(o, c2, b, b, c2, d); else idx.push(o, b, c2, b, d, c2);
             }
@@ -836,26 +1020,14 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
    * A tunnel, as a Japanese mountain road has them: kerbs with amber reflectors, a raised walkway each side,
    * cream-tiled lower walls with a painted band, a concrete arch, a continuous row of sodium lamps along each
    * springline, cable trays, green exit signs, red alarm lamps, jet fans hung in pairs from the crown, and the
-   * lamps' orange light lying along the walkways. Portals of any tunnel that starts or ends in this chunk too.
+   * lamps' orange light lying along the walkways. (The portals are _portals, a step of the build of their own.)
    */
   _tunnel(ch) {
     const t = this.track, pts = t.pts;
     const inside = [];
     for (let i = ch.i0; i <= ch.i1; i++) if (pts[i].tunnel) inside.push(i);
+    if (inside.length < 2) return null;
     const grp = new THREE.Group(); grp.name = 'tunnel';
-    for (const tn of t.tunnels) {
-      if (tn.fi >= t.nFinalF) continue;
-      for (const [s, flip] of [[tn.s0 - 1.0, Math.PI], [tn.s1 + 1.0, 0]]) {
-        const i = t.index(s); if (i < ch.i0 || i >= ch.i1) continue;
-        const p = t.sample(s);
-        const portal = this._portal(tn, ch);
-        portal.position.set(p.x, p.y, p.z); portal.rotation.y = p.h + flip;
-        grp.add(portal);
-        const out = flip ? -1 : 1, fx = Math.sin(p.h) * out, fz = Math.cos(p.h) * out;
-        this.lamps.push({ x: p.x + fx * 2.5, y: p.y + 7.4, z: p.z + fz * 2.5, c: ch.c });
-      }
-    }
-    if (inside.length < 2) return grp.children.length ? grp : null;
     const W = t.tubeHalf, K = t.half + 0.55, H0 = 2.4, RV = 4.05;
 
     // the bore: strips of the section, each with its own vertices so the corners stay crisp; texU is where the
@@ -982,6 +1154,31 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   }
 
   /**
+   * The portals of any tunnel that starts or ends in this chunk, and a lamp over each mouth. (Built in a step of its
+   * own: with the bore and its fittings in the same step, a chunk with a tunnel mouth took 11 ms in one frame.)
+   */
+  _portals(ch) {
+    const t = this.track;
+    let grp = null;
+    for (const tn of t.tunnels) {
+      if (tn.fi >= t.nFinalF) continue;
+      for (const [s, flip] of [[tn.s0 - 1.0, Math.PI], [tn.s1 + 1.0, 0]]) {
+        const i = t.index(s); if (i < ch.i0 || i >= ch.i1) continue;
+        const p = t.sample(s);
+        const portal = this._portal(tn, ch);
+        portal.position.set(p.x, p.y, p.z); portal.rotation.y = p.h + flip;
+        if (!grp) { grp = new THREE.Group(); grp.name = 'portals'; }
+        grp.add(portal);
+        // the lamp over the mouth washes the face: from 2.5 m out at full power it burned the face flat white, a
+        // light a little further out and softer shows the concrete and the plate
+        const out = flip ? -1 : 1, fx = Math.sin(p.h) * out, fz = Math.cos(p.h) * out;
+        this.lamps.push({ x: p.x + fx * 6, y: p.y + 6.2, z: p.z + fz * 6, c: ch.c, power: 200 });
+      }
+    }
+    return grp;
+  }
+
+  /**
    * A portal: a concrete face round the bore with a bell-mouth hood, a tiled coping, the tunnel's name plate, and
    * wing walls stepping down into the cutting. Built at the origin facing +Z (the way out of the tunnel).
    */
@@ -1012,11 +1209,19 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     // coping
     const cop = new THREE.Mesh(own(new THREE.BoxGeometry(2 * side + 0.3, 0.42, 1.25)), this.copingMat);
     cop.position.set(0, top + 0.21, -0.45); g.add(cop);
+    // the slab over the mouth behind the face: the terrain leaves its cells over the mouth open (see terrain.js), and
+    // from any higher road the slot behind the face showed the lining's back glowing orange
+    const lid = new THREE.Mesh(own(new THREE.BoxGeometry(2 * side, 0.7, 3.6)), this.portalMat);
+    lid.position.set(0, top + 0.05, -2.8); g.add(lid);
     // the name plate over the hood
     const names = [['霧峰', 'KIRIMINE'], ['紅葉', 'MOMIJI'], ['月見', 'TSUKIMI'], ['天狗', 'TENGU'], ['星降', 'HOSHIFURI'], ['白樺', 'SHIRAKABA'], ['狐塚', 'KITSUNEZUKA'], ['雷鳥', 'RAICHO']];
     const nm = names[(t.tunnels.indexOf(tn) + (t.seed % 5)) % names.length];
-    const plate = new THREE.Mesh(own(new THREE.BoxGeometry(3.4, 0.86, 0.12)), [this.copingMat, this.copingMat, this.copingMat, this.copingMat, this._plateMat(nm), this.copingMat]);
+    // (the plate's body goes in with the coping and its enamel face is one quad: as a box with a material per side it
+    // was six draws, and six more in every shadow pass)
+    const plate = new THREE.Mesh(own(new THREE.BoxGeometry(3.4, 0.86, 0.12)), this.copingMat);
     plate.position.set(0, H0 + RV + 0.95, 0.07); g.add(plate);
+    const enamel = new THREE.Mesh(this._plateFace || (this._plateFace = new THREE.PlaneGeometry(3.36, 0.82)), this._plateMat(nm));
+    enamel.position.set(0, H0 + RV + 0.95, 0.135); enamel.name = 'plate'; enamel.receiveShadow = true;
     // a lamp over the mouth, lighting the face and the plate
     const lamp = new THREE.Mesh(own(new THREE.BoxGeometry(0.9, 0.14, 0.3)), this.tunnelLampMat); lamp.position.set(0, H0 + RV + 1.55, 0.35); g.add(lamp);
     // wing walls, flaring out toward the road and stepping down
@@ -1051,10 +1256,22 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       for (const geo of list) geo.dispose();
       if (!merged) continue;
       own(merged);
+      // the concrete is mapped in metres off whichever axis a face looks along, so the forms' panels are the same
+      // size on the face, the hood and the wing walls (the boxes' own 0..1 uvs stretched a panel across each)
+      if (mat === this.portalMat) {
+        const P = merged.attributes.position, N = merged.attributes.normal, uv = merged.attributes.uv;
+        for (let i = 0; i < P.count; i++) {
+          const x = P.getX(i), y = P.getY(i), z = P.getZ(i), nx = Math.abs(N.getX(i)), ny = Math.abs(N.getY(i)), nz = Math.abs(N.getZ(i));
+          if (ny > 0.7) uv.setXY(i, x / 3.6, z / 3.6);
+          else if (nz >= nx) uv.setXY(i, x / 3.6, y / 3.6);
+          else uv.setXY(i, z / 3.6, y / 3.6);
+        }
+      }
       const m = new THREE.Mesh(merged, mat); m.receiveShadow = true; m.castShadow = true;
       out.add(m);
     }
-    for (const o of keep) { o.matrix.copy(o.matrixWorld); o.matrix.decompose(o.position, o.quaternion, o.scale); out.add(o); }
+    for (const o of keep) { o.matrix.copy(o.matrixWorld); o.matrix.decompose(o.position, o.quaternion, o.scale); o.castShadow = false; out.add(o); }
+    out.add(enamel);
     return out;
   }
 
@@ -1112,15 +1329,22 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     this._lampGlowMesh(ch);
   }
 
-  /** Light pools that lie on the ground (a small grid draped over it), so none floats beside an embankment. */
+  /**
+   * Light pools that lie on the ground (a small grid draped over it), so none floats beside an embankment. Over the
+   * pass's road they lie on the asphalt (the ground runs 15 cm under the ribbon, and a pool draped on it was hidden
+   * under the road: the string of lamps down the road had no light under it), and there they fade out toward the
+   * lens (aRoad), where the lamps' real lights draw the pools and a second one would burn the road orange.
+   */
   _glows(list, ch, mat = this.glowMat) {
-    const g = this.ground, N = 8;
-    const pos = [], uv = [], idx = [];
+    const g = this.ground, N = 8, probe = this._glowProbe || (this._glowProbe = {});
+    const pos = [], uv = [], road = [], idx = [];
     for (const [cx, cz, size] of list) {
       const base = pos.length / 3;
       for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
         const x = cx + (i / N - 0.5) * size, z = cz + (j / N - 0.5) * size * 0.85;
-        pos.push(x, g.height(x, z) + 0.05, z); uv.push(i / N, j / N);
+        g.sample(x, z, 2.2, probe);
+        const on = probe.edge < 0 && !probe.tunnel && !this.city;
+        pos.push(x, probe.h + (on ? 0.19 : 0.05), z); uv.push(i / N, j / N); road.push(on ? 1 : 0);
       }
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const a = base + j * (N + 1) + i, b = a + 1, c = a + N + 1, d = c + 1;
@@ -1130,6 +1354,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('aRoad', new THREE.Float32BufferAttribute(road, 1));
     geo.setIndex(idx); geo.computeBoundingSphere();
     ch.own.add(geo);
     const m = new THREE.Mesh(geo, mat);
@@ -1143,6 +1368,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     const s0 = t.pts[ch.i0].s, s1 = t.pts[ch.i1].s;
     const rng = mulberry32((this.seed * 131 + ch.c * 7919) >>> 0);
     const own = ch.c * 2;
+    const kit = this._kit();
     for (const m of t.markers) {
       if (m.fi >= t.nFinalF || m.s < s0 || m.s >= s1 || m.kind === 'tunnel') continue;
       const side = m.side;
@@ -1159,10 +1385,33 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         // a row of jizo in their red bibs by the path, facing the road
         for (const ds of [6.2, 7.3, 8.4]) { const a = at(m.s + ds, u0 + 0.9); this._put('jizo', own, a.x, a.y, a.z, face(a.p) + (rng() - 0.5) * 0.15, 0.95 + rng() * 0.12); }
         { const a = at(m.s + 11, u0 + 9.5); this._put('hut', own, a.x, a.y, a.z, face(a.p)); }
+        // the approach (sando): stone steps up from the verge onto the terrace, and a path of stone slabs through the
+        // gate to the hall (the pass's shrines: NEO TOKYO's are left as they were)
+        if (!this.city) {
+          const p = t.sample(m.s + 11), wv = side > 0 ? p.wl : p.wr;
+          for (let u = wv + 1.2, k = 0; u < u0 + 7.6; u += 0.68, k++) {
+            const a = at(m.s + 11, u), step = u < u0;
+            const y = step ? a.y + 0.06 : a.y + 0.04;
+            kit.box('stone', 0.56, step ? 0.5 : 0.1, step ? 1.9 : 1.5, a.x, y - (step ? 0.25 : 0.05), a.z, a.p.h);
+          }
+        }
+        // the terrace's front: a low wall of dressed stone blocks at the foot of its rise, open where the steps go up
+        // (the terrace was a grass bank rising off the verge, and nothing said where the shrine's ground began)
+        if (pad && !this.city) {
+          let k = 0;
+          for (let s = pad.s0 + 1.2; s < pad.s1 - 0.6; s += 1.15, k++) {
+            if (Math.abs(s - (m.s + 11)) < 1.5) continue;
+            const q = t.sample(s), h = 0.56 + ((k * 7) % 3) * 0.03;
+            const a = at(s, u0 - 1.12 + ((k * 5) % 3) * 0.02);
+            kit.box('stone', 0.5, h + 0.3, 1.1, a.x, q.y - 0.3 + (h + 0.3) / 2, a.z, q.h + (((k * 3) % 5) - 2) * 0.012);
+            this._reg(own, { name: 'wall', kind: 'solid', x: a.x, y: q.y, z: a.z, r: 0.45, alive: true });
+          }
+        }
         // a weeping cherry behind the gate, a Somei-Yoshino before it; further along, the shrine's five-storey pagoda
         { const a = at(m.s + 23, u0 + 8.6); this._put('pagoda', own, a.x, a.y - 0.35, a.z, face(a.p)); }
         for (let k = 0; k < 2; k++) {
-          const a = at(m.s - 2 + k * 12, u0 + 5 + rng() * 3);
+          // (the weeping one a little off the gate's axis, so the path runs clear through to the hall)
+          const a = at(m.s - 2 + k * (this.city ? 12 : 8.5), u0 + 5 + rng() * 3);
           if (k === 1) this._cherry('weeping', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.95 + rng() * 0.2, PAL.sakuraDeep);
           else this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.85 + rng() * 0.3, cherryColour(rng()));
         }
@@ -1175,24 +1424,73 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       const mid = m.s + m.len * 0.45;
       if (m.kind === 'conbini') {
         { const a = at(mid, edge + m.depth * 0.55); this._put('conbini', own, a.x, a.y, a.z, face(a.p)); }
-        // the shop's light spills over the lot: a cool pool on the ground, and a place for a lamp light
+        // the shop's light spills over the lot: a cool pool on the ground, and a place for a lamp light (up where a lot's
+        // floodlight hangs: from 3.2 m at full power it burned the lot white under it)
         { const a = at(mid, edge - 1.5); const gm = this._glows([[a.x, a.z, 16]], ch, this.glowCoolMat); if (gm) ch.group.add(gm);
-          this.lamps.push({ x: a.x, y: a.y + 3.2, z: a.z, c: ch.c, color: 0xdcecff, power: 260 }); }
+          this.lamps.push({ x: a.x, y: a.y + (this.city ? 3.2 : 5.6), z: a.z, c: ch.c, color: 0xdcecff, power: this.city ? 260 : 210 }); }
         for (const [ds, du] of [[mid - 9, 0.9], [mid - 7.8, 0.9]]) { const a = at(ds, edge + du); this._put('vending', own, a.x, a.y, a.z, face(a.p)); }
         for (const ds of [m.s - 4, m.s + m.len - 6]) { const a = at(ds, edge + 0.4); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI, this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI)); }
         { const a = at(m.s + m.len - 2, edge + m.depth - 1); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.9, cherryColour(rng())); }
+        if (!this.city) {
+          // the car park: the lay-by paved, bays painted in front of the shop (its gravel, flooded by the shop's white
+          // light, read as a sheet of snow at night). The bays are in the apron's own texture, 2.5 m to a repeat: as strips
+          // of geometry they broke into dashes at any glancing angle, where a texture keeps its lines. Three strips, so the
+          // bays stop clean at each end: before the shop, plain asphalt (u held in the texture's plain margin), the bays,
+          // and plain again, the apron's outer edge following the lay-by's as it widens and narrows.
+          {
+            const A = [], UV = [], I = [], u0 = t.wall + 0.4, b0 = mid - 10, b1 = mid + 10, uB = m.wlay - 0.15;
+            const strip = (sa, sb, bays) => {
+              const n = Math.max(1, Math.round((sb - sa) / 2));
+              let base = -1;
+              for (let k = 0; k <= n; k++) {
+                const s = sa + (sb - sa) * (k / n), p = t.sample(s);
+                const u1 = bays ? uB : Math.max(u0 + 0.05, (side > 0 ? p.wl : p.wr) - 0.15);
+                // (a few centimetres up: the ribbon's two-metre triangles bow up to that far out on a curve, and the lot,
+                // which writes no depth, went under them)
+                const b = A.length / 3;
+                for (const u of [u0, u1]) {
+                  const [x, z] = this._at(p, u * side); A.push(x, p.y + 0.04, z);
+                  UV.push(bays ? (u - u0) / (uB - u0) : 0.1, (s - b0) / 2.5);
+                }
+                if (base >= 0) { if (side > 0) I.push(base, b, base + 1, base + 1, b, b + 1); else I.push(base, base + 1, b, base + 1, b + 1, b); }
+                base = b;
+              }
+            };
+            strip(m.s - 14, b0, false); strip(b0, b1, true); strip(b1, m.s + m.len + 4, false);
+            const apron = new THREE.BufferGeometry();
+            apron.setAttribute('position', new THREE.Float32BufferAttribute(A, 3)); apron.setIndex(I); apron.computeVertexNormals();
+            apron.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2));
+            kit.lot.push(apron);
+          }
+          // the shop's pole sign at the start of the lot, lit, turned to the car coming up the road
+          {
+            const a = at(m.s - 7, edge + 1.6), H = 6.4;
+            kit.cyl('galv', 0.12, 0.14, H, 8, a.x, a.y + H / 2, a.z);
+            kit.box('pylon', 1.7, 1.4, 0.34, a.x, a.y + H + 0.55, a.z, a.p.h);
+            kit.box('metal', 1.8, 0.12, 0.4, a.x, a.y + H + 1.31, a.z, a.p.h);
+            this._reg(own, { name: 'pylon', kind: 'solid', x: a.x, y: a.y, z: a.z, r: 0.2, alive: true });
+          }
+        }
       } else if (m.kind === 'busstop') {
         { const a = at(mid, edge + 1.6); this._put('busstop', own, a.x, a.y, a.z, face(a.p)); }
         { const a = at(mid - 3.4, edge + 0.8); this._put('jizo', own, a.x, a.y, a.z, face(a.p), 1.0); }
         { const a = at(mid + 8, edge + 0.6); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI, this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI)); }
         { const a = at(mid - 7, edge + 3); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 1.0, cherryColour(rng())); }
         for (let k = 0; k < 3; k++) { const a = at(mid + 12 + k * 4, edge + 2 + rng() * 2); this._put('bamboo', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.8 + rng() * 0.3); }
+        if (!this.city) { const a = at(mid + 3.4, edge + 0.7); this._postbox(kit, own, a.x, a.y, a.z, face(a.p)); }
       } else if (m.kind === 'hut' || m.kind === 'vista') {
         if (m.kind === 'hut') {
           { const a = at(mid, edge + m.depth * 0.5); this._put('hut', own, a.x, a.y, a.z, face(a.p)); }
           { const a = at(mid - 4.2, edge + 0.9); this._put('vending', own, a.x, a.y, a.z, face(a.p)); }
+          // a bench under the eaves, the winter's firewood stacked at the gable end, a postbox by the road
+          { const a = at(mid + 0.6, edge + m.depth * 0.5 - 2.1); this._bench(kit, own, a.x, a.y, a.z, face(a.p)); }
+          { const a = at(mid + 3.1, edge + m.depth * 0.5); this._woodpile(kit, own, a.x, a.y, a.z, a.p.h); }
+          { const a = at(mid - 2.6, edge + 0.7); this._postbox(kit, own, a.x, a.y, a.z, face(a.p)); }
         } else {
-          for (let k = 0; k < 5; k++) { const a = at(m.s + 2 + k * 7, edge + m.depth - 0.6); this._put('pole', own, a.x, a.y, a.z, face(a.p)); }
+          // the viewpoint: a timber railing along the drop, a bench and a coin telescope turned to the view
+          this._railing(kit, own, (s) => at(s, edge + m.depth - 0.35), m.s + 1, m.s + m.len - 1);
+          { const a = at(mid - 1, edge + m.depth * 0.5); this._bench(kit, own, a.x, a.y, a.z, face(a.p) + Math.PI); }
+          { const a = at(mid + 4, edge + m.depth - 1.1); this._telescope(kit, own, a.x, a.y, a.z, face(a.p) + Math.PI); }
           { const a = at(mid + 6, edge + 2); this._put('boulder', own, a.x, a.y - 0.2, a.z, rng() * 6, 1.1); }
           for (const du of [0, 0.62]) { const a = at(mid + 2 + du * 1.4, edge + 1.0); this._put('jizo', own, a.x, a.y, a.z, face(a.p), 0.9 + du * 0.2); }
           // the lone cherry at the viewpoint, leaning out over the drop
@@ -1201,6 +1499,69 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         if (m.kind === 'hut') { const a = at(mid + 7, edge + m.depth - 1.5); this._cherry('sakura', own, a.x, a.y - 0.2, a.z, rng() * 6, 0.95, cherryColour(rng())); }
         { const a = at(m.s + 2, edge + 0.6); this._lampAt(ch, a.x, a.y, a.z, face(a.p) + Math.PI, this._put('lamp', own, a.x, a.y, a.z, face(a.p) + Math.PI)); }
       }
+    }
+    this._kitMeshes(ch, kit);
+  }
+
+  /** A Japanese postbox: a round red pillar with a domed cap and a dark slot, turned ry (its slot toward +Z). */
+  _postbox(kit, own, x, y, z, ry) {
+    kit.cyl('red', 0.21, 0.21, 1.05, 10, x, y + 0.6, z);
+    const cap = new THREE.SphereGeometry(0.225, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2);
+    kit.geo('red', cap, x, y + 1.12, z);
+    kit.cyl('metal', 0.23, 0.23, 0.08, 10, x, y + 0.04, z);
+    const fx = Math.sin(ry), fz = Math.cos(ry);
+    kit.box('metal', 0.26, 0.05, 0.05, x + fx * 0.2, y + 0.98, z + fz * 0.2, ry);
+    this._reg(own, { name: 'postbox', kind: 'solid', x, y, z, r: 0.24, alive: true });
+  }
+
+  /** A timber bench, its seat facing +Z turned ry. */
+  _bench(kit, own, x, y, z, ry) {
+    const fx = Math.sin(ry), fz = Math.cos(ry), lx = Math.cos(ry), lz = -Math.sin(ry);
+    kit.box('timber', 1.7, 0.07, 0.42, x, y + 0.45, z, ry);
+    kit.box('timber', 1.7, 0.3, 0.06, x - fx * 0.2, y + 0.75, z - fz * 0.2, ry);
+    for (const d of [-0.7, 0.7]) kit.box('timber', 0.08, 0.45, 0.4, x + lx * d, y + 0.22, z + lz * d, ry);
+    for (const d of [-0.45, 0.45]) this._reg(own, { name: 'bench', kind: 'solid', x: x + lx * d, y, z: z + lz * d, r: 0.4, alive: true });
+  }
+
+  /** Split logs stacked against a gable end: three courses of round ends, along a line turned h. */
+  _woodpile(kit, own, x, y, z, h) {
+    const fx = Math.sin(h), fz = Math.cos(h);
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 5 - r; k++) {
+      const log = new THREE.CylinderGeometry(0.11, 0.11, 0.9, 6); log.rotateX(Math.PI / 2);     // (along the wall: its ends toward the road)
+      const d = (k - (4 - r) / 2) * 0.23;
+      kit.geo('timber', log, x + fx * d, y + 0.11 + r * 0.2, z + fz * d, h + Math.PI / 2);
+    }
+    this._reg(own, { name: 'woodpile', kind: 'solid', x, y, z, r: 0.6, alive: true });
+  }
+
+  /** A coin telescope on its pedestal, looking along ry. */
+  _telescope(kit, own, x, y, z, ry) {
+    const fx = Math.sin(ry), fz = Math.cos(ry), lx = Math.cos(ry), lz = -Math.sin(ry);
+    kit.cyl('metal', 0.07, 0.11, 1.05, 8, x, y + 0.52, z);
+    kit.box('red', 0.3, 0.24, 0.42, x, y + 1.2, z, ry);
+    for (const d of [-0.07, 0.07]) {
+      const e = new THREE.CylinderGeometry(0.045, 0.045, 0.14, 8); e.rotateX(Math.PI / 2);
+      kit.geo('metal', e, x - fx * 0.25 + lx * d, y + 1.24, z - fz * 0.25 + lz * d, ry);
+    }
+    const hood = new THREE.CylinderGeometry(0.11, 0.09, 0.1, 10); hood.rotateX(Math.PI / 2);
+    kit.geo('metal', hood, x + fx * 0.25, y + 1.2, z + fz * 0.25, ry);
+    this._reg(own, { name: 'telescope', kind: 'solid', x, y, z, r: 0.14, alive: true });
+  }
+
+  /** A timber post-and-rail fence along at(s) from s0 to s1: a post every two metres, two rails; solid all along. */
+  _railing(kit, own, at, s0, s1) {
+    let prev = null;
+    for (let s = s0; s <= s1 + 0.01; s += 2) {
+      const a = at(s);
+      kit.box('timber', 0.12, 1.1, 0.12, a.x, a.y + 0.5, a.z, a.p.h);
+      this._reg(own, { name: 'fence', kind: 'solid', x: a.x, y: a.y, z: a.z, r: 0.14, alive: true });
+      if (prev) {
+        const dx = a.x - prev.x, dz = a.z - prev.z, L = Math.hypot(dx, dz), ang = Math.atan2(dx, dz);
+        for (const h of [0.55, 0.98]) kit.box('timber', 0.07, 0.1, L + 0.08, (a.x + prev.x) / 2, (a.y + prev.y) / 2 + h, (a.z + prev.z) / 2, ang);
+        // (and the rail between two posts: a car fits through a two-metre gap)
+        this._reg(own, { name: 'fence', kind: 'solid', x: (a.x + prev.x) / 2, y: a.y, z: (a.z + prev.z) / 2, r: 0.14, alive: true });
+      }
+      prev = a;
     }
   }
 
@@ -1285,6 +1646,107 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
   }
 
   /**
+   * The warning diamonds (see warnTexture): one pool for every kind, the face picked per instance out of the atlas by
+   * the instance colour's red channel (the kind, as (k + 0.5) / 8), so six pictures cost one draw. The post and the
+   * back sample the steel cell. Knocked over like a chevron.
+   */
+  _warnSigns() {
+    const tex = warnTexture();
+    const board = new THREE.BoxGeometry(0.62, 0.62, 0.03);
+    const uv = board.attributes.uv;
+    for (let i = 0; i < uv.count; i++) {
+      if (i >= 16 && i < 20) uv.setXY(i, uv.getX(i) * 0.25, 0.5 + uv.getY(i) * 0.5);     // the front (+z): the first cell
+      else uv.setXY(i, 0.875, 0.25);                                                     // the edges and the back: steel
+    }
+    board.rotateZ(Math.PI / 4); board.translate(0, 2.3, 0.045);
+    const post = new THREE.CylinderGeometry(0.035, 0.035, 2.34, 6, 1, true); post.translate(0, 1.17, 0);
+    { const pu = post.attributes.uv; for (let i = 0; i < pu.count; i++) pu.setXY(i, 0.875, 0.25); }
+    // (retroreflective, as the guide signs are: the headlights make it bright, and it keeps a faint glow of its own)
+    const mat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.2, roughness: 0.45, metalness: 0 });
+    mat.name = 'warn'; mat.userData.tinted = true;
+    mat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace('#include <color_vertex>', `#include <color_vertex>
+#ifdef USE_INSTANCING_COLOR
+  {
+    // the kind of sign, from the instance colour, moves the face to its cell (the steel sits in the bottom row)
+    float k = floor(instanceColor.r * 8.0);
+    vec2 cell = vec2(mod(k, 4.0) * 0.25, k < 3.5 ? 0.0 : -0.5);
+    if (vMapUv.y > 0.4) { vMapUv += cell; vEmissiveMapUv += cell; }
+    vColor = vec3(1.0);
+  }
+#endif`);
+    };
+    mat.customProgramCacheKey = () => 'warn-atlas';
+    const parts = [{ geometry: mergeGeos([board, post]), material: mat, local: new THREE.Matrix4() }];
+    this.parts.warn = parts;
+    this.foot.warn = [0.25, 0.1, 2.75];
+    this.pools.warn = new Pool(parts, 60, { tint: true });
+  }
+
+  /** Materials for the small things a set piece is dressed with (one merged mesh a material a chunk, see _kit). */
+  _kitMaterials() {
+    // the car park's asphalt with one bay painted on it, across (u, the lot's width from the road out) and 2.5 m along
+    // (v): the line along the front of the bays and the line between two bays. It lies on the ground and writes no
+    // depth, so the ink pass draws no line round it (a step of a centimetre or two at a glancing angle is a depth edge)
+    {
+      const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
+      const ctx = cv.getContext('2d');
+      let seed = 5;
+      const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      ctx.fillStyle = '#3a3b40'; ctx.fillRect(0, 0, S, S);
+      for (let i = 0; i < 700; i++) { const v = 50 + rnd() * 18; ctx.fillStyle = `rgb(${v | 0},${v | 0},${v + 4 | 0})`; ctx.fillRect(rnd() * S, rnd() * S, 1, 1); }
+      // (the lot is 6.9 m wide: the front line 2 m out, and the bay lines from there to the lot's far edge)
+      const front = 2.0 / 6.85, lw = 0.13;
+      ctx.fillStyle = '#e8e4da';
+      ctx.fillRect(front * S, 0, (lw / 6.85) * S + 1, S);
+      ctx.fillRect(front * S, 0, S, (lw / 2.5) * S * 0.5 + 0.5); ctx.fillRect(front * S, S - (lw / 2.5) * S * 0.5 - 0.5, S, (lw / 2.5) * S * 0.5 + 0.5);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = THREE.ClampToEdgeWrapping; tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
+      this.lotMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.62, metalness: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+      this.lotMat.name = 'lot';
+    }
+    this.postboxMat = new THREE.MeshStandardMaterial({ color: 0xc8261e, roughness: 0.38, metalness: 0.1 });
+    // a shrine's dressed stone: a shade lighter than the lanterns' and, like the portals' concrete, holding a little
+    // light of its own by day (a wall face turned from the sun went black under the cel bands)
+    this.stoneMat = new THREE.MeshStandardMaterial({ color: 0xaaa295, emissive: 0x8f8a80, emissiveIntensity: 0, roughness: 0.93, metalness: 0 });
+    this.stoneMat.name = 'stone';
+    // the shop's pole sign: its colours in bands, lit from inside (no lettering: the pass's props carry none)
+    const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#f4f1ea'; ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = '#c9402b'; ctx.fillRect(0, 34, 128, 40);
+    ctx.fillStyle = '#f4f1ea'; ctx.fillRect(0, 50, 128, 6);
+    ctx.fillStyle = '#2b2d31'; ctx.fillRect(0, 0, 128, 5); ctx.fillRect(0, 123, 128, 5); ctx.fillRect(0, 0, 5, 128); ctx.fillRect(123, 0, 5, 128);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    this.pylonMat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.4, metalness: 0 });
+  }
+
+  /**
+   * A set piece's small furniture, gathered while it is dressed and merged per material into one mesh each (see
+   * _kitMeshes): benches, a railing, a pole sign, a postbox, a car park's asphalt, a shrine's stone path.
+   */
+  _kit() {
+    const kit = { timber: [], metal: [], red: [], concrete: [], pylon: [], galv: [], lot: [], stone: [] };
+    kit.box = (set, w, h, d, x, y, z, ry = 0) => { const b = new THREE.BoxGeometry(w, h, d); b.rotateY(ry); b.translate(x, y, z); kit[set].push(b); };
+    kit.cyl = (set, r0, r1, h, n, x, y, z) => { const c = new THREE.CylinderGeometry(r0, r1, h, n); c.translate(x, y, z); kit[set].push(c); };
+    kit.geo = (set, geo, x, y, z, ry = 0) => { geo.rotateY(ry); geo.translate(x, y, z); kit[set].push(geo); };
+    return kit;
+  }
+
+  _kitMeshes(ch, kit) {
+    const mats = { timber: this.postMat, metal: this.fixMetalMat, red: this.postboxMat, concrete: this.portalMat, pylon: this.pylonMat, galv: this.railMat, lot: this.lotMat,
+      stone: this.stoneMat };
+    for (const k of Object.keys(mats)) {
+      if (!kit[k].length) continue;
+      const geo = mergeGeos(kit[k]); ch.own.add(geo);
+      const m = new THREE.Mesh(geo, mats[k]); m.name = 'kit-' + k;
+      // (the timber and the pole cast; the small things' shadows were three more draws each by day for a few pixels)
+      m.castShadow = k === 'timber' || k === 'galv'; m.receiveShadow = true;
+      if (k === 'lot') m.renderOrder = 0.5;
+      ch.group.add(m);
+    }
+  }
+
+  /**
    * Blue guide signs, the national road kind: two destinations up the pass, kanji over romaji, the distance
    * beside each, an arrow. A handful of faces are drawn once; each sign picks one.
    */
@@ -1342,13 +1804,125 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       board.position.set(x, (top + bottom) / 2, z); board.rotation.y = p.h;
       const face = new THREE.Mesh(this.signFaceGeo, faces[k]);
       face.position.set(x - fx * 0.05, (top + bottom) / 2, z - fz * 0.05); face.rotation.y = p.h + Math.PI;
-      for (const m of [board, face]) { m.castShadow = true; m.receiveShadow = true; ch.group.add(m); }
+      // (the board casts the shadow; its face, a hand's breadth in front, need not be drawn into every shadow map too)
+      for (const m of [board, face]) { m.castShadow = m === board; m.receiveShadow = true; ch.group.add(m); }
     }
     if (posts.length) {
       const geos = posts.map(([x, y0, z, y1, h]) => { const b = new THREE.CylinderGeometry(0.09, 0.09, y1 - y0, 10); b.rotateY(h); b.translate(x, (y0 + y1) / 2, z); return b; });
       const geo = mergeGeos(geos); ch.own.add(geo);
       const m = new THREE.Mesh(geo, this.railMat); m.castShadow = true; m.name = 'sign posts';
       ch.group.add(m);
+    }
+  }
+
+  /**
+   * Now and then along a stretch with nothing on it, a vending machine or two on the uphill verge, as a Japanese
+   * mountain road has them out in the middle of nowhere: lit all night, a cool pool of light in front of them.
+   */
+  _roadside(ch) {
+    if (this.city || !this.pools.vending) return;
+    const t = this.track, g = this.ground, pts = t.pts, own = ch.c * 2;
+    const glows = [];
+    // (what stands here is kept clear of the verge's bushes, trees and poles when the chunk is dressed: see _dress)
+    const keep = ch.keep = [];
+    for (let i = ch.i0; i < ch.i1; i++) {
+      const p = pts[i];
+      const ph = (((p.s - 315) % 560) + 560) % 560;
+      if (ph >= t.step || p.s < 60 || Math.abs(p.k) > 1 / 90 || t.nearTunnel(p.s, 30) || this.avenueAt(p.s)) continue;
+      // the uphill side, where the verge lies level with the road before the cut rises (no rail there)
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      const side = g.height(p.x + lx * (p.wl + 6), p.z + lz * (p.wl + 6)) >= g.height(p.x - lx * (p.wr + 6), p.z - lz * (p.wr + 6)) ? 1 : -1;
+      const w = side > 0 ? p.wl : p.wr;
+      if (ch.rails[side][i - ch.i0] || w > t.wall + 0.3) continue;
+      let clear = true;
+      for (const ds of [-26, -13, 0, 13, 26]) if (t.markerAt(p.s + ds, side) || t.padAt(p.s + ds, side)) clear = false;
+      if (!clear) continue;
+      const n = (ch.c * 7 + i) % 3 ? 2 : 1, spots = [];
+      for (let k = 0; k < n; k++) {
+        const q = t.sample(p.s + (k - (n - 1) / 2) * 1.06), [x, z] = this._at(q, (w + 1.25) * side), y = g.height(x, z);
+        if (Math.abs(y - q.y) > 0.35) { spots.length = 0; break; }
+        spots.push([x, y, z, q.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2)]);
+      }
+      if (!spots.length) continue;
+      for (const [x, y, z, ry] of spots) this._put('vending', own, x, y, z, ry);
+      keep.push([p.s - 3, p.s + 3, side]);
+      const [gx, gz] = this._at(p, (w + 0.6) * side);
+      glows.push([gx, gz, 6.5]);
+    }
+    if (glows.length) { const gm = this._glows(glows, ch, this.glowCoolMat); if (gm) ch.group.add(gm); }
+    // and a wayside shrine now and then: a little vermilion torii before a row of jizo in their red bibs and a stone
+    // lantern, lit at night, on the uphill verge (all of it the pools' own models: no new draws)
+    const warm = [];
+    for (let i = ch.i0; i < ch.i1; i++) {
+      const p = pts[i];
+      const ph = (((p.s - 45) % 830) + 830) % 830;
+      if (ph >= t.step || p.s < 120 || Math.abs(p.k) > 1 / 70 || t.nearTunnel(p.s, 30) || this.avenueAt(p.s)) continue;
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      const side = g.height(p.x + lx * (p.wl + 6), p.z + lz * (p.wl + 6)) >= g.height(p.x - lx * (p.wr + 6), p.z - lz * (p.wr + 6)) ? 1 : -1;
+      const w = side > 0 ? p.wl : p.wr;
+      if (ch.rails[side][i - ch.i0] || w > t.wall + 0.3) continue;
+      let clear = true;
+      for (const ds of [-24, -12, 0, 12, 24]) if (t.markerAt(p.s + ds, side) || t.padAt(p.s + ds, side)) clear = false;
+      if (!clear) continue;
+      const face = p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      // (as far back as the verge's trees and boulders, clear of a car that runs wide, and only where the ground there is
+      // near the road's level; each seated on the lowest ground under its footprint)
+      const at = (ds, du, r) => { const q = t.sample(p.s + ds), [x, z] = this._at(q, (w + du) * side); return [x, this._low(x, z, r), z]; };
+      const spot = [[0, 2.5, 0.7], [-1.3, 3.2, 0.3], [1.3, 3.2, 0.18], [0, 3.8, 0.2]].map(([ds, du, r]) => at(ds, du, r));
+      if (spot.some(([, y]) => Math.abs(y - p.y) > 0.6)) continue;
+      { const [x, y, z] = spot[0]; this._put('torii', own, x, y - 0.04, z, face, 0.3); }
+      { const [x, y, z] = spot[1]; this._put('lantern', own, x, y - 0.05, z, face, 0.8); }
+      { const [x, y, z] = spot[2]; this._put('jizo', own, x, y - 0.04, z, face + 0.1, 1.0); }
+      { const [x, y, z] = spot[3]; this._put('jizo', own, x, y - 0.04, z, face - 0.08, 1.12); }
+      const [lx2, ly2, lz2] = spot[1];
+      this.lamps.push({ x: lx2, y: ly2 + 1.4, z: lz2, c: ch.c, color: 0xffb070, power: 45 });
+      warm.push([lx2, lz2, 4.5]);
+      keep.push([p.s - 4, p.s + 4, side]);
+    }
+    if (warm.length) { const gm = this._glows(warm, ch, this.glowLanternMat); if (gm) ch.group.add(gm); }
+  }
+
+  /**
+   * The warning diamonds, near the car only: a bend ahead of each hairpin and each tight sweeper, a winding road ahead
+   * of a tight S, falling rocks where the road runs into a cutting, deer now and then. On the left, as Japan has
+   * them, facing the driver; on the right where the left has no room.
+   */
+  _warnFor(ch, own) {
+    const t = this.track, g = this.ground, pts = t.pts;
+    const s0 = pts[ch.i0].s, s1 = pts[ch.i1].s;
+    const want = [];
+    for (const f of t.features) {
+      if (f.i1 < ch.i0 - 40 || f.i0 > ch.i1 + 40) continue;
+      const hair = f.type === 'hairpin', ess = f.type === 'ess' && f.R < 70, bend = f.type === 'sweeper' && f.R < 60;
+      if (!hair && !ess && !bend) continue;
+      const s = pts[f.i0].s - (hair ? 6 : 28);
+      if (s >= s0 && s < s1) want.push([s, ess ? (f.dir > 0 ? WARN.windLeft : WARN.windRight) : (f.dir > 0 ? WARN.left : WARN.right)]);
+    }
+    for (let i = ch.i0; i < ch.i1; i++) {
+      const p = pts[i];
+      if (((((p.s - 410) % 760) + 760) % 760) < t.step) {
+        // (only where a cutting is coming: a face rising well over the road on either side a little way ahead)
+        const q = t.sample(p.s + 24);
+        for (const side of [1, -1]) {
+          const [x, z] = this._at(q, ((side > 0 ? q.wl : q.wr) + 5) * side);
+          if (g.height(x, z) > q.y + 3) { want.push([p.s, WARN.rocks]); break; }
+        }
+      }
+      if (((((p.s - 150) % 1270) + 1270) % 1270) < t.step && !this.avenueAt(p.s)) want.push([p.s, WARN.deer]);
+    }
+    for (const [s, kind] of want) {
+      const p = t.sample(s);
+      if (s < 12 || p.tunnel || t.nearTunnel(s, 20) || Math.abs(p.k) > 1 / 45) continue;
+      // (in a cherry avenue, not on the lanterns' side: a sign among their posts was clutter)
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      const lanterns = this.avenueAt(s) ? (g.height(p.x + lx * (p.wl + 6), p.z + lz * (p.wl + 6)) >= g.height(p.x - lx * (p.wr + 6), p.z - lz * (p.wr + 6)) ? 1 : -1) : 0;
+      for (const side of [1, -1]) {
+        if (side === lanterns || t.markerAt(s, side) || t.padAt(s, side) || this._kept(ch, s, side)) continue;
+        const [x, z] = this._at(p, ((side > 0 ? p.wl : p.wr) + 0.9) * side), y = g.height(x, z);
+        if (Math.abs(y - p.y) > 1.1) continue;
+        this._put('warn', own, x, y, z, p.h + Math.PI, 1, 1, new THREE.Color((kind + 0.5) / 8, 1, 1));
+        break;
+      }
     }
   }
 
@@ -1474,8 +2048,10 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         const [x, z] = this._at(p, (w + 2.5 + (rng() - 0.5) * 0.8) * side);
         g.sample(x, z, 2.2, probe);
         if (probe.tunnel || probe.edge < 0.8) continue;
-        if (this.pools.sakura) this._putLod(ch, 'sakura', x, probe.h - 0.25, z, rng() * 6.28, 0.95 + rng() * 0.2, cherryColour(rng()));
-        else this._cherry('sakura', own, x, probe.h - 0.25, z, rng() * 6.28, 0.95 + rng() * 0.2, cherryColour(rng()));
+        // (on the lowest ground round its trunk: at the top of a bank a trunk set by its middle stood out over the slope)
+        const y = Math.min(probe.h, this._low(x, z, 0.45, Math.cos(p.h), -Math.sin(p.h))) - 0.25;
+        if (this.pools.sakura) this._putLod(ch, 'sakura', x, y, z, rng() * 6.28, 0.95 + rng() * 0.2, cherryColour(rng()));
+        else this._cherry('sakura', own, x, y, z, rng() * 6.28, 0.95 + rng() * 0.2, cherryColour(rng()));
       }
       // the lantern posts, every STEP metres on one side, just behind the wall line
       const ph = ((p.s % STEP) + STEP) % STEP;
@@ -1520,6 +2096,23 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       ch.group.add(wl);
     }
     if (glows.length) { const gm = this._glows(glows, ch, this.glowLanternMat); if (gm) ch.group.add(gm); }
+  }
+
+  /** Whether the verge at s on a side is kept clear for a roadside shrine or a vending machine (see _roadside). */
+  _kept(ch, s, side) {
+    for (const [a, b, sd] of ch.keep || []) if (sd === side && s > a && s < b) return true;
+    return false;
+  }
+
+  /**
+   * The lowest ground under a footprint of radius r round (x, z): what a rock or a bush on a slope rests on. Given the
+   * way across the road (lx, lz), only across it, which is the way a verge's bank rises (half the samples: this runs for
+   * every bush and avenue cherry a chunk places).
+   */
+  _low(x, z, r, lx = 0, lz = 0) {
+    const g = this.ground;
+    if (lx || lz) return Math.min(g.height(x, z), g.height(x + lx * r, z + lz * r), g.height(x - lx * r, z - lz * r));
+    return Math.min(g.height(x, z), g.height(x + r, z), g.height(x - r, z), g.height(x, z + r), g.height(x, z - r));
   }
 
   /**
@@ -1584,6 +2177,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     const nearGroup = new THREE.Group(); nearGroup.name = 'dress';
     const face = (p, side) => p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
     const lampNear = (s) => { const r = ((s % LAMP_EVERY) + LAMP_EVERY) % LAMP_EVERY; return r < 3.5 || r > LAMP_EVERY - 3.5; };
+    const kept = (s, side) => this._kept(ch, s, side);
     // posts along the rails, snow poles on the other sides
     for (let i = ch.i0; i < ch.i1; i++) {
       const p = pts[i], k = i - ch.i0;
@@ -1619,7 +2213,9 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         if (p.tunnel || t.nearTunnel(p.s, 6)) continue;
         const w = outside > 0 ? p.wl : p.wr;
         const [x, z] = this._at(p, (w + 0.7) * outside);
-        this._put('chevron', own, x, g.height(x, z), z, p.h + Math.PI, 1, f.dir > 0 ? -1 : 1);
+        // (knocked over, it scores and sounds as a chevron, and flies as one)
+        const rec = this._put(f.dir > 0 ? 'chevronM' : 'chevron', own, x, g.height(x, z), z, p.h + Math.PI);
+        if (rec) rec.name = 'chevron';
       }
       // before a hairpin, SLOW (jokou) painted on the lane, as the mountain roads have it
       if (f.type === 'hairpin') {
@@ -1636,20 +2232,24 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         }
       }
     }
-    // boulders at the foot of a cutting
+    // boulders at the foot of a cutting, bedded into the bank: seated on the lowest ground under them (set at the height
+    // of their middle on the face, they hung on the slope with the verge showing under them, stuck to the lattice)
     if (!this.city) for (let i = ch.i0; i < ch.i1; i += 5) {
       const p = pts[i];
       if (p.tunnel || t.nearTunnel(p.s, 12)) continue;
       for (const side of [1, -1]) {
-        if (rng() > 0.3 || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
+        if (rng() > 0.3 || t.markerAt(p.s, side) || t.padAt(p.s, side) || kept(p.s, side)) continue;
         const w = side > 0 ? p.wl : p.wr;
         const [x5, z5] = this._at(p, (w + 5) * side);
         if (g.height(x5, z5) < p.y + 1.4) continue;             // not a cutting
-        const u = w + 2.3 + rng() * 1.2;
+        // (no further out than the foot of the face: up on it, a rock sat stuck to the lattice)
+        const u = Math.min(w + 2.3 + rng() * 1.2, w + 2.65);
         const [x, z] = this._at(p, u * side);
-        this._put('boulder', own, x, g.height(x, z) - 0.2, z, rng() * 6.28, 0.5 + rng() * 0.8);
+        const ry = rng() * 6.28, sc = 0.5 + rng() * 0.8;
+        this._put('boulder', own, x, this._low(x, z, 0.55 * sc) - 0.12 * sc, z, ry, sc);
       }
     }
+    if (!this.city && this.pools.warn) this._warnFor(ch, own);
     yield;
     // power poles on the uphill side every 44 m, and the two wires strung between them
     const wires = [];
@@ -1658,10 +2258,10 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       if (p.tunnel || t.nearTunnel(p.s, 12)) return null;
       const lx = Math.cos(p.h), lz = -Math.sin(p.h);
       const up = g.height(p.x + lx * (p.wl + 8), p.z + lz * (p.wl + 8)) >= g.height(p.x - lx * (p.wr + 8), p.z - lz * (p.wr + 8)) ? 1 : -1;
-      if (t.markerAt(p.s, up) || t.padAt(p.s, up)) return null;
+      if (t.markerAt(p.s, up) || t.padAt(p.s, up) || kept(p.s, up)) return null;
       const w = up > 0 ? p.wl : p.wr;
       const [x, z] = this._at(p, (w + 1.5) * up);
-      const y = g.height(x, z) - 0.05;
+      const y = this._low(x, z, 0.25) - 0.05;
       const fx = Math.sin(p.h), fz = Math.cos(p.h);
       return { p, x, y, z, side: up, ins: [-0.36, 0.36].map((d) => [x + fx * d, y + 8.55, z + fz * d]) };
     };
@@ -1726,7 +2326,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       for (const side of [1, -1]) {
         if (t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
         const w = side > 0 ? p.wl : p.wr;
-        if (rng() < 0.45 * dens && !lampNear(p.s)) {
+        if (rng() < 0.45 * dens && !lampNear(p.s) && !kept(p.s, side)) {
           // (a clear strip beyond the edge: the car can leave the road now, and a trunk at the kerb is a wall)
           const u = w + 3.2 + rng() * 3.4;
           const [x, z] = this._at(p, u * side);
@@ -1750,7 +2350,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       const p = pts[i];
       if (p.tunnel || t.nearTunnel(p.s, 6)) continue;
       for (const side of [1, -1]) {
-        if (rng() < 0.52 / dens || t.markerAt(p.s, side) || t.padAt(p.s, side)) continue;
+        if (rng() < 0.52 / dens || t.markerAt(p.s, side) || t.padAt(p.s, side) || kept(p.s, side)) continue;
         const w = side > 0 ? p.wl : p.wr;
         const u = w + 0.7 + rng() * 2.4;
         const [x, z] = this._at(p, u * side + (rng() - 0.5));
@@ -1758,7 +2358,11 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
         if (probe.edge < 0.5 || probe.tunnel) continue;
         const pick = rng();
         const colour = pick < 0.3 ? PAL.youngLeaf : pick < 0.52 ? PAL.moss : pick < 0.68 ? PAL.leafDeep : pick < 0.82 ? PAL.azalea : pick < 0.93 ? PAL.azaleaPink : PAL.sakuraWhite;
-        this._put('shrub', own, x, probe.h - 0.12, z, rng() * 6.28, 0.7 + rng() * 0.7, 1, colour);
+        const ry = rng(), sc = 0.7 + rng() * 0.7;
+        // (on the lowest ground under it where the verge meets a bank: set by its middle, a bush at the top of one hung
+        // out over the slope; on the level verge its middle is enough)
+        const y = probe.edge > 1.6 ? Math.min(probe.h, this._low(x, z, 0.5 * sc, Math.cos(p.h), -Math.sin(p.h))) : probe.h;
+        this._put('shrub', own, x, y - 0.1, z, ry * 6.28, sc, 1, colour);
       }
     }
     ch.nearGroup = nearGroup;
@@ -1862,19 +2466,25 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     for (const name of Object.keys(this.parts)) {
       for (const p of this.parts[name]) {
         const im = new THREE.InstancedMesh(p.geometry, p.material, 1);
-        im.setMatrixAt(0, m4); if (p.material.name === 'foliage_tinted') im.setColorAt(0, new THREE.Color(0xffffff));
+        // (a tinted part draws with an instance colour in its pool: compile it with one, or its first draw compiles)
+        im.setMatrixAt(0, m4); if (p.material.name === 'foliage_tinted' || p.material.userData.tinted) im.setColorAt(0, new THREE.Color(0xffffff));
         im.castShadow = true; stage.add(im);
       }
     }
     const box = new THREE.BoxGeometry(1, 1, 1);
     for (const m of [this.tunnelMat, this.tunnelLampMat, this.glowMat, this.glowCoolMat, this.glowLanternMat, this.glowCityMat, this.postMat, this.toriiRedMat, this.toriiBlackMat, this._plaqueMat, this.signBackMat, ...this._signMats, this._roadTextMat('徐行'), this._roadTextMat('止まれ'), ...(this._cityMats || []), this.bulbMat, this.groundMat, this.farMat, this.roadMat, this.railMat,
-      this.fixMetalMat, this.signGreenMat, this.signRedMat, this.reflectorMat, this.portalMat, this.copingMat, [...this._plates.values()][0]]) {
+      this.fixMetalMat, this.signGreenMat, this.signRedMat, this.reflectorMat, this.portalMat, this.copingMat, [...this._plates.values()][0],
+      this.postboxMat, this.pylonMat, this.lotMat, this.stoneMat]) {
       const x = new THREE.Mesh(box, m); x.position.y = -500; x.castShadow = true; stage.add(x);
     }
     { const l = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -500, 0), new THREE.Vector3(1, -500, 0)]), this.wireMat); stage.add(l); }
     this.scene.add(stage);
     const hidden = [];
     for (const p of Object.values(this.pools)) for (const part of p.parts) if (!part.im.visible) { part.im.visible = true; hidden.push(part.im); }
+    // (the pools of light and the valley towns are not drawn by day: compile them all the same)
+    const glowVis = [this.glowMat, this.glowCoolMat, this.glowLanternMat, this.glowCityMat].map((m) => { const v = m.visible; m.visible = true; return [m, v]; });
+    const townVis = this.town ? this.town.visible : false;
+    if (this.town) this.town.visible = true;
     if (refresh) refresh(this.scene);
     // compiled for the target the frame is really drawn into (the post chain's linear buffer, not the canvas),
     // and in parallel where the browser can
@@ -1895,6 +2505,8 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
       stage.position.set(0, 0, 0);
     }
     for (const im of hidden) im.visible = false;
+    for (const [m, v] of glowVis) m.visible = v;
+    if (this.town) this.town.visible = townVis;
     this.scene.remove(stage);
   }
 
@@ -1906,6 +2518,7 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     // (not quite a mirror: at 0.2 each street lamp burned a white blob into the wet asphalt; at 0.4 it is a soft
     // glow drawn out toward the lens)
     if (this.roadMat) this.roadMat.roughness = 1 - 0.6 * w;
+    if (this.lotMat) this.lotMat.roughness = 0.62 - 0.28 * w;
     if (this.groundMat) this.groundMat.roughness = 1 - 0.4 * w;
     this.setNight(this._n ?? 1);
   }
@@ -1915,24 +2528,48 @@ if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice,
     if (this.city && this.City) this.City.cityWet(this, this._wet || 0, n);
     const w = this._wet || 0, pool = 1 + 0.12 * w;
     if (this.glowMat) this.glowMat.opacity = 0.75 * n * pool;
-    if (this.glowCoolMat) this.glowCoolMat.opacity = Math.min(0.78, 0.62 * n * pool);
+    // (the pass's shop and its roadside machines a little softer than they were: the lot read as a sheet of snow)
+    if (this.glowCoolMat) this.glowCoolMat.opacity = this.city ? Math.min(0.78, 0.62 * n * pool) : Math.min(0.6, 0.5 * n * pool);
     if (this.glowLanternMat) this.glowLanternMat.opacity = 0.6 * n * pool;
     if (this.glowCityMat) this.glowCityMat.opacity = 0.26 * n;
     if (this.town) this.town.material.opacity = 0.9 * n;
+    // (by day the pools and the towns are drawn at nothing: seventy-odd draws of nothing, so not drawn at all)
+    for (const m of [this.glowMat, this.glowCoolMat, this.glowLanternMat, this.glowCityMat]) if (m) m.visible = m.opacity > 0.002;
+    if (this.town) this.town.visible = !this.city && this.town.material.opacity > 0.002;
+    if (this.portalMat) this.portalMat.emissiveIntensity = 0.16 * (1 - n);
+    if (this.stoneMat) this.stoneMat.emissiveIntensity = 0.34 * (1 - n);
+    if (this.pylonMat) this.pylonMat.emissiveIntensity = 0.3 + 1.1 * n;
+    // (the city's lantern strings stay as they were: lit whatever the hour)
+    const lit = 0.12 + 0.88 * smoothstep(0, 0.4, n);
+    for (const l of this._lit || []) l.mat.emissiveIntensity = l.base * (this.city && l.mat.name !== 'firebox' ? 1 : lit);
     if (!this._tinted) {
       this._tinted = [];
       const grab = (mat, k) => { if (mat && mat.color && !this._tinted.some((t) => t.mat === mat)) this._tinted.push({ mat, base: mat.color.clone(), k }); };
-      grab(this.groundMat, [0.42, 0.55, 0.95]); grab(this.farMat, [0.34, 0.45, 0.85]); grab(this.roadMat, [0.62, 0.70, 0.95]);
+      grab(this.groundMat, [0.42, 0.55, 0.95]); grab(this.farMat, [0.34, 0.45, 0.85]); grab(this.roadMat, [0.62, 0.70, 0.95]); grab(this.lotMat, [0.62, 0.70, 0.95]);
       for (const name of ['maple', 'shrub', 'broadleaf', 'cedar', 'bamboo']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.40, 0.52, 0.92]);
       // blossom keeps more of its pink by night: moonlight turns it pale lilac rather than blue
       for (const name of ['sakura', 'weeping']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.80, 0.62, 0.74]);
       // (the far ridges take their colour from the haze: skylineTint)
     }
     for (const t of this._tinted) {
-      const wk = t.mat === this.roadMat ? 1 - 0.38 * w : t.mat === this.groundMat ? 1 - 0.22 * w : 1;
+      const wk = t.mat === this.roadMat || t.mat === this.lotMat ? 1 - 0.38 * w : t.mat === this.groundMat ? 1 - 0.22 * w : 1;
       t.mat.color.setRGB(t.base.r * (1 + (t.k[0] - 1) * n) * wk, t.base.g * (1 + (t.k[1] - 1) * n) * wk, t.base.b * (1 + (t.k[2] - 1) * n) * wk);
     }
   }
+}
+
+/**
+ * A part's geometry with its place in the template baked in, mirrored left for right, each triangle wound the other
+ * way round so it still faces out.
+ */
+function mirrorX(geo, local) {
+  const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(new THREE.Matrix4().makeScale(-1, 1, 1).multiply(local));
+  for (const a of Object.values(g.attributes)) {
+    const n = a.itemSize, arr = a.array;
+    for (let t = 0; t + 2 < a.count; t += 3) for (let k = 0; k < n; k++) { const i1 = (t + 1) * n + k, i2 = (t + 2) * n + k, v = arr[i1]; arr[i1] = arr[i2]; arr[i2] = v; }
+  }
+  g.computeBoundingSphere();
+  return g;
 }
 
 /** Merge BufferGeometries with the same attributes (position, normal, uv) into one. */

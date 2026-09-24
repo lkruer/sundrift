@@ -1,0 +1,15 @@
+[
+  { "click": ".map[data-m=city]" },
+  { "wait": 4000 },
+  { "click": "#startb" },
+  { "wait": 1500 },
+  { "js": "(() => { const D = window.__DEBUG__; D.G.hour = 22; D.G.hourShown = 21.9; D.rainNow(0.8); D.teleport(2200, 0); })()" },
+  { "wait": 3500 },
+  { "shot": "W0_knee_now" },
+  { "js": "(() => { const U = window.__DEBUG__.world.roadSpecU; window.__K0__ = U.uSpecKnee.value; return window.__K0__; })()" },
+  { "wait": 500 },
+  { "shot": "W1_knee6" },
+  { "js": "(() => { const U = window.__DEBUG__.world.roadSpecU; void U; })()" },
+  { "wait": 500 },
+  { "shot": "W2_knee12" }
+]

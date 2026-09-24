@@ -34,8 +34,8 @@
  * Nothing here stands on the road or in the first 1.3 m of pavement.
  */
 import * as THREE from 'three';
-import { mulberry32 } from './config.js?v=202609232326';
-import { railLoad, railChunk, railUpdate, railSkip } from './citytrain.js?v=202609232326';
+import { mulberry32 } from './config.js?v=202609240354';
+import { railLoad, railChunk, railUpdate, railSkip } from './citytrain.js?v=202609240354';
 
 const TAU = Math.PI * 2;
 const POLE_U = 1.35;             // the utility poles stand this far past the road's edge (the kerb zone, 1.3 m, stays clear)
@@ -531,7 +531,8 @@ const SCREEN_MAIN = /* glsl */`
 }`;
 
 function screenMaterial(tex) {
-  const m = new THREE.MeshBasicMaterial({ map: tex, color: 0xffffff });
+  // (a screen is a centimetre in front of its housing: biased toward the lens, so the two never flicker far off)
+  const m = new THREE.MeshBasicMaterial({ map: tex, color: 0xffffff, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
   m.name = 'city screens';
   m.userData.uTime = { value: 0 };
   m.userData.uNight = { value: 1 };
@@ -714,6 +715,17 @@ function streetPieces(w, c, CH) {
   return P;
 }
 
+/** The posts of the shopping streets' arches in chunk c and either side of it, [x, z] each (so the pavement keeps clear). */
+export function archPosts(w, c, CH) {
+  const t = w.track, out = [];
+  for (let k = c - 1; k <= c + 1; k++) {
+    const P = streetPieces(w, k, CH); if (!P || !P.arch) continue;
+    const p = t.sample(P.arch.start), lx = Math.cos(p.h), lz = -Math.sin(p.h);
+    for (const u of [p.wl + 2.62, -(p.wr + 2.62)]) out.push([p.x + lx * u, p.z + lz * u]);
+  }
+  return out;
+}
+
 /** Whether anything over the street stands between s0 and s1 (an arch, a skybridge), with margin m. */
 function overStreet(w, c, CH, a, b, m) {
   const lo = Math.min(a, b) - m, hi = Math.max(a, b) + m;
@@ -731,7 +743,7 @@ export function detailBegin(w, ch, lists) {
   const D = {
     rng: mulberry32((w.seed * 577 + ch.c * 1291 + 17) >>> 0), CH,
     lots: [], screens: new Geo({ position: 3, uv: 2, aScr: 4 }), towers: [], lights: [],
-    housings: lists.housings, glows: lists.glows, streaks: lists.streaks, arch: pieces.arch, bridge: pieces.bridge,
+    housings: lists.housings, glows: lists.glows, streaks: lists.streaks, boards: lists.boards || null, arch: pieces.arch, bridge: pieces.bridge,
   };
   D.screen = (c, n, w0, h, seed, kind) => screenQuad(D.screens, c, n, w0, h, seed, kind);
   D.lamp = (c, ax, az, w0, d0) => {
@@ -773,7 +785,8 @@ export function detailLot(w, D, lot) {
   const lampNear = (x) => { const m = (((lot.s + x) % 30) + 30) % 30; return m < 3.2 || m > 26.8; };
   const k = phone ? 0.55 : 1;
   // is this front the one a driver sees head on as the street turns? (the first lots on the outside past a corner)
-  let corner = false;
+  // (the building cut across the inside of a corner faces the crossing: it is one too)
+  let corner = !!lot.chamfer;
   for (let ds = 6; ds <= 34 && !corner; ds += 4) { const q = w.track.sample(lot.s - ds); if (Math.abs(q.k) > 1 / 45 && Math.sign(q.k) !== side) corner = true; }
   // ---- a vertical LED tower standing out from the front at the end the neon sign is not at: one to three
   // screens stacked, each its own ad, lit on both faces
@@ -804,7 +817,7 @@ export function detailLot(w, D, lot) {
     }
   }
   // ---- a big screen on the upper floors of a tall building, and on most fronts that face the street head on
-  if ((H >= 20 || (corner && H >= 11)) && W >= 7.5 && r() < (corner ? 0.8 : lot.up ? 0.3 : 0.2) * k) {
+  if ((H >= 20 || (corner && H >= 11)) && W >= (lot.chamfer ? 6 : 7.5) && r() < (corner ? 0.8 : lot.up ? 0.3 : 0.2) * k) {
     const sw = Math.min(W - 2.2, 6 + r() * 5), sh = sw * 0.5;
     let fl = (H >= 20 ? 1 + Math.floor(r() * 2) : 0) + (lot.up ? 3 : 0);
     if (3.95 + fl * 3.4 < (lot.hTop || 0) + 0.4) fl++;                    // above the shop's own sign
@@ -883,6 +896,49 @@ function beam(p0, p1, t) {
 }
 
 /**
+ * The utility pole k (one every 34 m or so along the road), or null where none stands: at the kerb, 1.35 m back, on one
+ * side of each stretch of about 200 m, only on a bend's outside, clear of corners, the expressway, lay-bys and any other
+ * road's kerb zone. A function of the track alone, so a chunk can ask where its neighbours' poles stand.
+ */
+function poleAt(w, k, probe) {
+  const t = w.track, g = w.ground;
+  let s = k * 34 + (Math.sin(k * 7.13 + w.seed) * 0.5 + 0.5) * 6;
+  // (the street lamps stand every 30 m: a pole keeps 4 m clear of their posts)
+  const m = ((s % 30) + 30) % 30;
+  if (m < 4) s += 4 - m; else if (m > 26) s -= m - 26;
+  if (s < 30) return null;
+  const p = t.sample(s);
+  const hs = Math.sin(Math.floor(s / 200) * 12.9898 + (w.seed % 1000) * 0.37) * 43758.5453, side = hs - Math.floor(hs) < 0.5 ? 1 : -1;
+  if (p.tunnel || t.nearTunnel(p.s, 16) || p.express || t.markerAt(p.s, side) || t.padAt(p.s, side)) return null;
+  // on a bend only on its outside: there the wire from pole to pole cuts across over the road, on the inside it
+  // would cut into the fronts
+  if (Math.abs(p.k) > 1 / 55 || (Math.abs(p.k) > 1 / 400 && Math.sign(p.k) === side)) return null;
+  // clear of the corners' crossings and signals, the lamps, and any other road
+  const q0 = t.sample(s - 14), q1 = t.sample(s + 14);
+  if (Math.abs(q0.k) > 1 / 45 || Math.abs(q1.k) > 1 / 45 || q0.express || q1.express) return null;
+  const wall = side > 0 ? p.wl : p.wr;
+  const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, fx = Math.sin(p.h), fz = Math.cos(p.h);
+  // back from the kerb: the first 1.3 m of pavement is the car's in a drift, and a pole is solid
+  const x = p.x + lx * (wall + POLE_U), z = p.z + lz * (wall + POLE_U);
+  g.sample(x, z, 2.2, probe);
+  // (and clear of the kerb zone of any other road too, at a corner or where two streets run close)
+  if (probe.edge < POLE_U - 0.03 || probe.tunnel) return null;
+  return { k, s, side, x, z, y: g.height(x, z) - 0.05, lx, lz, fx, fz, h: p.h, wall, p };
+}
+
+/** Where the utility poles stand between sA and sB along the road, [x, z] each (every chunk's, built yet or not). */
+export function poleSpots(w, sA, sB, CH) {
+  const probe = {}, out = [], t = w.track;
+  for (let k = Math.ceil((sA - 6) / 34); k <= Math.floor((sB - 6) / 34); k++) {
+    const P = poleAt(w, k, probe);
+    if (!P || P.s < sA || P.s >= sB) continue;
+    const c = Math.floor(t.index(P.s) / CH);
+    if (!overStreet(w, c, CH, P.s, P.s, 1.2)) out.push([P.x, P.z]);
+  }
+  return out;
+}
+
+/**
  * The rest of a chunk's detail, after its lots: the wires and their poles, the shopping street, the pavement, and the
  * screens' mesh. lists: the chunk's glows, streaks and sign housings (shared with the neon).
  */
@@ -918,36 +974,11 @@ export function* detailChunk(w, ch, D) {
     }
     for (let k = 0; k < segs; k++) { const i = base + k * 2; cables.quad(i, i + 1, i + 3, i + 2); }      // (wound to face the camera)
   };
-  // the poles: at the kerb, on one side of each stretch of about 200 m, every 30 to 38 m
+  // the poles: at the kerb, on one side of each stretch of about 200 m, every 30 to 38 m (poleAt)
   const poles = [];
-  const stretchSide = (s) => { const h = Math.sin(Math.floor(s / 200) * 12.9898 + (w.seed % 1000) * 0.37) * 43758.5453; return h - Math.floor(h) < 0.5 ? 1 : -1; };
-  const poleAt = (k) => {
-    let s = k * 34 + (Math.sin(k * 7.13 + w.seed) * 0.5 + 0.5) * 6;
-    // (the street lamps stand every 30 m: a pole keeps 4 m clear of their posts)
-    const m = ((s % 30) + 30) % 30;
-    if (m < 4) s += 4 - m; else if (m > 26) s -= m - 26;
-    if (s < 30) return null;
-    const p = t.sample(s);
-    const side = stretchSide(s);
-    if (p.tunnel || t.nearTunnel(p.s, 16) || p.express || t.markerAt(p.s, side) || t.padAt(p.s, side)) return null;
-    // on a bend only on its outside: there the wire from pole to pole cuts across over the road, on the inside it
-    // would cut into the fronts
-    if (Math.abs(p.k) > 1 / 55 || (Math.abs(p.k) > 1 / 400 && Math.sign(p.k) === side)) return null;
-    // clear of the corners' crossings and signals, the lamps, and any other road
-    const q0 = t.sample(s - 14), q1 = t.sample(s + 14);
-    if (Math.abs(q0.k) > 1 / 45 || Math.abs(q1.k) > 1 / 45 || q0.express || q1.express) return null;
-    const wall = side > 0 ? p.wl : p.wr;
-    const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, fx = Math.sin(p.h), fz = Math.cos(p.h);
-    // back from the kerb: the first 1.3 m of pavement is the car's in a drift, and a pole is solid
-    const x = p.x + lx * (wall + POLE_U), z = p.z + lz * (wall + POLE_U);
-    g.sample(x, z, 2.2, probe);
-    // (and clear of the kerb zone of any other road too, at a corner or where two streets run close)
-    if (probe.edge < POLE_U - 0.03 || probe.tunnel) return null;
-    return { k, s, side, x, z, y: g.height(x, z) - 0.05, lx, lz, fx, fz, h: p.h, wall, p };
-  };
   {
     const k0 = Math.ceil((s0 - 6) / 34), k1 = Math.floor((s1 - 6) / 34);
-    for (let k = k0; k <= k1; k++) { const P = poleAt(k); if (P && P.s >= s0 && P.s < s1 && !overStreet(w, ch.c, D.CH, P.s, P.s, 1.2)) poles.push(P); }
+    for (let k = k0; k <= k1; k++) { const P = poleAt(w, k, probe); if (P && P.s >= s0 && P.s < s1 && !overStreet(w, ch.c, D.CH, P.s, P.s, 1.2)) poles.push(P); }
     // every pole: a point on it in its own axes (across toward the road, up, along the road)
     const pt = (P, x, y, zz = 0) => [P.x - P.lx * x + P.fx * zz, P.y + y, P.z - P.lz * x + P.fz * zz];
     for (const P of poles) {
@@ -955,7 +986,7 @@ export function* detailChunk(w, ch, D) {
       const ry = P.side > 0 ? P.h + Math.PI : P.h;
       w._put('upole', own, P.x, P.y, P.z, ry); w.detail.stats.poles++;
       // to the next pole along, if it stands on the same side in a straight line
-      const N = poleAt(P.k + 1);
+      const N = poleAt(w, P.k + 1, probe);
       if (N && N.side === P.side && Math.abs(Math.atan2(Math.sin(N.h - P.h), Math.cos(N.h - P.h))) < 0.7 && Math.hypot(N.x - P.x, N.z - P.z) < 44 && !overStreet(w, ch.c, D.CH, P.s, N.s, 0.5)) {
         const span = Math.hypot(N.x - P.x, N.z - P.z); w.detail.stats.spans++;
         // high voltage on the top arm and the pole's head, low voltage under it, then the black telecom bundles
@@ -1110,7 +1141,9 @@ export function* detailChunk(w, ch, D) {
       for (let i = ch.i0; i <= Math.min(ch.i1, t.nFinal - 1); i++) {
         const p = pts[i];
         const wall = side > 0 ? p.wl : p.wr;
-        const inside = Math.abs(p.k) > 1 / 70 && Math.sign(p.k) === side;
+        // (round the inside of a corner too, where the pavers close up a little, unless the bend is so tight that the
+        // row's far edge would fold back on itself: without it the corner's inside was bare ground by day)
+        const inside = Math.abs(p.k) > 1 / 70 && Math.sign(p.k) === side && 1 / Math.abs(p.k) < wall + 4.4;
         const okRow = !(p.tunnel || t.nearTunnel(p.s, 8) || (p.express && p.elev > 0.4) || t.markerAt(p.s, side) || t.padAt(p.s, side) || inside);
         let row = null;
         if (okRow) {

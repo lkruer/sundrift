@@ -6,22 +6,22 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609232326';
-import { createRig, detectTier } from '../rig.js?v=202609232326';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609232326';
-import { Car, gearbox } from './car.js?v=202609232326';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609232326';
-import { World, drawsGlyphs } from './world.js?v=202609232326';
-import { ChaseCam } from './camera.js?v=202609232326';
-import { Input } from './input.js?v=202609232326';
-import { Scoring } from './scoring.js?v=202609232326';
-import { Hud } from './hud.js?v=202609232326';
-import { Audio } from './audio.js?v=202609232326';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609232326';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609232326';
-import { Atmosphere } from './atmos.js?v=202609232326';
-import { Debris } from './debris.js?v=202609232326';
-import { makePost } from './post.js?v=202609232326';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609240354';
+import { createRig, detectTier } from '../rig.js?v=202609240354';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609240354';
+import { Car, gearbox } from './car.js?v=202609240354';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609240354';
+import { World, drawsGlyphs } from './world.js?v=202609240354';
+import { ChaseCam } from './camera.js?v=202609240354';
+import { Input } from './input.js?v=202609240354';
+import { Scoring } from './scoring.js?v=202609240354';
+import { Hud } from './hud.js?v=202609240354';
+import { Audio } from './audio.js?v=202609240354';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609240354';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609240354';
+import { Atmosphere } from './atmos.js?v=202609240354';
+import { Debris } from './debris.js?v=202609240354';
+import { makePost } from './post.js?v=202609240354';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -710,14 +710,17 @@ function frame(now) {
     const [clx, clz] = car.left();
     _camVel.set(cfx * car.vF + clx * car.vL, 0, cfz * car.vF + clz * car.vL);
     const wetAir = W.rain * (1 - (G.tunnelK || 0));
-    rain.update(dt, wetAir, camera.position, _fwd.x / hh, _fwd.z / hh, _carAt, G.night, lampLights, 0.05 + 0.3 * (1 - G.night), _camVel);
+    // (by day a drop is a pale sliver of the grey sky; the size of a pixel at a metre, so no streak is drawn thinner)
+    rain.update(dt, wetAir, camera.position, _fwd.x / hh, _fwd.z / hh, _carAt, G.night, lampLights, 0.05 + 0.72 * (1 - G.night), _camVel,
+      2 * Math.tan(camera.fov * Math.PI / 360) / Math.max(1, renderer.domElement.height));
     // the rain landing on the road ahead, the rain further off, the headlights' beams in it, and drops on the lens
     if (track) splashes.update(dt, wetAir, splashSpot);
     _rainCol.copy(rig.fog.color).multiplyScalar(0.5 + 0.9 * (1 - G.night)).addScalar(0.05);
     if (G.map === 'city') _rainCol.add(_cityRain.setRGB(0.12, 0.05, 0.1).multiplyScalar(G.night));
-    curtain.update(dt, wetAir * 0.6, camera.position, _rainCol);
+    curtain.update(dt, wetAir * 0.6, camera.position, _rainCol, 1 - G.night);
     beams.update(G.night * (0.012 + 0.05 * wetAir) * (1 - 0.7 * (G.tunnelK || 0)) * (headlights[0] && headlights[0].intensity > 0.01 ? 1 : 0), headlights);
-    if (post.retro) { post.retro.uniforms.uLens.value = G.mode === 'playing' ? wetAir * (1 - (G.tunnelK || 0)) : wetAir * 0.5; post.retro.uniforms.uFlow.value = clamp(car.speed / 40, 0, 1); }
+    // (fewer drops on the lens by day, where each one shows plainly as a lens flaw rather than a glint)
+    if (post.retro) { post.retro.uniforms.uLens.value = (G.mode === 'playing' ? wetAir * (1 - (G.tunnelK || 0)) : wetAir * 0.5) * (0.45 + 0.55 * G.night); post.retro.uniforms.uFlow.value = clamp(car.speed / 40, 0, 1); }
     // the paint beads up and shines in the wet
     if (paintMat) { paintMat.roughness = 0.22 - 0.12 * W.wet; paintMat.clearcoatRoughness = 0.06 - 0.035 * W.wet; }
   }
@@ -966,7 +969,9 @@ function step(dt, t0) {
       const k = 0.6 + Math.random() * 0.9;
       audio.pop && audio.pop(k);
       const [ex, ez] = car.point(EXHAUST[0], EXHAUST[1]), [fx, fz] = car.forward();
-      for (let i = 0; i < 3 + Math.round(k * 3); i++) particles.flame(ex, G.carY + EXHAUST[2], ez, -fx, -fz, 0.6 + k * 0.5);
+      // (the flame is the exhaust's own cone of fire, lit for a blink; a puff of sprites read as a yellow disc on the road)
+      G.popFlame = Math.max(G.popFlame || 0, 0.45 + 0.4 * k);
+      particles.flame(ex, G.carY + EXHAUST[2], ez, -fx, -fz, 0.4 + k * 0.3);
     }
   } else G.liftT = 0;
   // the revs flare as the rear tyres let go and spin up in a slide (the tach and the engine note, not the gearbox)
@@ -1115,6 +1120,8 @@ function mistToPass() {
   // motion blur: the last frame's camera, and none across a cut (a reset, a teleport, the title's first frame)
   const cut = camera.position.distanceTo(_lastCam) > 12;
   U.uBlur.value = tier === 'phone' || cut || G.mode !== 'playing' ? 0 : 0.5;
+  // (by day the shade keeps its colour under the bands; see the cel pass)
+  U.uLift.value = 1 - (G.night ?? 1);
   U.uPrevVP.value.copy(_vp);
   _vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   _lastCam.copy(camera.position);
@@ -1157,7 +1164,7 @@ const K_ = CAR_SCALE;
 const HIT_F = [-1.16 * K_, 0, 1.16 * K_], HIT_R = 1.0 * K_;
 const _seen = new Set();
 const COLL_TREES = new Set(['sakura', 'weeping', 'maple', 'broadleaf', 'bare', 'cedar', 'bamboo']);
-const SMASH = { pole: ['BOLLARD!', 50], bollard: ['BOLLARD!', 50], shrub: ['FLATTENED!', 20], lamp: ['LIGHTS OUT!', 150],
+const SMASH = { pole: ['BOLLARD!', 50], bollard: ['BOLLARD!', 50], shrub: ['FLATTENED!', 20], lamp: ['LIGHTS OUT!', 150], warn: ['SIGN DOWN!', 90],
   chevron: ['SIGN DOWN!', 90], mirror: ['MIRROR!', 90], vending: ['JACKPOT!', 300],
   bag: ['TRASH!', 15], box: ['TRASH!', 10], crate: ['CRATE!', 25], crates: ['CRATES!', 40], cone: ['CONE!', 25], aboard: ['MENU BOARD!', 40], bike: ['BIKE!', 80] };
 
@@ -1284,7 +1291,7 @@ function smash(rec, nx, nz, px, pz) {
   // flung along the car's travel and away from where it was struck
   let dx = (sp > 0.5 ? vx / sp : -nx) * 0.85 - nx * 0.4, dz = (sp > 0.5 ? vz / sp : -nz) * 0.85 - nz * 0.4;
   const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
-  const steel = rec.name === 'lamp' || rec.name === 'chevron' || rec.name === 'mirror' || rec.name === 'vending' || rec.name === 'bike';
+  const steel = rec.name === 'lamp' || rec.name === 'chevron' || rec.name === 'warn' || rec.name === 'mirror' || rec.name === 'vending' || rec.name === 'bike';
   debris.spawn(world.parts[rec.name], world.foot[rec.name] || [0.3, 0.3, 1.5], rec, { px, pz, dx, dz, speed: Math.max(2, sp), trail: steel });
   // the car feels it by the thing's weight
   const share = rec.m / (1250 + rec.m);
@@ -1293,7 +1300,7 @@ function smash(rec, nx, nz, px, pz) {
   G.hitStop = Math.max(G.hitStop || 0, 0.035 + Math.min(0.09, rec.m / 2600));
   chase.kick(0.08 + Math.min(0.45, rec.m / 400));
   const y = G.carY;
-  if (rec.name === 'lamp' || rec.name === 'chevron' || rec.name === 'mirror' || rec.name === 'vending') particles.sparks(px, y + 0.25, pz, -nx, -nz, rec.name === 'lamp' ? 26 : 14);
+  if (rec.name === 'lamp' || rec.name === 'chevron' || rec.name === 'warn' || rec.name === 'mirror' || rec.name === 'vending') particles.sparks(px, y + 0.25, pz, -nx, -nz, rec.name === 'lamp' ? 26 : 14);
   if (rec.light) {
     // the bulb pops: a flash where it was
     for (let i = 0; i < 3; i++) particles.spawn({ x: rec.light.x, y: rec.light.y, z: rec.light.z, vx: 0, vy: 0, vz: 0, life: 0.22 + i * 0.05, s0: 3.2 - i * 0.8, s1: 0.4, r: 1, g: 0.85, b: 0.55, a0: 0.8, drag: 1 });
@@ -1492,7 +1499,8 @@ function effects(dt, y, boost01) {
     const a = lifted ? 0 : onRoad && car.hand ? clamp(car.speed / 10, 0, 0.8) : (onRoad ? car.slipFront * 0.7 : 0);
     mark(2 + i, wx, wz, a);
   });
-  flame.update(dt, boost01);
+  G.popFlame = Math.max(0, (G.popFlame || 0) - dt * 9);
+  flame.update(dt, Math.max(boost01, G.popFlame), boost01 >= G.popFlame ? 1 : 0.1);
   if (boost01 > 0.05 && Math.random() < 0.7) {
     const [ex, ez] = car.point(EXHAUST[0], EXHAUST[1]);
     particles.flame(ex, y + EXHAUST[2], ez, -fx, -fz, boost01);

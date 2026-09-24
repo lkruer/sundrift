@@ -396,6 +396,103 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 25 September: drifting that holds, rain that behaves by day
+
+- **The drift, held.** The owner: "rework some of the drifting physics if needed. SATISFYING PLEASE". Measured first
+  (work/feel_test.mjs drives the car sim through the moves a drift is made of, with a keyboard's ramped wheel): a
+  handbrake flick at 80 km/h with the throttle floored and the key held into the turn reached 49 degrees and then
+  unwound on its own to grip in a second and a half (held angle 26 +- 17 degrees), because past 35 degrees the rear's
+  grip came back (the old spin guard) and outpulled the front; with the key let go the slide died as fast; and no
+  lift-off, feint or power-over could start a slide at all (9 degrees at most): only the handbrake could.
+  Now, once the car is well sideways (over 6 to 11 degrees, going forwards at speed, not a donut or a J-turn; over
+  10 to 17 above 120 km/h), its angle is steered toward the one the hands ask for (car.js, the drift held; a spring on
+  the angle with damping on its rate, at most 6.5 rad/s^2 of yaw): the key held into the turn holds the slide (40
+  degrees with the throttle down, 16 off it; a small correction, under 30% of the key, holds nothing), the throttle
+  sets how deep, a key against the slide closes it, the handbrake throws it wide, and letting the key go (its hold
+  eases off over half a second, so a keyboard's taps keep a slide alive) brings the car straight in about a second
+  without a lurch. The old grip tricks give way to it inside a drift; the spin guard past 50
+  degrees stays. Measured: held angle 40 +- 0.4 degrees; lift-off and feint entries now work (40 and 39 degrees);
+  a switchback swings from 43 degrees one way to 42 the other in about a second; letting go of the key: straight by
+  1.2 s, accelerating away.
+- **A held slide carries its speed**: on the throttle, 65% of what the tyres dragged sideways would take off the car's
+  speed is given back, along its way only (the line is the tyres' own). Held drifts lost 2.4 to 3.6 m/s^2; now 0.6 to
+  0.9. Lift, and the scrub is all there.
+- **Power over**: cornering at the limit on the throttle with the wheel held into the bend in the low gears (under about
+  75 km/h), the rear lets go of a third of its grip. Not above: the gate's phone driver, swinging between full locks
+  four times a second at 140 km/h, had every swing step the rear out and the hold grow it into a weave that never ended,
+  so no drift banked (0 in one run); a player's quick corrections on a fast sweeper would have felt the same. With both
+  fixes a full-lock turn at 110 km/h is grip again (8 degrees), and the phone driver banks as before. A handbrake pull
+  with the wheel over kicks the tail out at once (20 degrees at 0.5 s from the pull, was 0.7).
+- Checked: steering (work/steer_test.mjs: no spins, keys and touch), donuts (power_test), J-turns, reverse, the stop
+  hunt, wall escapes; in the game, hairpins (work/hairpin_test.json: 7 of 7 exited, the old code 6, no touches, no
+  spins) and the city's square corners (work/corner_city.json: 10 of 10, 4 wall touches where the old code had 6).
+- **Rain by day.** "the rain looks a little janky, fix it. especially at day". Everything in it was added light: the
+  far curtain (900 even columns of long dashes round the camera) read as a barcode across a bright sky, the near
+  streaks as glowing white scratches (and at speed, raked fully by the car's velocity, as long bars swinging round in
+  a drift), the splashes as white hoops on the road, the drops on the lens as grey balls with a dark rim and a glint.
+  Now all of it is premultiplied: by night a drop is only the light it catches (it glitters as before), by day a pale
+  sliver of the grey sky laid over what is behind it (lighter than the trees, a touch darker than the sky). The near
+  streaks are at least a pixel wide (a thinner one shimmered) and fainter by as much, lean back with speed by less,
+  and thin away before the lens; the curtain is a column every ten centimetres, short dashes, most of them dark,
+  coming in gusts, over a faint veil; the splashes are smaller and quiet by day; fewer drops on the lens by day, and
+  a weaker rim and glint. The exhaust's pops light the exhaust's own cone of fire for a blink (a puff of sprites read
+  as a yellow disc on the road), with only a flash of its light on the road; the tyres' spray is a finer, greyer mist.
+
+- **The pass, gone over end to end** (a sub-agent; before/after pairs in work/shots/pass_qa/compare). It was at the
+  jam's limits further along than the gate drives: by day 3 km in, 1.49 M triangles (the limit is 1.5 M) and 834 draws
+  at the viewpoint (900). Now 1.31 M and 762 at the worst places measured, and lighter everywhere, desktop and phone:
+  simpler cedars in the second forest ring, no light pools or towns drawn by day, the tunnel plate one draw, no
+  shadows from sign faces, no 1 cm bolts on 1,400 guardrail posts. Fixed: the lamps' pools lay on the ground 15 cm
+  under the asphalt (only the verge half showed); a wavy roughness map drew lamp reflections as wobbling puddles and
+  black blotches by day; the road texture smeared into grit streaks where the road widens; tunnel portals burned flat
+  white, with a trench beside the mouth showing the lining glowing through, and black roof stains; every chevron
+  pointing the other way was inside out (a negative scale), now a mirrored model; boulders, bushes, cherries and
+  poles floating over banks (a raycast check at five places: 28 flagged, now 1); the forest grew into the viewpoint's
+  view; the convenience store's lot read as snow; paper lanterns glowed at noon; a 12 to 15 ms step in the chunk build
+  (the tunnel and its portals now build in separate steps, 6 ms at worst); guardrail runs ended in a bare cut. Added:
+  yellow warning diamonds (bends, winding road, falling rocks, deer; one draw, knockable, SIGN DOWN! 90), a wayside
+  shrine every 830 m or so (a small torii, a lit stone lantern and its pool of light, two jizo), pairs of lit vending
+  machines in the long empty stretches, a railing, bench and coin telescope at the viewpoint, a woodpile and postbox at
+  the hut, steps and a dressed-stone wall at the shrines, lit windows in the stone lanterns.
+- **By day the shade keeps its colour**: under the cel bands the darkest band was black, so a face in shade at noon
+  went black (a pagoda's shaded side); by day it is now the first band up (post.js uLift), at night as it was.
+- **The HUD, the rewards, the sounds of scoring** (a sub-agent): a banked drift flashes where the live count was, flies
+  up into the score and the score pulses as it lands and rolls up; callouts come one at a time (a bigger one cuts in);
+  the multiplier, the tier and the combo punch as they climb; BIG ANGLE! for a slide held past 47 degrees; NEW BEST as
+  a callout and a glow; a first-run hint on how to drift, and a line on the title; the pause screen a run card; on
+  Android a short vibration on the big moments (after a first tap); the off-road panel no longer wraps into a blob
+  over the drift count on phones and says HOLD ON TIGHT while the magnet has the car; phone portrait and landscape
+  layouts of their own (the title no longer taller than a landscape phone). Sounds: a cash-in for a bank that climbs
+  with the tier and the chain, combo steps, a multiplier tick, tier stings, a clip ting, a big-angle shing, a new-best
+  fanfare, a J-turn sting, a bell that rises with each hit in a smash chain, UI clicks.
+- **NEO TOKYO, gone over end to end** (a sub-agent; before and after in work/shots/city_qa, and in-page audits of
+  buildings against roads and each other, loose things against buildings, poles and signals, people against
+  buildings, and how full every pool gets: work/city_qa_audit.json, all clear on EASY and HARD). Fixed: the street
+  fronts z-fought at every chunk seam (the last lot of a chunk ran into the next one's first: 39 overlapping pairs in
+  1.2 km, up to 27 of them sharing a face; now none share a face); building corners came within a metre of the road
+  at dog-legs (only six points of a footprint were tested; now eleven round the box as it stands); bags, bikes, crates
+  and cones stood inside buildings on bends (the pavement's 30 m stretches ran on straight; now they follow the kerb)
+  and inside poles, signals and vending machines; people stood inside buildings where an alley was closed off; coin
+  parkings' cars had corners in the neighbour's wall; the pools of bags, bikes, cones and vending machines filled up,
+  so chunks built ahead of the car had nothing on their pavements (some things now thinned by a hash of their place,
+  every pool under 83%); by day the skyline showed its night (dark towers, lit windows); the insides of square
+  corners were bare ground (a building on the corner facing the crossing, pavers round it); dark empty lots behind
+  the convenience stores; manhole steam beside the car read as a white pillar in the rain; a chunk's last build step
+  had grown to 13.5 ms (split; the worst world update is 9.2 ms, 10.4 before). Added: blue direction boards over the
+  corners (the turn's arrow, place names in kanji and romaji, a route shield), pedestrian signals whose green man
+  blinks before it ends and runs with the crossing's chirps, stop lines and crossing-ahead diamonds, podium towers
+  (a tall one set back on a block of shops), lit signs on steel frames on the low roofs, lit tower crowns and red
+  aviation lights, building sites (a hoarding with its lamps, a frame in scaffold sheet, a floodlit luffing crane),
+  JR-style station name boards, amber and white delineators along the Shuto's barriers, the vending machines' pools of
+  light, paler tiles on some fronts so the street is not all dark grey by day. Budget, a 26-point night tour of
+  5 km: desktop draws at most 754 (747 before), triangles at most 1.09 M (1.13 M); phone 570 (567), 0.92 M (1.00 M).
+- **A lamp's highlight on the wet road beside the car** spread into a white pill the cel pass inked round like a
+  solid thing; the road's specular is now let go within a few metres of the lens, and its knee is harder (a soft glint,
+  not a disc).
+- **The camera in a slide** eases back about 35 cm and opens 3 degrees as the slide deepens, so the car's angle and
+  the bend both fit the frame; it settles back as the slide ends. Tyre smoke is shaded (lit from above, darker
+  underneath) and thins away right at the lens.
+
 ## 25 September, early: nothing stops dead, reverse that behaves, a city that lives
 
 - **The car no longer stops dead.** The owner: "sometimes some inputs make the car just stop dead. For instance,

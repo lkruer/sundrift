@@ -11,7 +11,7 @@
  * Every consequence is emitted as an event ({ type, value }) so the HUD and the audio can react without
  * this file knowing either exists.
  */
-import { SCORE, clamp } from './config.js?v=202609232326';
+import { SCORE, clamp } from './config.js?v=202609240354';
 
 export class Scoring {
   constructor() {
@@ -29,6 +29,7 @@ export class Scoring {
     this.endTimer = 0;
     this.clipCooldown = 0;
     this.tier = 0;
+    this.bigT = 0; this.bigDone = false;     // a big angle held (the HUD's callout; see update)
     this.events = [];
     this.stats = { drifts: 0, longest: 0, biggest: 0, clips: 0, crashes: 0, distance: 0 };
     this.boostGrant = 0;
@@ -75,6 +76,7 @@ export class Scoring {
         this.mult = 1 + Math.min(4, (this.chain - 1) * 0.5);
         this.chainTimer = 0;
         this.stats.drifts++;
+        this.bigT = 0; this.bigDone = false;
         this.emit('start', this.chain);
       }
       return;
@@ -107,6 +109,10 @@ export class Scoring {
       }
       const tier = this.tierOf(this.points);
       if (tier > this.tier) { this.tier = tier; this.emit('tier', tier); }
+      // (for the HUD and the sound only, the points are untouched: a slide held past the angle that scores the most,
+      // 0.825 rad where the angle factor above tops out, for most of a second is called out, once a drift)
+      this.bigT = slip >= 0.825 ? (this.bigT || 0) + dt : Math.max(0, (this.bigT || 0) - dt * 2);
+      if (this.bigT > 0.9 && !this.bigDone) { this.bigDone = true; this.emit('angle', slip); }
     } else {
       // the boost comes the moment the slide ends (the points still bank after the grace, in case it resumes)
       if (this.endTimer === 0) this.giveBoost();

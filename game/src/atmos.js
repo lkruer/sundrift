@@ -11,7 +11,7 @@
  * tiling noise texture made here once. Nothing in here writes depth, so none of it is inked by the cel pass.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from './config.js?v=202609232326';
+import { clamp, lerp, smoothstep } from './config.js?v=202609240354';
 
 /** Tiling value noise, four octaves in the four channels (4, 8, 16 and 32 cells across). */
 function noiseTexture(size = 128) {

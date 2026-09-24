@@ -96,8 +96,12 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 | reverse | hold `S` when stopped (a strong gear, to about 40 mph) | pull the finger down |
 | J-turn | reverse straight and fast, let go of `S`, then full lock (held) and `W` | pull down, then push up and slide over |
 
-Drift: tap the handbrake into a corner (or lift and turn), steer into the slide, hold it with the throttle.
-The car does part of the counter-steer for you (more on a phone), holds a slide at a comfortable angle, and
+Drift: tap the handbrake into a corner (or lift off and turn in, or flick the wheel the other way first, or just
+push a fast corner on the throttle) and keep the key held into the turn: the slide holds for as long as you hold it,
+at the angle your hands ask for. The throttle sets how deep (lift and it tightens up), the key held into the turn
+opens it, a tap the other way closes it, the handbrake throws it wide; let go of the key and the car comes straight
+and pulls away. Throw the key the other way mid-slide and the car swings through into a drift the other way. A held
+slide carries its speed. The car does part of the counter-steer for you (more on a phone), and
 A and D ask for as much lock as the corner ahead needs. Nothing steers the car when no key is held, and the help
 never overrides you: steer into the turn and the wheels go where you steer, the counter-steer stepping aside as
 the key goes down. In a tight
@@ -137,8 +141,10 @@ passing 90 degrees).
 - `game/src/world.js`: the road chunks chosen by distance from the car, the rails where the ground falls away,
   the lamps, the set pieces, the tunnels (a tiled bore with walkways, sodium lamps every 3 m, cable trays,
   reflectors, exit signs, alarm cabinets, jet fans, and a named portal at each end), the cherry avenues with
-  their lantern strings, the great torii, the guide signs and the paint on the road, and every repeated prop as
-  one shared instanced pool.
+  their lantern strings, the great torii, the guide signs and the paint on the road, the yellow warning diamonds
+  before the hairpins and cuttings, a wayside shrine (a small torii, a lit stone lantern, two jizo) every kilometre
+  or so and lit vending machines in the long stretches between the set pieces, and every repeated prop as one shared
+  instanced pool.
 - `game/src/city.js`: NEO TOKYO beside the road: street-front buildings on their lots, neon signs from one atlas
   (`neon.js`), the light they throw on the pavement and the wet road, crossings and signals at the corners, the
   far skyline with Tokyo Tower and the Skytree (`landmarks.js`); `buildings.js` draws every building's windows
@@ -150,8 +156,11 @@ passing 90 degrees).
   vents and the tall roofs, lit by the light nearest it. `citypeople.js`: people where a car cannot reach them, at
   the mouths of the alleys and in the coin parkings, umbrellas up in the rain (and in the rooms' atlas, customers
   at the counters, shoppers, players at the machines, someone working late). A few neon tubes are failing and
-  stutter, a few signs blink, the signals cycle green, amber, red, and an airship with an LED screen along its
-  flanks drifts over the skyline.
+  stutter, a few signs blink, the signals cycle green, amber, red (with the walkers' own signals, the green man
+  blinking before it ends), and an airship with an LED screen along its flanks drifts over the skyline. Blue
+  direction boards hang over the corners, stop lines and diamonds mark the crossings, towers stand back on podiums
+  of shops with their crowns lit at night, a building site has its floodlit tower crane, the stations their name
+  boards, the Shuto its amber delineators.
 - `game/src/offroad.js`: the countdown panel and the magnet (its swoop, the flight, the drop, every beat of it).
 - `game/src/atmos.js`: the air: the cloud deck (moonlit wisps on the pass, lit from beneath over the city), the
   searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of

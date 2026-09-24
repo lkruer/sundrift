@@ -612,6 +612,86 @@ export function parkingProps(T, lot, rng, out) {
   return { bays, bayD, lamp: F.P(lx + s * 1.3, back + 0.3, 4.3), sign: F.P(px, -0.35, 0), back };
 }
 
+/**
+ * A building site on a lot: a white hoarding along the front with a blue band, its gate and a row of small lamps along
+ * its top; the concrete frame of the building going up, its lower floors wrapped in the scaffold's sheet and the top
+ * floor's columns bare; and a luffing-jib tower crane at a back corner, the jib raised steeply over the lot so all of
+ * it stays over the lot (a jib swung out over the street's other buildings would run through the taller ones). lot as
+ * lotProps. Returns the red lamps as [x, y, z, size] (the crane's, and the small ones along the hoarding) and flood,
+ * the floodlight's place on the mast.
+ */
+export function siteProps(T, lot, rng, out) {
+  const M = new Mesher();
+  const W = lot.width, D = lot.depth;
+  const F = frame([lot.x, lot.y, lot.z], [lot.fx, 0, lot.fz], [-lot.lx, 0, -lot.lz]);
+  const lamps = [];
+  const white = sw(C.white), off = sw(C.offwhite), blue = sw(C.bagBlue), grey = sw(C.midgrey), conc = sw(C.concrete);
+  // ---- the hoarding: panels along the building line, a blue band at the foot and the top, seams, the gate
+  M.box('props', F.P(0, -0.06, 1.5), F.A(W / 2), F.U(1.5), F.B(0.06), white, { 4: white }, [3]);
+  M.box('props', F.P(0, 0.01, 0.2), F.A(W / 2), F.U(0.2), F.B(0.02), blue, null, [3, 5]);
+  M.box('props', F.P(0, 0.01, 2.86), F.A(W / 2), F.U(0.08), F.B(0.02), blue, null, [5]);
+  for (let x = -W / 2 + 1.8; x < W / 2 - 0.6; x += 1.8) M.box('props', F.P(x, 0.02, 1.55), F.A(0.025), F.U(1.2), F.B(0.02), sw(C.lightgrey), null, [5]);
+  const gs = rng() < 0.5 ? -1 : 1, gx = gs * (W / 2 - 2.6);
+  M.box('props', F.P(gx, 0.035, 1.35), F.A(2.05), F.U(1.3), F.B(0.03), grey, null, [5]);
+  for (let x = -W / 2 + 1.5; x < W / 2 - 0.5; x += 3) lamps.push([...F.P(x, 0.06, 3.02), 0.07]);
+  // ---- the frame going up: slabs every floor, columns round its edge, the scaffold's sheet over the lower floors
+  const N = 3 + Math.floor(rng() * 4), x0 = -W / 2 + 1.0, x1 = W / 2 - 1.0, z0 = -1.9, z1 = -D + 1.0;
+  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, hx = (x1 - x0) / 2, hz = (z0 - z1) / 2;
+  for (let k = 1; k < N; k++) M.box('props', F.P(cx, cz, k * 3.4 - 0.15), F.A(hx), F.U(0.15), F.B(hz), conc);
+  const colsX = Math.max(1, Math.round((x1 - x0) / 4.5)), colsZ = Math.max(1, Math.round((z0 - z1) / 4.5)), top = N * 3.4 - 0.3;
+  for (let i = 0; i <= colsX; i++) for (const z of [z0, z1]) M.box('props', F.P(x0 + (x1 - x0) * i / colsX, z, top / 2), F.A(0.25), F.U(top / 2), F.B(0.25), conc, null, [3]);
+  for (let j = 1; j < colsZ; j++) for (const x of [x0, x1]) M.box('props', F.P(x, z0 - (z0 - z1) * j / colsZ, top / 2), F.A(0.25), F.U(top / 2), F.B(0.25), conc, null, [3]);
+  // (the sheet on the scaffold, a metre out from the frame: over the front and both sides, up to the top floor)
+  const hs = (N - 1) * 3.4 + 1.1, zs = z0 + 0.9, sheet = sw(C.lightgrey);
+  M.box('props', F.P(cx, zs, hs / 2), F.A(hx + 0.9), F.U(hs / 2), F.B(0.03), sheet, null, [3]);
+  for (const s of [-1, 1]) M.box('props', F.P(cx + s * (hx + 0.9), (zs + z1 - 0.9) / 2, hs / 2), F.A(0.03), F.U(hs / 2), F.B((zs - z1 + 0.9) / 2), sheet, null, [3]);
+  for (let h = 1.8; h < hs; h += 1.8) M.box('props', F.P(cx, zs + 0.02, h), F.A(hx + 0.9), F.U(0.03), F.B(0.02), off, null, [5]);
+  // the scaffold's poles and guard rail showing above the sheet round the top floor
+  for (let x = x0 - 0.9; x <= x1 + 0.95; x += 1.8) M.box('metal', F.P(x, zs, hs + 0.9), F.A(0.03), F.U(0.9), F.B(0.03), sw(C.silver), null, [3]);
+  M.beam('metal', F.P(x0 - 0.9, zs, hs + 1.7), F.P(x1 + 0.9, zs, hs + 1.7), 0.05, sw(C.silver));
+  // ---- the crane: a lattice mast at a back corner, the slewing deck on top, the jib raised over the lot
+  const cs = -gs, mx = cs * (W / 2 - 2.8), mz = -D + 2.8;
+  const Hm = Math.max(top + 12, 30 + rng() * 14), mw = 0.85;
+  const craneW = sw(C.white), craneR = sw(C.red);
+  const leg = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  for (const [a, b] of leg) M.beam('metal', F.P(mx + a * mw, mz + b * mw, 0), F.P(mx + a * mw, mz + b * mw, Hm), 0.12, craneW);
+  for (let f = 0; f < 4; f++) {
+    const [a0, b0] = leg[f], [a1, b1] = leg[(f + 1) % 4];
+    for (let h = 0, k = 0; h < Hm - 0.5; h += 2.4, k++) {
+      const p = k % 2 ? [a0, b0] : [a1, b1], q = k % 2 ? [a1, b1] : [a0, b0];
+      M.beam('metal', F.P(mx + p[0] * mw, mz + p[1] * mw, h), F.P(mx + q[0] * mw, mz + q[1] * mw, Math.min(Hm, h + 2.4)), 0.06, h > Hm - 7 ? craneR : craneW);
+    }
+  }
+  // the jib points in over the lot: toward the middle of its front half, raised until its tip is over the lot
+  let dx = cx - mx, dz = -D * 0.42 - mz;
+  const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
+  const dir = nrm(add(F.A(dx), F.B(dz))), side = nrm(cross(dir, [0, 1, 0]));
+  const mt = F.P(mx, mz, Hm), at = (base, a, s, u) => add(add(add(base, mul(dir, a)), mul(side, s)), [0, u, 0]);
+  // the deck, the counterweight at its back, the cab at its front, the A-frame over it
+  M.box('props', at(mt, -0.6, 0, 0.35), mul(dir, 2.3), [0, 0.35, 0], mul(side, 1.25), craneW);
+  M.box('props', at(mt, -2.3, 0, 1.4), mul(dir, 0.65), [0, 0.7, 0], mul(side, 1.15), conc, null, [3]);
+  M.box('props', at(mt, 0.9, 1.3, 1.35), mul(dir, 0.75), [0, 0.65, 0], mul(side, 0.55), craneW, { 0: sw(C.charcoal) }, [3]);
+  const apex = at(mt, -1.0, 0, 6.2);
+  for (const s of [-1, 1]) M.beam('metal', at(mt, -1.8, s * 1.0, 0.7), apex, 0.1, craneR), M.beam('metal', at(mt, 0.2, s * 1.0, 0.7), apex, 0.1, craneR);
+  const reach = Math.min(dl * 0.95, 11), Lj = 26 + rng() * 7, th = Math.acos(Math.min(0.5, reach / Lj));
+  const pivot = at(mt, 1.3, 0, 0.9), tip = add(add(pivot, mul(dir, Lj * Math.cos(th))), [0, Lj * Math.sin(th), 0]);
+  // the jib: four chords tapering to the tip, braced along both sides
+  const jd = nrm(sub(tip, pivot)), jn = nrm(cross(side, jd));
+  const J = (u, a, b) => { const w = 0.55 * (1 - 0.55 * u); return add(add(add(pivot, mul(sub(tip, pivot), u)), mul(side, a * w)), mul(jn, b * w)); };
+  for (const [a, b] of leg) M.beam('metal', J(0, a, b), J(1, a, b), 0.09, craneW);
+  const nb = Math.round(Lj / 2);
+  for (let k = 0; k < nb; k++) for (const a of [-1, 1]) M.beam('metal', J(k / nb, a, k % 2 ? 1 : -1), J((k + 1) / nb, a, k % 2 ? -1 : 1), 0.05, k >= nb - 2 ? craneR : craneW);
+  // the luffing ropes from the A-frame to the tip, and the hook hanging from the tip
+  for (const s of [-0.25, 0.25]) M.beam('metal', add(apex, mul(side, s)), add(tip, mul(side, s)), 0.03, sw(C.charcoal));
+  const hookY = Math.max(top + 3, tip[1] - 16 - rng() * 10);
+  M.beam('metal', tip, [tip[0], hookY, tip[2]], 0.03, sw(C.charcoal));
+  M.box('props', [tip[0], hookY - 0.3, tip[2]], mul(dir, 0.25), [0, 0.3, 0], mul(side, 0.25), sw(C.yellow));
+  // its red lamps: the jib's tip, the A-frame's top, the deck's corners
+  lamps.push([...add(tip, [0, 0.35, 0]), 0.22], [...add(apex, [0, 0.3, 0]), 0.22], [...at(mt, -2.9, 1.2, 0.8), 0.16], [...at(mt, -2.9, -1.2, 0.8), 0.16]);
+  M.flush(T, out);
+  return { lamps, flood: F.P(mx, mz, Math.min(14, top + 2)), mast: F.P(mx, mz, 0) };
+}
+
 // ---------------------------------------------------------------- the pavement's clutter
 
 /** A garbage bag: a lumpy body of revolution with its knot on top. */
@@ -666,7 +746,8 @@ function cone(M, F, x, z) {
 /**
  * The clutter of a stretch of pavement. seg = { x, z, y, fx, fz, lx, lz, length }: (x, y, z) its start at the
  * kerb line, running `length` metres along (fx, fz); (lx, lz) points from the road toward the buildings, and the
- * pavement is about 2.8 m deep. If the pavement climbs, give seg.y1 (the height at its end) or seg.heightAt(x, z).
+ * pavement is about 2.8 m deep. If the pavement climbs, give seg.y1 (the height at its end) or seg.heightAt(x, z); if
+ * it bends, give seg.along(s), the kerb point and axes s metres along ({ x, z, fx, fz, lx, lz }).
  * Bollards are not built: their positions go to out.__bollards as [x, y, z]; nor are the loose things, which go to
  * out.__items as [name, x, y, z, ry, scale, stretch, colour]. seg.clear(x, z), if given, says a place is off every
  * road: at a square corner a stretch runs on straight past the turn, into the street across.
@@ -675,11 +756,14 @@ export function streetProps(T, seg, rng, out) {
   const M = new Mesher();
   const L = seg.length;
   const yAt = (s) => (seg.y1 !== undefined ? seg.y + (seg.y1 - seg.y) * (s / Math.max(1e-6, L)) : seg.y);
-  // every placement re-bases the frame at its own height, so a sloping pavement keeps things on it
+  // every placement re-bases the frame at its own height (and, given seg.along(s), on the kerb there: the stretch
+  // follows the road round a bend), so a sloping or a bending pavement keeps things on it
   const at = (s) => {
-    const o = [seg.x + seg.fx * s, 0, seg.z + seg.fz * s];
+    const e = seg.along ? seg.along(s) : null;
+    const f = e ? [e.fx, 0, e.fz] : [seg.fx, 0, seg.fz], l = e ? [e.lx, 0, e.lz] : [seg.lx, 0, seg.lz];
+    const o = e ? [e.x, 0, e.z] : [seg.x + seg.fx * s, 0, seg.z + seg.fz * s];
     o[1] = seg.heightAt ? seg.heightAt(o[0], o[2]) : yAt(s);
-    return frame([o[0] - seg.fx * s, o[1], o[2] - seg.fz * s], [seg.fx, 0, seg.fz], [seg.lx, 0, seg.lz]);
+    return frame([o[0] - f[0] * s, o[1], o[2] - f[2] * s], f, l);
   };
   const bollards = out.__bollards || (out.__bollards = []);
   const items = out.__items || (out.__items = []);
@@ -688,11 +772,10 @@ export function streetProps(T, seg, rng, out) {
   const clear = (p, r = 0) => !seg.clear || seg.clear(p[0], p[2], r);
   // an item on the pavement: turned to run along it (local x along, z across), back against the fronts, and only
   // where it keeps clear of every road and its kerb zone (1.3 m of pavement a drift can use)
-  const heading = Math.atan2(-seg.fz, seg.fx);
   const item = (name, F, s, z, turn = 0, sc = 1, sx = 1, colour = null, h = 0) => {
     const p = F.P(s, z, h);
     if (!clear(p, 0.35 + 1.15)) return;
-    items.push([name, p[0], p[1], p[2], heading + turn, sc, sx, colour]);
+    items.push([name, p[0], p[1], p[2], Math.atan2(-F.a[2], F.a[0]) + turn, sc, sx, colour]);
   };
 
   // drain grates along the kerb, manholes, puddles

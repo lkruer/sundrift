@@ -1,0 +1,23 @@
+{ "setup": { "hour": 22, "rain": 0 },
+  "shots": [
+    { "name": "01_road_lamps_night", "s": 1100, "wait": 3500 },
+    { "name": "02_pools_down_the_road_night", "s": 2630 },
+    { "name": "03_portal_night", "s": 860, "cam": [870, 0, 4, 906, 0, 5, 60] },
+    { "name": "04_portal_trench_above", "s": 860, "cam": [866, -22, 26, 910, 0, 4, 60] },
+    { "name": "05_conbini_lot_night", "s": 1470, "cam": [1452, 4, 3, 1478, -14, 2, 60] },
+    { "name": "06_tunnel_crown_night", "s": 940 },
+    { "name": "07_vista_view_night", "s": 2264, "cam": [2264, 2, 3.5, 2264, 300, -60, 60] },
+    { "name": "08_shrine_night", "s": 20, "cam": [22, -3, 1.8, 40, 12, 0.8, 55] },
+    { "name": "09_hut_night", "s": 5700, "cam": [5696, 5, 2.5, 5716, -14, 2, 60] },
+    { "name": "10_empty_stretch_night", "s": 4170 },
+    { "name": "11_road_day", "s": 520, "hour": 12.5, "wait": 3600 },
+    { "name": "12_hairpin_gravel_day", "s": 300, "cam": [320, -3, 7, 356, -6, 0, 60] },
+    { "name": "13_portal_day", "s": 860, "cam": [870, 0, 4, 906, 0, 5, 60] },
+    { "name": "14_vista_view_day", "s": 2264, "cam": [2264, 2, 3.5, 2264, 300, -60, 60] },
+    { "name": "15_boulder_day", "s": 300, "cam": [284, 6.5, 0.9, 290, 10.7, 0.3, 55] },
+    { "name": "16_shrine_day", "s": 20, "cam": [22, -3, 1.8, 40, 12, 0.8, 55] },
+    { "name": "17_chevrons_day", "s": 330, "js": "__Q__.chev('M', 4, 1.4) === 'none' ? __Q__.chev(true, 4, 1.4) : 1" },
+    { "name": "18_far_forest_day", "s": 3000 },
+    { "name": "19_road_gold", "s": 1100, "hour": 17.2, "wait": 3600 },
+    { "name": "20_conbini_dawn", "s": 1470, "hour": 5.6, "wait": 3600 }
+  ] }

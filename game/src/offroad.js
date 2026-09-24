@@ -11,7 +11,7 @@
  * GPU process); the magnet, its beam and its rings are a handful of meshes made once and parked out of sight.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from './config.js?v=202609232326';
+import { clamp, lerp, smoothstep } from './config.js?v=202609240354';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const COURSE_OUT_S = 5;
@@ -36,8 +36,10 @@ export class CourseOutUI {
     const px = Math.round(52 * Math.min(3, Math.max(1, window.devicePixelRatio || 1)));
     this.cv.width = this.cv.height = px;
     this.ctx = this.cv.getContext('2d');
-    this.sub = el.querySelector('.co-sub');
+    this.head = el.querySelector('.co-txt b'); this.line = el.querySelector('.co-txt span'); this.sub = el.querySelector('.co-sub');
     this.shown = false; this.lastN = -1; this.mode = ''; this.punch = -1e9;
+    this.dy = null;                               // how far the drift count under the score steps down while the panel is up
+    addEventListener('resize', () => { this.dy = null; });
     // every state drawn once now, so the canvas's own drawing is ready before it is needed
     this._draw(0.7, 4, '', 0.3, 0); this._draw(0.3, 2, 'hot', 0.6, 0); this._draw(1, null, 'mag', 0.5, 0); this._draw(0, null, '', 0, 0);
   }
@@ -87,22 +89,49 @@ export class CourseOutUI {
   /** t: seconds left (null to hide); magnet: the magnet has taken over. */
   update(t, magnet = false) {
     const want = t !== null || magnet;
-    if (want !== this.shown) { this.shown = want; this.el.classList.toggle('on', want); if (!want) this.lastN = -1; }
+    if (want !== this.shown) { this.shown = want; this.el.classList.toggle('on', want); if (!want) this.lastN = -1; this._makeRoom(want); }
     if (!want) return;
     const mode = magnet ? 'mag' : t < 2 ? 'hot' : '';
     if (mode !== this.mode) {
+      // (only the words change, never the panel's style; the magnet's words are what is happening, not an order)
       this.mode = mode;
-      this.sub.textContent = magnet ? 'HOLD ON TIGHT' : 'OR THE MAGNET TAKES YOU';
+      this.head.textContent = magnet ? 'マグネット' : 'コースアウト';
+      this.line.textContent = magnet ? 'HOLD ON TIGHT' : 'BACK TO THE ROAD';
+      this.sub.textContent = magnet ? 'BACK TO WHERE YOU LEFT' : mode === 'hot' ? 'THE MAGNET IS COMING' : 'OR THE MAGNET TAKES YOU';
+      if (magnet) buzz([40, 60, 30]);
     }
     const now = performance.now() / 1000;
     if (magnet) { this._draw(1, null, 'mag', 0.5 + 0.5 * Math.sin(now * 40), 0); return; }
     const n = Math.max(0, Math.ceil(t - 1e-3));
-    if (n !== this.lastN) { this.lastN = n; this.punch = now; }
+    if (n !== this.lastN) { this.lastN = n; this.punch = now; if (mode === 'hot' && n > 0) buzz(16); }
     const p = Math.max(0, 1 - (now - this.punch) / 0.32);
     // the last two seconds: the ring's glow throbs
     const glow = mode === 'hot' ? 0.3 + 0.3 * (0.5 + 0.5 * Math.sin(now * 14)) : 0.24;
     this._draw(clamp(t / COURSE_OUT_S, 0, 1), n, mode, glow, p);
   }
+
+  /**
+   * Where the panel comes down over the drift count (on a desktop it sits just under the score, and so does the count),
+   * the count steps down below it while it is up (index.html moves the drift stack by --coY, a transform). Measured at
+   * the first showing, and again after a resize; on a phone the panel sits lower and nothing has to move.
+   */
+  _makeRoom(on) {
+    const hud = this.el.parentNode;
+    if (!hud || !hud.style) return;
+    if (on && this.dy === null) {
+      const ds = document.getElementById('dstack'), top = this.el.offsetTop, bottom = top + this.el.offsetHeight;
+      this.dy = ds && top < ds.offsetTop + ds.offsetHeight ? Math.max(0, Math.round(bottom + 6 - ds.offsetTop)) : 0;
+    }
+    hud.style.setProperty('--coY', on && this.dy ? this.dy + 'px' : '0px');
+  }
+}
+
+/** A short buzz on a phone that can (Android), for the last two seconds and the magnet: in a run, after a first tap. */
+function buzz(p) {
+  if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+  if (!document.body.classList.contains('touch') || !document.body.classList.contains('playing')) return;
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+  try { navigator.vibrate(p); } catch {}
 }
 
 // the seven segments of one digit, as in the HUD's (12 x 22, bars 2.3 thick, gaps 0.45)

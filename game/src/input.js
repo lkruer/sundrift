@@ -128,6 +128,9 @@ export class Input {
         t.brake = Math.min(1, down);
         t.throttle = t.brake > 0.05 ? 0 : 1;
         nub.style.transform = `translateX(${s * (wheel.clientWidth * 0.5 - 17)}px)`;
+        // the nub goes red while the finger is pulled down into the brake, so the brake zone can be seen
+        const braking = t.brake > 0.05;
+        if (braking !== t.braking) { t.braking = braking; nub.style.background = braking ? 'rgba(255,59,48,.75)' : ''; nub.style.borderColor = braking ? '#ff3b30' : ''; }
         // the wheel follows the finger vertically a little so it never sits far from the thumb
         if (Math.abs(dy) > 90) { t.y0 = c.clientY - Math.sign(dy) * 90; place(t.x0, t.y0); }
       }
@@ -138,12 +141,18 @@ export class Input {
         if (c.identifier !== t.id) continue;
         t.active = false; t.id = null; t.steer = 0; t.throttle = 0; t.brake = 0;
         wheel.style.opacity = '0';
+        if (t.braking) { t.braking = false; nub.style.background = ''; nub.style.borderColor = ''; }
       }
     };
     stick.addEventListener('touchend', end);
     stick.addEventListener('touchcancel', end);
 
-    const bd = (e) => { t.hand = true; brake.classList.add('dn'); layer.classList.add('used'); if (!this.touchMode) this.setTouchMode(true); if (this.onAny) this.onAny(); e.preventDefault(); };
+    // (a light tick under the thumb as the handbrake goes on, where the phone can: Android; the first touch of a
+    // second finger on the pad does not tick again)
+    const bd = (e) => {
+      if (!t.hand && typeof navigator.vibrate === 'function' && !(navigator.userActivation && !navigator.userActivation.hasBeenActive)) { try { navigator.vibrate(10); } catch {} }
+      t.hand = true; brake.classList.add('dn'); layer.classList.add('used'); if (!this.touchMode) this.setTouchMode(true); if (this.onAny) this.onAny(); e.preventDefault();
+    };
     const bu = (e) => { if (e.touches && e.touches.length && [...e.touches].some((x) => brake.contains(x.target))) return; t.hand = false; brake.classList.remove('dn'); };
     brake.addEventListener('touchstart', bd, { passive: false });
     brake.addEventListener('touchend', bu);

@@ -1,0 +1,6 @@
+{ "setup": { "hour": 22, "rain": 0 },
+  "shots": [
+    { "name": "PC1_portal_night", "s": 860, "wait": 3500, "cam": [870, 0, 4, 906, 0, 5, 60] },
+    { "name": "PC2_tunnel_inside", "s": 940 },
+    { "name": "PC3_exit_portal", "s": 3400, "cam": [3395, 0, 3, 3359, 0, 5, 60] }
+  ] }

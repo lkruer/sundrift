@@ -1,0 +1,7 @@
+[
+  { "click": "#startb" },
+  { "wait": 1200 },
+  { "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.G.hour = 22; D.G.hourShown = 22; D.G.lastApplied = -9; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); window.__POOLS__ = (label) => { const W = D.world; const out = []; for (const [k, p] of Object.entries(W.pools)) { let tri = 0; for (const part of p.parts) { const g = part.im.geometry; tri += (g.index ? g.index.count : g.attributes.position.count) / 3; } out.push([k, p.n, tri, Math.round(p.n * tri / 1000)]); } out.sort((a, b) => b[3] - a[3]); const T = W.terrain; let ft = []; if (T.farTrees) for (const [k, p] of Object.entries(T.farTrees)) { let tri = 0; for (const part of p.parts) { const g = part.im.geometry; tri += (g.index ? g.index.count : g.attributes.position.count) / 3; } ft.push(k + ' n' + p.n + ' x' + tri + ' = ' + Math.round(p.n * tri / 1000) + 'k'); } const lods = [0, 0, 0]; for (const t of T.tiles.values()) if (t.lod >= 0) lods[t.lod]++; return { label, pools: out.slice(0, 16).map(a => a[0] + ' n' + a[1] + ' x' + a[2] + ' = ' + a[3] + 'k').join(' | '), far: ft.join(' | '), lods }; }; })()" },
+  { "js": "window.__DEBUG__.teleport(4000, 0); 1" }, { "wait": 2600 }, { "js": "window.__POOLS__('s4000')" },
+  { "js": "window.__DEBUG__.teleport(3000, 0); 1" }, { "wait": 2600 }, { "js": "window.__POOLS__('s3000')" }
+]

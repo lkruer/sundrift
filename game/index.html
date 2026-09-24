@@ -27,6 +27,11 @@
     --pink:#ff4f9a; --violet:#7a4dff; --panel:rgba(12,10,18,.72);
     --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
     --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
+    /* the anime popups' ink: a hard dark outline (eight unblurred copies, cheap to draw) that keeps the text legible
+       on a bright day sky or a white car as well as at night */
+    --olc: rgba(18,8,28,.96);
+    --ol: 2px 0 0 var(--olc), -2px 0 0 var(--olc), 0 2px 0 var(--olc), 0 -2px 0 var(--olc),
+          1.4px 1.4px 0 var(--olc), -1.4px 1.4px 0 var(--olc), 1.4px -1.4px 0 var(--olc), -1.4px -1.4px 0 var(--olc);
   }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
   html,body { margin:0; padding:0; height:100%; overflow:hidden; background:#140f1c; color:var(--ink);
@@ -76,6 +81,12 @@
   #title .logo { font-size:clamp(44px,7.2vw,96px); }
   #title .menu { position:absolute; left:calc(var(--safe-l) + clamp(18px,5vw,72px)); top:50%; transform:translateY(-50%);
       width:min(470px,86vw); display:flex; flex-direction:column; gap:clamp(10px,1.8vh,18px); pointer-events:auto; }
+  #title .menu > * { flex:none; }
+  /* (on a short screen a menu taller than the screen scrolls rather than losing its logo and its START button off the
+     edges; padded so the slanted buttons and the logo's shadow are not clipped by the scroll box) */
+  @media (max-height: 560px) {
+    #title .menu { max-height:calc(100% - 8px); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:none; padding:6px 16px; margin-left:-16px; }
+  }
   .sect { font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.34em; color:var(--dim); margin-bottom:-4px; }
   .maps { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .map { position:relative; padding:8px 12px 7px; border:1.5px solid rgba(246,239,226,.22); background:rgba(12,8,20,.55); color:var(--ink);
@@ -111,17 +122,24 @@
            background:linear-gradient(180deg,#ffe3a6,#ffb347 45%,#ff8a2a); transform:skewX(-10deg);
            box-shadow:0 0 0 2px #1a0f1f, 0 0 0 4px var(--amber), 0 8px 30px rgba(255,138,42,.45); animation:glow 1.6s ease-in-out infinite; }
   .start > span { display:inline-block; transform:skewX(10deg); }
+  /* (a keyboard's focus shows; a click's does not) */
+  button:focus { outline:none; }
+  button:focus-visible { outline:2px solid var(--ink); outline-offset:3px; }
   .start:active { transform:skewX(-10deg) scale(.97); }
   @keyframes glow { 0%,100% { filter:brightness(1);} 50% { filter:brightness(1.18);} }
   .keys { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; color:var(--dim); letter-spacing:.06em; }
   .keys div { white-space:nowrap; }
   .keys .tip { color:var(--amber); opacity:.75; }
+  /* the one thing a first-time player has to know */
+  .keys .how { flex-basis:100%; white-space:normal; color:var(--ink); font-size:14px; letter-spacing:.04em; margin-bottom:2px; }
+  .keys .how b { color:var(--amber); font-weight:700; letter-spacing:.12em; margin-right:4px; }
+  .keys .nw { white-space:nowrap; }
   body.orbiting, body.orbiting canvas { cursor:grabbing; }
   kbd { display:inline-block; min-width:24px; padding:1px 6px; border:1px solid rgba(246,239,226,.4); border-bottom-width:2px; border-radius:4px;
         font-family:"Share Tech Mono",monospace; font-size:12px; color:var(--ink); background:rgba(0,0,0,.3); margin-right:3px; text-align:center; }
   body.touch .keys.k { display:none; } body:not(.touch) .keys.f { display:none; }
   #title .credit { position:absolute; right:calc(var(--safe-r) + 18px); bottom:calc(var(--safe-b) + 14px); font-family:"Share Tech Mono",monospace;
-                   font-size:11px; letter-spacing:.3em; color:rgba(246,239,226,.45); }
+                   font-size:11px; letter-spacing:.3em; color:rgba(246,239,226,.62); text-shadow:0 1px 3px rgba(0,0,0,.8); }
   #building { position:absolute; left:0; right:0; bottom:calc(var(--safe-b) + 18px); text-align:center; font-family:"Share Tech Mono",monospace;
               font-size:12px; letter-spacing:.3em; color:var(--amber); opacity:0; transition:opacity .2s; }
   #building.on { opacity:1; }
@@ -137,6 +155,18 @@
           font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:22px; letter-spacing:.12em; cursor:pointer; transform:skewX(-10deg); }
   .pbtn:hover, .pbtn:focus-visible { border-color:var(--amber); color:var(--amber); outline:none; }
   #pause .stats { font-family:"Share Tech Mono",monospace; font-size:12px; letter-spacing:.2em; color:var(--dim); margin-top:6px; text-align:center; line-height:1.8; }
+  /* the run card replaces the one-line stats */
+  #pause #pstats { display:none; }
+  #pcard { margin-top:6px; padding:9px 18px 10px; min-width:min(430px,86vw); background:rgba(12,8,20,.74); border:1px solid rgba(255,179,71,.3); border-radius:3px; text-align:center; }
+  #pcard .pc-course { font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.34em; color:var(--dim); margin-bottom:7px; }
+  #pcard .pc-grid { display:grid; grid-template-columns:repeat(4,auto); justify-content:center; gap:7px 24px; }
+  #pcard .pc-grid div { display:flex; flex-direction:column; align-items:center; }
+  #pcard i { font-style:normal; font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.24em; color:var(--dim); white-space:nowrap; }
+  #pcard b { font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:21px; line-height:1.15; color:var(--ink); letter-spacing:.03em; white-space:nowrap; }
+  #pcard b.hi, #pcard i.hi { color:var(--gold); }
+  @media (max-width: 440px) { #pcard .pc-grid { grid-template-columns:repeat(2,1fr); gap:8px 12px; } }
+  @media (max-height: 500px) { #pause { gap:8px; } #pause h2 { font-size:34px; margin:0; } #pause .kana { display:none; } .pbtn { padding:7px 0 6px; font-size:18px; }
+                               #pcard { padding:6px 14px 7px; } #pcard b { font-size:18px; } }
 
   /* ---- hud ---- */
   #hud { position:fixed; inset:0; z-index:12; display:none; pointer-events:none; }
@@ -149,18 +179,38 @@
   #scorebox { position:absolute; left:50%; top:calc(var(--safe-t) + 10px); transform:translateX(-50%); padding:6px 14px 7px;
               background:var(--panel); border:1px solid rgba(255,179,71,.25); border-radius:3px; text-align:center; }
   #scorebox .lab { font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.5em; color:var(--dim); text-indent:.5em; margin-bottom:3px; }
+  #scorebox .lab.best { color:var(--gold); }
+  /* the score's flash when a drift is banked into it: a glow drawn once and only faded in and out */
+  #sflash { position:absolute; inset:-2px; border-radius:4px; border:1.5px solid #ffd23f; pointer-events:none; opacity:0;
+            box-shadow:0 0 20px rgba(255,190,60,.6), inset 0 0 14px rgba(255,190,60,.3); }
   #score7 { height:clamp(30px,5.4vw,44px); }
-  #drift { position:absolute; left:0; right:0; top:calc(var(--safe-t) + clamp(84px,11vw,104px)); text-align:center; opacity:0; transition:opacity .18s;
-           text-shadow:0 2px 10px rgba(0,0,0,.7); }
-  #drift.on { opacity:1; }
-  #driftpts { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(28px,5.4vw,44px); color:var(--gold); letter-spacing:.03em; }
-  #mult { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(18px,3.4vw,26px); color:var(--amber2); margin-left:10px; }
-  #tier { font-family:"Share Tech Mono",monospace; font-size:clamp(13px,2.4vw,17px); letter-spacing:.42em; text-indent:.42em; color:var(--ink); margin-top:2px; height:20px; }
-  #tier.t1 { color:var(--ink);} #tier.t2 { color:var(--gold);} #tier.t3 { color:var(--amber2);} #tier.t4 { color:var(--red);}
+  /* the drift stack under the score: the live drift, and the banked points flying up into the score. It steps down
+     out of the way while the off-road countdown is up (--coY, set by offroad.js), by transform only */
+  #dstack { position:absolute; left:0; right:0; top:calc(var(--safe-t) + clamp(90px,11vw,100px)); text-align:center; pointer-events:none;
+            transform:translateY(var(--coY,0px)); transition:transform .3s cubic-bezier(.3,1.3,.5,1); }
+  /* (it fades in, and goes at once: a banked drift's cash-in takes its place) */
+  #drift { opacity:0; }
+  #drift.on { opacity:1; transition:opacity .18s; }
+  #driftpts { display:inline-block; font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(30px,5.6vw,50px); line-height:1.05;
+              color:#ffd23f; letter-spacing:.02em; text-shadow:var(--ol), 0 4px 0 var(--olc), 0 0 16px rgba(255,150,40,.5); }
+  #mult { display:inline-block; font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(18px,3.2vw,28px); color:#ff9a3d; margin-left:10px;
+          text-shadow:var(--ol), 0 3px 0 var(--olc); }
+  #tier { display:block; width:max-content; margin:1px auto 0; height:1.25em; font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(16px,2.6vw,22px);
+          letter-spacing:.1em; color:var(--ink); text-shadow:var(--ol), 0 3px 0 var(--olc); }
+  #tier.t1 { color:#8ff5e6; } #tier.t2 { color:#ffd23f; } #tier.t3 { color:#ff5fa0; }
+  #bank { position:absolute; left:0; right:0; top:0; opacity:0; }
+  #bank b { display:inline-block; font-weight:400; font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(30px,5.6vw,50px); line-height:1.05;
+            color:#fff1b8; letter-spacing:.02em; text-shadow:var(--ol), 0 4px 0 var(--olc), 0 0 22px rgba(255,200,80,.85); }
+  #bank.t1 b { color:#c9fff6; } #bank.t2 b { color:#ffe066; } #bank.t3 b { color:#ffc2dc; }
+  /* first run only: how to drift, until the first drift */
+  #coach { position:absolute; left:50%; bottom:calc(var(--safe-b) + 54px); transform:translateX(-50%); width:max-content; max-width:92vw; text-align:center;
+           font-family:"Share Tech Mono",monospace; font-size:13px; letter-spacing:.14em; line-height:1.5; color:var(--ink); padding:7px 14px 6px;
+           background:rgba(12,10,18,.72); border:1px solid rgba(255,179,71,.4); border-radius:3px; opacity:0; transition:opacity .45s; }
+  #coach b { font-weight:400; color:var(--amber); }
   #combo { position:absolute; left:calc(var(--safe-l) + 16px); top:calc(var(--safe-t) + 12px); padding:7px 12px 8px; background:var(--panel);
            border:1px solid rgba(255,179,71,.2); border-radius:3px; min-width:112px; }
   #combo .lab, #clockbox .lab, #distbox .lab { font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.4em; color:var(--dim); }
-  #combon { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:34px; line-height:1; color:var(--ink); }
+  #combon { display:inline-block; font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:34px; line-height:1; color:var(--ink); transform-origin:30% 60%; }
   #combo .x { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:18px; color:var(--amber); margin-right:2px; }
   #combo .chain { height:4px; width:100%; background:rgba(255,255,255,.12); margin-top:5px; overflow:hidden; }
   #combo .chain i { display:block; height:100%; width:100%; background:linear-gradient(90deg,var(--amber2),var(--gold)); transform-origin:left; }
@@ -190,33 +240,38 @@
   #lampboost.on { background:#5ad1ff; border-color:#5ad1ff; box-shadow:0 0 10px rgba(90,209,255,.85); }
   #lampclip.on { background:#9ff0b8; border-color:#9ff0b8; box-shadow:0 0 10px rgba(159,240,184,.85); }
   #boostbar { position:absolute; right:calc(var(--safe-r) + 12px); bottom:calc(var(--safe-b) + 10px + clamp(190px,24vw,262px) * 1.02 + 8px);
-              width:clamp(190px,24vw,262px); display:flex; align-items:center; gap:8px; }
+              width:clamp(190px,24vw,262px); display:flex; align-items:center; gap:8px; transform-origin:100% 50%; }
   #boostbar .lab { font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.3em; color:var(--dim); }
   #leds { flex:1; display:flex; gap:3px; }
   #leds i { flex:1; height:9px; background:rgba(90,209,255,.1); border:1px solid rgba(90,209,255,.18); transform:skewX(-14deg); }
   #leds i.on { background:#5ad1ff; box-shadow:0 0 6px rgba(90,209,255,.8); }
   #leds i.on.hi { background:#c9f1ff; }
-  #angle { position:absolute; left:50%; bottom:calc(var(--safe-b) + 18px); transform:translateX(-50%); width:min(300px,50vw); opacity:0; transition:opacity .25s; }
+  /* the drift angle: a dark rail over a fixed amber-to-pink scale, uncovered from the middle out (two covers that only
+     scale, so no layout per frame); the pink ends past the ticks are the angle that scores the most */
+  #angle { position:absolute; left:50%; bottom:calc(var(--safe-b) + 14px); transform:translateX(-50%); width:min(320px,52vw); opacity:0; transition:opacity .25s; }
   #angle.on { opacity:1; }
-  #angle .rail { position:relative; height:10px; border:1px solid rgba(255,179,71,.3); background:rgba(0,0,0,.35); }
-  #angle .rail::before { content:""; position:absolute; left:50%; top:-3px; bottom:-3px; width:1px; background:rgba(255,255,255,.35); }
-  #anglef { position:absolute; top:0; bottom:0; left:50%; width:0; background:linear-gradient(90deg,var(--amber2),var(--gold)); }
-  #angle .lab { display:flex; justify-content:space-between; font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.2em; color:var(--dim); margin-top:3px; }
-  #angledeg { color:var(--amber); }
+  #angle .rail { position:relative; height:10px; border:1px solid rgba(255,179,71,.35);
+                 background:linear-gradient(90deg,#ff4f9a 0%,#ff5fa0 15.6%,#ffd23f 17.4%,#ff8a2a 50%,#ffd23f 82.6%,#ff5fa0 84.4%,#ff4f9a 100%); }
+  #angle .cov { position:absolute; top:0; bottom:0; width:50%; background:#120c1a; }
+  #anglecl { left:0; transform-origin:0 50%; } #anglecr { right:0; transform-origin:100% 50%; }
+  #angle .rail::before { content:""; position:absolute; left:50%; top:-4px; bottom:-4px; width:1px; margin-left:-.5px; background:rgba(255,255,255,.45); z-index:1; }
+  #angle .zt { position:absolute; top:-5px; bottom:-5px; width:2px; margin-left:-1px; background:#ff5fa0; z-index:1; }
+  #anglehot { position:absolute; inset:-4px; border:1.5px solid #ff5fa0; border-radius:2px; box-shadow:0 0 12px rgba(255,79,154,.75); opacity:0; transition:opacity .15s; }
+  #angle .lab { display:flex; justify-content:space-between; align-items:baseline; font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.2em;
+                color:var(--dim); margin-top:2px; text-shadow:0 1px 3px rgba(0,0,0,.9); }
+  #angledeg { font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:20px; letter-spacing:.04em; color:#ffb347; text-shadow:var(--ol); line-height:1; }
 
-  /* ---- smashing things: one label, punched in on every hit ---- */
-  #smash { position:absolute; left:50%; top:60%; transform:translate(-50%,-50%) rotate(-4deg); text-align:center; pointer-events:none;
-           opacity:0; transition:opacity .35s; font-family:"Racing Sans One",sans-serif; font-style:italic; white-space:nowrap; }
-  #smash.on { opacity:1; }
-  #smash.pop { animation:smashPop .38s cubic-bezier(.2,1.9,.4,1); }
-  #smash b { display:block; font-weight:400; font-size:clamp(26px,5vw,46px); color:#ffd23f; letter-spacing:.02em;
-             text-shadow:0 3px 0 #1a0f24, 0 0 18px rgba(255,150,40,.65); }
-  #smash span { display:block; font-size:clamp(15px,2.6vw,22px); color:#ff8fbf; text-shadow:0 2px 0 #1a0f24, 0 0 12px rgba(255,79,154,.5); }
-  @keyframes smashPop { 0% { transform:translate(-50%,-50%) rotate(-10deg) scale(1.9); } 60% { transform:translate(-50%,-50%) rotate(-2deg) scale(.94); }
-                        100% { transform:translate(-50%,-50%) rotate(-4deg) scale(1); } }
+  /* ---- smashing things: one label, punched in on every hit, standing just above the car's roof ---- */
+  #smash { position:absolute; left:50%; bottom:calc(49% + var(--safe-b)); transform:translate(-50%,0) rotate(-4deg); transform-origin:50% 100%; text-align:center;
+           pointer-events:none; opacity:0; font-family:"Racing Sans One",sans-serif; font-style:italic; white-space:nowrap; }
+  #smash b { display:block; font-weight:400; font-size:clamp(26px,4.4vw,40px); line-height:1.05; color:#ffd23f; letter-spacing:.02em;
+             text-shadow:var(--ol), 0 4px 0 var(--olc), 0 0 16px rgba(255,150,40,.55); }
+  #smash span { display:block; font-size:clamp(15px,2.2vw,20px); line-height:1.1; color:#ff9ccb; letter-spacing:.04em; text-shadow:var(--ol), 0 3px 0 var(--olc); }
 
   /* ---- course out: the countdown under the score, and the magnet ---- */
-  #courseout { position:absolute; left:50%; top:calc(var(--safe-t) + clamp(76px, 12vh, 100px)); transform:translate(-50%,-26px) scale(.86); opacity:0;
+  /* (width:max-content: an absolute box at left:50% otherwise shrinks to the half screen right of it, and on a phone the
+     text wrapped into a tall blob) */
+  #courseout { position:absolute; left:50%; top:calc(var(--safe-t) + clamp(76px, 12vh, 100px)); transform:translate(-50%,-26px) scale(.86); opacity:0; width:max-content; white-space:nowrap;
      display:flex; align-items:center; gap:12px; padding:7px 16px 7px 8px; pointer-events:none;
      background:linear-gradient(180deg, rgba(46,12,30,.84), rgba(18,8,24,.8)); border:1px solid rgba(255,95,180,.55); border-radius:40px;
      box-shadow:0 0 22px rgba(255,79,154,.32), inset 0 0 14px rgba(255,79,154,.14);
@@ -224,20 +279,34 @@
   #courseout.on { transform:translate(-50%,0) scale(1); opacity:1; }
   #courseout .co-ring { position:relative; width:52px; height:52px; flex:none; }
   #courseout .co-cv { position:absolute; inset:0; width:100%; height:100%; display:block; }
-  #courseout .co-txt { display:flex; flex-direction:column; line-height:1.05; }
+  #courseout .co-txt { display:flex; flex-direction:column; line-height:1.05; min-width:164px; }
   #courseout .co-txt b { font-weight:400; font-size:19px; letter-spacing:.06em; color:#ffc2d9; text-shadow:0 0 10px rgba(255,79,154,.6); }
   #courseout .co-txt span { font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.28em; color:var(--ink); margin-top:4px; }
   #courseout .co-txt i { font-style:normal; font-family:"Share Tech Mono",monospace; font-size:9px; letter-spacing:.2em; color:var(--dim); margin-top:2px; }
   #courseout .co-mag { width:30px; height:30px; flex:none; opacity:.8; }
   #courseout .co-mag svg { width:100%; height:100%; display:block; }
 
-  #toasts { position:absolute; left:0; right:0; top:36%; text-align:center; pointer-events:none; }
-  .toast { position:absolute; left:0; right:0; font-family:"Racing Sans One",sans-serif; font-style:italic; font-size:clamp(22px,4.6vw,38px);
-           letter-spacing:.12em; color:var(--gold); text-shadow:0 0 18px rgba(255,138,42,.5), 0 3px 0 rgba(20,10,30,.8); animation:toast 1.25s ease-out forwards; }
-  .toast.bad { color:var(--red); text-shadow:0 0 18px rgba(255,59,48,.5), 0 3px 0 rgba(20,10,30,.8); }
-  .toast.good { color:var(--teal); text-shadow:0 0 18px rgba(111,227,214,.45), 0 3px 0 rgba(20,10,30,.8); }
-  .toast.big { font-size:clamp(30px,7vw,60px); }
-  @keyframes toast { 0% { opacity:0; transform:translateY(14px) skewX(-8deg) scale(.85);} 12% { opacity:1; transform:translateY(0) skewX(-8deg) scale(1.06);} 30% { transform:skewX(-8deg) scale(1);} 100% { opacity:0; transform:translateY(-36px) skewX(-8deg);} }
+  /* the callouts (a banked drift's tier, a switch, a clip, a new best...): one at a time (hud.js decides who gives way),
+     above the road ahead, clear of the car and of the smash counter under them */
+  #toasts { position:absolute; left:0; right:0; top:calc(var(--safe-t) + 33%); text-align:center; pointer-events:none; }
+  .toast { position:absolute; left:0; right:0; top:0; font-family:"Racing Sans One",sans-serif; font-style:italic;
+           font-size:clamp(19px,3.2vw,28px); line-height:1.05; letter-spacing:.07em; color:var(--gold); white-space:nowrap;
+           text-shadow:var(--ol), 0 3px 0 var(--olc), 0 0 16px rgba(255,138,42,.45); animation:toast 1.35s ease-out forwards; }
+  .toast.big { font-size:clamp(25px,4.4vw,40px); }
+  .toast b, .toast span { display:block; font-weight:400; }
+  .toast span { font-size:max(13px,.45em); letter-spacing:.22em; margin-top:1px; color:var(--ink); }
+  .toast.bad { color:#ff5a48; text-shadow:var(--ol), 0 3px 0 var(--olc), 0 0 16px rgba(255,59,48,.5); }
+  .toast.good { color:#7ff0e0; text-shadow:var(--ol), 0 3px 0 var(--olc), 0 0 16px rgba(111,227,214,.45); }
+  .toast.calm { color:#ffd9e8; text-shadow:var(--ol), 0 3px 0 var(--olc), 0 0 16px rgba(255,127,174,.4); }
+  .toast.t1 { color:#8ff5e6; text-shadow:var(--ol), 0 3px 0 var(--olc), 0 0 16px rgba(111,227,214,.45); }
+  .toast.t2 { color:#ffd23f; }
+  .toast.t3 { color:#ff5fa0; text-shadow:var(--ol), 0 3px 0 var(--olc), 0 0 16px rgba(255,79,154,.55); }
+  .toast.clip { color:#9ff0b8; text-shadow:var(--ol), 0 3px 0 var(--olc), 0 0 16px rgba(159,240,184,.45); }
+  @keyframes toast { 0% { opacity:0; transform:translateY(12px) skewX(-8deg) scale(.8);} 10% { opacity:1; transform:translateY(0) skewX(-8deg) scale(1.08);}
+                     24% { transform:skewX(-8deg) scale(1);} 78% { opacity:1; } 100% { opacity:0; transform:translateY(-26px) skewX(-8deg);} }
+  /* (a callout cut in on leaves quickly, up and out) */
+  .toast.out { animation:toastOut .18s ease-in forwards; }
+  @keyframes toastOut { 0% { opacity:1; transform:skewX(-8deg); } 100% { opacity:0; transform:translateY(-18px) skewX(-8deg) scale(.9); } }
 
   #vign { position:fixed; inset:0; z-index:11; pointer-events:none; opacity:0;
           background:radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%); }
@@ -254,19 +323,22 @@
   body.playing #touch.on { display:block; }
   #stick { position:absolute; left:0; top:22%; bottom:0; width:60%; }
   #brake { position:absolute; right:0; top:22%; bottom:0; width:40%; }
-  #stick .hint, #brake .hint { position:absolute; left:calc(var(--safe-l) + 16px); bottom:calc(var(--safe-b) + 60px);
-        font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.24em; color:rgba(246,239,226,.65); white-space:nowrap; text-shadow:0 2px 8px rgba(0,0,0,.6);
-        transition:opacity .4s; }
-  #brake .hint { left:auto; right:calc(var(--safe-r) + 16px); bottom:calc(var(--safe-b) + 330px); }
-  #touch.used .hint { opacity:0; }
+  #stick .hint { position:absolute; left:calc(var(--safe-l) + 16px); bottom:calc(var(--safe-b) + 60px);
+        font-family:"Share Tech Mono",monospace; font-size:12px; letter-spacing:.2em; line-height:1.7; color:rgba(246,239,226,.75); white-space:nowrap;
+        text-shadow:0 1px 2px rgba(0,0,0,.9), 0 2px 8px rgba(0,0,0,.6); transition:opacity .4s; }
+  #stick .hint b { font-weight:400; color:var(--amber); }
+  #touch.used .hint, #touch.used .pad i { opacity:0; }
   #wheel { position:absolute; width:180px; height:56px; margin:-28px 0 0 -90px; opacity:0; transition:opacity .15s; }
   #wheel .track { position:absolute; left:0; right:0; top:26px; height:4px; background:rgba(246,239,226,.35); }
   #wheel .tick { position:absolute; left:50%; top:18px; width:2px; height:20px; margin-left:-1px; background:rgba(246,239,226,.5); }
   #wheel .nub { position:absolute; left:50%; top:28px; width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%;
                 border:2px solid rgba(246,239,226,.85); background:rgba(255,179,71,.35); box-shadow:0 2px 12px rgba(0,0,0,.4); }
-  #brake .pad { position:absolute; right:calc(var(--safe-r) + 26px); bottom:calc(var(--safe-b) + 240px); width:88px; height:88px; border-radius:50%;
-        border:2px solid rgba(246,239,226,.45); background:rgba(0,0,0,.25); display:flex; align-items:center; justify-content:center;
-        font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.14em; color:rgba(246,239,226,.85); text-align:center; line-height:1.3; }
+  /* the handbrake pad marks where the right thumb goes (all of the right side is the handbrake): at the bottom, just left of
+     the dash, so it never sits on the car or the clock */
+  #brake .pad { position:absolute; right:calc(var(--safe-r) + clamp(190px,24vw,262px) + 26px); bottom:calc(var(--safe-b) + 26px); width:88px; height:88px; border-radius:50%;
+        border:2px solid rgba(246,239,226,.5); background:rgba(0,0,0,.3); display:flex; flex-direction:column; align-items:center; justify-content:center;
+        font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.14em; color:rgba(246,239,226,.9); text-align:center; line-height:1.3; }
+  #brake .pad i { font-style:normal; font-size:9px; letter-spacing:.22em; color:var(--amber); transition:opacity .4s; }
   #brake.dn .pad { background:rgba(255,59,48,.5); border-color:var(--red); color:#fff; }
 
   @media (max-width: 720px) {
@@ -276,10 +348,18 @@
     .start { align-self:stretch; text-align:center; font-size:22px; padding:13px 0 11px; }
     #cluster, #boostbar { width:170px; }
     #boostbar { bottom:calc(var(--safe-b) + 10px + 174px + 6px); }
-    #brake .pad { bottom:calc(var(--safe-b) + 222px); right:calc(var(--safe-r) + 18px); width:78px; height:78px; }
-    #brake .hint { bottom:calc(var(--safe-b) + 306px); }
+    /* a phone held upright: the pad sits in the corner above the dash, beside the car rather than on it, and the left
+       thumb's hint stays left of the dash */
+    #brake .pad { bottom:calc(var(--safe-b) + 206px); right:calc(var(--safe-r) + 10px); width:72px; height:72px; }
+    #stick .hint { bottom:calc(var(--safe-b) + 150px); }
     #combo { min-width:92px; } #combon { font-size:28px; }
-    #angle { width:62vw; top:calc(var(--safe-t) + 150px); bottom:auto; left:50%; }
+    #angle { width:62vw; top:calc(var(--safe-t) + 150px); bottom:auto; left:50%; transform:translate(-50%, var(--coY,0px)); transition:opacity .25s, transform .3s cubic-bezier(.3,1.3,.5,1); }
+    #coach { top:calc(var(--safe-t) + 90px); bottom:auto; font-size:12px; letter-spacing:.1em; }
+    #coach .br { display:block; }
+    /* (below the drift count and the angle meter, so nothing has to move out of its way) */
+    #courseout { top:calc(var(--safe-t) + 186px); }
+    #toasts { top:calc(var(--safe-t) + 30%); }
+    #smash { bottom:calc(55% + var(--safe-b)); }
     #title .credit { display:none; }
     #score7 { height:24px; }
     #scorebox { padding:5px 10px 6px; }
@@ -287,6 +367,35 @@
     #clockbox { padding:5px 8px 6px; } #clock7 { height:18px; }
     #hbtns { top:calc(var(--safe-t) + 58px); }
     .tb { width:34px; height:34px; }
+  }
+  /* a phone on its side: the title compacts to fit the height, and the dash and the popups get smaller so the road shows */
+  @media (max-height: 500px) and (min-width: 721px) {
+    #title .logo { font-size:40px; }
+    #title .kana, #title .tag, #title .sect { display:none; }
+    #title .menu { gap:7px; }
+    #title .tatebox { top:calc(var(--safe-t) + 14px); } #title .tate { font-size:34px; }
+    .map { padding:5px 10px 4px; } .map b { font-size:17px; } .map span { font-size:10px; }
+    .diff { padding:6px 10px 5px; } .diff b { font-size:18px; } .diff span { display:none; } .diff i { margin-top:2px; }
+    .sw { width:28px; height:28px; }
+    .start { font-size:20px; padding:10px 38px 9px; margin-top:2px; }
+    .keys { font-size:11px; gap:3px 12px; }
+    #cluster, #boostbar { width:150px; }
+    #boostbar { bottom:calc(var(--safe-b) + 10px + 153px + 6px); }
+    #brake .pad { right:calc(var(--safe-r) + 150px + 24px); bottom:calc(var(--safe-b) + 16px); width:72px; height:72px; }
+    #stick .hint { bottom:calc(var(--safe-b) + 24px); }
+    #score7 { height:26px; } #scorebox { padding:4px 10px 5px; }
+    #combo { min-width:84px; padding:5px 9px 6px; } #combon { font-size:26px; }
+    #clockbox { padding:4px 8px 5px; } #clock7 { height:17px; }
+    #hbtns { top:calc(var(--safe-t) + 50px); } .tb { width:32px; height:32px; }
+    #dstack { top:calc(var(--safe-t) + 64px); }
+    #driftpts, #bank b { font-size:32px; } #mult { font-size:20px; } #tier { font-size:16px; }
+    #courseout { top:calc(var(--safe-t) + 62px); }
+    #toasts { top:calc(var(--safe-t) + 31%); }
+    .toast { font-size:19px; } .toast.big { font-size:24px; }
+    #smash b { font-size:23px; } #smash span { font-size:13px; }
+    #angle { width:min(300px,40vw); }
+    /* (in the drift count's place, empty until the first drift: at the bottom it ran into the handbrake pad) */
+    #coach { top:calc(var(--safe-t) + 64px); bottom:auto; font-size:12px; padding:5px 12px 4px; }
   }
 </style>
 </head>
@@ -296,17 +405,22 @@
 <div id="load">
   <h1 class="logo" data-t="MINIDRIFT">MINIDRIFT</h1>
   <div class="kana jp">ミニドリフト</div>
-  <div class="tag">NIGHT TOUGE</div>
+  <div class="tag" id="loadtag">NIGHT TOUGE</div>
   <div id="bar"><div id="barf"></div></div>
   <div id="loadmsg">warming up</div>
 </div>
+<!-- (the loading screen names the map the game will open on, as the title's tagline does) -->
+<script>try { if (localStorage.getItem('minidrift.map') === 'city') document.getElementById('loadtag').textContent = 'NEON STREETS'; } catch (e) {}</script>
 
 
 <div id="hud">
   <div id="combo"><div class="lab">COMBO</div><div><span class="x">×</span><span id="combon" class="num">0</span></div><div class="chain"><i id="chainf"></i></div>
     <div id="distbox"><div class="lab">DIST MI</div><svg id="dist7" class="seg"></svg></div></div>
-  <div id="scorebox"><div class="lab">SCORE</div><svg id="score7" class="seg glow"></svg></div>
-  <div id="drift"><span id="driftpts" class="num">0</span><span id="mult" class="num">×1.0</span><div id="tier"></div></div>
+  <div id="scorebox"><div class="lab" id="scorelab">SCORE</div><svg id="score7" class="seg glow"></svg><i id="sflash"></i></div>
+  <div id="dstack">
+    <div id="drift"><span id="driftpts" class="num">0</span><span id="mult" class="num">×1.0</span><div id="tier"></div></div>
+    <div id="bank"><b class="num"></b></div>
+  </div>
   <div id="clockbox"><div class="lab">TIME</div><svg id="clock7" class="seg glow"></svg></div>
   <div id="boostbar"><span class="lab">BOOST</span><div id="leds"></div></div>
   <div id="cluster">
@@ -316,7 +430,9 @@
     <div class="kmh">MPH</div>
     <div id="lamps"><span class="lamp" id="lampdrift">DRIFT</span><span class="lamp" id="lampclip">CLIP</span><span class="lamp" id="lampboost">BOOST</span></div>
   </div>
-  <div id="angle"><div class="rail"><div id="anglef"></div></div><div class="lab"><span>L</span><span id="angledeg">0°</span><span>R</span></div></div>
+  <div id="angle"><div class="rail"><i class="cov" id="anglecl"></i><i class="cov" id="anglecr"></i><i class="zt" style="left:16.4%"></i><i class="zt" style="left:83.6%"></i><i id="anglehot"></i></div>
+    <div class="lab"><span>L</span><span id="angledeg">0°</span><span>R</span></div></div>
+  <div id="coach"></div>
   <div id="toasts"></div>
   <div id="perf"></div>
 </div>
@@ -324,8 +440,8 @@
 <div id="hbtns"><button class="tb" id="mute" title="sound (M)">♪</button><button class="tb" id="pauseb" title="pause (Esc)">II</button></div>
 
 <div id="touch">
-  <div id="stick"><div class="hint">HOLD TO DRIVE · SLIDE TO STEER</div><div id="wheel"><div class="track"></div><div class="tick"></div><div class="nub"></div></div></div>
-  <div id="brake"><div class="hint">HOLD FOR HANDBRAKE</div><div class="pad">E-BRAKE</div></div>
+  <div id="stick"><div class="hint"><b>HOLD</b> TO DRIVE<br><b>SLIDE</b> TO STEER</div><div id="wheel"><div class="track"></div><div class="tick"></div><div class="nub"></div></div></div>
+  <div id="brake"><div class="pad"><i>HOLD</i>E-BRAKE</div></div>
 </div>
 
 <div id="title">
@@ -348,10 +464,10 @@
     <div class="sect">PAINT <span id="paintname">PEARL WHITE</span></div>
     <div class="swatches" id="swatches"></div>
     <button class="start" id="startb"><span>START</span></button>
-    <div class="keys k"><div><kbd>W</kbd><kbd>S</kbd>gas · brake · reverse</div><div><kbd>A</kbd><kbd>D</kbd>steer</div><div><kbd>SPACE</kbd>handbrake</div><div><kbd>ESC</kbd>pause</div><div>wheel · zoom</div><div>hold mouse · orbit</div><div class="tip">back up fast, full lock, gas: J-TURN</div></div>
-    <div class="keys f"><div>left thumb: hold to drive, slide to steer</div><div>pull down: brake, reverse</div><div>right thumb: handbrake</div></div>
+    <div class="keys k"><div class="how"><b>DRIFT</b>tap <kbd>SPACE</kbd> into a corner, <span class="nw">steer into the slide,</span> <span class="nw">hold <kbd>W</kbd></span></div><div><kbd>W</kbd><kbd>S</kbd>gas · brake · reverse</div><div><kbd>A</kbd><kbd>D</kbd>steer</div><div><kbd>SPACE</kbd>handbrake</div><div><kbd>ESC</kbd>pause</div><div>wheel · zoom</div><div>hold mouse · orbit</div><div class="tip">back up fast, full lock, gas: J-TURN</div></div>
+    <div class="keys f"><div class="how"><b>DRIFT</b>tap the handbrake into a corner, <span class="nw">steer into the slide</span></div><div>left thumb: hold to drive, slide to steer</div><div>pull down: brake, reverse</div><div>right thumb: handbrake</div></div>
   </div>
-  <div id="building">BUILDING THE PASS</div>
+  <div id="building">LAYING THE ROAD</div>
   <div class="credit">CHAIN DRIFTS · BANK SCORE · EARN BOOST</div>
 </div>
 
@@ -362,8 +478,13 @@
   <button class="pbtn" id="restartb">RESTART</button>
   <button class="pbtn" id="quitb">MAIN MENU</button>
   <div class="stats" id="pstats"></div>
+  <!-- the run so far, filled in by the HUD the moment the pause opens -->
+  <div id="pcard"><div class="pc-course" id="pc-course"></div><div class="pc-grid">
+    <div><i>SCORE</i><b id="pc-score">0</b></div><div><i id="pc-bestl">BEST</i><b id="pc-best">—</b></div><div><i>DRIFTS</i><b id="pc-drifts">0</b></div><div><i>BIGGEST</i><b id="pc-big">0</b></div>
+    <div><i>LONGEST</i><b id="pc-long">0.0 s</b></div><div><i>CLIPS</i><b id="pc-clips">0</b></div><div><i>SMASHED</i><b id="pc-smash">0</b></div><div><i>DISTANCE</i><b id="pc-dist">0.0 MI</b></div>
+  </div></div>
 </div>
 
-<script type="module" src="./src/main.js?v=202609232326"></script>
+<script type="module" src="./src/main.js?v=202609240354"></script>
 </body>
 </html>

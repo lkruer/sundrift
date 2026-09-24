@@ -1,0 +1,179 @@
+[
+ {
+  "click": "#startb"
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__; D.rainNow(0); D.G.hour = 22; D.G.hourShown = 22; D.G.lastApplied = -9; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(8, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s8"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's8 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(300, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s300"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's300 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(520, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s520"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's520 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(880, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s880"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's880 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(1100, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s1100"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's1100 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(1470, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s1470"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's1470 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(2264, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s2264"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's2264 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(2630, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s2630"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's2630 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(3000, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s3000"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's3000 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(3320, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s3320"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's3320 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(4000, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s4000"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's4000 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(4600, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s4600"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's4600 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(5200, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s5200"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's5200 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ },
+ {
+  "js": "window.__DEBUG__.teleport(5710, 0); 1"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "h22_r0_s5710"
+ },
+ {
+  "js": "(() => { const g = window.__GAME__; return 's5710 draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()"
+ }
+]

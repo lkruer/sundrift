@@ -1,0 +1,9 @@
+[
+  { "click": ".map[data-m=\"city\"]" }, { "wait": 3000 },
+  { "click": "#startb" }, { "wait": 1500 },
+  { "js": "(() => { const D = __DEBUG__; D.rainNow(0); D.G.hour = 22; D.G.hourShown = 22; D.G.lastApplied = -9; window.__AUTOPILOT__ = () => ({ throttle: 0, brake: 1, steer: 0, hand: 0, reverse: false, touch: false }); return D.G.map + ' ' + D.track.markers.slice(0, 8).map(m => m.kind + '@' + Math.round(m.s)).join(' '); })()" },
+  { "js": "__DEBUG__.teleport(300, 0); 1" }, { "wait": 3000 }, { "shot": "CT1_s300" }, { "js": "(() => { const g = window.__GAME__; return 'draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()" },
+  { "js": "(() => { const D = __DEBUG__, m = D.track.markers.find(q => q.kind === 'conbini' && q.s > 100); D.teleport(m.s - 20, 0); return m.s; })()" }, { "wait": 3000 }, { "shot": "CT2_conbini" }, { "js": "(() => { const g = window.__GAME__; return 'draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()" },
+  { "js": "(() => { const D = __DEBUG__, m = D.track.markers.find(q => q.kind === 'shrine' && q.s > 100); if (!m) return 'no shrine'; D.teleport(m.s - 30, 0); return m.s; })()" }, { "wait": 3000 }, { "shot": "CT3_shrine" }, { "js": "(() => { const g = window.__GAME__; return 'draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()" },
+  { "js": "(() => { const D = __DEBUG__; D.G.hour = 12.5; D.G.hourShown = 12.5; D.G.lastApplied = -9; D.teleport(300, 0); return 1; })()" }, { "wait": 3500 }, { "shot": "CT4_day" }, { "js": "(() => { const g = window.__GAME__; return 'draws ' + g.draws + ' tris ' + Math.round(g.tris / 1000) + 'k'; })()" }
+]
