@@ -1,0 +1,10 @@
+[
+  { "wait": 3000 },
+  { "shot": "T1_pass" },
+  { "click": ".map[data-m=city]" },
+  { "wait": 9000 },
+  { "shot": "T2_city" },
+  { "js": "(() => { const t = document.getElementById('tagline'); const r = t.getBoundingClientRect(); return { text: t.textContent, h: Math.round(r.height), w: Math.round(r.width), menu: Math.round(document.querySelector('#title .menu').getBoundingClientRect().width) }; })()" },
+  { "click": ".map[data-m=mountain]" },
+  { "wait": 6000 }
+]

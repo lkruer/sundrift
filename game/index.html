@@ -63,8 +63,10 @@
                  -webkit-background-clip:text; background-clip:text; pointer-events:none; }
   .jp { font-family:"Dela Gothic One","Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif; font-weight:400; font-style:normal; }
   .tag { font-family:"Share Tech Mono",monospace; font-size:clamp(11px,2.2vw,15px); letter-spacing:.5em; color:#ffd9a8; text-indent:.5em; opacity:.9; }
+  /* (the title's tagline keeps to one line: the city's is a letter longer than the pass's, and at .5em it wrapped) */
+  #tagline { white-space:nowrap; letter-spacing:.42em; }
   /* (on the narrowest phones the tagline keeps to one line) */
-  @media (max-width: 420px) { .tag { letter-spacing:.24em; } }
+  @media (max-width: 420px) { .tag, #tagline { letter-spacing:.24em; } }
   /* (and the eight paints in one row) */
   @media (max-width: 380px) { .swatches { gap:6px; } .sw { width:30px !important; height:30px !important; } }
 
@@ -347,6 +349,6 @@
   </div></div>
 </div>
 
-<script type="module" src="./src/main.js?v=202609241743"></script>
+<script type="module" src="./src/main.js?v=202609242050"></script>
 </body>
 </html>

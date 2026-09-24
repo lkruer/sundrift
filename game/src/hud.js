@@ -17,7 +17,7 @@
  * fly off the clock it moved. On a phone that can (Android), a short buzz goes with the big moments.
  */
 import * as THREE from 'three';
-import { SCORE, clamp, damp } from './config.js?v=202609241743';
+import { SCORE, clamp, damp } from './config.js?v=202609242050';
 
 const $ = (id) => document.getElementById(id);
 // the slide angle past which a drift scores the most: scoring.js's angle factor tops out at 1.5 x 0.55 rad, 47 degrees
