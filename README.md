@@ -39,12 +39,13 @@ five seconds, or a giant magnet comes down and carries you back.
   phrase picks one of its tunes or leaves the chords alone, so it never plays the same way twice.
 - **The frame.** It is drawn as cel bands with ink outlines, halftone shade and scanlines, with a camera motion blur
   (the world streaks as the lens swings through a drift; the car stays sharp), then shown on a curved CRT whose
-  picture bends at the edges and rounds into the corners, in a 90s console's dithered colour.
-- **The HUD is on the TV.** The score, the clock, the combo, the dash (a bar-graph tach round three quarters of a
-  dial, the speed inside it; a strip along the bottom on a phone), the drift count and its cash-in, every callout
-  and the off-road countdown are the set's own on-screen display: drawn in pixel type at a 90s set's resolution
-  and laid into the picture under the glass, so they bend with the screen, darken into its rim, take its scanlines
-  and dither, and glow a little like phosphor. A run comes on with the channel's caption, CH 01.
+  picture bends out to a thin dark border and rounds into the corners, in a 90s console's dithered colour.
+- **The HUD and the menus are on the TV.** The score, the clock, the combo, the dash (a bar-graph tach round three
+  quarters of a dial, the speed inside it; a strip along the bottom on a phone), the drift count and its cash-in,
+  every callout and the off-road countdown are the set's own display, in the 90s dash's amber seven-segment digits
+  and the title's racing italic, laid into the picture under the glass: they bend with the screen, take its
+  scanlines and its colour steps, and glow a little like phosphor. The title screen and the pause menu are drawn on
+  the set the same way. A run comes on with the channel's caption, CH 01.
 - **The car.** Held in a drift, its tail lamps leave thin red light trails hanging in the air behind it, the way a
   drift anime draws a slide at night; the lamps burn brighter on the brakes. The engine is an inline four built
   from its firing pulses (see below), the revs flare as the rear tyres spin up in a slide, it cuts for a moment on
@@ -78,7 +79,8 @@ at load time.
   aid that stopped a sliding car dead; a drift that unwound on its own after a second and a half (a slide now holds
   for as long as it is held); rain drawn as added light, which glowed white by day; a DOM countdown panel that
   stalled the compositor (it is a canvas now); a HUD of page elements laid flat over the curved tube (it is drawn on
-  the TV now); and the 20:36 start (runs now begin at dusk, so the first drifts visibly carry the sky into the night).
+  the TV now), and then a HUD in pixel type at 360 lines (too low-res; the tube itself makes it retro now); and the
+  20:36 start (runs now begin at dusk, so the first drifts visibly carry the sky into the night).
 
 ## Courses
 
@@ -189,9 +191,12 @@ passing 90 degrees).
   direction boards hang over the corners, stop lines and diamonds mark the crossings, towers stand back on podiums
   of shops with their crowns lit at night, a building site has its floodlit tower crane, the stations their name
   boards, the expressway its amber delineators.
-- `game/src/hud.js`: the HUD, drawn into a small canvas at a 90s set's resolution in pixel type (every string with
-  its outline kept as a sprite, redrawn only when something on it changes, thirty times a second at most) and
-  laid in by the tube pass in `post.js`, through the glass's own curve; on a phone it also draws where the thumbs go.
+- `game/src/hud.js`: the HUD, drawn into a canvas at the screen's resolution (every string with its outline kept as a
+  sprite, the digits as seven-segment polygons, redrawn only when something on it changes, thirty times a second at
+  most) and laid in by the tube pass in `post.js`, through the glass's own curve; on a phone it also draws where
+  the thumbs go. `game/src/pagetv.js`: the title and the pause menu, laid out by the page, which keeps their buttons
+  (invisible) for every click, tap and key, and drawn into the same canvas from the page's own computed styles, each
+  box and each word where the tube shows its place.
 - `game/src/offroad.js`: the countdown's state and the magnet (its swoop, the flight, the drop, every beat of it).
 - `game/src/atmos.js`: the air: the cloud deck (moonlit wisps on the pass, lit from beneath over the city), the
   searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of
@@ -256,7 +261,6 @@ instanced object is a module under `game/assets/` written through the recipe loo
 ## Credits
 
 Method and harness: [404](https://404.xyz), Apache 2.0. Three.js. Fonts: Racing Sans One, Rajdhani and Share
-Tech Mono; Jersey 10, Jersey 15 and Silkscreen for the HUD; Dela Gothic One, Noto Serif JP, M PLUS Rounded 1c and
-DotGothic16 for the Japanese, fetched as subsets of only the characters the game draws (Google Fonts, the only
-non-code files the page loads besides Three.js). Built
+Tech Mono, with Dela Gothic One, Noto Serif JP and M PLUS Rounded 1c for the Japanese, fetched as subsets of only
+the characters the game draws (Google Fonts, the only non-code files the page loads besides Three.js). Built
 with Claude Code.

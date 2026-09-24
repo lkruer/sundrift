@@ -1,0 +1,19 @@
+--- gate 
+drifts banked   8  at metres 233, 236, 283, 328, 404, 441, 452, 560
+score           1131
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- gate --phone
+            this._reject(callback, new TargetCloseError('Target closed'));
+TargetCloseError: Protocol error (Page.captureScreenshot): Target closed
+  cause: ProtocolError
+--- gate --city
+drifts banked   10  at metres 179, 237, 238, 238, 239, 240, 241, 242, 305, 519
+score           3900
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- gate --city --phone
+drifts banked   10  at metres 131, 181, 239, 242, 242, 243, 253, 293, 512, 540
+score           3326
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.

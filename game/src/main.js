@@ -6,22 +6,23 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609242050';
-import { createRig, detectTier } from '../rig.js?v=202609242050';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242050';
-import { Car, gearbox } from './car.js?v=202609242050';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609242050';
-import { World, drawsGlyphs } from './world.js?v=202609242050';
-import { ChaseCam } from './camera.js?v=202609242050';
-import { Input } from './input.js?v=202609242050';
-import { Scoring } from './scoring.js?v=202609242050';
-import { Hud } from './hud.js?v=202609242050';
-import { Audio } from './audio.js?v=202609242050';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609242050';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242050';
-import { Atmosphere } from './atmos.js?v=202609242050';
-import { Debris } from './debris.js?v=202609242050';
-import { makePost } from './post.js?v=202609242050';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609242129';
+import { createRig, detectTier } from '../rig.js?v=202609242129';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242129';
+import { Car, gearbox } from './car.js?v=202609242129';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609242129';
+import { World, drawsGlyphs } from './world.js?v=202609242129';
+import { ChaseCam } from './camera.js?v=202609242129';
+import { Input } from './input.js?v=202609242129';
+import { Scoring } from './scoring.js?v=202609242129';
+import { Hud } from './hud.js?v=202609242129';
+import { PageTV } from './pagetv.js?v=202609242129';
+import { Audio } from './audio.js?v=202609242129';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609242129';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242129';
+import { Atmosphere } from './atmos.js?v=202609242129';
+import { Debris } from './debris.js?v=202609242129';
+import { makePost } from './post.js?v=202609242129';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -253,8 +254,10 @@ async function boot() {
   hud = new Hud();
   // (the HUD is the TV's own display: drawn into the tube pass, through the glass's own curve)
   const RU = post.retro.uniforms;
-  hud.attach(RU, input, { curve: RU.uCurve.value, edge: RU.uEdge.value });
+  hud.attach(RU, input, { curve: RU.uCurve.value, edge: RU.uEdge.value, zoom: RU.uZoom.value });
   hud.resize(innerWidth, innerHeight, renderer.getPixelRatio());
+  // (and so are the title and the pause menu: the page lays them out and takes the input, the TV draws them)
+  new PageTV(hud);
   audio = new Audio();
   audio.setMap(G.map === 'city');
   skids = new SkidMarks(scene, Q.skid);
@@ -746,6 +749,8 @@ function frame(now) {
   if (G.mode === 'playing') step(dt, t0);
   else if (G.mode === 'title') idle(dt, t0);
   else if (G.mode === 'paused') { if (world && car) world.update(car.x, car.z, G.s, t0 + 2); }
+  // the title or the pause menu, drawn on the TV when something on it changed
+  if (hud) hud.pageFrame();
 
   // a debug camera for inspecting the world from anywhere (set window.__CAM__ = { pos: [x,y,z], look: [x,y,z], fov })
   if (window.__CAM__) { const c = window.__CAM__; camera.position.set(...c.pos); camera.up.set(0, 1, 0); camera.lookAt(...c.look); if (c.fov && camera.fov !== c.fov) { camera.fov = c.fov; camera.updateProjectionMatrix(); } }

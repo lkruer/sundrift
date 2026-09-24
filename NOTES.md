@@ -396,6 +396,37 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 24 September, evening: less pixelated, a smaller angle meter, a thinner border, the menus on the TV
+
+Asked for (after the entry went in): the HUD a little less pixelated while still retro; the steering angle meter
+smaller; the TV's border smaller and more discreet, keeping its warp; the main menu on the TV too, not low-res.
+
+- **The type.** The pixel faces at 360 lines read as low-res. The HUD is now drawn at the screen's own resolution
+  (a canvas the size of the drawing buffer, within half a million pixels on a phone and 1.2 million on a desktop),
+  in the old dash's amber seven-segment digits (polygons, every unlit segment ghosting through) and the title's
+  racing italic with a hard ink outline and a soft glow; the tube supplies the retro: the curve, the scanlines, the
+  colour steps, the phosphor's bleed. The layout keeps its units (about 2 CSS px), so every panel is where it was.
+- **The angle meter** is about 40% smaller: 20 blocks of 4 units on a desktop (was 28 of 5), 18 of 3 on a phone.
+- **The border.** The picture is drawn 3.4% larger than the glass (uZoom 0.966), so its edges bow out to a border
+  of about half a percent instead of 2.4%; the corners round off on 3% of the short side (was 4.5%), the rim darkens
+  over 1.8% (was 3.5%) and only to 68% (was 55%). The warp itself is unchanged.
+- **The title and the pause menu on the TV** (`pagetv.js`). The page still lays them out and takes every click, tap
+  and key (its elements invisible, not gone), and the painter draws what it lays out into the HUD's canvas: every
+  box from its computed background, gradient, border, shadows and transform, every run of text from its computed
+  font, colour, spacing and shadow, each point pushed through the glass's curve so that what is drawn sits exactly
+  over what is clicked. Each word is fitted between where the tube shows its two ends (drawn from its first point
+  only, a word came out short near an edge, where the glass squeezes, and a line of text cut across the curve in a
+  staircase). The logo's and the vertical title's gradient type, the swatches and the seal are drawn their own way.
+  It draws again only when something changed (a choice, a hover, a focus, a font, a resize); the pause menu is
+  drawn over a copy of the HUD as the run left it. The pixel fonts are gone from the page (three fewer downloads).
+- **What it costs.** The phone profile under 4x CPU throttling, the HUD switched on and off every second: +2.5 ms of
+  JS a frame (+1.3 ms for the pixel HUD at 195 x 422); with the HUD kept on screen and only its redrawing switched,
+  +1.4 ms. So about 1.2 ms a frame on the jam gate's 2x phone, most of it the canvas going to the GPU.
+- **Measured.** The drift gate: pass desktop 8 banked, pass phone 2 (its first run lost its tab to the browser in a
+  screenshot, `Target closed`; the rerun was clean), city 10, city phone 10; 0 slow frames in every run. The HUD's
+  overlap check over 23 screen sizes: none. The title's credit had gone round the glass's corner at 1280 x 720 (the
+  page set it 18 px from the corner): on the TV it sits 44 px in.
+
 ## 24 September, afternoon: the HUD on the TV, the phone, SUNDRIFT again
 
 Asked for: the HUD to look like it is on the TV and lean more retro; the phone's UI less clunky and the car easier

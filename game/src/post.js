@@ -180,14 +180,14 @@ const Cel = {
 const Retro = {
   uniforms: {
     tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
-    uCurve: { value: 0.022 }, uEdge: { value: 0.055 }, uCorner: { value: 0.045 },
+    uCurve: { value: 0.022 }, uEdge: { value: 0.055 }, uCorner: { value: 0.03 }, uZoom: { value: 0.966 },
     uLevels: { value: 32 }, uMask: { value: 0.06 }, uLens: { value: 0 }, uTime: { value: 0 }, uFlow: { value: 0 },
     uScan: { value: 0.036 }, uHudScan: { value: 0.1 },
     tHud: { value: null }, uHudOn: { value: 0 }, uHudSize: { value: new THREE.Vector2(4, 4) }, uHudScale: { value: 2 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uLevels, uMask, uLens, uTime, uFlow;
+    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uZoom, uLevels, uMask, uLens, uTime, uFlow;
     uniform float uScan, uHudScan, uHudOn, uHudScale; uniform sampler2D tHud; uniform vec2 uHudSize;
     varying vec2 vUv;
     // the OSD's texel under p, square and crisp, softened only over the last screen pixel at its edges
@@ -235,7 +235,9 @@ const Retro = {
     void main(){
       vec2 c = vUv * 2.0 - 1.0;
       float r2 = dot(c, c) * 0.5;                          // 0 at the centre, 0.5 mid-edge, 1 in the corners
-      vec2 uv = vUv + c * (uCurve * r2 + uEdge * r2 * r2);
+      // (drawn a touch larger than the glass, so the edges bow right out to a thin dark border and only the corners
+      // pull in round)
+      vec2 uv = 0.5 + (vUv - 0.5 + c * (uCurve * r2 + uEdge * r2 * r2)) * uZoom;
       // the picture's frame, in pixels of the picture: a rounded rectangle, anti-aliased over a pixel and a half
       vec2 px = (uv - 0.5) * uRes;
       float side = min(uRes.x, uRes.y);
@@ -273,9 +275,9 @@ const Retro = {
       col *= mask * (1.0 + uMask * 0.6);
       // set back behind the glass: darker into the rim, and a faint cold sheen along it, brightest top left
       float rim = -d / side;                               // distance in from the edge, in the screen's shorter side
-      col *= 0.55 + 0.45 * smoothstep(0.0, 0.035, rim);
-      float sheen = smoothstep(0.012, 0.0, abs(rim - 0.006)) * (0.5 + 0.5 * dot(normalize(c + 1e-4), vec2(-0.6, 0.8)));
-      col += vec3(0.05, 0.06, 0.075) * sheen;
+      col *= 0.68 + 0.32 * smoothstep(0.0, 0.018, rim);
+      float sheen = smoothstep(0.006, 0.0, abs(rim - 0.003)) * (0.5 + 0.5 * dot(normalize(c + 1e-4), vec2(-0.6, 0.8)));
+      col += vec3(0.04, 0.05, 0.06) * sheen;
       gl_FragColor = vec4(col * inside, 1.0);
     }`,
 };

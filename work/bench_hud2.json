@@ -1,0 +1,7 @@
+[
+  { "wait": 2500 },
+  { "js": "document.getElementById('startb').click()" },
+  { "wait": 1500 },
+  { "keys": ["KeyW"], "ms": 2000 },
+  { "js": "(() => { const h = window.__DEBUG__.hud, now = () => performance.now(); const T = (f, n = 200) => { const t0 = now(); for (let i = 0; i < n; i++) f(i); return +((now() - t0) / n).toFixed(3); }; const c = h.ctx; c.setTransform(h.s, 0, 0, h.s, 0, 0); const r = {}; r.top = T(() => h._drawTop(now())); r.dash = T(() => h._drawDash(now())); r.seg8 = T((i) => h._seg(String(10000000 + i), 10, 10, h.Z.sc, '#ffb347')); r.panel = T(() => h._panel(10, 10, 60, 30)); r.all = T(() => h._draw(now())); return r; })()" }
+]
