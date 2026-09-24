@@ -256,7 +256,7 @@ export function detectTier() {
   try { if (globalThis.screen && globalThis.screen.width) { sw = globalThis.screen.width; sh = globalThis.screen.height; } } catch (e) { /* no screen */ }
   const small = Math.min(w, h) <= 500 || Math.min(sw, sh) <= 500 || (w * h) <= 1000 * 1000;
   const mobileUA = !!nav && /iPhone|iPad|Android|Mobile/i.test(nav.userAgent || '');
-  // (MINIDRIFT) a touch laptop has a touch screen too, and at 125-150% scaling its window is "small", but its main
+  // (SUNDRIFT) a touch laptop has a touch screen too, and at 125-150% scaling its window is "small", but its main
   // pointer is a trackpad or a mouse: only a coarse main pointer (a finger) makes a small touch screen a phone.
   // Phones, and iPads (which send a desktop user agent), are coarse, so they are unchanged.
   let coarse = false;
@@ -345,7 +345,7 @@ export const ATMOS_KEYS = [
 const STOPS = ['horizon', 'low', 'mid', 'high', 'zenith', 'haze', 'below', 'sunGlow'];
 
 /**
- * (MINIDRIFT) weather: the same row under cloud. Every stop greys toward its own luminance and darkens, the haze
+ * (SUNDRIFT) weather: the same row under cloud. Every stop greys toward its own luminance and darkens, the haze
  * thickens toward grey, and the sun is mostly taken away. oc is 0 (clear) to 1 (heavy rain).
  */
 function overcastAtm(atm, oc) {
@@ -398,13 +398,13 @@ vec3 atmosSky(vec3 d) {
   float band = pow(1.0 - clamp(el / 0.14, 0.0, 1.0), 1.7);
   col = mix(col, uAtmHaze, band * 0.8);
   float sd = max(dot(d, uAtmSunDir), 0.0);
-  // (MINIDRIFT) a softer, tighter glow: the old one, banded by the cel pass, read as a huge glare
+  // (SUNDRIFT) a softer, tighter glow: the old one, banded by the cel pass, read as a huge glare
   float glow = pow(sd, 8.0) * 0.12 + pow(sd, 90.0) * 0.3;
   // the glow spreads along the horizon toward the sun's bearing, not just around the disc
   float az = max(dot(normalize(vec3(d.x, 0.0, d.z) + 1e-5), normalize(vec3(uAtmSunDir.x, 0.0, uAtmSunDir.z) + 1e-5)), 0.0);
   glow += pow(az, 3.0) * 0.10 * (1.0 - smoothstep(0.0, 0.5, el));
   col += uAtmSunGlow * glow;
-  // (MINIDRIFT) lightning: the whole sky and the haze in it flare for a moment
+  // (SUNDRIFT) lightning: the whole sky and the haze in it flare for a moment
   col += uAtmFlash * (0.55 + 0.45 * smoothstep(-0.05, 0.4, y));
   col = mix(col, uAtmBelow, smoothstep(0.004, -0.02, y));
   return col;
@@ -572,7 +572,7 @@ void main() {
 // compiled three programs per setTime() and stalled a running game for 30 ms or more every few seconds.
 let envCache = null;
 /**
- * (MINIDRIFT) Every build after the first goes into the first one's render target, the steps of PMREMGenerator.fromScene
+ * (SUNDRIFT) Every build after the first goes into the first one's render target, the steps of PMREMGenerator.fromScene
  * (three r169, pinned) without its allocation. fromScene makes a new target each time, and a new environment texture
  * made three work out the program of every lit material again on the next frame, plus a texture allocated: a hitch
  * every 2.5 s whenever the sky moves (dusk, dawn, all day). The same texture, redrawn, changes nothing else.
@@ -841,7 +841,7 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     sunPos = sunPosition(THREE, { hour: time.hour, azimuth: time.azimuth, elevation: time.elevation, sunrise: o.sunrise, sunset: o.sunset, maxElevation: o.maxElevation });
     atm = atmosphereAt(sunPos.elevation);
     if (o.overcast > 0) atm = overcastAtm(atm, o.overcast);
-    // (MINIDRIFT) a city's light thrown back by the air: strongest at the horizon, a little of it overhead
+    // (SUNDRIFT) a city's light thrown back by the air: strongest at the horizon, a little of it overhead
     if (o.glow && o.glowK > 0) {
       atm = { ...atm };
       const g = o.glow, k = o.glowK;
@@ -866,7 +866,7 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     // A light of intensity 0 still renders a shadow map, because three keys that off castShadow
     // and not off intensity: below the horizon that is a whole pass for nothing. Measured on one
     // night scene: 1004 draw calls and 19k triangles a frame, all of it discarded.
-    // (MINIDRIFT) castShadow stays constant: it is part of every lit shader, and switching it at dusk and
+    // (SUNDRIFT) castShadow stays constant: it is part of every lit shader, and switching it at dusk and
     // dawn recompiled every material in the scene, a freeze of seconds. The maps simply stop updating instead.
     for (const l of csmLights()) { const on = sunI > 0.01; if (l.shadow.autoUpdate !== on) { l.shadow.autoUpdate = on; if (on) l.shadow.needsUpdate = true; } }
     if (!csm) { sun.castShadow = !!o.shadows; sun.shadow.autoUpdate = sunI > 0.01; if (sunI > 0.01) sun.shadow.needsUpdate = true; }
@@ -925,13 +925,13 @@ export function createRig(THREE, renderer, scene, opts = {}) {
 
     // The environment. Rebuilt because its content is the atmosphere, and the atmosphere moved.
     const groundLin = [bounceU.uBounce.value.r * 1.6 + 0.02, bounceU.uBounce.value.g * 1.6 + 0.02, bounceU.uBounce.value.b * 1.6 + 0.02];
-    // (MINIDRIFT) a light update skips this: the game eases the time of day every frame and rebuilds the
+    // (SUNDRIFT) a light update skips this: the game eases the time of day every frame and rebuilds the
     // environment every few seconds, since a PMREM build is several milliseconds and the sky itself is uniforms
     const flash = atmosU.uAtmFlash.value.clone(); atmosU.uAtmFlash.value.setRGB(0, 0, 0);
     const next = env ? (opts.envMap || buildEnvironment(THREE, renderer, atmosU, groundLin)) : null;
     atmosU.uAtmFlash.value.copy(flash);
     if (next) {
-      // (MINIDRIFT) the environment is redrawn into the same texture after its first build: never dispose that one
+      // (SUNDRIFT) the environment is redrawn into the same texture after its first build: never dispose that one
       if (envTex && envTex !== next && envTex !== opts.envMap && scene.environment === envTex) envTex.dispose();
       envTex = next;
       scene.environment = envTex;
@@ -1184,11 +1184,11 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     }
   }
 
-  /** (MINIDRIFT) cloud cover 0..1; takes effect at the next setTime. */
+  /** (SUNDRIFT) cloud cover 0..1; takes effect at the next setTime. */
   function setOvercast(x) { o.overcast = x; }
-  /** (MINIDRIFT) Light pollution: a linear colour and an amount, applied at the next setTime(). */
+  /** (SUNDRIFT) Light pollution: a linear colour and an amount, applied at the next setTime(). */
   function setGlow(rgb, k = 1) { o.glow = rgb; o.glowK = rgb ? k : 0; }
-  /** (MINIDRIFT) Lightning: how bright the flash is right now (0 none); per frame, no rebuild. */
+  /** (SUNDRIFT) Lightning: how bright the flash is right now (0 none); per frame, no rebuild. */
   function setFlash(k) { atmosU.uAtmFlash.value.setRGB(0.42 * k, 0.46 * k, 0.62 * k); }
 
   function setTime(next = {}, { env = true } = {}) {

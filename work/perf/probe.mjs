@@ -1,4 +1,4 @@
-// Frame-time probe for MINIDRIFT: drives the car with the longrun autopilot under CDP CPU throttling and records
+// Frame-time probe for SUNDRIFT: drives the car with the longrun autopilot under CDP CPU throttling and records
 // per-frame JS / render / shadow timing and renderer counts; optionally a CPU profile of a further window.
 //   node probe.mjs --game=<dir> [--map=city] [--phone] [--cpu=2] [--secs=20] [--warm=5] [--hour=23] [--rain=0]
 //                  [--prof=out.json] [--profsecs=10] [--nomin] [--diff=easy] [--frames=out.json] [--tag=A]

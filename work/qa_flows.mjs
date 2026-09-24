@@ -135,7 +135,7 @@ note('right-button orbit:', await ev('({ oYaw: window.__DEBUG__.chase.oYaw.toFix
 await page.mouse.up({ button: 'right' }); await sleep(800);
 for (let i = 0; i < 12; i++) { await page.mouse.wheel({ deltaY: 120 }); await sleep(40); }
 await sleep(800);
-note('zoom out x12:', await ev('({ zoom: window.__DEBUG__.chase.zoom, stored: localStorage.getItem("minidrift.zoom") })'));
+note('zoom out x12:', await ev('({ zoom: window.__DEBUG__.chase.zoom, stored: localStorage.getItem("sundrift.zoom") })'));
 await shot('08_zoom_out');
 for (let i = 0; i < 24; i++) { await page.mouse.wheel({ deltaY: -120 }); await sleep(40); }
 await sleep(800);

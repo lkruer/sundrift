@@ -1,9 +1,17 @@
 /**
- * MINIDRIFT — every tunable in one place.
+ * SUNDRIFT — every tunable in one place.
  *
  * Colours here are the style lock (STYLE_LOCK.md at the repo root) and nothing else; the assets use the
  * same hex values, which is what makes a road, a tree and a car built by different agents read as one place.
  */
+// The game was MINIDRIFT for two days (22 to 24 September) and kept its bests and settings under 'minidrift.': they are
+// moved to 'sundrift.' once, before anything reads them (this module is the first every other one imports)
+try {
+  const old = [];
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('minidrift.')) old.push(k); }
+  for (const k of old) { localStorage.setItem('sundrift.' + k.slice(10), localStorage.getItem(k)); localStorage.removeItem(k); }
+} catch {}
+
 export const PAL = {
   asphalt: 0x3a3b40, laneWhite: 0xe8e4da, concrete: 0xa8a49c, galvanised: 0xb9bcc0, stone: 0x8a7f72,
   dryGrass: 0x9a8a3c, moss: 0x5f7a3a, cedar: 0x2f5a3a, bark: 0x5a3f2c,

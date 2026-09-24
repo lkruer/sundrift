@@ -10,7 +10,7 @@
 <!-- (a dark page by design: no browser's forced dark mode re-colours it; and iOS never makes a score into a phone link) -->
 <meta name="color-scheme" content="dark">
 <meta name="format-detection" content="telephone=no">
-<title>MINIDRIFT</title>
+<title>SUNDRIFT</title>
 <!-- The only network dependencies: Three.js pinned to the version the recipe's verifier renders with, and fonts. -->
 <script type="importmap">
 { "imports": {
@@ -22,10 +22,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Racing+Sans+One&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap">
 <!-- the Japanese type: only the few characters the game draws are fetched -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Serif+JP:wght@900&family=M+PLUS+Rounded+1c:wght@800&text=%E5%A4%9C%E6%A1%9C%E5%B3%A0%E3%83%9F%E3%83%8B%E3%83%89%E3%83%AA%E3%83%95%E3%83%88%E8%B5%B0%E4%B8%80%E6%99%82%E5%81%9C%E6%AD%A2%E6%AB%BB%E5%AE%AE%E9%9C%A7%E5%B3%B0%E7%B4%85%E8%91%89%E6%9C%88%E8%A6%8B%E5%A4%A9%E7%8B%97%E6%98%9F%E9%99%8D%E7%99%BD%E6%A8%BA%E7%8B%90%E5%A1%9A%E9%9B%B7%E9%B3%A5%E7%BE%A4%E9%A6%AC%E3%81%9F%E3%83%B3%E3%83%8D%E3%83%AB0123456789-%C2%B7km%E2%86%91%E2%86%90%E2%86%92%20%E5%BE%90%E8%A1%8C%E3%82%AA%E6%9D%B1%E4%BA%AC%E3%81%BE%E3%82%8C%E3%83%A9%E3%83%BC%E3%83%A1%E3%82%AB%E3%82%B1%E5%B1%85%E9%85%92%E5%B1%8B%E5%AF%BF%E5%8F%B8%E7%84%BC%E8%82%89%E8%96%AC%E3%81%8F%E3%81%99%E3%82%8A%E3%83%9B%E3%83%86%E3%83%91%E3%83%81%E3%82%B3%E3%82%B2%E3%83%A0%E5%96%AB%E8%8C%B6%E9%BA%BB%E9%9B%80%E5%8D%A0%E3%81%84%E7%8F%88%E7%90%B2%E5%96%B6%E6%A5%AD%E4%B8%AD%E5%A0%B4%E3%82%B9%E3%83%8A%E3%83%83%E3%82%AFABCDEFGHIJKLMNOPQRSTUVWXYZ%26%C2%A5%2C.%2F%3Ain%E3%82%A2%E3%82%A6%E3%83%9E%E3%82%B0%E5%BC%95%E6%88%BB%E9%A6%96%E9%83%BD%E9%AB%98%E9%80%9F%E7%92%B0%E7%8A%B6%E7%B7%9A%E9%8A%80%E5%BA%A7%E6%96%B0%E5%AE%BF%E7%99%BA%E5%A3%B2%E4%BD%9C%E5%A4%A7%E5%87%BA%E3%81%97%E3%81%AE%E6%B0%97%E9%9B%A8%E7%95%AA%E8%A1%97%E5%95%86%E5%BA%97%E5%AF%8C%E5%A3%AB%E5%B1%B1&display=swap">
-<!-- the icon, drawn in code like everything else: the logo's M in its sunset gradient -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffd23f'/%3E%3Cstop offset='.5' stop-color='%23ff6a8a'/%3E%3Cstop offset='1' stop-color='%239a5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%23140f1c'/%3E%3Crect x='3' y='3' width='58' height='58' rx='11' fill='none' stroke='%23ffb347' stroke-opacity='.35' stroke-width='2'/%3E%3Ctext x='33' y='47' text-anchor='middle' font-family='Arial Black,Arial,sans-serif' font-weight='900' font-style='italic' font-size='40' fill='url(%23g)'%3EM%3C/text%3E%3C/svg%3E">
-<meta name="description" content="MINIDRIFT: a night touge drift game. Every drift you bank moves the clock toward dawn. Keyboard, or one finger on a phone.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Noto+Serif+JP:wght@900&family=M+PLUS+Rounded+1c:wght@800&text=%E5%A4%9C%E6%A1%9C%E5%B3%A0%E3%83%9F%E3%83%8B%E3%83%89%E3%83%AA%E3%83%95%E3%83%88%E8%B5%B0%E4%B8%80%E6%99%82%E5%81%9C%E6%AD%A2%E6%AB%BB%E5%AE%AE%E9%9C%A7%E5%B3%B0%E7%B4%85%E8%91%89%E6%9C%88%E8%A6%8B%E5%A4%A9%E7%8B%97%E6%98%9F%E9%99%8D%E7%99%BD%E6%A8%BA%E7%8B%90%E5%A1%9A%E9%9B%B7%E9%B3%A5%E7%BE%A4%E9%A6%AC%E3%81%9F%E3%83%B3%E3%83%8D%E3%83%AB0123456789-%C2%B7km%E2%86%91%E2%86%90%E2%86%92%20%E5%BE%90%E8%A1%8C%E3%82%AA%E6%9D%B1%E4%BA%AC%E3%81%BE%E3%82%8C%E3%83%A9%E3%83%BC%E3%83%A1%E3%82%AB%E3%82%B1%E5%B1%85%E9%85%92%E5%B1%8B%E5%AF%BF%E5%8F%B8%E7%84%BC%E8%82%89%E8%96%AC%E3%81%8F%E3%81%99%E3%82%8A%E3%83%9B%E3%83%86%E3%83%91%E3%83%81%E3%82%B3%E3%82%B2%E3%83%A0%E5%96%AB%E8%8C%B6%E9%BA%BB%E9%9B%80%E5%8D%A0%E3%81%84%E7%8F%88%E7%90%B2%E5%96%B6%E6%A5%AD%E4%B8%AD%E5%A0%B4%E3%82%B9%E3%83%8A%E3%83%83%E3%82%AFABCDEFGHIJKLMNOPQRSTUVWXYZ%26%C2%A5%2C.%2F%3Ain%E3%82%A2%E3%82%A6%E3%83%9E%E3%82%B0%E5%BC%95%E6%88%BB%E9%A6%96%E9%83%BD%E9%AB%98%E9%80%9F%E7%92%B0%E7%8A%B6%E7%B7%9A%E9%8A%80%E5%BA%A7%E6%96%B0%E5%AE%BF%E7%99%BA%E5%A3%B2%E4%BD%9C%E5%A4%A7%E5%87%BA%E3%81%97%E3%81%AE%E6%B0%97%E9%9B%A8%E7%95%AA%E8%A1%97%E5%95%86%E5%BA%97%E5%AF%8C%E5%A3%AB%E5%B1%B1%E3%82%B5&display=swap">
+<!-- the icon, drawn in code like everything else: the logo's S in its sunset gradient -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffd23f'/%3E%3Cstop offset='.5' stop-color='%23ff6a8a'/%3E%3Cstop offset='1' stop-color='%239a5cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%23140f1c'/%3E%3Crect x='3' y='3' width='58' height='58' rx='11' fill='none' stroke='%23ffb347' stroke-opacity='.35' stroke-width='2'/%3E%3Ctext x='33' y='47' text-anchor='middle' font-family='Arial Black,Arial,sans-serif' font-weight='900' font-style='italic' font-size='40' fill='url(%23g)'%3ES%3C/text%3E%3C/svg%3E">
+<meta name="description" content="SUNDRIFT: a night touge drift game. Every drift you bank moves the clock toward dawn. Keyboard, or one finger on a phone.">
 <style>
   :root {
     --ink:#f6efe2; --dim:#a79f95; --amber:#ffb347; --amber2:#ff8a2a; --gold:#f0c24a; --red:#ff3b30; --teal:#6fe3d6;
@@ -435,14 +435,14 @@
 <canvas id="c"></canvas>
 
 <div id="load">
-  <h1 class="logo" data-t="MINIDRIFT">MINIDRIFT</h1>
-  <div class="kana jp">ミニドリフト</div>
+  <h1 class="logo" data-t="SUNDRIFT">SUNDRIFT</h1>
+  <div class="kana jp">サンドリフト</div>
   <div class="tag" id="loadtag">NIGHT TOUGE</div>
   <div id="bar"><div id="barf"></div></div>
   <div id="loadmsg">warming up</div>
 </div>
 <!-- (the loading screen names the map the game will open on, as the title's tagline does) -->
-<script>try { if (localStorage.getItem('minidrift.map') === 'city') document.getElementById('loadtag').textContent = 'NEON STREETS'; } catch (e) {}</script>
+<script>try { if ((localStorage.getItem('sundrift.map') || localStorage.getItem('minidrift.map')) === 'city') document.getElementById('loadtag').textContent = 'NEON STREETS'; } catch (e) {}</script>
 <div id="lost"><div><b>THE BROWSER DROPPED THE GRAPHICS</b><br>TAP OR CLICK TO RELOAD · YOUR BEST SCORES ARE KEPT</div></div>
 <script>
 // The page says what went wrong where the loading bar would otherwise just stand still: a browser with no import maps
@@ -456,7 +456,7 @@
     if (said || window.__READY__ || !l || !m || l.style.display === 'none') return;
     said = true; m.className = 'err'; m.textContent = t;
   }
-  var OLD = 'This browser is too old for MINIDRIFT: it needs Safari 16.4, Chrome 89 or Firefox 108, or newer';
+  var OLD = 'This browser is too old for SUNDRIFT: it needs Safari 16.4, Chrome 89 or Firefox 108, or newer';
   var S = window.HTMLScriptElement;
   if (S && (!('noModule' in S.prototype) || (S.supports && !S.supports('importmap')))) say(OLD);
   // (caught on the way down, so a script that failed to load is heard as well as one that threw)
@@ -465,7 +465,7 @@
     if (el && el.tagName === 'SCRIPT') { say('Could not load the game: check the connection, and reload'); return; }
     if (el && el !== window) return;           // (a font that did not come is nothing: the page has fallbacks)
     var t = String((e && e.message) || '');
-    if (/WebGL/i.test(t)) say('MINIDRIFT needs WebGL 2, and this browser could not start it: turn on hardware acceleration, or try another browser');
+    if (/WebGL/i.test(t)) say('SUNDRIFT needs WebGL 2, and this browser could not start it: turn on hardware acceleration, or try another browser');
     else if (/specifier|resolve|import map|importmap/i.test(t)) say(OLD);
     else if (t) say('Could not start: ' + t);
   }, true);
@@ -515,8 +515,8 @@
   <div class="shade"></div>
   <div class="tatebox"><div class="tate jp">夜桜峠</div><div class="seal jp">走</div></div>
   <div class="menu">
-    <h1 class="logo" data-t="MINIDRIFT">MINIDRIFT</h1>
-    <div class="kana jp">ミニドリフト</div>
+    <h1 class="logo" data-t="SUNDRIFT">SUNDRIFT</h1>
+    <div class="kana jp">サンドリフト</div>
     <div class="tag" id="tagline" style="text-indent:0;margin-top:-4px">NIGHT TOUGE · DRIFT UNTIL DAWN</div>
     <div class="sect">MAP</div>
     <div class="maps" id="maps">

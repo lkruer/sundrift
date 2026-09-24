@@ -27,7 +27,7 @@ export class Input {
     this.touchMode = false;
     this.anyKey = false;
     this.zoom = 1;                // chase camera distance factor, mouse wheel or plus and minus
-    try { this.zoom = Math.min(2.6, Math.max(0.7, Number(localStorage.getItem('minidrift.zoom')) || 1)); } catch {}
+    try { this.zoom = Math.min(2.6, Math.max(0.7, Number(localStorage.getItem('sundrift.zoom')) || 1)); } catch {}
     // A wheel's notch (a line or a page, or 40 px and more) is one 12% step, as it was; a trackpad sends a stream of a few
     // pixels at a time (dozens a swipe), which moves the zoom in proportion instead of throwing it end to end. A pinch
     // on a trackpad arrives as ctrl + wheel (Chrome, Firefox): the camera's zoom too, never the page's.
@@ -59,7 +59,7 @@ export class Input {
 
   setZoom(z) {
     this.zoom = Math.min(2.6, Math.max(0.7, z));
-    try { localStorage.setItem('minidrift.zoom', String(this.zoom)); } catch {}
+    try { localStorage.setItem('sundrift.zoom', String(this.zoom)); } catch {}
   }
 
   detectTouch() {

@@ -1,5 +1,5 @@
 /**
- * MINIDRIFT — boot, the title screen, the frame loop, pause, and the contract the harness steers by.
+ * SUNDRIFT — boot, the title screen, the frame loop, pause, and the contract the harness steers by.
  *
  * window.__GAME__ is refreshed every frame: `pos` in metres (the gate drives by it), `fps` from REAL elapsed
  * time, draws and tris straight from renderer.info. The start button is #startb and it is the only way a run
@@ -27,8 +27,8 @@ const $ = (id) => document.getElementById(id);
 const canvas = $('c');
 const loadEl = $('load'), barf = $('barf'), loadmsg = $('loadmsg');
 const store = {
-  get(k, d) { try { const v = localStorage.getItem('minidrift.' + k); return v === null ? d : v; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('minidrift.' + k, String(v)); } catch {} },
+  get(k, d) { try { const v = localStorage.getItem('sundrift.' + k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('sundrift.' + k, String(v)); } catch {} },
 };
 
 const PAINTS = [

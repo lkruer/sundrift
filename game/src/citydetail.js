@@ -213,7 +213,7 @@ function adAtlas(w) {
     c.fillStyle = '#d11c1c'; c.fillRect(-122, -6, 12, 10);
     c.fillStyle = '#18181a'; for (const x of [-72, 78]) { c.beginPath(); c.arc(x, 18, 20, 0, TAU); c.fill(); c.fillStyle = '#b8843a'; c.beginPath(); c.arc(x, 18, 10, 0, TAU); c.fill(); c.fillStyle = '#18181a'; }
     c.restore();
-    text('MINIDRIFT', W / 2, 58, 72, '#ffffff', { font: `italic 72px ${RACE}`, glow: '#ff8a2a', stroke: '#4a0a2a', sw: 6, maxW: W - 50 });
+    text('SUNDRIFT', W / 2, 58, 72, '#ffffff', { font: `italic 72px ${RACE}`, glow: '#ff8a2a', stroke: '#4a0a2a', sw: 6, maxW: W - 50 });
   });
   // 6: a sale
   cell(6, (W, H) => {

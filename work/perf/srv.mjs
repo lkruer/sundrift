@@ -1,6 +1,6 @@
 // Static server for A/B perf runs: several game folders side by side.
 //   /<name>/...       -> that folder
-//   /<name>-city/...  -> the same folder, index.html with localStorage minidrift.map = city set first
+//   /<name>-city/...  -> the same folder, index.html with localStorage sundrift.map = city set first
 // CLI: node srv.mjs <port> name=dir [name=dir ...]
 import { createServer } from 'http';
 import fs from 'fs';
@@ -25,7 +25,7 @@ export function startServer(mounts, port = 0) {
     const type = MIME[path.extname(file)] || 'application/octet-stream';
     if (city && sub === '/index.html') {
       let html = fs.readFileSync(file, 'utf8');
-      html = html.replace('<head>', "<head><script>try{localStorage.setItem('minidrift.map','city')}catch(e){}</script>");
+      html = html.replace('<head>', "<head><script>try{localStorage.setItem('sundrift.map','city')}catch(e){}</script>");
       res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' });
       return res.end(html);
     }

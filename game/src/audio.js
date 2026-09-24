@@ -70,7 +70,7 @@ const SONGS = {
   },
 };
 // the engine's own processor (see _engine): loaded from a blob, so there is no file to ship
-const ENGINE_WORKLET = "\n/**\n * The engine, sample by sample: an inline four firing every half turn of the crank, each firing a sharp pressure\n * pulse (harder under load, softer off it, never two alike, the four cylinders never quite equal) with the noise of\n * the burn riding on it, ringing through the exhaust's fixed resonances, then a DC blocker and a little saturation.\n * A pop (the 'pop' parameter rising): unburnt fuel lighting off in the hot pipe on the overrun, a crack and a boom.\n */\nclass MinidriftEngine extends AudioWorkletProcessor {\n  static get parameterDescriptors() {\n    return [\n      { name: 'rpm', defaultValue: 900, minValue: 200, maxValue: 12000, automationRate: 'k-rate' },\n      { name: 'load', defaultValue: 0.2, minValue: 0, maxValue: 1, automationRate: 'k-rate' },\n      { name: 'cut', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },\n      { name: 'pop', defaultValue: 0, minValue: 0, maxValue: 2, automationRate: 'k-rate' },\n    ];\n  }\n  constructor() {\n    super();\n    this.ph = 0; this.cyl = 0; this.t = 1; this.amp = 0; this.pop = 0; this.popT = 1; this.popIn = 0;\n    this.bias = [1.0, 0.9, 1.07, 0.95];\n    this.s = 22222; this.dc = 0;\n    // the exhaust's and the body's resonances: frequency, Q, gain (two-pole band-passes, unity at the peak)\n    const R = [[92, 3.0, 1.0], [205, 4.5, 0.85], [430, 6.0, 0.6], [860, 5.5, 0.38], [1620, 4.5, 0.22], [3100, 3.0, 0.1]];\n    this.r = R.map(([f, q, g]) => {\n      const w = 2 * Math.PI * f / sampleRate, al = Math.sin(w) / (2 * q), a0 = 1 + al;\n      return { b0: al / a0, b2: -al / a0, a1: -2 * Math.cos(w) / a0, a2: (1 - al) / a0, g, x1: 0, x2: 0, y1: 0, y2: 0 };\n    });\n  }\n  rnd() { this.s = (this.s * 1664525 + 1013904223) >>> 0; return this.s / 4294967296; }\n  process(inputs, outputs, P) {\n    const out = outputs[0] && outputs[0][0];\n    if (!out) return true;\n    const rpm = P.rpm[0], load = P.load[0], cut = P.cut[0];\n    const sr = sampleRate, dph = rpm / 60 / sr, dt = 1 / sr;\n    const tau = 0.0008 + 0.0024 * (1 - load);\n    const popIn = P.pop[0];\n    if (popIn > 0.05 && this.popIn <= 0.05) { this.pop = popIn * (0.8 + 0.4 * this.rnd()); this.popT = 0; }\n    this.popIn = popIn;\n    for (let i = 0; i < out.length; i++) {\n      this.ph += dph;\n      if (this.ph >= 0.5) {\n        this.ph -= 0.5;\n        const c = this.cyl; this.cyl = (c + 1) & 3;\n        const fired = cut > 0 && this.rnd() < cut ? 0 : 1;\n        this.amp = fired * (0.22 + 0.78 * load) * this.bias[c] * (0.86 + 0.28 * this.rnd());\n        this.t = 0;\n      }\n      this.t += dt; this.popT += dt;\n      const env = Math.exp(-this.t / tau) * (1 - Math.exp(-this.t / 0.00016));\n      const nz = this.rnd() * 2 - 1;\n      let x = this.amp * env * (1 + 0.5 * nz);\n      if (this.popT < 0.07) { const pe = Math.exp(-this.popT / 0.011); x += this.pop * pe * (nz * 0.95 + Math.sin(this.popT * 440) * 0.7); }\n      let y = x * 0.22;\n      for (let k = 0; k < this.r.length; k++) {\n        const r = this.r[k];\n        const v = r.b0 * x + r.b2 * r.x2 - r.a1 * r.y1 - r.a2 * r.y2;\n        r.x2 = r.x1; r.x1 = x; r.y2 = r.y1; r.y1 = v;\n        y += v * r.g;\n      }\n      this.dc += (y - this.dc) * 0.0015;\n      out[i] = Math.tanh((y - this.dc) * 2.4) * 0.6;\n    }\n    return true;\n  }\n}\nregisterProcessor('minidrift-engine', MinidriftEngine);\n";
+const ENGINE_WORKLET = "\n/**\n * The engine, sample by sample: an inline four firing every half turn of the crank, each firing a sharp pressure\n * pulse (harder under load, softer off it, never two alike, the four cylinders never quite equal) with the noise of\n * the burn riding on it, ringing through the exhaust's fixed resonances, then a DC blocker and a little saturation.\n * A pop (the 'pop' parameter rising): unburnt fuel lighting off in the hot pipe on the overrun, a crack and a boom.\n */\nclass SundriftEngine extends AudioWorkletProcessor {\n  static get parameterDescriptors() {\n    return [\n      { name: 'rpm', defaultValue: 900, minValue: 200, maxValue: 12000, automationRate: 'k-rate' },\n      { name: 'load', defaultValue: 0.2, minValue: 0, maxValue: 1, automationRate: 'k-rate' },\n      { name: 'cut', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },\n      { name: 'pop', defaultValue: 0, minValue: 0, maxValue: 2, automationRate: 'k-rate' },\n    ];\n  }\n  constructor() {\n    super();\n    this.ph = 0; this.cyl = 0; this.t = 1; this.amp = 0; this.pop = 0; this.popT = 1; this.popIn = 0;\n    this.bias = [1.0, 0.9, 1.07, 0.95];\n    this.s = 22222; this.dc = 0;\n    // the exhaust's and the body's resonances: frequency, Q, gain (two-pole band-passes, unity at the peak)\n    const R = [[92, 3.0, 1.0], [205, 4.5, 0.85], [430, 6.0, 0.6], [860, 5.5, 0.38], [1620, 4.5, 0.22], [3100, 3.0, 0.1]];\n    this.r = R.map(([f, q, g]) => {\n      const w = 2 * Math.PI * f / sampleRate, al = Math.sin(w) / (2 * q), a0 = 1 + al;\n      return { b0: al / a0, b2: -al / a0, a1: -2 * Math.cos(w) / a0, a2: (1 - al) / a0, g, x1: 0, x2: 0, y1: 0, y2: 0 };\n    });\n  }\n  rnd() { this.s = (this.s * 1664525 + 1013904223) >>> 0; return this.s / 4294967296; }\n  process(inputs, outputs, P) {\n    const out = outputs[0] && outputs[0][0];\n    if (!out) return true;\n    const rpm = P.rpm[0], load = P.load[0], cut = P.cut[0];\n    const sr = sampleRate, dph = rpm / 60 / sr, dt = 1 / sr;\n    const tau = 0.0008 + 0.0024 * (1 - load);\n    const popIn = P.pop[0];\n    if (popIn > 0.05 && this.popIn <= 0.05) { this.pop = popIn * (0.8 + 0.4 * this.rnd()); this.popT = 0; }\n    this.popIn = popIn;\n    for (let i = 0; i < out.length; i++) {\n      this.ph += dph;\n      if (this.ph >= 0.5) {\n        this.ph -= 0.5;\n        const c = this.cyl; this.cyl = (c + 1) & 3;\n        const fired = cut > 0 && this.rnd() < cut ? 0 : 1;\n        this.amp = fired * (0.22 + 0.78 * load) * this.bias[c] * (0.86 + 0.28 * this.rnd());\n        this.t = 0;\n      }\n      this.t += dt; this.popT += dt;\n      const env = Math.exp(-this.t / tau) * (1 - Math.exp(-this.t / 0.00016));\n      const nz = this.rnd() * 2 - 1;\n      let x = this.amp * env * (1 + 0.5 * nz);\n      if (this.popT < 0.07) { const pe = Math.exp(-this.popT / 0.011); x += this.pop * pe * (nz * 0.95 + Math.sin(this.popT * 440) * 0.7); }\n      let y = x * 0.22;\n      for (let k = 0; k < this.r.length; k++) {\n        const r = this.r[k];\n        const v = r.b0 * x + r.b2 * r.x2 - r.a1 * r.y1 - r.a2 * r.y2;\n        r.x2 = r.x1; r.x1 = x; r.y2 = r.y1; r.y1 = v;\n        y += v * r.g;\n      }\n      this.dc += (y - this.dc) * 0.0015;\n      out[i] = Math.tanh((y - this.dc) * 2.4) * 0.6;\n    }\n    return true;\n  }\n}\nregisterProcessor('sundrift-engine', SundriftEngine);\n";
 
 // the left hand breaks the chord in quarters: the bass, then three of the pad's notes
 const LH = { 0: -1, 4: 1, 8: 2, 12: 3 };
@@ -95,7 +95,7 @@ export class Audio {
   constructor() {
     this.ctx = null; this.ready = false;
     this.muted = false;
-    try { this.muted = localStorage.getItem('minidrift.mute') === '1'; } catch {}
+    try { this.muted = localStorage.getItem('sundrift.mute') === '1'; } catch {}
     this.rpm = 900; this.throttle = 0; this.lastThrottle = 0; this.lastRpm = 900;
     this.music = { on: true, next: 0, step: 0, tempo: 128, intensity: 0 };
     // the menus' buttons click: a mouse on the press, a finger on the release (a browser lets a page make sound from a
@@ -109,7 +109,7 @@ export class Audio {
     };
     addEventListener('pointerdown', ui, true); addEventListener('pointerup', ui, true);
     // a new best is the HUD's to notice (main.js hands it only the HUD); it says so with a window event
-    addEventListener('minidrift:best', () => this.onEvent({ type: 'best' }));
+    addEventListener('sundrift:best', () => this.onEvent({ type: 'best' }));
     // (the sound's life: held while the game is paused (pause) or the page is hidden; any other time a context that has
     // stopped is started again, at the next touch or key if it needs one (iOS stops it for a call, an alarm or another
     // app's sound, reports 'interrupted', and lets a page start it again only from a gesture: a finger's touchend, a
@@ -228,7 +228,7 @@ export class Audio {
         const url = URL.createObjectURL(new Blob([ENGINE_WORKLET], { type: 'application/javascript' }));
         c.audioWorklet.addModule(url).then(() => {
           if (settled) return;
-          const node = new AudioWorkletNode(c, 'minidrift-engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+          const node = new AudioWorkletNode(c, 'sundrift-engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
           node.connect(this.engFilter);
           settled = true; clearTimeout(timer);
           this.engNode = node;
@@ -387,7 +387,7 @@ export class Audio {
 
   setMuted(m) {
     this.muted = m;
-    try { localStorage.setItem('minidrift.mute', m ? '1' : '0'); } catch {}
+    try { localStorage.setItem('sundrift.mute', m ? '1' : '0'); } catch {}
     if (!m) this._session();
     if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.05);
   }
@@ -874,7 +874,7 @@ export class Audio {
     this._bellHit(t + 0.27, top * 2, 0.09, 0.8);
   }
 
-  /** React to scoring events (and a new best, which the HUD announces with a window event 'minidrift:best'). */
+  /** React to scoring events (and a new best, which the HUD announces with a window event 'sundrift:best'). */
   onEvent(e) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;

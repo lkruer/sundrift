@@ -1,4 +1,4 @@
-# MINIDRIFT
+# SUNDRIFT
 
 Endless night drifting in Japan, on two maps: a mountain pass in cherry-blossom season (夜桜峠, Yozakura Pass)
 or the rain-slick neon streets of NEO TOKYO (ネオ東京). Chain drifts to bank score and boost, clip the guardrail
@@ -69,7 +69,7 @@ at load time.
   own gate (`gate/drift-gate.mjs`: real keys or real touches, steering by telemetry, asserting that drifts were
   banked), run on both maps, desktop and phone, before every push; each round's numbers are in NOTES.md.
 - **What was thrown away,** each with its reason in NOTES.md: the first plan (an autumn pass at golden hour) for a
-  night touge in cherry-blossom season; the first name (SUNDRIFT); the first hero car, and the losing candidates of
+  night touge in cherry-blossom season; a second name (MINIDRIFT, for two days; the game is SUNDRIFT again); the first hero car, and the losing candidates of
   every asset (`work/cands/`); the MEDIUM course; a counter-steer assist that overrode the player's key; a reversing
   aid that stopped a sliding car dead; a drift that unwound on its own after a second and a half (a slide now holds
   for as long as it is held); rain drawn as added light, which glowed white by day; a DOM countdown panel that

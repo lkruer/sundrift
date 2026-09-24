@@ -1,4 +1,4 @@
-# MINIDRIFT build notes (the game was called SUNDRIFT until 22 September)
+# SUNDRIFT build notes (the game was called MINIDRIFT from 22 to 24 September, then SUNDRIFT again)
 
 The receipts: what was decided, what was measured, what was thrown away, what is still wrong. Dates are UTC.
 Everything was built between 21 and 25 September 2026 for the 404 game jam 001, by one person driving Claude
@@ -232,7 +232,7 @@ triangles, median 60 fps. The car is 34,176 triangles in 431 meshes, baked per j
 - No traffic, no ghosts, no leaderboards beyond a local best score.
 
 
-## 22 September, evening: MINIDRIFT, one mountain
+## 22 September, evening: one mountain (and a new name for two days, MINIDRIFT)
 
 Asked for: no jitter, no freezes, no terrain that clips or road that floats, the name MINIDRIFT, a smaller car
 with a sportier tail, a bigger 90s JDM dash, easier clean drifting, easy/medium/hard courses, a title screen

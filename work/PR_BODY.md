@@ -2,7 +2,7 @@
 
 - Play link: https://lkruer.github.io/sundrift/game/
 - Source repo: https://github.com/lkruer/sundrift
-- Commit the verdict names: FINAL_SHA
+- Commit the verdict names: 83f608b4ee71cd503b329dc0e0073cef07f9ec45
 - Team (GitHub handles): lkruer
 
 ## Verdict block
@@ -10,7 +10,25 @@
 Paste the block `harness/jam.mjs` printed, unedited, from `=== 404 JAM VERDICT ===` to `=== END ===`.
 
 ```
-VERDICT_BLOCK
+=== 404 JAM VERDICT ===
+url             https://lkruer.github.io/sundrift/game/
+utc             2026-09-24T08:11:04.501Z
+commit          83f608b4ee71cd503b329dc0e0073cef07f9ec45
+viewport        390x844 @3x phone, real touch, Android Chrome UA
+network         4G: 4 Mbps down, 1 Mbps up, 60 ms latency, CPU 2x slower
+ready           10.0 s   budget 20 s   PASS
+weight          1.9 MB   budget 10 MB   PASS
+started         yes (tap on #startb)
+moved           96.8 m   needs 1 m   PASS
+peak draws      336   budget 900   PASS
+peak tris       596,797   budget 1,500,000   PASS
+median fps      60 (ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11))
+errors          0   PASS
+404s            0   PASS
+external deps   none   cdn: fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net
+outside folder  none, every file came from the game folder
+RESULT: PASS
+=== END ===
 ```
 
 ## What I found

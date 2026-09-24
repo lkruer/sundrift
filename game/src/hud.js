@@ -136,7 +136,7 @@ export class Hud {
     this.holdScore = 0;                  // the score's roll waits for the banked points to fly in
     this.canBuzz = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
     this._buzzT = 0;
-    try { this.coached = localStorage.getItem('minidrift.drifted') === '1'; } catch { this.coached = false; }
+    try { this.coached = localStorage.getItem('sundrift.drifted') === '1'; } catch { this.coached = false; }
     this.run = { t: 0, smashN: 0, smashLast: 0, newBest: false, best0: 0 };
     this.scoring = null;
     // the run card on the pause screen is filled in the moment the pause opens (main.js adds the class)
@@ -199,12 +199,12 @@ export class Hud {
     if (this.el.scorelab) { this.el.scorelab.textContent = 'SCORE'; this.el.scorelab.classList.remove('best'); }
   }
 
-  /** The best kept for the course picked on the title (main.js keeps it under minidrift.best.<city.>easy|hard). */
+  /** The best kept for the course picked on the title (main.js keeps it under sundrift.best.<city.>easy|hard). */
   _storedBest() {
     try {
       const m = document.querySelector('.map.sel'), d = document.querySelector('.diff.sel');
       const key = (m && m.dataset.m === 'city' ? 'city.' : '') + (d ? d.dataset.d : 'easy');
-      return Number(localStorage.getItem('minidrift.best.' + key)) || 0;
+      return Number(localStorage.getItem('sundrift.best.' + key)) || 0;
     } catch { return 0; }
   }
 
@@ -365,7 +365,7 @@ export class Hud {
         const word = SCORE.tierNames[e.tier] || '';
         if (word) this.toast(word + ' DRIFT!', 't' + e.tier, e.tier >= 2, e.chain > 1 ? 'COMBO ×' + e.chain : '', 2);
         if (e.value >= 100) this.buzz(e.tier >= 3 ? [26, 40, 26, 40, 50] : e.tier === 2 ? [20, 40, 24] : e.tier === 1 ? 18 : 10);
-        if (!this.coached) { this.coached = true; try { localStorage.setItem('minidrift.drifted', '1'); } catch {} }
+        if (!this.coached) { this.coached = true; try { localStorage.setItem('sundrift.drifted', '1'); } catch {} }
         break;
       }
       case 'switch': this._punch('combo'); this.toast('SWITCH!', 'good', false, '', 1); break;
@@ -385,7 +385,7 @@ export class Hud {
         play(el.scorebox, [{ transform: 'translateX(-50%) scale(1)' }, { transform: 'translateX(-50%) scale(1.14)', offset: 0.25 }, { transform: 'translateX(-50%) scale(1)' }], 460, 'ease-out');
         this.buzz([30, 50, 30, 50, 80]);
         // (main.js hands a new best to the HUD alone; the sound hears of it from this)
-        dispatchEvent(new CustomEvent('minidrift:best'));
+        dispatchEvent(new CustomEvent('sundrift:best'));
         break;
       }
       case 'jturn': this.toast('J-TURN!', 'good', true, '+' + fmt(e.value), 2); this.buzz([20, 30, 30]); break;

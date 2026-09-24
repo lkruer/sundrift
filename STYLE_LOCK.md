@@ -1,4 +1,4 @@
-# MINIDRIFT — the locked style (spring night, since 23 September)
+# SUNDRIFT — the locked style (spring night, since 23 September)
 
 > Stylised Japanese mountain-pass objects on a spring night in cherry-blossom season (yozakura): clean low-segment geometry with crisp silhouettes and chunky
 > proportions, one flat matte colour per part from the palette below, flat shading on foliage and rock, smooth
