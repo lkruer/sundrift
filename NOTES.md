@@ -396,6 +396,61 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 25 September, the last pass: ready to enter
+
+- **The jam gate, run as the organisers will** (`harness/jam.mjs` against the live URL: phone, real touch, 4G, CPU
+  slowed 2x): PASS, ready 13.8 s of 20, 2.3 MB of 10, 379 draws, 0.64 M triangles, no errors, no 404s; the recipe's
+  `ship.mjs` flags nothing (no literal vertex arrays, no base64). Where the load goes, under the same conditions
+  (work/boot_probe.mjs reads the game's own boot log): 3.6 s of network, 2.1 s of assets, 2.0 s for NEO TOKYO (loaded
+  at boot although a run starts on the pass), 0.5 s the car, 0.8 s the mountain, 3.5 s the shaders and the first
+  build.
+- **Runs start at dusk.** 20:36 was already full night: the first drifts moved a clock nobody could see move. A run
+  (and the title) now starts at 18:12, the sky still warm and the lamps lit, and the first minute's drifting carries
+  it on into the night (at 18:36 it reads as night), so the find is on screen before it is read about. By sunrise a
+  judge has driven through a whole night: about 45 km, or less with good drifting, within a half-hour session.
+- **The clock says it moved.** A banked drift's minutes (one for every hundred points) fly off the TIME panel as the
+  clock rolls forward (transform and opacity only, drawn once at the title like every other effect). SUNRISE is a
+  big callout now: YOU DROVE THROUGH THE NIGHT.
+- **The title says the find**: NIGHT TOUGE · DRIFT UNTIL DAWN, and EVERY DRIFT YOU BANK MOVES THE CLOCK; the J-turn
+  hint says to let go of S first (the rule since the reverse round). The drift hint in a run waits nine seconds, so
+  the first seconds of a run (the frames a gate or a judge grabs first) are the road. A favicon, drawn in SVG like
+  everything else (the logo's M in its sunset gradient), and a description.
+- **A judge's thirty minutes** (a sub-agent drove the build for 80 minutes over five sessions on both maps, plus every
+  flow, the phone and the clock). Critical: every sky rebuild (every 2.5 s while the sky changes: dusk, dawn, all day,
+  every shower) leaked its environment map's render target, about 11 MB of GPU memory each (textures 80 to 260 in a
+  20-minute run): a phone would have lost its WebGL context well inside half an hour. The sky is now redrawn into the
+  same texture (rig.js); 60 rebuilds: textures 64 to 64, GPU memory flat. Also found and fixed: a 390 to 570 ms freeze
+  about a minute into most pass runs (each tunnel's name plate made a new material mid-drive, compiled on the spot
+  before the rig had patched it; new chunks' materials are now patched before they join the scene); terrain tiles
+  getting dearer the further the course ran (every terrace of the whole course tested per sample; now kept sorted and
+  searched, bit-identical output); pausing never silenced the game, and the car's sounds (and the rain) droned on
+  under the title after a run; the magnet left hanging in the sky after a restart mid-flight; small phones on their
+  side (568 to 720 px wide) got the portrait layout with START below the screen; SUNRISE and SUNSET missed when a
+  banked drift carried the clock over; the road studs' buffers never freed; Enter or Space could not start a run.
+- **Every device a judge might hold** (a sub-agent audited every web feature used against iOS Safari 16.4+, Safari,
+  Firefox and Android): the petals and the rain were placed by the wind times the clock, so as the wind changed they
+  slid sideways faster and faster, 78 to 117 m/s after twenty minutes (now the drift is integrated: the wind's own
+  speed); keys follow the printed letter on AZERTY, QWERTZ and the like (W A S D where they are printed, ZQSD too);
+  trackpad zoom proportional; on iPhone the sound plays with the silent switch on (an audio session for playback),
+  restarts after a call, sleeps while the page is hidden; pinch zoom, pull to refresh and the long-press callout
+  blocked while playing; a message instead of a frozen bar if the browser lacks import maps or WebGL 2 or the CDN is
+  blocked, and a reload panel if the GPU context is lost; touch laptops no longer take the phone tier; the canvas no
+  longer multisampled for nothing (it only ever shows the post chain's quads); reduced motion respected.
+- **Phone performance** (a sub-agent; every change proven pixel-identical by reading frames back): the shared prop
+  pools culled when out of view and uploaded only where they changed, each terrain tile's forest with its own vertex
+  array, static objects' matrices frozen, the moon's shadow pass skipped by day, far-terrain normals spread over four
+  steps (a 7 to 10 ms step every 4 s), the scene copy pass gone, double-sided transparent meshes split in two (three
+  re-derived their programs twice a frame), idle particles and trails not uploaded, skid marks uploading only the slots
+  touched. Per-frame JS at CPU 2x: 19.5 to 15.9 ms on the pass at night, 21 to 16.3 by day; phone 16.9 to 13.3;
+  at dusk (where a run starts) 34.6 to 47.7 fps. The jam gate's median fps under CPU 2x: pass 51 to 55 before, 60
+  after; city 46 to 48 before, 54 to 55 after. And NEO TOKYO now loads only when it is chosen: the pass boot fetches
+  no city file and compiles 75 programs instead of 98, ready 14.1 s to 10.9 s under the gate's 4G and CPU 2x; the
+  first switch to the city takes 4 to 6 s behind LAYING THE ROAD, and a START pressed meanwhile is kept and the run
+  starts the moment the road is ready (it was lost: the city probe, pressing START 3 s after choosing the city, never
+  started). Checked on the final tree: 10 minutes on the pass and 8 in the city (frames p99 16.8 ms, GPU textures flat,
+  no shader compiled in play, no errors); 60 sky rebuilds with textures 64 to 64; all four gates (drifts banked 7, 7,
+  9, 12; no frame over 34 ms); the 45 s probes p99 17 ms on both maps; ready 10.8 s under the gate's conditions.
+
 ## 25 September: drifting that holds, rain that behaves by day
 
 - **The drift, held.** The owner: "rework some of the drifting physics if needed. SATISFYING PLEASE". Measured first

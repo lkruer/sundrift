@@ -1,7 +1,7 @@
 /**
  * A render rig, for any Three.js game in this format.
  *
- *     import { createRig } from './rig.js?v=202609240354';
+ *     import { createRig } from './rig.js?v=202609240808';
  *     const rig = createRig(THREE, renderer, scene, { hour: 16.5, azimuth: 250 });
  *     rig.render(camera, dt);        // once a frame, instead of renderer.render(scene, camera)
  *
@@ -256,7 +256,12 @@ export function detectTier() {
   try { if (globalThis.screen && globalThis.screen.width) { sw = globalThis.screen.width; sh = globalThis.screen.height; } } catch (e) { /* no screen */ }
   const small = Math.min(w, h) <= 500 || Math.min(sw, sh) <= 500 || (w * h) <= 1000 * 1000;
   const mobileUA = !!nav && /iPhone|iPad|Android|Mobile/i.test(nav.userAgent || '');
-  if ((touch && small) || (mobileUA && small)) return 'phone';
+  // (MINIDRIFT) a touch laptop has a touch screen too, and at 125-150% scaling its window is "small", but its main
+  // pointer is a trackpad or a mouse: only a coarse main pointer (a finger) makes a small touch screen a phone.
+  // Phones, and iPads (which send a desktop user agent), are coarse, so they are unchanged.
+  let coarse = false;
+  try { coarse = typeof globalThis.matchMedia === 'function' && globalThis.matchMedia('(pointer: coarse)').matches; } catch (e) { /* no matchMedia */ }
+  if ((touch && coarse && small) || (mobileUA && small)) return 'phone';
   return 'high';
 }
 
@@ -566,11 +571,36 @@ void main() {
 // The dome, its material and the PMREM generator are kept between builds: making them fresh each time
 // compiled three programs per setTime() and stalled a running game for 30 ms or more every few seconds.
 let envCache = null;
+/**
+ * (MINIDRIFT) Every build after the first goes into the first one's render target, the steps of PMREMGenerator.fromScene
+ * (three r169, pinned) without its allocation. fromScene makes a new target each time, and a new environment texture
+ * made three work out the program of every lit material again on the next frame, plus a texture allocated: a hitch
+ * every 2.5 s whenever the sky moves (dusk, dawn, all day). The same texture, redrawn, changes nothing else.
+ */
+function rebuildInto(pmrem, scene, target) {
+  const r = pmrem._renderer;
+  const t0 = r.getRenderTarget(), f0 = r.getActiveCubeFace(), l0 = r.getActiveMipmapLevel(), xr0 = r.xr.enabled;
+  r.xr.enabled = false;
+  // (as a new target comes: its scissor on, so a clear touches only the region drawn next)
+  target.scissorTest = true;
+  try {
+    pmrem._sceneToCubeUV(scene, 1, 100, target);
+    pmrem._blur(target, 0, 0, 0.02);
+    pmrem._applyPMREM(target);
+  } finally {
+    // (what fromScene's _cleanup does, with the target saved here)
+    target.scissorTest = false;
+    target.viewport.set(0, 0, target.width, target.height); target.scissor.set(0, 0, target.width, target.height);
+    r.setRenderTarget(t0, f0, l0);
+    r.xr.enabled = xr0;
+  }
+  return target.texture;
+}
 function buildEnvironment(THREE, renderer, uniforms, ground) {
   if (envCache && envCache.renderer === renderer) {
     const c = envCache;
     c.mat.uniforms.uEnvGround.value.setRGB(ground[0], ground[1], ground[2]);
-    try { return c.pmrem.fromScene(c.scene, 0.02, 1, 100).texture; }
+    try { return c.target && typeof c.pmrem._sceneToCubeUV === 'function' ? rebuildInto(c.pmrem, c.scene, c.target) : c.pmrem.fromScene(c.scene, 0.02, 1, 100).texture; }
     catch (e) { console.warn('[rig] environment build failed:', e && e.message); return null; }
   }
   const envScene = new THREE.Scene();
@@ -590,10 +620,10 @@ void main() {
   const dome = new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), mat);
   envScene.add(dome);
   const pmrem = new THREE.PMREMGenerator(renderer);
-  let tex = null;
-  try { tex = pmrem.fromScene(envScene, 0.02, 1, 100).texture; }
+  let tex = null, target = null;
+  try { target = pmrem.fromScene(envScene, 0.02, 1, 100); tex = target.texture; }
   catch (e) { console.warn('[rig] environment build failed:', e && e.message); }
-  envCache = { renderer, scene: envScene, mat, pmrem };
+  envCache = { renderer, scene: envScene, mat, pmrem, target };
   return tex;
 }
 
@@ -901,7 +931,8 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     const next = env ? (opts.envMap || buildEnvironment(THREE, renderer, atmosU, groundLin)) : null;
     atmosU.uAtmFlash.value.copy(flash);
     if (next) {
-      if (envTex && envTex !== opts.envMap && scene.environment === envTex) envTex.dispose();
+      // (MINIDRIFT) the environment is redrawn into the same texture after its first build: never dispose that one
+      if (envTex && envTex !== next && envTex !== opts.envMap && scene.environment === envTex) envTex.dispose();
       envTex = next;
       scene.environment = envTex;
       scene.environmentIntensity = o.envIntensity;

@@ -14,7 +14,7 @@
  * mid-drift, which is what stalled the browser before), and every look is drawn once at the title (warm) so its
  * raster pipeline is compiled before a run. On a phone that can (Android), a short buzz goes with the big moments.
  */
-import { SCORE, clamp, damp } from './config.js?v=202609240354';
+import { SCORE, clamp, damp } from './config.js?v=202609240808';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -372,7 +372,11 @@ export class Hud {
       case 'clip': this.toast('CLIP!', 'clip', false, '+' + fmt(e.value), 1); this.clipT = 0.9; this.buzz(14); break;
       case 'crash': this.toast('CRASH', 'bad', true, '-' + fmt(e.value) + ' LOST', 3); this.hitFlash = 1; this.buzz(70); break;
       case 'bump': this.hitFlash = Math.max(this.hitFlash, 0.5); break;
-      case 'sun': this.toast(e.value, 'calm', false, '', 0); break;
+      // (a run starts at dusk: sunrise is the night driven through, the find's own reward, and is called out as one)
+      case 'sun':
+        if (e.value === 'SUNRISE') { this.toast('SUNRISE!', 't3', true, 'YOU DROVE THROUGH THE NIGHT', 3); this.buzz([30, 60, 30, 60, 90]); }
+        else this.toast(e.value, 'calm', false, '', 0);
+        break;
       case 'best': {
         this.run.newBest = true;
         this.toast('NEW BEST!', 't2', true, '', 3);

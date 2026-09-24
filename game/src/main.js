@@ -6,22 +6,22 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609240354';
-import { createRig, detectTier } from '../rig.js?v=202609240354';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, clamp, damp, lerp, smoothstep } from './config.js?v=202609240354';
-import { Car, gearbox } from './car.js?v=202609240354';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609240354';
-import { World, drawsGlyphs } from './world.js?v=202609240354';
-import { ChaseCam } from './camera.js?v=202609240354';
-import { Input } from './input.js?v=202609240354';
-import { Scoring } from './scoring.js?v=202609240354';
-import { Hud } from './hud.js?v=202609240354';
-import { Audio } from './audio.js?v=202609240354';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609240354';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609240354';
-import { Atmosphere } from './atmos.js?v=202609240354';
-import { Debris } from './debris.js?v=202609240354';
-import { makePost } from './post.js?v=202609240354';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609240808';
+import { createRig, detectTier } from '../rig.js?v=202609240808';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609240808';
+import { Car, gearbox } from './car.js?v=202609240808';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609240808';
+import { World, drawsGlyphs } from './world.js?v=202609240808';
+import { ChaseCam } from './camera.js?v=202609240808';
+import { Input } from './input.js?v=202609240808';
+import { Scoring } from './scoring.js?v=202609240808';
+import { Hud } from './hud.js?v=202609240808';
+import { Audio } from './audio.js?v=202609240808';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609240808';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609240808';
+import { Atmosphere } from './atmos.js?v=202609240808';
+import { Debris } from './debris.js?v=202609240808';
+import { makePost } from './post.js?v=202609240808';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -54,18 +54,26 @@ window.__GAME__ = { pos: [0, 0], fps: 0, speed: 0, score: 0, over: false, draws:
 // ---------------------------------------------------------------- renderer
 const tier = detectTier();
 const Q = QUALITY[tier === 'phone' ? 'phone' : 'high'];
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: tier !== 'phone', powerPreference: 'high-performance' });
+// (no antialiasing on the canvas: the scene is drawn into the post chain's own target, and the canvas only ever gets
+// the chain's full-screen triangle, whose multisampled copy was memory and a resolve a frame for an identical picture)
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.pixelRatio));
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.shadowMap.enabled = Q.shadow;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
+// (the scene's own matrix never changes: left updating itself, it told every object in the world to remake its world
+// matrix every frame, even the road and the terrain whose matrices are made once, see instancing.js freezeStatic)
+scene.matrixAutoUpdate = false;
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.3, 4500);
 scene.add(camera);
 // the camera goes in at creation, so the rig builds its shadow cascades as soon as they load, before any shader compiles
 const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 60, fogDensity: 0.00095, exposure: 1.05, post: false, camera });
 const post = makePost(renderer, scene, camera, { bloom: tier !== 'phone', fringe: tier !== 'phone', width: innerWidth, height: innerHeight });
 renderer.info.autoReset = false;
+// a lost and restored context gets back what three restores for itself, but not the environment map the rig built, which
+// would stay black until the sky next changed: build the light of the hour again
+renderer.domElement.addEventListener('webglcontextrestored', () => { if (G.sunApplied) applySun(0, true); });
 
 let track, world, car, carRoot, bodyPivot, joints, chase, input, scoring, hud, audio, skids, particles, flame, headlights, paintMat, petals, rain, courseOut, magnet, debris, atmos;
 let splashes, curtain, beams, trails;
@@ -216,7 +224,12 @@ async function boot() {
     await Promise.race([Promise.all([document.fonts.load('900 64px "Noto Serif JP"', '櫻宮霧峰'), document.fonts.load('64px "Dela Gothic One"', '夜桜峠霧峰'), document.fonts.load('700 30px Rajdhani', 'Kirimine 12 km'), document.fonts.load('800 64px "M PLUS Rounded 1c"', 'ラーメンカラオケBAR'), document.fonts.load('64px "Dela Gothic One"', 'GAME CENTER 24H')]), new Promise((r) => setTimeout(r, 2500))]);
   } catch {}
   world = new World(scene, Q);
+  // a chunk's own materials (a tunnel's name plate, a road text) get the rig's patches before the chunk is first drawn:
+  // drawn unpatched, each compiled a shader of its own on the spot (a 400-550 ms stall a minute into a run)
+  world.onChunk = (g) => g.traverse((o) => { const m = o.material; if (m) for (const x of Array.isArray(m) ? m : [m]) rig.setupMaterial(x); });
   await world.load((f, k) => prog(0.05 + f * 0.55, k.replace('_', ' ')));
+  // NEO TOKYO loads at boot only when it is the saved map; otherwise the first time it is chosen (setMap)
+  if (G.map === 'city') { prog(0.6, 'neo tokyo'); await world.loadCity(); }
   world.setTrack(track);
   prog(0.62, 'the car');
   await buildCar();
@@ -260,38 +273,7 @@ async function boot() {
   applySun(0, true);
   rig.refresh(scene);
   prog(0.93, 'the shaders');
-  // one real frame while hidden, with every prop in view and every shadow map drawn: shadow and post programs
-  // compile here, not in the first seconds of play
-  // things that are only drawn later (skid marks, the boost flame) are drawn once here too: the first draw of
-  // a mesh is when the GPU driver finishes its shader, and that was a 100 ms stall at the first drift
-  const warmRender = () => {
-    idle(0.016); rig.update(camera, 0.016);
-    if (rig.csm) for (const l of rig.csm.lights) l.shadow.needsUpdate = true;
-    for (const t of skids.tracks) t.geo.setDrawRange(0, 6);
-    flame.cones.visible = true;
-    // the magnet (parked out of sight) and the rain (hidden until it rains) are drawn once here too, in front of
-    // the lens, with their beam and rings lit: their first draw would otherwise be a stall the first time they appear
-    const [wfx, wfz] = car.forward();
-    magnet.g.position.set(car.x + wfx * 9, carRoot.position.y + 3, car.z + wfz * 9);
-    magnet.beam.material.opacity = 0.2; for (const r of magnet.rings) r.material.opacity = 0.5; magnet.dust.material.opacity = 0.5;
-    rain.mesh.visible = true; rain.u.uAmount.value = 1; rain.u.uCenter.value.copy(camera.position);
-    splashes.mesh.visible = true; curtain.mesh.visible = true; beams.mesh.visible = true;
-    trails.update(0.016, [camera.position.clone().add(new THREE.Vector3(0, 0, -5)), camera.position.clone().add(new THREE.Vector3(1, 0, -5))], 0.5, camera.position, camera);
-    if (post.retro) post.retro.uniforms.uLens.value = 1;
-    atmos.warm(true, camera.position);
-    post.render(0.016);
-    atmos.warm(false);
-    splashes.mesh.visible = false; curtain.mesh.visible = false; beams.mesh.visible = false;
-    trails.clear(); trails.update(0.016, [], 0, camera.position, camera);
-    if (post.retro) post.retro.uniforms.uLens.value = 0;
-    for (const t of skids.tracks) t.geo.setDrawRange(0, 0);
-    flame.cones.visible = false;
-    magnet.g.position.set(0, -600, 0); magnet.beam.material.opacity = 0; for (const r of magnet.rings) r.material.opacity = 0; magnet.dust.material.opacity = 0;
-    rain.mesh.visible = false; rain.u.uAmount.value = 0;
-  };
-  const [fx0, fz0] = car.forward();
-  await world.precompile(renderer, camera, (root) => rig.refresh(root), post.sceneRT, { x: car.x + fx0 * 6, y: start.y, z: car.z + fz0 * 6, render: warmRender });
-  warmRender();
+  await compileAll(start.y);
   window.__DEBUG__ = { world, get track() { return track; }, car, rig, scene, renderer, G, chase, audio, post, get scoring() { return scoring; }, prof, W, get debris() { return debris; }, get magnet() { return magnet; }, get atmos() { return atmos; }, get courseOut() { return courseOut; }, get hud() { return hud; }, get trails() { return trails; },
     // hold the weather at x (0 clear .. 1 downpour) for testing
     rainNow(x) { W.raining = x > 0; W.target = x; W.rain = x; W.wet = x > 0 ? 1 : 0; W.t = 0; W.next = 1e9; },
@@ -304,6 +286,8 @@ async function boot() {
     } };
   input.onAny = () => audio.unlock();
   input.onPause = () => { if (G.mode === 'playing') setPaused(true); else if (G.mode === 'paused') setPaused(false); };
+  // (Enter or Space on the title, from input.js; true when a run started, so the key does nothing else)
+  input.onStart = () => { if (building) { startWanted = true; return true; } if (G.mode !== 'title') return false; startGame(); return true; };
   input.onMute = () => toggleMute();
   buildTitle();
   prog(0.99, 'title');
@@ -325,6 +309,46 @@ async function boot() {
 
 // a frame, or a moment if the tab is hidden (a hidden tab never runs requestAnimationFrame, and the boot must not wait on it)
 const nextFrame = () => new Promise((r) => { let done = false; const f = () => { if (!done) { done = true; r(); } }; requestAnimationFrame(f); setTimeout(f, 60); });
+
+/**
+ * One real frame while hidden, with every prop in view and every shadow map drawn: shadow and post programs compile
+ * here, not in the first seconds of play. Things that are only drawn later (skid marks, the boost flame) are drawn once
+ * here too: the first draw of a mesh is when the GPU driver finishes its shader, and that was a 100 ms stall at the
+ * first drift.
+ */
+function warmRender() {
+  idle(0.016); rig.update(camera, 0.016);
+  if (rig.csm) for (const l of rig.csm.lights) l.shadow.needsUpdate = true;
+  if (night.moon) night.moon.shadow.needsUpdate = true;              // (drawn even if the moon is down just now)
+  for (const t of skids.tracks) t.geo.setDrawRange(0, 6);
+  flame.cones.visible = true;
+  // the magnet (parked out of sight) and the rain (hidden until it rains) are drawn once here too, in front of
+  // the lens, with their beam and rings lit: their first draw would otherwise be a stall the first time they appear
+  const [wfx, wfz] = car.forward();
+  magnet.g.position.set(car.x + wfx * 9, carRoot.position.y + 3, car.z + wfz * 9);
+  magnet.beam.material.opacity = 0.2; for (const r of magnet.rings) r.material.opacity = 0.5; magnet.dust.material.opacity = 0.5;
+  rain.mesh.visible = true; rain.u.uAmount.value = 1; rain.u.uCenter.value.copy(camera.position);
+  splashes.mesh.visible = true; curtain.mesh.visible = true; beams.mesh.visible = true;
+  trails.update(0.016, [camera.position.clone().add(new THREE.Vector3(0, 0, -5)), camera.position.clone().add(new THREE.Vector3(1, 0, -5))], 0.5, camera.position, camera);
+  if (post.retro) post.retro.uniforms.uLens.value = 1;
+  atmos.warm(true, camera.position);
+  post.render(0.016);
+  atmos.warm(false);
+  splashes.mesh.visible = false; curtain.mesh.visible = false; beams.mesh.visible = false;
+  trails.clear(); trails.update(0.016, [], 0, camera.position, camera);
+  if (post.retro) post.retro.uniforms.uLens.value = 0;
+  for (const t of skids.tracks) t.geo.setDrawRange(0, 0);
+  flame.cones.visible = false;
+  magnet.g.position.set(0, -600, 0); magnet.beam.material.opacity = 0; for (const r of magnet.rings) r.material.opacity = 0; magnet.dust.material.opacity = 0;
+  rain.mesh.visible = false; rain.u.uAmount.value = 0;
+}
+
+/** Every program the world can ask for compiled (world.precompile), then the warm-up frame: at boot, and when NEO TOKYO first loads. */
+async function compileAll(y) {
+  const [fx0, fz0] = car.forward();
+  await world.precompile(renderer, camera, (root) => rig.refresh(root), post.sceneRT, { x: car.x + fx0 * 6, y, z: car.z + fz0 * 6, render: warmRender });
+  warmRender();
+}
 
 function toggleMute() { audio.unlock(); audio.setMuted(!audio.muted); $('mute').classList.toggle('off', audio.muted); }
 
@@ -529,19 +553,33 @@ async function setMap(m) {
   G.map = m; store.set('map', m); markMap();
   $('building').classList.add('on');
   await nextFrame(); await nextFrame();
-  track = new Track(SEED, G.diff, G.map);
-  track.ensure(2400);
-  world.setTrack(track);
-  applyMapLook(); resetWeather(); applySun(0, true);
-  skids.clear && skids.clear();
-  resetCarToStart();
-  world.prime(car.x, car.z, START_S);
-  rig.refresh(scene);
-  $('building').classList.remove('on');
-  building = false;
+  // NEO TOKYO chosen for the first time: its module and materials load now (the boot skipped them), and nothing is
+  // drawn until its programs are compiled, so no frame compiles a shader on the spot (the title holds its last frame
+  // under LAYING THE ROAD)
+  const firstCity = m === 'city' && !world.City;
+  try {
+    if (firstCity) { G.mode = 'loading'; await world.loadCity(); }
+    track = new Track(SEED, G.diff, G.map);
+    track.ensure(2400);
+    world.setTrack(track);
+    applyMapLook(); resetWeather(); applySun(0, true);
+    skids.clear && skids.clear();
+    resetCarToStart();
+    world.prime(car.x, car.z, START_S);
+    rig.refresh(scene);
+    if (firstCity) await compileAll(G.carY);
+  } finally {
+    if (firstCity) G.mode = 'title';
+    $('building').classList.remove('on');
+    building = false;
+  }
+  startIfWanted();
 }
 
-let building = false;
+// (START pressed while a map or a course is being laid, NEO TOKYO's first build most of all: the run starts the moment
+// the road is ready, instead of the press being lost)
+let building = false, startWanted = false;
+function startIfWanted() { if (startWanted) { startWanted = false; startGame(); } }
 async function setCourse(diff) {
   if (building || !DIFFS[diff] || G.mode !== 'title') return;
   if (diff === G.diff) return;
@@ -558,6 +596,7 @@ async function setCourse(diff) {
   rig.refresh(scene);
   $('building').classList.remove('on');
   building = false;
+  startIfWanted();
 }
 
 function resetCarToStart() {
@@ -602,7 +641,8 @@ function showTitle() {
 }
 
 function startGame() {
-  if (G.mode !== 'title' || building) return;
+  if (building) { startWanted = true; return; }
+  if (G.mode !== 'title') return;
   $('title').classList.remove('on');
   document.body.classList.add('playing');
   if (night.hero) night.hero.intensity = 0;
@@ -654,6 +694,8 @@ function quitToTitle() {
   saveBest();
   $('pause').classList.remove('on');
   audio.pause && audio.pause(false);
+  // (the engine, the tyres and the wind fade out: they droned on under the title after a quit)
+  audio.quiet && audio.quiet();
   scoring.reset(); hud.reset();
   resetCarToStart();
   world.prime(car.x, car.z, START_S);
@@ -790,7 +832,8 @@ function idle(dt, t0 = performance.now()) {
   const n = track.nearest(car.x, car.z, G.idx);
   const y = n.y;
   orbitT += dt * 0.14;
-  const portrait = innerWidth <= 720;
+  // (as the page's layout: a phone upright; a small phone on its side has the menu at the left, as on a laptop)
+  const portrait = innerWidth <= 720 && innerHeight > innerWidth;
   const a = car.yaw + Math.PI + 0.5 + Math.sin(orbitT) * 1.0;
   const d = portrait ? 7.4 : 5.0;
   camera.position.set(car.x + Math.sin(a) * d, y + (portrait ? 2.3 : 1.15) + 0.2 * Math.cos(orbitT * 0.7), car.z + Math.cos(a) * d);
@@ -798,7 +841,7 @@ function idle(dt, t0 = performance.now()) {
   // portrait: the menu fills the lower half, so the car sits in the upper third
   camera.lookAt(car.x, y + (portrait ? -0.9 : 0.5), car.z);
   // the car sits right of centre, clear of the menu: pan the camera sideways along its own right axis
-  if (innerWidth > 720) {
+  if (!portrait) {
     const k = clamp((1400 - innerWidth) / 700, 0, 1) * 1.1 + 1.0;
     camera.updateMatrixWorld();
     const rx = camera.matrixWorld.elements[0], rz = camera.matrixWorld.elements[2];
@@ -921,6 +964,8 @@ function step(dt, t0) {
     const e = { type: 'jturn', value: 500 };
     hud.onEvent(e); audio.onEvent && audio.onEvent(e); chase.kick(0.15);
   }
+  // (the clock before this frame's banks: a banked drift moves it too, and may carry it over sunrise or sunset)
+  const h0 = G.hour;
   for (const e of scoring.drain()) {
     hud.onEvent(e); audio.onEvent(e);
     if (e.type === 'bank') { G.hour += e.value / 6000; if (scoring.total > (G.best[bestKey()] || 0)) { G.best[bestKey()] = scoring.total; store.set('best.' + bestKey(), Math.round(scoring.total)); } }
@@ -938,7 +983,10 @@ function step(dt, t0) {
   const rate = (h >= 7.2 && h < 16.6) ? 7 : 1;
   G.hour += ds / 3000 * rate;
   if (G.hour >= 24) G.hour -= 24;
-  const crossed = (edge) => h < edge && G.hour >= edge;
+  // an edge the clock passed this frame, on the road or by a bank, and across midnight too, counts once (tested only
+  // against the road's share, a bank carrying the clock over sunrise let the SUNRISE callout go by)
+  const moved = (G.hour - h0 + 24) % 24;
+  const crossed = (edge) => { const d = (edge - h0 + 24) % 24; return d > 0 && d <= moved; };
   if (crossed(18.05)) { const e = { type: 'sun', value: 'SUNSET' }; hud.onEvent(e); audio.onEvent(e); }
   if (crossed(5.95)) { const e = { type: 'sun', value: 'SUNRISE' }; hud.onEvent(e); audio.onEvent(e); }
   applySun(dt);
@@ -956,7 +1004,8 @@ function step(dt, t0) {
   effects(dt, y, boost01);
   // the tail lamps' light trails, while a slide is held (fainter by day, when the lamps are only lamps)
   if (trails && tailLamps.length === 2) {
-    carRoot.updateMatrixWorld(true);
+    // (getWorldPosition brings the lamp's own chain of parents up to date, the car root down to the lamp: the whole car,
+    // some 120 objects, was remade here first, and then again by the render)
     tailLamps[0].getWorldPosition(_tl[0]); tailLamps[1].getWorldPosition(_tl[1]);
     const slide = smoothstep(0.2, 0.5, Math.abs(car.beta)) * smoothstep(7, 14, car.speed) * (car.air || mag ? 0 : 1);
     G.trailK = damp(G.trailK || 0, slide, slide > (G.trailK || 0) ? 10 : 6, dt);
@@ -1063,14 +1112,26 @@ function applySun(dt, force = false) {
   const nightAmt = smoothstep(4, -3, el);
   G.night = nightAmt; night.amt = nightAmt;
   for (const hl of headlights) hl.intensity = 2.6 * nightAmt;
-  if (night.moon) night.moon.intensity = 0.85 * nightAmt;
-  if (night.glow) night.glow.material.opacity = 0.42 * smoothstep(-0.5, -5, el);
+  if (night.moon) {
+    night.moon.intensity = 0.85 * nightAmt;
+    // (the moon's shadow map is drawn only while the moon gives light: by day it was a whole shadow pass a frame, the
+    // car and everything near it drawn again for a light of intensity 0, about 100 draws; castShadow itself stays on,
+    // as switching it recompiles every lit shader)
+    night.moon.shadow.autoUpdate = night.moon.intensity > 0;
+  }
+  // (the night sky's pieces are not drawn at all while they are drawn at nothing, all day long: the horizon glow was two
+  // draws a frame, each making three work its program out again, and the stars and the moon three more)
+  if (night.glow) { night.glow.material.opacity = 0.42 * smoothstep(-0.5, -5, el); night.glow.visible = night.glow.material.opacity > 0; }
   if (night.tailGlow) night.tailGlow.intensity = 0.9 * nightAmt;
   if (rig.hemi && night.hemiDay) { G.hemiNow = night.hemiDay * (1 - 0.66 * nightAmt); rig.hemi.intensity = G.hemiNow + (G.flash || 0) * 1.8; }
   // cloud takes the stars and most of the moon
   const clear = 1 - W.rain;
-  if (night.stars) night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el) * clear * clear * (night.starK ?? 1);
-  if (night.disc) { night.disc.userData.dm.material.opacity = smoothstep(-1, -5, el) * (1 - 0.85 * W.rain); night.disc.userData.halo.material.opacity = 0.35 * smoothstep(-1, -5, el) * (1 - 0.6 * W.rain); }
+  if (night.stars) { night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el) * clear * clear * (night.starK ?? 1); night.stars.visible = night.stars.material.opacity > 0; }
+  if (night.disc) {
+    const { dm, halo } = night.disc.userData;
+    dm.material.opacity = smoothstep(-1, -5, el) * (1 - 0.85 * W.rain); halo.material.opacity = 0.35 * smoothstep(-1, -5, el) * (1 - 0.6 * W.rain);
+    dm.visible = dm.material.opacity > 0; halo.visible = halo.material.opacity > 0;
+  }
   if (night.fuji) { night.fuji.material.transparent = true; night.fuji.material.opacity = 1 - 0.85 * W.rain; }
   // Fuji is drawn in the night's colours; by day the same mountain, lifted into daylight
   if (night.fuji) night.fuji.material.color.setRGB(lerp(2.5, 1, nightAmt), lerp(2.45, 1, nightAmt), lerp(2.2, 1, nightAmt));
@@ -1122,7 +1183,8 @@ function mistToPass() {
   U.uTanFov.value.set(ty * camera.aspect, ty);
   // motion blur: the last frame's camera, and none across a cut (a reset, a teleport, the title's first frame)
   const cut = camera.position.distanceTo(_lastCam) > 12;
-  U.uBlur.value = tier === 'phone' || cut || G.mode !== 'playing' ? 0 : 0.5;
+  // (and none for a player who asked their system for less motion)
+  U.uBlur.value = tier === 'phone' || cut || G.mode !== 'playing' || REDUCED_MOTION ? 0 : 0.5;
   // (by day the shade keeps its colour under the bands; see the cel pass)
   U.uLift.value = 1 - (G.night ?? 1);
   U.uPrevVP.value.copy(_vp);
@@ -1295,7 +1357,8 @@ function smash(rec, nx, nz, px, pz) {
   let dx = (sp > 0.5 ? vx / sp : -nx) * 0.85 - nx * 0.4, dz = (sp > 0.5 ? vz / sp : -nz) * 0.85 - nz * 0.4;
   const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
   const steel = rec.name === 'lamp' || rec.name === 'chevron' || rec.name === 'warn' || rec.name === 'mirror' || rec.name === 'vending' || rec.name === 'bike';
-  debris.spawn(world.parts[rec.name], world.foot[rec.name] || [0.3, 0.3, 1.5], rec, { px, pz, dx, dz, speed: Math.max(2, sp), trail: steel });
+  // (thrown as the model its pool draws: a mirrored chevron scores as a chevron, but flies as the mirrored one it was)
+  debris.spawn(world.parts[rec.pool] || world.parts[rec.name], world.foot[rec.pool] || world.foot[rec.name] || [0.3, 0.3, 1.5], rec, { px, pz, dx, dz, speed: Math.max(2, sp), trail: steel });
   // the car feels it by the thing's weight
   const share = rec.m / (1250 + rec.m);
   car.vF *= 1 - share * 1.6; car.vL *= 1 - share;

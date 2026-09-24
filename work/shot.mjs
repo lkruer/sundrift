@@ -33,7 +33,12 @@ const URL = `http://127.0.0.1:${server.address().port}/${arg('query', '')}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--window-size=1280,720'] });
 const page = await browser.newPage();
-if (PHONE) {
+const VP = arg('vp', '');   // --vp=667x375: a phone of that size, touch, mobile (portrait or on its side)
+if (VP) {
+  const [vw, vh] = VP.split('x').map(Number);
+  await page.setViewport({ width: vw, height: vh, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1');
+} else if (PHONE) {
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await page.setUserAgent('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36');
 } else await page.setViewport({ width: Number(arg('w', 1280)), height: Number(arg('h', 720)), deviceScaleFactor: 1 });

@@ -8,7 +8,7 @@
  * points; it is tinted by the sun so it reads warm at golden hour and cool in shade.
  */
 import * as THREE from 'three';
-import { clamp } from './config.js?v=202609240354';
+import { clamp } from './config.js?v=202609240808';
 
 function spriteTexture() {
   const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
@@ -43,7 +43,11 @@ export class SkidMarks {
       const mesh = new THREE.Mesh(geo, this.mat);
       mesh.frustumCulled = false; mesh.renderOrder = 1;
       scene.add(mesh);
-      this.tracks.push({ mesh, geo, pos, al, head: 0, count: 0, lastX: 0, lastY: 0, lastZ: 0, px: 1, pz: 0, n: 0, open: false });
+      const t = { mesh, geo, pos, al, head: 0, count: 0, lastX: 0, lastY: 0, lastZ: 0, px: 1, pz: 0, n: 0, open: false, wholeP: true, wholeA: true };
+      // (once a whole ring has gone up, later changes go up by the slot: see _dirty)
+      geo.attributes.position.onUploadCallback = () => { t.wholeP = false; };
+      geo.attributes.alpha.onUploadCallback = () => { t.wholeA = false; };
+      this.tracks.push(t);
     }
   }
 
@@ -51,8 +55,21 @@ export class SkidMarks {
   clear() {
     for (const t of this.tracks) {
       t.al.fill(0); t.pos.fill(0); t.head = 0; t.count = 0; t.n = 0; t.open = false;
-      t.geo.attributes.position.needsUpdate = true; t.geo.attributes.alpha.needsUpdate = true; t.geo.setDrawRange(0, 0);
+      // (the whole ring goes up next time: no ranges means all of it, and none are added until it has gone)
+      const P = t.geo.attributes.position, A = t.geo.attributes.alpha;
+      P.clearUpdateRanges(); A.clearUpdateRanges(); t.wholeP = t.wholeA = true;
+      P.needsUpdate = true; A.needsUpdate = true; t.geo.setDrawRange(0, 0);
     }
+  }
+
+  /**
+   * A slot of the ring changed. Only the slots a new point touched go to the GPU (a few floats), not the whole ring (900
+   * points a wheel, about 29 KB), which used to be sent for all four wheels at every point laid in a slide. While a
+   * whole upload is still owed (the first one, or after clear()) no ranges are added, so it stays whole.
+   */
+  _dirty(t, slot) {
+    if (!t.wholeP) t.geo.attributes.position.addUpdateRange(slot * 6, 6);
+    if (!t.wholeA) t.geo.attributes.alpha.addUpdateRange(slot * 2, 2);
   }
 
   /**
@@ -110,6 +127,7 @@ export class SkidMarks {
     const o = slot * 6, hw = width * 0.5;
     t.pos[o] = x + px * hw; t.pos[o + 1] = y; t.pos[o + 2] = z + pz * hw;
     t.pos[o + 3] = x - px * hw; t.pos[o + 4] = y; t.pos[o + 5] = z - pz * hw;
+    this._dirty(t, slot);
   }
 
   _write(t, x, y, z, px, pz, a, width) {
@@ -126,6 +144,7 @@ export class SkidMarks {
     t.pos.copyWithin(h * 6, p * 6, p * 6 + 6);
     t.al[h * 2] = 0; t.al[h * 2 + 1] = 0;
     t.al[o * 2] = 0; t.al[o * 2 + 1] = 0;
+    this._dirty(t, h); this._dirty(t, o);
     t.geo.attributes.position.needsUpdate = true;
     t.geo.attributes.alpha.needsUpdate = true;
     t.geo.setDrawRange(0, m * 6);
@@ -209,12 +228,14 @@ export class Particles {
 
   update(dt) {
     const P = this.p;
+    let live = 0, died = false;
     for (let i = 0; i < this.max; i++) {
       const p = P[i];
       const o3 = i * 3, o4 = i * 4;
       if (!p.alive) { this.col[o4 + 3] = 0; this.size[i] = 0; continue; }
       p.age += dt;
-      if (p.age >= p.life) { p.alive = false; this.col[o4 + 3] = 0; this.size[i] = 0; continue; }
+      if (p.age >= p.life) { p.alive = false; died = true; this.col[o4 + 3] = 0; this.size[i] = 0; continue; }
+      live++;
       const k = Math.exp(-p.drag * dt);
       p.vx *= k; p.vz *= k; p.vy = p.vy * k - p.grav * dt;
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
@@ -224,6 +245,11 @@ export class Particles {
       this.col[o4 + 3] = p.a0 * (1 - t) * (t < 0.1 ? t / 0.1 : 1);
       this.size[i] = p.s0 + (p.s1 - p.s0) * t;
     }
+    // with nothing in the air the pool is neither sent to the GPU nor drawn (it was, all of it, every frame: three buffers
+    // and a draw of points all of size nought). The frame the last one dies still goes up, to clear it; and the points
+    // were drawn at the load's warm-up, so their first draw in play is not their first draw at all
+    this.points.visible = live > 0;
+    if (!live && !died) return;
     const g = this.points.geometry;
     g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true; g.attributes.psize.needsUpdate = true;
   }
@@ -241,13 +267,19 @@ export class ExhaustFlame {
     const geo = new THREE.ConeGeometry(0.075, 0.9, 8, 1, true);
     geo.rotateX(Math.PI / 2);               // point along -Z (backwards) after the flip below
     geo.translate(0, 0, -0.45);
-    this.mat = new THREE.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+    // (each cone seen from both sides as two meshes of one side, the inside drawn first, the way three draws a
+    // double-sided transparent material, but without flipping its side between two passes: each flip made three work
+    // the material's shader program out again, twice a cone a frame while the flame burns)
+    const coneMat = (color, opacity, side) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, side, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.mat = coneMat(0xffb347, 0.85, THREE.FrontSide); this.matBack = coneMat(0xffb347, 0.85, THREE.BackSide);
+    const innerGeo = new THREE.ConeGeometry(0.04, 0.55, 8, 1, true).rotateX(Math.PI / 2).translate(0, 0, -0.27);
+    this.coreBack = new THREE.Mesh(geo, this.matBack);
     this.core = new THREE.Mesh(geo, this.mat);
-    this.inner = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.55, 8, 1, true).rotateX(Math.PI / 2).translate(0, 0, -0.27),
-      new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.innerBack = new THREE.Mesh(innerGeo, coneMat(0xfff2c0, 0.9, THREE.BackSide));
+    this.inner = new THREE.Mesh(innerGeo, coneMat(0xfff2c0, 0.9, THREE.FrontSide));
     this.group = new THREE.Group();
     this.cones = new THREE.Group();
-    this.cones.add(this.core, this.inner);
+    this.cones.add(this.coreBack, this.core, this.innerBack, this.inner);
     this.cones.visible = false;
     this.group.add(this.cones);
     this.light = new THREE.PointLight(0xff9a3a, 0, 6, 2);
@@ -265,7 +297,7 @@ export class ExhaustFlame {
     if (!on) { this.light.intensity = 0; return; }
     const f = 0.7 + 0.3 * Math.sin(this.t * 61) * Math.sin(this.t * 37 + 1);
     this.cones.scale.set(1, 1, (0.6 + 1.2 * strength) * f);
-    this.mat.opacity = 0.6 * f * strength + 0.2;
+    this.mat.opacity = this.matBack.opacity = 0.6 * f * strength + 0.2;
     this.light.intensity = 25 * strength * f * light;
   }
 }
@@ -313,15 +345,19 @@ export class Petals {
     const U = this.u = {
       uTime: { value: 0 }, uBox: { value: new THREE.Vector3(30, 14, 30) }, uCenter: { value: new THREE.Vector3() },
       uWind: { value: new THREE.Vector2(0.6, 0.2) }, uCar: { value: new THREE.Vector3(0, -1e4, 0) }, uCarV: { value: new THREE.Vector2() },
-      uEye: { value: new THREE.Vector3() }, uDensity: { value: 1 },
+      uEye: { value: new THREE.Vector3() }, uDensity: { value: 1 }, uDrift: { value: new THREE.Vector2() },
     };
     // (no depth written: a petal drawn into the depth buffer gets an ink outline from the cel pass, and at a few
     // pixels across a petal is all outline, a dark speck)
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0, side: THREE.DoubleSide,
+    // Seen from both sides, drawn as three draws a double-sided transparent material, the faces turned away first and
+    // then the ones turned toward the lens, but as two meshes of one side each: three flips a double-sided material's
+    // side between its two passes, and each flip made it work the material's shader program out again, twice a frame
+    const matOf = (side) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0, side,
       emissive: 0x70404f, emissiveIntensity: 1, transparent: true, opacity: 0.95, depthWrite: false });
-    mat.name = 'petals';
+    const mat = matOf(THREE.FrontSide), matBack = matOf(THREE.BackSide);
+    mat.name = 'petals'; matBack.name = 'petals';
     const ROT = `
-uniform float uTime, uDensity; uniform vec3 uBox, uCenter, uCar, uEye; uniform vec2 uWind, uCarV;
+uniform float uTime, uDensity; uniform vec3 uBox, uCenter, uCar, uEye; uniform vec2 uWind, uCarV, uDrift;
 attribute vec4 aSeed;
 vec3 petalRot(vec3 v, vec4 sd, float t) {
   float ph = sd.w * 6.2831853;
@@ -341,7 +377,9 @@ vec3 transformed;
   vec4 sd = aSeed;
   float t = uTime, ph = sd.w * 6.2831853;
   float fall = 0.45 + 0.5 * fract(sd.w * 7.13);
-  vec3 p = sd.xyz * uBox + vec3(uWind.x * t, -fall * t, uWind.y * t);
+  // (the breeze's drift is summed on the CPU, uDrift: the wind times the clock slid the petals faster and faster as a
+  // run went on, since the wind itself changes with the clock)
+  vec3 p = sd.xyz * uBox + vec3(uDrift.x, -fall * t, uDrift.y);
   p.x += sin(t * 1.3 + ph) * 0.7; p.z += cos(t * 1.1 + ph * 1.7) * 0.7; p.y += sin(t * 2.1 + ph * 2.3) * 0.15;
   vec3 rel = mod(p - uCenter + 0.5 * uBox, uBox) - 0.5 * uBox;
   vec3 e = 1.0 - smoothstep(0.36 * uBox, 0.5 * uBox, abs(rel));
@@ -359,11 +397,18 @@ vec3 transformed;
 }`);
     };
     mat.customProgramCacheKey = () => 'petals';
-    this.mat = mat;
+    matBack.onBeforeCompile = mat.onBeforeCompile; matBack.customProgramCacheKey = mat.customProgramCacheKey;
+    this.mat = mat; this.matBack = matBack;
+    // (the back faces' mesh made and added first: same place, same draw order, so it is drawn just before the front's)
+    this.meshBack = new THREE.Mesh(geo, matBack);
     this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.frustumCulled = false; this.mesh.castShadow = false; this.mesh.receiveShadow = false;
-    this.mesh.name = 'petals';
-    scene.add(this.mesh);
+    for (const m of [this.meshBack, this.mesh]) { m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.name = 'petals'; scene.add(m); }
+    // A petal shows only while the density reaches its own threshold (fract(seed * 91.7), the shader's `on`): below the
+    // lowest of those, none can show, and the petals are not drawn at all (in the city, in a tunnel). Half of it, for the
+    // GPU's own rounding of the same sum.
+    let low = 1;
+    for (let i = 3; i < seed.length; i += 4) { const f = seed[i] * 91.7 - Math.floor(seed[i] * 91.7); if (f < low) low = f; }
+    this.dMin = low * 0.5;
     this.t = 0; this.gust = 0;
   }
 
@@ -377,8 +422,12 @@ vec3 transformed;
     // the breeze swings about and gusts now and then
     this.gust = 0.5 + 0.5 * Math.sin(this.t * 0.23) * Math.sin(this.t * 0.071 + 1.3);
     U.uWind.value.set(0.35 + 0.9 * this.gust, 0.25 * Math.sin(this.t * 0.05));
+    // the petals drift with the breeze as it blows now (kept within the box: the shader wraps positions into it anyway)
+    const D = U.uDrift.value, B = U.uBox.value;
+    D.set((D.x + U.uWind.value.x * dt) % B.x, (D.y + U.uWind.value.y * dt) % B.z);
     if (car) { U.uCar.value.set(car.x, car.y, car.z); U.uCarV.value.set(car.vx, car.vz); }
     U.uDensity.value += (density - U.uDensity.value) * Math.min(1, dt * 2);
+    this.mesh.visible = this.meshBack.visible = U.uDensity.value >= this.dMin;
   }
 }
 
@@ -634,6 +683,16 @@ export class LightTrails {
    */
   update(dt, sources, k, eye, camera) {
     this.t += dt;
+    // no streak left and no slide: nothing is built, sent or drawn (every frame it was: two ribbons and two flares of
+    // nothing). (k under a ten-thousandth, a slide's long tail, makes a flare a few micrometres across: no pixel at all)
+    let left = 0;
+    for (const tr of this.trails) left += tr.pts.length;
+    if (k < 1e-4 && !left) {
+      for (const tr of this.trails) tr.on = false;
+      this.mesh.visible = false;
+      return;
+    }
+    this.mesh.visible = true;
     const t = this.t, life = this.life;
     this.trails.forEach((tr, j) => {
       const src = sources[j];
@@ -710,7 +769,7 @@ export class Rain {
       uEye: { value: new THREE.Vector3() }, uWind: { value: new THREE.Vector2(1.2, 0.4) }, uCar: { value: new THREE.Vector3(0, -1e4, 0) },
       uCarFwd: { value: new THREE.Vector2(0, 1) }, uHead: { value: 1 }, uSky: { value: new THREE.Vector3(0.1, 0.12, 0.16) },
       uLamps: { value: lamps }, uLampCol: { value: lampCol }, uCamVel: { value: new THREE.Vector3() },
-      uDay: { value: 0 }, uPx: { value: 0.0015 },
+      uDay: { value: 0 }, uPx: { value: 0.0015 }, uDrift: { value: new THREE.Vector2() },
     };
     // Premultiplied: by night a drop is only the light it catches (it adds, the way lit rain glitters), by day it is a
     // pale sliver of water laid over what is behind it (lighter than the trees, a touch darker than a bright sky). Drawn
@@ -719,14 +778,16 @@ export class Rain {
       uniforms: this.u, transparent: true, depthWrite: false, fog: false,
       blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
       vertexShader: `
-        uniform float uTime, uAmount, uHead, uPx; uniform vec3 uBox, uCenter, uEye, uCar, uSky, uCamVel; uniform vec2 uWind, uCarFwd;
+        uniform float uTime, uAmount, uHead, uPx; uniform vec3 uBox, uCenter, uEye, uCar, uSky, uCamVel; uniform vec2 uWind, uCarFwd, uDrift;
         uniform vec3 uLamps[5]; uniform vec3 uLampCol[5];
         attribute vec4 aSeed; attribute vec2 aCorner;
         varying vec3 vC; varying float vA; varying float vX;
         void main() {
           float fall = 8.5 + 3.5 * fract(aSeed.w * 7.1);
           vec3 vel = vec3(uWind.x, -fall, uWind.y);
-          vec3 p = aSeed.xyz * uBox + vel * uTime;
+          // (the wind's drift is summed on the CPU, uDrift: the wind times the clock swept the rain sideways faster and
+          // faster as a run went on, since the wind itself changes with the clock; vel still gives each streak its lean)
+          vec3 p = aSeed.xyz * uBox + vec3(uDrift.x, -fall * uTime, uDrift.y);
           vec3 rel = mod(p - uCenter + 0.5 * uBox, uBox) - 0.5 * uBox;
           vec3 wp = uCenter + rel;
           // the streak lies along the drop's motion as the lens sees it: at speed it leans back toward the lens, but only
@@ -786,6 +847,9 @@ export class Rain {
     U.uEye.value.copy(eye);
     U.uCenter.value.set(eye.x + fx * 7, eye.y + 3, eye.z + fz * 7);
     U.uWind.value.set(1.0 + 0.8 * Math.sin(this.t * 0.13), 0.5 * Math.sin(this.t * 0.07 + 1));
+    // the drops drift with the wind as it blows now (kept within the box: the shader wraps positions into it anyway)
+    const D = U.uDrift.value, B = U.uBox.value;
+    D.set((D.x + U.uWind.value.x * dt) % B.x, (D.y + U.uWind.value.y * dt) % B.z);
     if (car) { U.uCar.value.set(car.x, car.y, car.z); U.uCarFwd.value.set(car.fx, car.fz); }
     U.uHead.value = head;
     U.uSky.value.set(sky, sky * 1.08, sky * 1.2);

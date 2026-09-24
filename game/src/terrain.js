@@ -9,9 +9,9 @@
  * rebuilding (new road beside it, or a new level of detail) keeps its old mesh until the new one is ready.
  */
 import * as THREE from 'three';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609240354';
-import { REACH } from './ground.js?v=202609240354';
-import { instanceGroup, Pool } from './instancing.js?v=202609240354';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609240808';
+import { REACH } from './ground.js?v=202609240808';
+import { instanceGroup, Pool, freezeStatic, releaseGeometry } from './instancing.js?v=202609240808';
 
 export const TILE = 96;
 export const LODS = [
@@ -21,6 +21,7 @@ export const LODS = [
 ];
 const DROP_R = 640;
 const FAR_SPAN = 3400, FAR_SEG = 136, FAR_RECENTER = 96;
+let farIndex = null;                                      // the far mesh's triangles, the same every time (see _buildFar)
 const tkey = (i, j) => (i + 50000) * 100000 + (j + 50000);
 
 const C = {
@@ -42,6 +43,7 @@ export class Terrain {
     this.ground = opts.ground;
     this.field = opts.ground.field;
     this.root = new THREE.Group(); this.root.name = 'terrain';
+    this.root.matrixAutoUpdate = false;                  // (it never moves: see freezeStatic)
     opts.scene.add(this.root);
     this.tiles = new Map();
     this.job = null;
@@ -74,7 +76,7 @@ export class Terrain {
       cedar: new Pool([{ geometry: cone, material: ced.material, local: I }], 7000),
       cherry: new Pool([{ geometry: blob, material: chr.material, local: I }], 4000, { tint: true }),
     };
-    for (const p of Object.values(this.farTrees)) this.root.add(p.group);
+    for (const p of Object.values(this.farTrees)) { this.root.add(p.group); freezeStatic(p.group); }
   }
 
   /** Forget every tile (a new course). */
@@ -189,7 +191,8 @@ export class Terrain {
     if (t.mesh) { this.root.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh = null; }
     if (t.farId && this.farTrees) { for (const p of Object.values(this.farTrees)) p.removeOwner(t.farId); t.farId = 0; }
     if (t.trunks && this.o.colliders) { this.o.colliders.drop('tile' + t.i + ',' + t.j); t.trunks = null; }
-    if (t.trees) { this.root.remove(t.trees); t.trees.traverse((o) => { if (o.isInstancedMesh) o.dispose(); }); t.trees = null; }
+    // (a tile's forest draws with geometries of its own over the templates' buffers: releaseGeometry, not dispose)
+    if (t.trees) { this.root.remove(t.trees); t.trees.traverse((o) => { if (o.isInstancedMesh) { o.dispose(); if (o.userData.sharedGeometry) releaseGeometry(o.geometry); } }); t.trees = null; }
   }
 
   *_build(tile, lod) {
@@ -221,6 +224,8 @@ export class Terrain {
     this.root.add(mesh);
     tile.mesh = mesh;
     if (trees) { this.root.add(trees); tile.trees = trees; }
+    // (a tile and its forest never move once built: their matrices are made once, see freezeStatic)
+    freezeStatic(mesh); if (trees) freezeStatic(trees);
     // the trunks the car can hit (the near ring only: the car is never out in the far one)
     if (this._trunks && this._trunks.length && this.o.colliders && lod === 0) { this.o.colliders.add('tile' + tile.i + ',' + tile.j, this._trunks); tile.trunks = true; }
     this._trunks = null;
@@ -495,24 +500,52 @@ export class Terrain {
       }
       if (j % 34 === 33) yield;
     }
-    const idx = new Uint32Array(seg * seg * 6);
-    let o = 0;
-    for (let j = 0; j < seg; j++) for (let i = 0; i < seg; i++) {
-      const a = j * row + i, b = a + 1, c = a + row, d = c + 1;
-      idx[o++] = a; idx[o++] = c; idx[o++] = b; idx[o++] = b; idx[o++] = c; idx[o++] = d;
+    // (the grid's triangles are the same for every far mesh: made once)
+    if (!farIndex) {
+      farIndex = new Uint32Array(seg * seg * 6);
+      let o = 0;
+      for (let j = 0; j < seg; j++) for (let i = 0; i < seg; i++) {
+        const a = j * row + i, b = a + 1, c = a + row, d = c + 1;
+        farIndex[o++] = a; farIndex[o++] = c; farIndex[o++] = b; farIndex[o++] = b; farIndex[o++] = c; farIndex[o++] = d;
+      }
+    }
+    // The normals, as geometry.computeVertexNormals() makes them, operation for operation (so the very same numbers),
+    // but a quarter of the triangles a step: done at once it was a 7 to 10 ms step (twice that on a slow phone) every
+    // time the far mesh moved on, about every four seconds of driving
+    const nor = new Float32Array(V * 3), idx = farIndex, nIdx = idx.length, per = Math.ceil(nIdx / 12) * 3;
+    for (let q = 0; q < 4; q++) {
+      const e = Math.min(nIdx, per * (q + 1));
+      for (let i = per * q; i < e; i += 3) {
+        const a = idx[i] * 3, b = idx[i + 1] * 3, c = idx[i + 2] * 3;
+        const cbx = pos[c] - pos[b], cby = pos[c + 1] - pos[b + 1], cbz = pos[c + 2] - pos[b + 2];
+        const abx = pos[a] - pos[b], aby = pos[a + 1] - pos[b + 1], abz = pos[a + 2] - pos[b + 2];
+        const x = cby * abz - cbz * aby, y = cbz * abx - cbx * abz, z = cbx * aby - cby * abx;
+        const ax = nor[a] + x, ay = nor[a + 1] + y, az = nor[a + 2] + z;
+        const bx = nor[b] + x, by = nor[b + 1] + y, bz = nor[b + 2] + z;
+        const qx = nor[c] + x, qy = nor[c + 1] + y, qz = nor[c + 2] + z;
+        nor[a] = ax; nor[a + 1] = ay; nor[a + 2] = az;
+        nor[b] = bx; nor[b + 1] = by; nor[b + 2] = bz;
+        nor[c] = qx; nor[c + 1] = qy; nor[c + 2] = qz;
+      }
+      yield;
+    }
+    for (let v = 0; v < V * 3; v += 3) {
+      const x = nor[v], y = nor[v + 1], z = nor[v + 2], s = 1 / (Math.sqrt(x * x + y * y + z * z) || 1);
+      nor[v] = x * s; nor[v + 1] = y * s; nor[v + 2] = z * s;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    geo.computeVertexNormals();
+    yield;
     geo.computeBoundingSphere();
     yield;
     if (this.far) { this.root.remove(this.far); this.far.geometry.dispose(); }
     const m = new THREE.Mesh(geo, this.o.farMat);
     m.frustumCulled = false; m.receiveShadow = false; m.castShadow = false; m.name = 'far';
     m.renderOrder = -1;
-    this.root.add(m);
+    this.root.add(m); freezeStatic(m);
     this.far = m; this.farAt = [cx, cz];
   }
 }

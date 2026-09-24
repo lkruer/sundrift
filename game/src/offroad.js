@@ -11,7 +11,7 @@
  * GPU process); the magnet, its beam and its rings are a handful of meshes made once and parked out of sight.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from './config.js?v=202609240354';
+import { clamp, lerp, smoothstep } from './config.js?v=202609240808';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const COURSE_OUT_S = 5;
@@ -197,6 +197,20 @@ export class Magnet {
   }
 
   get active() { return !!this.run; }
+
+  get run() { return this._run; }
+  /**
+   * A run let go of before its end (RESTART or MAIN MENU while the magnet has the car: the game sets run to null) parks
+   * the rig out of sight again with its beam, rings and dust dark; it used to hang in the sky where it was, beam lit.
+   */
+  set run(r) {
+    this._run = r;
+    if (!r && this.g) {
+      this.g.position.set(0, -600, 0);
+      this.beam.material.opacity = 0; this.dust.material.opacity = 0;
+      for (const ring of this.rings) ring.material.opacity = 0;
+    }
+  }
 
   /** from, to: { x, y, z, yaw }. */
   play(from, to) {

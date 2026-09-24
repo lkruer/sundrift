@@ -1,0 +1,8 @@
+[
+  { "wait": 3500 },
+  { "shot": "title" },
+  { "click": "#startb" },
+  { "wait": 2500 },
+  { "keys": ["KeyW"], "ms": 1500 },
+  { "shot": "run" }
+]

@@ -11,7 +11,17 @@
  */
 import * as THREE from 'three';
 
-const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _c = new THREE.Color();
+const _m = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _c = new THREE.Color(), _s = new THREE.Sphere();
+
+/**
+ * A subtree that never moves once placed (a road chunk's meshes, a terrain tile and its forest, a pool's group): its
+ * matrices are made once here and three stops remaking them. It composes every object's matrix from its position,
+ * rotation and scale and multiplies it into the parent's every frame otherwise, some 800 objects on a drive.
+ * Anything added to the subtree later is left as it comes (updating itself), so it is always safe to freeze again.
+ */
+export function freezeStatic(root) {
+  root.traverse((o) => { if (o.matrixAutoUpdate) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
+}
 
 /** The meshes of a template (at the origin) with their transforms inside it. */
 export function partsOf(tpl) {
@@ -21,12 +31,36 @@ export function partsOf(tpl) {
   return parts;
 }
 
+/**
+ * A geometry object of its own over a template's vertex buffers. An InstancedMesh drawn with the very geometry another
+ * one uses (a kind of tree in every terrain tile) shares its vertex array with it, and three binds every attribute again
+ * (a dozen GL calls) each time the two are drawn one after the other: some 350 to 550 GL calls a frame. With a geometry
+ * of its own it keeps a vertex array of its own; the buffers are still the template's (nothing is copied). Let go of it
+ * with releaseGeometry, never dispose(), which would delete the template's buffers.
+ */
+function shareGeometry(g) {
+  const s = new THREE.BufferGeometry();
+  for (const k in g.attributes) s.setAttribute(k, g.attributes[k]);
+  s.setIndex(g.index);
+  s.groups = g.groups; s.drawRange = g.drawRange;
+  if (!g.boundingSphere) g.computeBoundingSphere();
+  s.boundingBox = g.boundingBox; s.boundingSphere = g.boundingSphere;
+  return s;
+}
+
+/** A shared geometry let go: its vertex arrays go with it, the template's buffers stay. */
+export function releaseGeometry(g) {
+  g.attributes = {}; g.index = null;
+  g.dispose();
+}
+
 /** items: [{ m: Matrix4, colour? }]. Tinted parts (material named foliage_tinted) take the item colour. */
 export function instanceGroup(parts, items, { castShadow = false, tint = false } = {}) {
   const g = new THREE.Group();
   if (!items.length) return g;
   for (const p of parts) {
-    const im = new THREE.InstancedMesh(p.geometry, p.material, items.length);
+    const im = new THREE.InstancedMesh(shareGeometry(p.geometry), p.material, items.length);
+    im.userData.sharedGeometry = true;                // (released with releaseGeometry when its tile goes)
     const tinted = tint && (p.material.name === 'foliage_tinted' || p.material.userData.tinted);
     for (let i = 0; i < items.length; i++) {
       _m.multiplyMatrices(items[i].m, p.local);
@@ -49,10 +83,21 @@ export class Pool {
     this.base = new Float32Array(cap * 16);
     this.col = new Float32Array(cap * 3);
     this.dirty = false;
+    this.lo = cap; this.hi = -1;                        // the slots written since the last flush: only they go to the GPU
+    // A pool is culled like anything else when every one of its instances is out of view: it was drawn wherever the
+    // camera looked, and on the pass about half of the pools' hundred draws had nothing in view (the torii, the shrine's
+    // lanterns, the chevrons of a bend behind the car). The sphere round all its live instances is made again whenever
+    // they change (flush); the template's own sphere (every part, at an instance's origin) is fixed.
+    this.tpl = new THREE.Sphere(); this.sphere = new THREE.Sphere();
+    this.tpl.makeEmpty();
+    for (const p of parts) {
+      if (!p.geometry.boundingSphere) p.geometry.computeBoundingSphere();
+      this.tpl.union(_s.copy(p.geometry.boundingSphere).applyMatrix4(p.local));
+    }
     this.parts = parts.map((p) => {
       const im = new THREE.InstancedMesh(p.geometry, p.material, cap);
       im.count = 0;
-      im.frustumCulled = false;
+      im.frustumCulled = true; im.boundingSphere = this.sphere;       // (every part lies within the pool's sphere)
       im.castShadow = castShadow; im.receiveShadow = true;
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       const tinted = tint && (p.material.name === 'foliage_tinted' || p.material.userData.tinted);
@@ -99,6 +144,8 @@ export class Pool {
   }
 
   _write(k) {
+    if (k < this.lo) this.lo = k;
+    if (k > this.hi) this.hi = k;
     _m.fromArray(this.base, k * 16);
     for (const p of this.parts) {
       _m2.multiplyMatrices(_m, p.local);
@@ -125,14 +172,53 @@ export class Pool {
 
   clear() { this.n = 0; this.dirty = true; }
 
+  /**
+   * The GPU gets the slots written since the last flush, not the whole live range: a chunk laid down or taken up sent
+   * every instance of every pool it touched again (the grass alone about 200 KB), frame after frame of a build. Ranges
+   * add up until three sends them (the next time the mesh is drawn, which for a pool out of view may be a while); past
+   * a couple of dozen they give way to the whole live range, which covers them all.
+   */
   flush() {
     if (!this.dirty) return;
+    const lo = this.lo, hi = Math.min(this.hi, this.n - 1);
     for (const p of this.parts) {
       p.im.count = this.n;
+      if (hi < lo) continue;                            // (only the count changed: nothing to send)
       const im = p.im.instanceMatrix;
-      im.clearUpdateRanges(); im.addUpdateRange(0, Math.max(16, this.n * 16)); im.needsUpdate = true;
-      if (p.tinted) { const ic = p.im.instanceColor; ic.clearUpdateRanges(); ic.addUpdateRange(0, Math.max(3, this.n * 3)); ic.needsUpdate = true; }
+      if (im.updateRanges.length > 24) { im.clearUpdateRanges(); im.addUpdateRange(0, this.n * 16); }
+      else im.addUpdateRange(lo * 16, (hi - lo + 1) * 16);
+      im.needsUpdate = true;
+      if (p.tinted) {
+        const ic = p.im.instanceColor;
+        if (ic.updateRanges.length > 24) { ic.clearUpdateRanges(); ic.addUpdateRange(0, this.n * 3); }
+        else ic.addUpdateRange(lo * 3, (hi - lo + 1) * 3);
+        ic.needsUpdate = true;
+      }
     }
+    this.lo = this.cap; this.hi = -1;
+    this._bound();
     this.dirty = false;
+  }
+
+  /**
+   * The sphere round every live instance: each instance's copy of the template's sphere (moved, and grown by its largest
+   * scale), boxed, and the sphere round the box. Never smaller than the truth, so nothing in view is ever culled.
+   */
+  _bound() {
+    const S = this.sphere, B = this.base, c = this.tpl.center, r = this.tpl.radius;
+    if (this.n === 0 || r < 0) { S.makeEmpty(); return; }
+    let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+    for (let k = 0, o = 0; k < this.n; k++, o += 16) {
+      const x = B[o] * c.x + B[o + 4] * c.y + B[o + 8] * c.z + B[o + 12];
+      const y = B[o + 1] * c.x + B[o + 5] * c.y + B[o + 9] * c.z + B[o + 13];
+      const z = B[o + 2] * c.x + B[o + 6] * c.y + B[o + 10] * c.z + B[o + 14];
+      const sc = Math.sqrt(Math.max(B[o] * B[o] + B[o + 1] * B[o + 1] + B[o + 2] * B[o + 2], B[o + 4] * B[o + 4] + B[o + 5] * B[o + 5] + B[o + 6] * B[o + 6], B[o + 8] * B[o + 8] + B[o + 9] * B[o + 9] + B[o + 10] * B[o + 10]));
+      const rk = r * sc;
+      if (x - rk < x0) x0 = x - rk; if (x + rk > x1) x1 = x + rk;
+      if (y - rk < y0) y0 = y - rk; if (y + rk > y1) y1 = y + rk;
+      if (z - rk < z0) z0 = z - rk; if (z + rk > z1) z1 = z + rk;
+    }
+    S.center.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    S.radius = 0.5 * Math.hypot(x1 - x0, y1 - y0, z1 - z0);
   }
 }

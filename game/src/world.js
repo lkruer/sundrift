@@ -15,12 +15,12 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609240354';
-import { surface } from '../surfaces.js?v=202609240354';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609240354';
-import { Ground } from './ground.js?v=202609240354';
-import { Terrain, LODS } from './terrain.js?v=202609240354';
-import { partsOf, Pool } from './instancing.js?v=202609240354';
+import { ASSET } from '../assetlib.js?v=202609240808';
+import { surface } from '../surfaces.js?v=202609240808';
+import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202609240808';
+import { Ground } from './ground.js?v=202609240808';
+import { Terrain, LODS } from './terrain.js?v=202609240808';
+import { partsOf, Pool, freezeStatic } from './instancing.js?v=202609240808';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const ASSETS = {
@@ -326,6 +326,7 @@ export class World {
     this.cols = new Map();      // collider cell -> records of things the car can hit
     this.colsBy = new Map();    // owner (a chunk's build or dress level, a terrain tile) -> its records
     this.root = new THREE.Group(); this.root.name = 'road'; scene.add(this.root);
+    this.onChunk = null;        // (a chunk's group, before it joins the scene: main.js has the rig patch its materials)
     this.job = null;
     this.stats = { chunks: 0, near: 0 };
     this.track = null; this.ground = null; this.terrain = null;
@@ -507,8 +508,12 @@ vec2 roadUv(vec2 uv) {
     this.signGreenMat = new THREE.MeshStandardMaterial({ color: 0x3ad082, emissive: 0x20c46a, emissiveIntensity: 1.7, roughness: 0.5 });
     this.signRedMat = new THREE.MeshStandardMaterial({ color: 0xff3a24, emissive: 0xff2a18, emissiveIntensity: 2.4, roughness: 0.5 });
     this.reflectorMat = new THREE.MeshStandardMaterial({ color: 0xffb030, emissive: 0xff9a20, emissiveIntensity: 1.5, roughness: 0.4 });
-    this.tunnelGlowMat = new THREE.MeshBasicMaterial({ color: 0xff9a40, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, opacity: 0.55 });
+    // (the bore's glow, seen from both sides: the inside faces and the outside faces as two meshes of one side each,
+    // drawn in that order as three draws a double-sided transparent material, without flipping its side between two
+    // passes, which made three work its shader program out again twice a frame)
+    const tunnelGlow = (side) => new THREE.MeshBasicMaterial({ color: 0xff9a40, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      side, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4, opacity: 0.55 });
+    this.tunnelGlowMat = tunnelGlow(THREE.FrontSide); this.tunnelGlowBackMat = tunnelGlow(THREE.BackSide);
     // the portal's concrete shows its forms; by day it keeps a little light of its own (setNight): a face turned
     // from the sun went flat black under the cel bands, where real concrete in the shade still reads grey
     { const fw = formworkTexture(); this.portalMat = new THREE.MeshStandardMaterial({ color: 0xa29e95, map: fw, emissive: 0x8f8a80, emissiveMap: fw, emissiveIntensity: 0, roughness: 0.92, metalness: 0 }); }
@@ -610,17 +615,35 @@ vec2 roadUv(vec2 uv) {
       for (const p of pool.parts) { p.im.material.depthWrite = false; p.im.renderOrder = 2; p.im.receiveShadow = false; }
     }
     for (const p of Object.values(this.pools)) this.root.add(p.group);
+    // (the pools' groups and meshes sit at the origin for good: their instances carry the places)
+    freezeStatic(this.root);
     this.buildSky();
-    // the city (NEO TOKYO): its module is loaded here, and its materials made now so they compile with the rest
-    try {
-      this.glyphs = drawsGlyphs;
-      this.City = await import('./city.js?v=202609240354');
-      this._cityMats = this.City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
-      const L = await import('./landmarks.js?v=202609240354').catch((e) => { console.warn('landmarks', e && e.message); return null; });
-      this.citySky = this.City.citySkyBuild(this, L);
-      this.citySky.visible = false;
-      this.scene.add(this.citySky);
-    } catch (e) { console.warn('city', e && e.message); this.City = null; this._cityMats = []; }
+    this.glyphs = drawsGlyphs;
+    // (NEO TOKYO is not loaded here: see loadCity)
+    this.City = null; this._cityMats = [];
+  }
+
+  /**
+   * The city (NEO TOKYO): its module, its atlases, materials and pools, and its far skyline. Loaded the first time the
+   * city is the map (at boot when it is the saved one, else when it is chosen on the title) rather than at every boot:
+   * a run on the pass no longer pays about two seconds of the load for it, nor its share of the shader compile. The
+   * caller compiles its programs before its first frame (world.precompile). Every call gets the same promise.
+   */
+  loadCity() {
+    if (!this._cityLoad) this._cityLoad = (async () => {
+      try {
+        const City = await import('./city.js?v=202609240808');
+        this._cityMats = City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
+        const L = await import('./landmarks.js?v=202609240808').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+        this.citySky = City.citySkyBuild(this, L);
+        this.citySky.visible = false;
+        this.scene.add(this.citySky);
+        this.City = City;
+        freezeStatic(this.root);                                   // (the city's pools, as the pass's at load)
+      } catch (e) { console.warn('city', e && e.message); this.City = null; this._cityMats = []; }
+      return this.City;
+    })();
+    return this._cityLoad;
   }
 
   /** A new course: everything built for the old one goes. */
@@ -712,7 +735,12 @@ vec2 roadUv(vec2 uv) {
       }
       if (!this.job) break;
       const r = this.job.it.next();
-      if (r.done) this.job = null;
+      if (r.done) {
+        // a chunk just built or dressed stands still from now on: its matrices are made once (see freezeStatic)
+        const ch = this.chunks.get(this.job.c);
+        if (ch) freezeStatic(ch.group);
+        this.job = null;
+      }
     }
     for (const p of Object.values(this.pools)) { p.flush(); for (const part of p.parts) part.im.visible = p.n > 0; }
     this.stats.chunks = this.chunks.size;
@@ -742,7 +770,8 @@ vec2 roadUv(vec2 uv) {
     for (const p of Object.values(this.pools)) p.removeOwner(ch.c * 2);
     this._unregOwner(ch.c * 2);
     this.root.remove(ch.group);
-    ch.group.traverse((o) => { if ((o.isMesh || o.isLineSegments) && ch.own.has(o.geometry)) o.geometry.dispose(); });
+    // (the road studs are points: theirs went too, or every chunk dropped kept its studs' buffers on the GPU)
+    ch.group.traverse((o) => { if ((o.isMesh || o.isLineSegments || o.isPoints) && ch.own.has(o.geometry)) o.geometry.dispose(); });
     this.lamps = this.lamps.filter((l) => l.c !== ch.c);
   }
 
@@ -893,6 +922,9 @@ vec2 roadUv(vec2 uv) {
     this._roadside(ch);
     this._studs(ch);
     if (this.city) yield* this.City.cityChunk(this, ch);
+    // (the chunk's own materials, a tunnel's name plate, a road text, get the rig's patches before its first draw:
+    // drawn unpatched, each compiled a shader of its own on the spot, a 400-550 ms stall a minute into a run)
+    if (this.onChunk) this.onChunk(ch.group);
     this.root.add(ch.group);
     ch.built = true;
   }
@@ -1147,8 +1179,7 @@ vec2 roadUv(vec2 uv) {
       gg.setAttribute('color', new THREE.Float32BufferAttribute(gc, 4));
       gg.setIndex(gi); gg.computeBoundingSphere();
       ch.own.add(gg);
-      const glow = new THREE.Mesh(gg, this.tunnelGlowMat); glow.renderOrder = 2; glow.name = 'tunnel-glow';
-      grp.add(glow);
+      for (const m of [this.tunnelGlowBackMat, this.tunnelGlowMat]) { const glow = new THREE.Mesh(gg, m); glow.renderOrder = 2; glow.name = 'tunnel-glow'; grp.add(glow); }
     }
     return grp;
   }
@@ -2366,6 +2397,7 @@ vec2 roadUv(vec2 uv) {
       }
     }
     ch.nearGroup = nearGroup;
+    if (this.onChunk) this.onChunk(nearGroup);                    // (as a chunk's build: see _build)
     ch.group.add(nearGroup);
     ch.near = true;
   }
@@ -2480,7 +2512,8 @@ vec2 roadUv(vec2 uv) {
     { const l = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -500, 0), new THREE.Vector3(1, -500, 0)]), this.wireMat); stage.add(l); }
     this.scene.add(stage);
     const hidden = [];
-    for (const p of Object.values(this.pools)) for (const part of p.parts) if (!part.im.visible) { part.im.visible = true; hidden.push(part.im); }
+    // (an empty pool's sphere is empty and it would be culled: it is drawn here all the same, as it always was)
+    for (const p of Object.values(this.pools)) for (const part of p.parts) if (!part.im.visible) { part.im.visible = true; part.im.frustumCulled = false; hidden.push(part.im); }
     // (the pools of light and the valley towns are not drawn by day: compile them all the same)
     const glowVis = [this.glowMat, this.glowCoolMat, this.glowLanternMat, this.glowCityMat].map((m) => { const v = m.visible; m.visible = true; return [m, v]; });
     const townVis = this.town ? this.town.visible : false;
@@ -2504,10 +2537,13 @@ vec2 roadUv(vec2 uv) {
       warm.render();
       stage.position.set(0, 0, 0);
     }
-    for (const im of hidden) im.visible = false;
+    for (const im of hidden) { im.visible = false; im.frustumCulled = true; }
     for (const [m, v] of glowVis) m.visible = v;
     if (this.town) this.town.visible = townVis;
     this.scene.remove(stage);
+    // (the stand-ins' own buffers go: this runs again when NEO TOKYO first loads; the parts' geometry stays)
+    for (const o of stage.children) { if (o.isInstancedMesh) o.dispose(); else if (o.isLineSegments) o.geometry.dispose(); }
+    box.dispose();
   }
 
   /** Night: light pools come up, towns light, and ground, road and foliage take a cool dark tint. */

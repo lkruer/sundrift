@@ -57,6 +57,25 @@ procedurally. There is not one mesh file, texture file or audio file in the ship
 markings, the ground grain, the slope lattice, the tunnel tiles, the particle sprite and every sound are made
 at load time.
 
+## How it was made (the receipts)
+
+- **Who and what.** One person (lkruer) directing Claude Code, from 22 to 25 September 2026 (UTC). The code, the
+  assets and the critic rounds were written by Claude Fable 5.1 and then Claude Opus 5.5, with sub-agents for the
+  asset loop, the critic rounds and the late QA passes (each commit names its model). No image or audio model: the
+  folder has no image or sound files at all.
+- **The history is the work.** Every round is a commit, and [NOTES.md](NOTES.md) is the log of each one, newest
+  first: what the owner asked for, what was measured, what was changed and what was rejected, with the numbers.
+- **Gate runs.** The jam gate (`harness/jam.mjs`, phone, 4G, CPU slowed 2x) against the live URL, and this game's
+  own gate (`gate/drift-gate.mjs`: real keys or real touches, steering by telemetry, asserting that drifts were
+  banked), run on both maps, desktop and phone, before every push; each round's numbers are in NOTES.md.
+- **What was thrown away,** each with its reason in NOTES.md: the first plan (an autumn pass at golden hour) for a
+  night touge in cherry-blossom season; the first name (SUNDRIFT); the first hero car, and the losing candidates of
+  every asset (`work/cands/`); the MEDIUM course; a counter-steer assist that overrode the player's key; a reversing
+  aid that stopped a sliding car dead; a drift that unwound on its own after a second and a half (a slide now holds
+  for as long as it is held); rain drawn as added light, which glowed white by day; a DOM countdown panel that
+  stalled the compositor (it is a canvas now); and the 20:36 start (runs now begin at dusk, so the first drifts
+  visibly carry the sky into the night).
+
 ## Courses
 
 The difference between them is the road.
@@ -86,6 +105,7 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 
 | | keyboard | phone |
 |---|---|---|
+| start | `Enter`, or the START button | tap START |
 | drive / brake | `W` / `S` | hold the left half of the screen |
 | steer | `A` / `D` | slide the finger left or right |
 | handbrake | `Space` | hold the right half of the screen |
@@ -95,6 +115,9 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 | mute | `M` | the note button |
 | reverse | hold `S` when stopped (a strong gear, to about 40 mph) | pull the finger down |
 | J-turn | reverse straight and fast, let go of `S`, then full lock (held) and `W` | pull down, then push up and slide over |
+
+The keys follow what is printed on them, so on an AZERTY or a QWERTZ keyboard W, A, S and D are where the keyboard
+says (the arrow keys work too).
 
 Drift: tap the handbrake into a corner (or lift off and turn in, or flick the wheel the other way first, or just
 push a fast corner on the throttle) and keep the key held into the turn: the slide holds for as long as you hold it,
@@ -195,6 +218,12 @@ passing 90 degrees).
 | `work/track_test.mjs`, `work/tile_test.mjs` | the generator and terrain checks (overlaps, dead ends, ground above the road) |
 | `work/city_track_test.mjs` | the same checks for the NEO TOKYO layouts |
 | `work/jturn_test.mjs`, `work/reverse_test.mjs` | the J-turn and reversing, simulated |
+| `work/feel_test.mjs`, `work/steer_test.mjs`, `work/power_test.mjs` | the drift's feel by numbers (entries, the held angle, speed kept, switchbacks), the wheel against the key, donuts |
+| `work/stop_hunt.mjs`, `work/reverse_release_test.mjs`, `work/unstick_test.mjs` | 600 runs of random keys hunting for the car stopping dead; letting go of reverse; getting off a wall |
+| `work/hairpin_test.json`, `work/corner_city.json`, `work/gatebot_phone.json` | in the game: hairpins and square corners taken sideways by an autopilot; the jam gate's phone driver replayed |
+| `work/pass_qa/`, `work/city_qa_audit.json`, `work/city_qa_measure.json` | the maps' placement audits (floating props, things inside buildings, full pools) and draw and triangle tours |
+| `work/qa_*.mjs` | a judge's half hour, scripted: long autopilot sessions sampling memory, GPU textures, programs and frame times; the sky-rebuild leak test; every flow (pause, restart, map switches, the phone) |
+| `work/perf/`, `work/boot_probe.mjs` | the phone performance probes (JS per frame under CPU throttling, CPU profiles, a pixel A/B that proves a change invisible) and where the load time goes under the jam gate's 4G |
 | `work/jitter.mjs`, `work/shot.mjs` | a frame-time and on-screen jitter probe, and scripted screenshots |
 | `gate/drift-gate.mjs` | the gate this game needs: real keys or real touches, steers by telemetry, handbrakes into corners, asserts drifts were banked, writes a filmstrip |
 | `NOTES.md` | the build log: what was measured, what was rejected, what is still wrong |

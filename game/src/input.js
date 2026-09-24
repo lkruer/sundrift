@@ -9,17 +9,43 @@
  *
  * Keyboard steering is ramped rather than instant: a key is a switch, and a car steered by a switch darts.
  * The ramp is fast (about 0.12 s to full lock) and the return is faster, so it reads as responsive.
+ *
+ * A key means what is printed on it where that is one of the letters the game binds (W A S D, P, M), so the hints
+ * hold on AZERTY and QWERTZ; any other key means where it sits (KeyboardEvent.code), so ZQSD by position on an AZERTY
+ * board and every non-Latin layout still drive. One meaning per key, so no key does two things.
  */
+const LABELS = { w: 'KeyW', a: 'KeyA', s: 'KeyS', d: 'KeyD', p: 'KeyP', m: 'KeyM' };
+const meaning = (e) => (typeof e.key === 'string' && e.key.length === 1 && LABELS[e.key.toLowerCase()]) || e.code;
+const DRIVE = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD']);
+
 export class Input {
   constructor() {
-    this.keys = new Set();
+    this.keys = new Set();          // what the held keys mean (see meaning)
+    this.held = new Map();          // physical key (code) -> its meaning, so a key lets go of what it pressed
     this.kSteer = 0;              // ramped keyboard steer, -1..1, left positive
     this.t = { active: false, id: null, x0: 0, y0: 0, steer: 0, throttle: 0, brake: 0, hand: false };
     this.touchMode = false;
     this.anyKey = false;
     this.zoom = 1;                // chase camera distance factor, mouse wheel or plus and minus
     try { this.zoom = Math.min(2.6, Math.max(0.7, Number(localStorage.getItem('minidrift.zoom')) || 1)); } catch {}
-    addEventListener('wheel', (e) => this.setZoom(this.zoom * (1 + Math.sign(e.deltaY) * 0.12)), { passive: true });
+    // A wheel's notch (a line or a page, or 40 px and more) is one 12% step, as it was; a trackpad sends a stream of a few
+    // pixels at a time (dozens a swipe), which moves the zoom in proportion instead of throwing it end to end. A pinch
+    // on a trackpad arrives as ctrl + wheel (Chrome, Firefox): the camera's zoom too, never the page's.
+    // (deltaMode is read before deltaY: Firefox reports lines only to a page that asks what unit it is using)
+    addEventListener('wheel', (e) => {
+      const unit = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1, px = e.deltaY * unit;
+      if (!px) return;
+      const step = unit > 1 || Math.abs(px) >= 40 ? 0.12 : Math.min(0.12, Math.abs(px) * (e.ctrlKey ? 0.01 : 0.0025));
+      this.setZoom(this.zoom * (1 + Math.sign(px) * step));
+    }, { passive: true });
+    // (held only over the play surfaces, the canvas and the thumbs' layer, so the title menu's own scrolling stays passive)
+    for (const id of ['c', 'touch']) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+    }
+    // (Safari's own pinch, on a Mac trackpad and on an iPhone or iPad, comes as gesture events: the page does not zoom
+    // under the game; and iOS ignores user-scalable=no, so two thumbs on the glass could otherwise zoom the page)
+    for (const g of ['gesturestart', 'gesturechange']) addEventListener(g, (e) => e.preventDefault(), { passive: false });
     this.onAny = null;            // called on the first real input, to unlock audio
     this.onPause = null;          // Escape or P
     this.onMute = null;           // M
@@ -52,19 +78,38 @@ export class Input {
   _bindKeys() {
     const down = (e) => {
       if (e.repeat) return;
-      this.keys.add(e.code);
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) e.preventDefault();
-      if (e.code === 'Equal' || e.code === 'NumpadAdd') this.setZoom(this.zoom / 1.12);
-      if (e.code === 'Minus' || e.code === 'NumpadSubtract') this.setZoom(this.zoom * 1.12);
-      if ((e.code === 'Escape' || e.code === 'KeyP') && this.onPause) { this.onPause(); e.preventDefault(); }
-      if (e.code === 'KeyM' && this.onMute) this.onMute();
+      const k = meaning(e);
+      this.held.set(e.code, k);
+      this.keys.add(k);
+      if (DRIVE.has(k)) e.preventDefault();
+      // zoom: the keys printed + and - on any layout (on QWERTZ + is where QWERTY has ], and - where it has /), or the pad's
+      if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') this.setZoom(this.zoom / 1.12);
+      else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') this.setZoom(this.zoom * 1.12);
+      if ((k === 'Escape' || k === 'KeyP') && this.onPause) { this.onPause(); e.preventDefault(); }
+      if (k === 'KeyM' && this.onMute) this.onMute();
+      // Enter or Space on the title starts a run (main.js decides whether the title is up), also straight after a
+      // click on a map, a course or a paint (the focus stays on that button, and its own Enter would only choose it
+      // again); not while START or a pause-menu button has the focus, whose own Enter and Space already press it
+      if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') && this.onStart) {
+        const f = document.activeElement;
+        const choice = f && f.closest && f.closest('.map, .diff, .sw');
+        if (choice || !(f && f.closest && f.closest('button, a, input, select, textarea'))) {
+          if (this.onStart() && choice) e.preventDefault();
+        }
+      }
       this.anyKey = true;
       if (this.onAny) this.onAny();
     };
-    const up = (e) => this.keys.delete(e.code);
+    const up = (e) => {
+      const k = this.held.has(e.code) ? this.held.get(e.code) : e.code;
+      this.held.delete(e.code);
+      // (another key still held with the same meaning keeps it: on AZERTY both Q and A are left)
+      for (const v of this.held.values()) if (v === k) return;
+      this.keys.delete(k);
+    };
     addEventListener('keydown', down, { passive: false });
     addEventListener('keyup', up);
-    addEventListener('blur', () => this.keys.clear());
+    addEventListener('blur', () => { this.keys.clear(); this.held.clear(); });
   }
 
   _bindOrbit() {
@@ -106,6 +151,9 @@ export class Input {
       wheel.style.top = (y - r.top) + 'px';
     };
     stick.addEventListener('touchstart', (e) => {
+      // (first, for every finger that lands here: a second thumb on the stick is ignored, but left to the browser it
+      // could still start a pinch-zoom, a double-tap zoom or iOS's long-press magnifier)
+      e.preventDefault();
       const c = e.changedTouches[0];
       if (t.active) return;
       t.active = true; t.id = c.identifier; t.x0 = c.clientX; t.y0 = c.clientY;
@@ -115,7 +163,6 @@ export class Input {
       layer.classList.add('used');
       if (!this.touchMode) this.setTouchMode(true);
       if (this.onAny) this.onAny();
-      e.preventDefault();
     }, { passive: false });
     stick.addEventListener('touchmove', (e) => {
       for (const c of e.changedTouches) {

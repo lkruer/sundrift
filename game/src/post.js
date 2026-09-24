@@ -7,13 +7,12 @@
  * a scribble, plus a softer luma edge for creases. Bands are decided on a tone-mapped copy of the colour and
  * applied as a ratio, so hue survives and the output stays linear HDR for the OutputPass to tone-map.
  *
- * The scene renders into its own target that owns the depth texture; the composer copies the colour out of
- * it and never touches that depth. Giving the composer's ping-pong buffers a shared depth texture rendered
- * one black frame a second, which is the kind of thing worth writing down.
+ * The scene renders into its own target that owns the depth texture; the cel pass reads the colour and the depth
+ * straight out of it and the composer never touches that depth. Giving the composer's ping-pong buffers a shared
+ * depth texture rendered one black frame a second, which is the kind of thing worth writing down.
  */
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { TexturePass } from 'three/addons/postprocessing/TexturePass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
@@ -253,10 +252,17 @@ const Retro = {
 export function makePost(renderer, scene, camera, { bloom = true, width, height, fringe = true, tube = true }) {
   const pr = renderer.getPixelRatio();
   const w = Math.floor(width * pr), h = Math.floor(height * pr);
-  const sceneRT = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(w, h), depthBuffer: true });
-  const composer = new EffectComposer(renderer);
-  composer.addPass(new TexturePass(sceneRT.texture));
-  const cel = new ShaderPass(Cel);
+  // (a GPU that cannot draw into half floats gets 8-bit buffers: a little more banding in the glow, but a picture, where
+  // a half-float target it cannot draw into is black. Every desktop and recent phone has one of the two)
+  const ext = renderer.extensions;
+  const type = ext.has('EXT_color_buffer_half_float') || ext.has('EXT_color_buffer_float') ? THREE.HalfFloatType : THREE.UnsignedByteType;
+  const sceneRT = new THREE.WebGLRenderTarget(w, h, { type, depthTexture: new THREE.DepthTexture(w, h), depthBuffer: true });
+  const composer = type === THREE.HalfFloatType ? new EffectComposer(renderer) : new EffectComposer(renderer, new THREE.WebGLRenderTarget(w, h, { type }));
+  // the cel pass reads the scene's own target: the frame used to be copied into the composer's buffer first (a
+  // TexturePass), a whole extra full-screen pass and render() call a frame for an identical picture. (A null texture
+  // name keeps the pass from pointing tDiffuse at the composer's buffer.)
+  const cel = new ShaderPass(Cel, null);
+  cel.uniforms.tDiffuse.value = sceneRT.texture;
   cel.uniforms.tDepth.value = sceneRT.depthTexture;
   cel.uniforms.uRes.value.set(w, h);
   cel.uniforms.uCA.value = fringe ? 0.0042 : 0;
@@ -285,6 +291,7 @@ export function makePost(renderer, scene, camera, { bloom = true, width, height,
       sceneRT.setSize(w2, h2);
       composer.setSize(width2, height2);
       cel.uniforms.uRes.value.set(w2, h2);
+      cel.uniforms.tDiffuse.value = sceneRT.texture;
       cel.uniforms.tDepth.value = sceneRT.depthTexture;
       if (bloomPass) bloomPass.setSize(w2, h2);
       if (retro) retro.uniforms.uRes.value.set(w2, h2);

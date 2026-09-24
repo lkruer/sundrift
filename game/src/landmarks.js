@@ -100,6 +100,22 @@ function aviationPoints(T, pts, size = 3.2) {
 
 // ---------------------------------------------------------------- Tokyo Tower
 
+/**
+ * A lattice seen from both sides, as two meshes of one side each: the far faces, then the near ones, which is how three
+ * draws a double-sided transparent material, but without flipping the material's side between its two passes (each flip
+ * made three work the material's shader program out again: twice a frame for each tower).
+ */
+function latticeMat(T, color, alphaMap, side) {
+  return new T.MeshBasicMaterial({ color, alphaMap, transparent: true, depthWrite: false, side, fog: false });
+}
+function latticeMeshes(T, g, geometry, mats, name) {
+  // (the back faces' mesh made and added first: the same place and draw order, so it is drawn just before the front's)
+  for (const [mat, n] of [[mats.latticeBack, name + ' back'], [mats.lattice, name]]) {
+    const l = new T.Mesh(geometry, mat);
+    l.name = n; l.castShadow = false; l.receiveShadow = false; l.renderOrder = 1; g.add(l);
+  }
+}
+
 /** The lattice between the members: a square cell with an X, drawn into an alpha map. */
 function latticeAlpha(T) {
   const S = 128, cv = document.createElement('canvas'); cv.width = cv.height = S;
@@ -198,15 +214,16 @@ export function tokyoTower(T = THREE) {
 
   const K = 3.0;                                              // bright enough to bloom
   // (the orange and white members and the lit windows are one mesh in their own colours: one draw, not three)
+  const towerAlpha = latticeAlpha(T);
   const mats = {
     lit: new T.MeshBasicMaterial({ vertexColors: true, fog: false }),
-    lattice: new T.MeshBasicMaterial({ color: new T.Color(0xff8a2a).multiplyScalar(K * 0.9), alphaMap: latticeAlpha(T), transparent: true, depthWrite: false, side: T.DoubleSide, fog: false }),
+    lattice: latticeMat(T, new T.Color(0xff8a2a).multiplyScalar(K * 0.9), towerAlpha, T.FrontSide),
+    latticeBack: latticeMat(T, new T.Color(0xff8a2a).multiplyScalar(K * 0.9), towerAlpha, T.BackSide),
   };
   {
     const m = new T.Mesh(mergeLit(T, [[orange, 0xff8a2a, K], [white, 0xffe0b0, K * 0.85], [windows, 0xfff6e6, K * 1.1]]), mats.lit);
     m.name = 'tower lit'; m.castShadow = false; m.receiveShadow = false; g.add(m);
-    const l = new T.Mesh(lattice.geometry(), mats.lattice);
-    l.name = 'tower lattice'; l.castShadow = false; l.receiveShadow = false; l.renderOrder = 1; g.add(l);
+    latticeMeshes(T, g, lattice.geometry(), mats, 'tower lattice');
   }
   // the red aviation lights: the top, the antenna, the decks' corners
   const av = [0, 333.8, 0];
@@ -296,15 +313,16 @@ export function tokyoSkytree(T = THREE) {
   trim.beam([0, 590, 0], [0, 634, 0], 1.8, true, 0.7);
   for (let y = 470; y < 590; y += 24) trim.prism(0, 0, y, y + 2, 6.8 - (y - 455) * 0.02, 6.8 - (y - 455) * 0.02, 8, 0, false);
   const K = 2.6;
+  const treeAlpha = latticeAlpha(T);
   const mats = {
     lit: new T.MeshBasicMaterial({ vertexColors: true, fog: false }),
-    lattice: new T.MeshBasicMaterial({ color: new T.Color(0x7cc4ff).multiplyScalar(K), alphaMap: latticeAlpha(T), transparent: true, depthWrite: false, side: T.DoubleSide, fog: false }),
+    lattice: latticeMat(T, new T.Color(0x7cc4ff).multiplyScalar(K), treeAlpha, T.FrontSide),
+    latticeBack: latticeMat(T, new T.Color(0x7cc4ff).multiplyScalar(K), treeAlpha, T.BackSide),
   };
   {
     const m = new T.Mesh(mergeLit(T, [[core, 0x2a4a7a, 1.2], [glass, 0xf4f8ff, K * 1.1], [trim, 0xe8f4ff, K * 1.15]]), mats.lit);
     m.name = 'skytree lit'; m.castShadow = false; m.receiveShadow = false; g.add(m);
-    const l = new T.Mesh(lattice.geometry(), mats.lattice);
-    l.name = 'skytree lattice'; l.castShadow = false; l.receiveShadow = false; l.renderOrder = 1; g.add(l);
+    latticeMeshes(T, g, lattice.geometry(), mats, 'skytree lattice');
   }
   const av = [0, 635, 0, 0, 598, 0];
   for (let k = 0; k < 3; k++) { const a = Math.PI / 2 + k * 2.094; av.push(Math.cos(a) * 23, 461, Math.sin(a) * 23, Math.cos(a) * 27, 362, Math.sin(a) * 27); }

@@ -20,7 +20,7 @@
  * wheels over the rail joints, and a crossing's chirp for the blind as the car passes a signal. Each is placed where it
  * is: quieter, duller and wetter (a street's own reverb) the further off, and panned to its side.
  */
-import { clamp, smoothstep } from './config.js?v=202609240354';
+import { clamp, smoothstep } from './config.js?v=202609240808';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -110,14 +110,50 @@ export class Audio {
     addEventListener('pointerdown', ui, true); addEventListener('pointerup', ui, true);
     // a new best is the HUD's to notice (main.js hands it only the HUD); it says so with a window event
     addEventListener('minidrift:best', () => this.onEvent({ type: 'best' }));
+    // (the sound's life: held while the game is paused (pause) or the page is hidden; any other time a context that has
+    // stopped is started again, at the next touch or key if it needs one (iOS stops it for a call, an alarm or another
+    // app's sound, reports 'interrupted', and lets a page start it again only from a gesture: a finger's touchend, a
+    // key, a click; a touchstart is not one). A hidden page is silent on its own account: with the 'playback' session
+    // below iOS would let the sound play on behind the lock screen, and the title does not pause the sound itself.)
+    this._held = false;
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this._sleep(); else this._wake(); });
+    const wake = () => this._wake();
+    addEventListener('touchend', wake, { capture: true, passive: true });
+    addEventListener('click', wake, true);
+  }
+
+  /** Start the context again if it has stopped, unless the game has it held or the page is hidden. */
+  _wake() {
+    const c = this.ctx;
+    if (!c || c.state === 'running' || c.state === 'closed' || this._held || document.hidden) return;
+    try { const p = c.resume(); if (p && p.catch) p.catch(() => {}); } catch {}
+  }
+
+  _sleep() {
+    const c = this.ctx;
+    if (!c || c.state === 'closed') return;
+    try { const p = c.suspend(); if (p && p.catch) p.catch(() => {}); } catch {}
+  }
+
+  /**
+   * iOS gives a page's Web Audio the 'ambient' session, which the ring/silent switch mutes, so a phone on silent heard
+   * none of the game. Safari 16.4+ lets a page ask for 'playback' instead, as a game or a music player does (the game has
+   * its own mute button, M). Asked for before the context starts, and not while the game is muted (a session that is
+   * 'playback' stops the phone's own music). Nothing, on every other browser.
+   */
+  _session() {
+    try { const s = navigator.audioSession; if (s && !this.muted && s.type !== 'playback') s.type = 'playback'; } catch {}
   }
 
   /** Create everything on the first real gesture; browsers refuse audio before one. */
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) { this._wake(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
-    const ctx = this.ctx = new AC({ latencyHint: 'interactive' });
+    this._session();
+    let ctx;
+    try { ctx = new AC({ latencyHint: 'interactive' }); } catch { try { ctx = new AC(); } catch { return; } }
+    this.ctx = ctx;
     this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.9;
     this.comp = ctx.createDynamicsCompressor();
     this.comp.threshold.value = -14; this.comp.knee.value = 18; this.comp.ratio.value = 4; this.comp.attack.value = 0.004; this.comp.release.value = 0.18;
@@ -133,6 +169,8 @@ export class Audio {
     this._engine(); this._tyres(); this._wind(); this._rain(); this._musicBus();
     for (const g of [this.engGain, this.raspGain, this.turboGain, this.screechGain]) if (g) g.connect(this.echoIn);
     this.ready = true;
+    // (Safari can make the context 'suspended' even inside the gesture that made it: start it while the gesture lasts)
+    this._wake();
   }
 
   /** Inside a tunnel (0..1): the echo comes up, and the wind drops. */
@@ -181,11 +219,21 @@ export class Audio {
     this.engNode = null; this.voices = [];
     this.gearShown = -1; this.cutUntil = 0;
     if (c.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
-      const url = URL.createObjectURL(new Blob([ENGINE_WORKLET], { type: 'application/javascript' }));
-      c.audioWorklet.addModule(url).then(() => {
-        this.engNode = new AudioWorkletNode(c, 'minidrift-engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
-        this.engNode.connect(this.engFilter);
-      }).catch(() => this._engineOsc());
+      // (and the oscillators if the worklet has not loaded in five seconds: WebKit will not fetch a blob: URL in a
+      // sandboxed frame, and a load that neither loads nor fails would have left the car with no engine at all)
+      let settled = false;
+      const fallback = () => { if (!settled) { settled = true; this._engineOsc(); } };
+      const timer = setTimeout(fallback, 5000);
+      try {
+        const url = URL.createObjectURL(new Blob([ENGINE_WORKLET], { type: 'application/javascript' }));
+        c.audioWorklet.addModule(url).then(() => {
+          if (settled) return;
+          const node = new AudioWorkletNode(c, 'minidrift-engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+          node.connect(this.engFilter);
+          settled = true; clearTimeout(timer);
+          this.engNode = node;
+        }).catch(() => { clearTimeout(timer); fallback(); });
+      } catch { clearTimeout(timer); fallback(); }
     } else this._engineOsc();
   }
 
@@ -315,15 +363,32 @@ export class Audio {
     return b;
   }
 
-  /** Pause: the whole audio clock stops, so the engine, the tyres and the music all hold where they are. */
+  /**
+   * Pause: the whole audio clock stops, so the engine, the tyres and the music all hold where they are. (Held until the
+   * game lets go: a key or a touch while paused no longer starts the sound under the pause screen.)
+   */
   pause(on) {
-    if (!this.ctx) return;
-    try { if (on) this.ctx.suspend(); else this.ctx.resume(); } catch {}
+    this._held = !!on;
+    if (on) this._sleep(); else this._wake();
+  }
+
+  /**
+   * The car falls silent: back at the title nothing calls update() any more, and every sound of the car held the
+   * last level it was given (the engine droned on under the menu). The music plays on.
+   */
+  quiet() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (const g of [this.engGain, this.raspGain, this.whineGain, this.turboGain, this.screechGain, this.scrubGain, this.gravelGain, this.windGain]) if (g) g.gain.setTargetAtTime(0, t, 0.12);
+    // (the rain too, and forgotten, so the next run's rain is set again from nothing)
+    if (this.rainGain) this.rainGain.gain.setTargetAtTime(0, t, 0.3);
+    this._rainV = -1;
   }
 
   setMuted(m) {
     this.muted = m;
     try { localStorage.setItem('minidrift.mute', m ? '1' : '0'); } catch {}
+    if (!m) this._session();
     if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.05);
   }
 

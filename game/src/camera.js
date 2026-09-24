@@ -10,7 +10,7 @@
  * It is kept above the ground so a hairpin cut into the mountain can never put it inside the rock.
  */
 import * as THREE from 'three';
-import { CAM, clamp, damp, smoothstep } from './config.js?v=202609240354';
+import { CAM, clamp, damp, smoothstep, REDUCED_MOTION } from './config.js?v=202609240808';
 
 const TAU = Math.PI * 2;
 function wrapA(d) { while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; return d; }
@@ -50,7 +50,8 @@ export class ChaseCam {
     this._place(car, 1);
   }
 
-  kick(amount) { this.shake = Math.min(1, this.shake + amount); }
+  // (a player who asked their system for less motion gets a third of the shake)
+  kick(amount) { this.shake = Math.min(1, this.shake + amount * (REDUCED_MOTION ? 0.3 : 1)); }
 
   /**
    * @param car the Car; y the road height under it; groundAt (x, z) => ground height; boost01 0..1; zoom factor;

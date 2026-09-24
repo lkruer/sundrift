@@ -64,6 +64,13 @@ export const QUALITY = {
 
 export const MAX_DT = 1 / 20;
 
+/**
+ * The player has asked their system for less motion (macOS, iOS, Android and Windows all have the switch): what the
+ * camera's kicks, the motion blur and the lightning's flicker should read to take themselves down. (The menus' own
+ * pulsing is index.html's, in CSS.)
+ */
+export const REDUCED_MOTION = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /** The car as drawn: a little smaller than the physics body, so the road reads roomy. */
 export const CAR_SCALE = 0.62;
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

@@ -11,15 +11,15 @@
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202609240354';
-import { buildingMaterial } from './buildings.js?v=202609240354';
-import { neonAtlas } from './neon.js?v=202609240354';
-import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609240354';
-import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202609240354';
-import { railSkip } from './citytrain.js?v=202609240354';
-import { carsLoad, parkCar } from './citycars.js?v=202609240354';
-import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202609240354';
-import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202609240354';
+import { clamp, lerp, mulberry32 } from './config.js?v=202609240808';
+import { buildingMaterial } from './buildings.js?v=202609240808';
+import { neonAtlas } from './neon.js?v=202609240808';
+import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609240808';
+import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202609240808';
+import { railSkip } from './citytrain.js?v=202609240808';
+import { carsLoad, parkCar } from './citycars.js?v=202609240808';
+import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202609240808';
+import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202609240808';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 // the points of a lot's footprint tested against the roads: [along the front (-0.5..0.5 of its width), in (0..1 of its depth)]
@@ -266,10 +266,15 @@ export function cityLoad(w, Pool, fontFamily) {
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   // the street's clutter (cityprops.js), one draw per material per chunk
   w.propMats = cityPropMaterials(THREE);
+  // The knockable things' pools draw with copies of these materials, not the materials themselves: the chunks' clutter
+  // draws with those as plain meshes, and a material drawn both instanced and not flips between two shader programs,
+  // which made three work its program out again at every flip, eight to ten times a frame in the city.
+  const inst = {};
+  for (const [k, m] of Object.entries(w.propMats)) { const c = m.clone(); c.name = m.name + ' pooled'; inst[k] = c; }
   // the bollards the car can take out: a pool of their own
   {
     const b = bollardGeometry(THREE);
-    const m = w.propMats[b.material] || w.propMats.glossy;
+    const m = inst[b.material] || inst.glossy;
     w.pools.bollard = new Pool([{ geometry: b.geometry, material: m, local: new THREE.Matrix4() }], 900);
     w.root.add(w.pools.bollard.group);
     w.parts.bollard = [{ geometry: b.geometry, material: m, local: new THREE.Matrix4() }];
@@ -286,7 +291,7 @@ export function cityLoad(w, Pool, fontFamily) {
     const CAP = { bag: 1600, crate: 300, crates: 300, box: 300, cone: 480, aboard: 360, bike: 700 };
     for (const [name, parts0] of Object.entries(streetItems(THREE))) {
       const parts = parts0.map((p) => ({ geometry: p.geometry, local: new THREE.Matrix4(),
-        material: TINTED.has(name) && tint[p.material] ? tint[p.material] : (w.propMats[p.material] || w.propMats.props) }));
+        material: TINTED.has(name) && tint[p.material] ? tint[p.material] : (inst[p.material] || inst.props) }));
       w.pools[name] = new Pool(parts, CAP[name] || 300, { tint: TINTED.has(name) });
       w.root.add(w.pools[name].group);
       w.parts[name] = parts;
@@ -1133,7 +1138,8 @@ function skyDay(w, U) {
   if (U.ring && U.ring.userData.day) { U.ring.userData.day.value = d; U.ring.userData.materials.lights.color.setScalar(1 - 0.8 * d); }
   for (const L of [U.tower, U.skytree]) {
     const M = L && L.userData.materials; if (!M) continue;
-    for (const m of [M.lit, M.lattice]) { if (!m.userData.base) m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(1 - 0.62 * d); }
+    // (the lattice is two materials, its far faces and its near ones: see landmarks.js latticeMeshes)
+    for (const m of [M.lit, M.lattice, M.latticeBack]) { if (!m) continue; if (!m.userData.base) m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(1 - 0.62 * d); }
   }
 }
 

@@ -11,7 +11,7 @@
  * tiling noise texture made here once. Nothing in here writes depth, so none of it is inked by the cel pass.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from './config.js?v=202609240354';
+import { clamp, lerp, smoothstep, REDUCED_MOTION } from './config.js?v=202609240808';
 
 /** Tiling value noise, four octaves in the four channels (4, 8, 16 and 32 cells across). */
 function noiseTexture(size = 128) {
@@ -517,14 +517,16 @@ class Lightning {
         this.next = 5 + rnd() * 12;
         this.t = 0;
         const dist = this._bolt(cam, viewYaw, topY, groundY);
-        this.shape = [[0, 1], [0.07, 0.55], [0.16, 0.9], [0.3, 0.25]].map(([a, k]) => [a + rnd() * 0.03, k * (0.7 + rnd() * 0.3)]);
+        // (a player who asked their system for less motion gets one soft flash, not the flicker of three)
+        this.shape = REDUCED_MOTION ? [[0, 0.6]] : [[0, 1], [0.07, 0.55], [0.16, 0.9], [0.3, 0.25]].map(([a, k]) => [a + rnd() * 0.03, k * (0.7 + rnd() * 0.3)]);
         thunder = { delay: dist / 340, k: clamp(1.3 - dist / 1600, 0.35, 1) };
       }
     }
     if (this.t >= 0) {
       this.t += dt;
       let f = 0;
-      for (const [a, k] of this.shape) if (this.t >= a) f = Math.max(f, k * Math.exp(-(this.t - a) / 0.05));
+      const fade = REDUCED_MOTION ? 0.16 : 0.05;
+      for (const [a, k] of this.shape) if (this.t >= a) f = Math.max(f, k * Math.exp(-(this.t - a) / fade));
       this.flash = f;
       this.u.uI.value = this.t < 0.36 ? f : 0;
       this.mesh.visible = this.t < 0.36;

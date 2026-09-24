@@ -12,8 +12,8 @@
  *
  * Pure maths, no Three.js: the terrain tiles, the props, the camera and the tests all ask this one function.
  */
-import { clamp, smoothstep } from './config.js?v=202609240354';
-import { CELL, ckey } from './track.js?v=202609240354';
+import { clamp, smoothstep } from './config.js?v=202609240808';
+import { CELL, ckey } from './track.js?v=202609240808';
 
 export const CUT = 1.25;          // steepest cut face: rise per metre (51 degrees)
 export const FILL = 0.8;          // steepest embankment (39 degrees)
@@ -59,7 +59,10 @@ export class Ground {
     const cells = t._cells;
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     const rc = Math.ceil((R + 2) / CELL);
-    const pads = t.pads, nPads = pads.length;
+    // (the terraces, final ones only and in order of where they start: every nearby stretch of road used to test every
+    // terrace on the course, so a sample cost more with every kilometre driven, and a terrain tile three times as much
+    // after half an hour)
+    const PX = t.pads.length ? this._padIndex() : null, pads = PX ? PX.list : null, ps0 = PX ? PX.s0 : null, nPads = pads ? pads.length : 0;
     for (let dx = -rc; dx <= rc; dx++) for (let dz = -rc; dz <= rc; dz++) {
       const c = cells.get(ckey(cx + dx, cz + dz)); if (!c) continue;
       for (let k = 0; k < c.length; k++) {
@@ -101,9 +104,15 @@ export class Ground {
         if (nPads) {
           // a shrine terrace: the verge on its side widens into a level pad a little above the road
           const s = a.s + (b.s - a.s) * tt;
-          for (let j = 0; j < nPads; j++) {
+          // only the terraces whose stretch (6 m more at each end) can reach s: those starting before s + 6, back to
+          // the longest terrace's length before s - 6
+          let lo = 0, hi = nPads;
+          while (lo < hi) { const m = (lo + hi) >> 1; if (ps0[m] - 6 <= s) lo = m + 1; else hi = m; }
+          let j0 = lo;
+          while (j0 > 0 && ps0[j0 - 1] >= s - 6 - PX.span) j0--;
+          for (let j = j0; j < lo; j++) {
             const p = pads[j];
-            if (p.fi >= t.nFinalF || s < p.s0 - 6 || s > p.s1 + 6 || (p.side > 0) !== left) continue;
+            if (s > p.s1 + 6 || (p.side > 0) !== left) continue;
             const kS = smoothstep(p.s0 - 6, p.s0, s) * (1 - smoothstep(p.s1, p.s1 + 6, s));
             fe = Math.max(fe, w + verge + (p.u1 - w) * kS);
             flatY += (p.h + VERGE_DROP) * smoothstep(p.u0 - 1.4, p.u0, d) * kS;
@@ -134,6 +143,23 @@ export class Ground {
     }
     out.h = h;
     return out;
+  }
+
+  /**
+   * The final terraces sorted by where they start (a stable sort: the course lays them in that order anyway), their
+   * starts, and the longest one's length. Rebuilt only when the road grows: a terrace of a feature not yet final can be
+   * laid again differently, one of a final feature never changes.
+   */
+  _padIndex() {
+    const t = this.track;
+    if (this._padList && this._padOf === t.pads && this._padN === t.pads.length && this._padF === t.nFinalF) return this._padList;
+    const list = t.pads.filter((p) => p.fi < t.nFinalF).sort((a, b) => a.s0 - b.s0);
+    const s0 = new Float64Array(list.length);
+    let span = 0;
+    for (let i = 0; i < list.length; i++) { s0[i] = list[i].s0; span = Math.max(span, list[i].s1 - list[i].s0); }
+    this._padOf = t.pads; this._padN = t.pads.length; this._padF = t.nFinalF;
+    this._padList = { list, s0, span };
+    return this._padList;
   }
 
   /** Stretches of road (by distance along it) at the two mouths of every final tunnel. */
