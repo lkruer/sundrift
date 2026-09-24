@@ -1,0 +1,17 @@
+[
+  { "wait": 2500 },
+  { "js": "localStorage.removeItem('sundrift.drifted'); window.__DEBUG__.hud.coached = false; document.getElementById('startb').click()" },
+  { "wait": 800 },
+  { "keys": ["KeyW"], "ms": 10500 },
+  { "shot": "O0_coach" },
+  { "js": "(() => { const D = window.__DEBUG__, t = D.track; let s = 250; for (; s < 1800; s += 2) { const i = t.index(s); let ok = true; for (let k = i; k < i + 20; k++) if (t.pts[k].hardR !== Infinity) ok = false; if (ok) break; } D.teleport(s, 40); return s; })()" },
+  { "keys": ["KeyW", "KeyD"], "ms": 900 },
+  { "keys": ["KeyW"], "ms": 900 },
+  { "shot": "O1_off" },
+  { "wait": 1700 },
+  { "shot": "O2_hot" },
+  { "wait": 1900 },
+  { "shot": "O3_magnet" },
+  { "wait": 1800 },
+  { "shot": "O4_back" }
+]

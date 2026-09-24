@@ -1,0 +1,7 @@
+[
+  { "wait": 2500 },
+  { "js": "document.getElementById('startb').click()" },
+  { "wait": 1500 },
+  { "keys": ["KeyW"], "ms": 2000 },
+  { "js": "(() => { const D = window.__DEBUG__, h = D.hud, now = () => performance.now(); const time = (f, n = 300) => { const t0 = now(); for (let i = 0; i < n; i++) f(i); return +((now() - t0) / n).toFixed(3); }; const r = {}; r.draw = time(() => h._draw(now())); r.w = time(() => { h._w('DRIFT', '700 8px Silkscreen, monospace'); h._w('00:00', '15px \"Jersey 15\", monospace'); }); r.spr = time(() => h._spr('12345', '15px \"Jersey 15\", \"Share Tech Mono\", monospace', '#ffb347')); const post = D.post; r.renderNoUp = time(() => post.render(0.016), 60); r.renderUp = time(() => { h.texture.needsUpdate = true; post.render(0.016); }, 60); r.size = [h.W, h.H]; r.cache = h.cache.size; return r; })()" }
+]

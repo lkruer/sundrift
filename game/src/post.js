@@ -21,7 +21,7 @@ const Cel = {
   uniforms: {
     tDiffuse: { value: null }, tDepth: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uNear: { value: 0.4 }, uFar: { value: 4500 }, uTime: { value: 0 },
-    uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uScan: { value: 0.075 }, uSpeed: { value: 0 }, uLift: { value: 0 },
+    uInk: { value: 1.0 }, uBands: { value: 1.0 }, uGrain: { value: 0.035 }, uSpeed: { value: 0 }, uLift: { value: 0 },
     uVig: { value: 0 }, uHit: { value: 0 }, uCA: { value: 0.006 },
     uShaft: { value: new THREE.Vector3(0.5, 0.5, 0) }, uShaftCol: { value: new THREE.Color(1, 1, 1) },
     uMist: { value: new THREE.Vector4(-1e4, 0.03, 14, 0) }, uMistCol: { value: new THREE.Color() }, uMistGlow: { value: new THREE.Color() }, uMistFar: { value: new THREE.Color() },
@@ -31,7 +31,7 @@ const Cel = {
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uScan, uSpeed, uVig, uHit, uCA, uLift;
+    uniform sampler2D tDiffuse, tDepth; uniform vec2 uRes; uniform float uNear, uFar, uTime, uInk, uBands, uGrain, uSpeed, uVig, uHit, uCA, uLift;
     uniform vec3 uShaft, uShaftCol;
     uniform vec4 uMist; uniform vec3 uMistCol, uMistGlow, uMistFar, uCamPos, uMoonDir; uniform mat3 uCamRot; uniform vec2 uTanFov; uniform sampler2D uNoise; uniform float uMistT;
     uniform mat4 uPrevVP; uniform float uBlur;
@@ -150,10 +150,9 @@ const Cel = {
         float fall = 1.0 - smoothstep(0.05, 0.95, length((uShaft.xy - vUv) * vec2(uRes.x / uRes.y, 1.0)));
         col += uShaftCol * (acc / wsum) * fall * fall * uShaft.z * mix(1.0, 0.18, sky);
       }
-      // grain and a faint scanline veneer
+      // grain (the scanlines are the tube's, drawn last, over the on-screen display as well)
       float gr = (hash(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5) * uGrain;
       col += gr * (0.25 + l);
-      col *= 1.0 - uScan * (0.5 + 0.5 * sin(gl_FragCoord.y * 1.5708));
       // the tube's vignette, deeper while a drift is held, and the red flash of a hit: drawn here rather than as
       // full-screen page layers, which cost the browser a 100 ms stall the first time a drift lit them
       vec2 vq = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
@@ -168,19 +167,36 @@ const Cel = {
  * The tube, last, in display space. The glass is nearly flat in the middle and bends more toward the edges and
  * most into the corners (a quadratic plus a quartic term in the distance from the centre), so the picture's own
  * edges bow and its corners pull in round, the way a 90s set's did. The picture sits a little back from the
- * glass: it darkens into the rounded edge, and a faint cold sheen runs round the rim. Then colour is cut to 32
- * levels a channel with an ordered dither (the grain of a 90s console's output), and a faint aperture grille.
+ * glass: it darkens into the rounded edge, and a faint cold sheen runs round the rim. (The rim and the corners are
+ * measured on the screen's shorter side, so a phone held upright keeps its narrow picture.)
+ *
+ * The HUD is the set's own on-screen display (hud.js draws it into a small canvas at the set's resolution): laid in
+ * here, through the same curve, before anything the tube does, it bends with the picture, darkens into the rim and
+ * takes the scanlines, the colour steps and the grille like everything else on the screen. Its texels are drawn
+ * square and crisp with a screen pixel of softening at their edges (sharp bilinear), and its light bleeds a texel or
+ * two into the dark round it, the way a phosphor's does. Then the scanlines, colour cut to 32 levels a channel with
+ * an ordered dither (the grain of a 90s console's output), and a faint aperture grille.
  */
 const Retro = {
   uniforms: {
     tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
     uCurve: { value: 0.022 }, uEdge: { value: 0.055 }, uCorner: { value: 0.045 },
     uLevels: { value: 32 }, uMask: { value: 0.06 }, uLens: { value: 0 }, uTime: { value: 0 }, uFlow: { value: 0 },
+    uScan: { value: 0.036 }, uHudScan: { value: 0.1 },
+    tHud: { value: null }, uHudOn: { value: 0 }, uHudSize: { value: new THREE.Vector2(4, 4) }, uHudScale: { value: 2 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uLevels, uMask, uLens, uTime, uFlow;
+    uniform float uScan, uHudScan, uHudOn, uHudScale; uniform sampler2D tHud; uniform vec2 uHudSize;
     varying vec2 vUv;
+    // the OSD's texel under p, square and crisp, softened only over the last screen pixel at its edges
+    vec4 hudAt(vec2 p) {
+      vec2 t = p * uHudSize, f = fract(t) - 0.5;
+      float rr = 0.5 - 0.5 / max(uHudScale, 1.0);
+      t = floor(t) + (f - clamp(f, -rr, rr)) * uHudScale + 0.5;
+      return texture2D(tHud, t / uHudSize);
+    }
     float hs(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     // rain on the glass: beads that gather and dry on a grid of cells, and drops that run down their own tracks (raked
     // sideways at speed). Returns where to look through the drop (an offset) in xy, and how much drop there is in z.
@@ -222,13 +238,16 @@ const Retro = {
       vec2 uv = vUv + c * (uCurve * r2 + uEdge * r2 * r2);
       // the picture's frame, in pixels of the picture: a rounded rectangle, anti-aliased over a pixel and a half
       vec2 px = (uv - 0.5) * uRes;
-      float rad = uCorner * uRes.y;
+      float side = min(uRes.x, uRes.y);
+      float rad = uCorner * side;
       float d = rbox(px, 0.5 * uRes, rad);
       float inside = 1.0 - smoothstep(-1.5, 0.0, d);
       if (inside <= 0.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
       vec3 col;
+      vec2 lro = vec2(0.0);
       if (uLens > 0.001) {
         vec3 lr = lensRain(uv);
+        lro = lr.xy;
         float m = clamp(lr.z, 0.0, 1.0);
         col = texture2D(tDiffuse, clamp(uv + lr.xy, 0.0, 1.0)).rgb;
         // a drop darkens a touch at its rim and catches a small glint up on its left (stronger, every drop read as a
@@ -236,12 +255,24 @@ const Retro = {
         col *= 1.0 - 0.06 * m * (1.0 - m);
         col += vec3(0.07) * m * smoothstep(0.75, 1.0, dot(normalize(lr.xy + 1e-5), vec2(0.55, -0.83)));
       } else col = texture2D(tDiffuse, clamp(uv, 0.0, 1.0)).rgb;
+      // the on-screen display (premultiplied), under the same glass: a drop on the lens bends it too, a little
+      float hudA = 0.0;
+      if (uHudOn > 0.5) {
+        vec2 hp = clamp(uv + lro * 0.5, 0.0, 1.0), ht = 1.0 / uHudSize;
+        vec4 h = hudAt(hp);
+        vec3 glow = texture2D(tHud, hp + vec2(ht.x * 1.5, 0.0)).rgb + texture2D(tHud, hp - vec2(ht.x * 1.5, 0.0)).rgb
+                  + texture2D(tHud, hp + vec2(0.0, ht.y * 1.2)).rgb + texture2D(tHud, hp - vec2(0.0, ht.y * 1.2)).rgb;
+        col = col * (1.0 - h.a) + h.rgb + glow * 0.075 * (1.0 - h.a);
+        hudA = h.a;
+      }
+      // the scanlines: faint over the picture, deeper through the display's bright type
+      col *= 1.0 - (uScan + uHudScan * hudA) * (0.5 + 0.5 * sin(gl_FragCoord.y * 1.5708));
       col = floor(col * uLevels + bayer4(gl_FragCoord.xy)) / uLevels;
       float m = mod(gl_FragCoord.x, 3.0);
       vec3 mask = vec3(m < 1.0 ? 1.0 : 1.0 - uMask, (m >= 1.0 && m < 2.0) ? 1.0 : 1.0 - uMask, m >= 2.0 ? 1.0 : 1.0 - uMask);
       col *= mask * (1.0 + uMask * 0.6);
       // set back behind the glass: darker into the rim, and a faint cold sheen along it, brightest top left
-      float rim = -d / uRes.y;                             // distance in from the edge, in picture heights
+      float rim = -d / side;                               // distance in from the edge, in the screen's shorter side
       col *= 0.55 + 0.45 * smoothstep(0.0, 0.035, rim);
       float sheen = smoothstep(0.012, 0.0, abs(rim - 0.006)) * (0.5 + 0.5 * dot(normalize(c + 1e-4), vec2(-0.6, 0.8)));
       col += vec3(0.05, 0.06, 0.075) * sheen;

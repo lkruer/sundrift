@@ -2,7 +2,7 @@
 //   node work/shot.mjs <script.json|inline-json> [--phone] [--out=work/shots]
 // A script is a list of steps: { wait: ms } | { js: "code run in the page" } | { shot: "name" } | { click: "#sel" }
 //   | { mouse: ['down' | 'move' | 'up', x, y, 'left' | 'right'] }
-//   | { keys: ["KeyW"], ms: 800 } (hold keys for ms)
+//   | { keys: ["KeyW"], ms: 800 } (hold keys for ms) | { touch: ['start' | 'move' | 'end' | 'tap', x, y] }
 import fs from 'fs';
 import path from 'path';
 import { createServer } from 'http';
@@ -52,6 +52,8 @@ for (const s of steps) {
   if (s.js) { const r = await page.evaluate(s.js); if (r !== undefined) console.log(JSON.stringify(r)); }
   if (s.click) await page.click(s.click);
   if (s.mouse) { const [act, x, y, button] = s.mouse; if (act === 'down') { await page.mouse.move(x, y); await page.mouse.down({ button: button || 'left' }); } else if (act === 'move') await page.mouse.move(x, y, { steps: 12 }); else await page.mouse.up({ button: button || 'left' }); }
+  // { touch: ['start' | 'move' | 'end' | 'tap', x, y] }: a real touch (a phone viewport, --phone or --vp)
+  if (s.touch) { const [act, x, y] = s.touch; if (act === 'start') await page.touchscreen.touchStart(x, y); else if (act === 'move') await page.touchscreen.touchMove(x, y); else if (act === 'tap') await page.touchscreen.tap(x, y); else await page.touchscreen.touchEnd(); }
   if (s.keys) { for (const k of s.keys) await page.keyboard.down(k); await sleep(s.ms || 500); for (const k of s.keys) await page.keyboard.up(k); }
   if (s.shot) { await page.screenshot({ path: path.join(OUT, s.shot + '.png') }); console.log('shot', s.shot); }
 }

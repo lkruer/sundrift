@@ -34,8 +34,8 @@
  * Nothing here stands on the road or in the first 1.3 m of pavement.
  */
 import * as THREE from 'three';
-import { mulberry32 } from './config.js?v=202609240808';
-import { railLoad, railChunk, railUpdate, railSkip } from './citytrain.js?v=202609240808';
+import { mulberry32 } from './config.js?v=202609241743';
+import { railLoad, railChunk, railUpdate, railSkip } from './citytrain.js?v=202609241743';
 
 const TAU = Math.PI * 2;
 const POLE_U = 1.35;             // the utility poles stand this far past the road's edge (the kerb zone, 1.3 m, stays clear)
@@ -73,7 +73,7 @@ const AW = 2048, AH = 1536, CW = 512, CH = 256;
 const JP = '"Dela Gothic One", "M PLUS Rounded 1c", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
 const ROUND = '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif';
 /** Every Japanese character the ad atlas draws: they are in index.html's &text= list. */
-export const DETAIL_CHARS = 'ネオ東京新発売作ドームラーメン大出しの天気雨カオケ月見一番街銀座商店首都高速環状線宿富士山寿司ホテル';
+export const DETAIL_CHARS = 'ネオ東京新発売作アリナラーメン大出しの天気雨カオケ月見一番街銀座商店首都高速環状線宿富士山寿司ホテル';
 
 /**
  * Draw the ads. Cells 0-7 are landscape ads, 8-10 portrait ones (drawn turned a quarter, so they stand upright on a
@@ -167,7 +167,7 @@ function adAtlas(w) {
     c.beginPath(); c.moveTo(372, H); c.lineTo(386, 138); c.lineTo(434, 138); c.lineTo(448, H); c.closePath(); c.fill();
     c.beginPath(); c.moveTo(430, 150); c.lineTo(472, 104); c.lineWidth = 10; c.strokeStyle = '#120420'; c.stroke();
     text('LIVE', 170, 86, 96, '#ffffff', { font: `italic 700 96px Rajdhani, sans-serif`, glow: '#ff4fd8', stroke: '#3a0060', sw: 8 });
-    text(T('東京 ドーム', 'TOKYO DOME'), 170, 168, 38, '#ffe86a', { maxW: 300 });
+    text(T('ネオ東京 アリーナ', 'NEO TOKYO ARENA'), 170, 168, 38, '#ffe86a', { maxW: 300 });
     text('9.25  SAT', 170, 214, 30, '#ffffff', { font: `700 30px Rajdhani, sans-serif` });
   });
   // 3: ramen
@@ -305,14 +305,14 @@ function adAtlas(w) {
     c.fillStyle = '#3a3a7a'; c.beginPath(); c.moveTo(20, H); c.lineTo(230, 70); c.lineTo(250, 66); c.lineTo(270, 72); c.lineTo(480, H); c.closePath(); c.fill();
     c.fillStyle = '#f4f4ff'; c.beginPath(); c.moveTo(196, 100); c.lineTo(230, 70); c.lineTo(250, 66); c.lineTo(270, 72); c.lineTo(306, 104); c.lineTo(282, 96); c.lineTo(262, 110); c.lineTo(244, 94); c.lineTo(222, 108); c.closePath(); c.fill();
     text(T('富士山', 'MT FUJI'), 100, 62, 56, '#ffffff', { stroke: '#2a1a6a', sw: 6, maxW: 180 });
-    text('FUJI EXPRESS', 400, 224, 24, '#2a1a6a', { font: '700 24px Rajdhani, sans-serif' });
+    text('LIMITED EXPRESS', 400, 224, 24, '#2a1a6a', { font: '700 24px Rajdhani, sans-serif' });
   });
   // 11: an energy drink
   cell(11, (W, H) => {
     c.fillStyle = '#0a0a0e'; c.fillRect(0, 0, W, H);
     c.strokeStyle = '#46ff7a'; c.lineWidth = 3; for (let k = 0; k < 9; k++) { c.beginPath(); c.moveTo(0, 30 + k * 26); c.lineTo(W, 10 + k * 26); c.stroke(); }
     c.fillStyle = '#ffe23a'; c.beginPath(); c.moveTo(120, 20); c.lineTo(60, 140); c.lineTo(110, 140); c.lineTo(80, 236); c.lineTo(180, 100); c.lineTo(128, 100); c.lineTo(170, 20); c.closePath(); c.fill();
-    text('MAX', 340, 90, 110, '#46ff7a', { font: 'italic 700 110px Rajdhani, sans-serif', glow: '#46ff7a', stroke: '#002a10', sw: 6 });
+    text('DRIFT', 340, 90, 110, '#46ff7a', { font: 'italic 700 110px Rajdhani, sans-serif', glow: '#46ff7a', stroke: '#002a10', sw: 6, maxW: 300 });
     text('ENERGY  ¥200', 340, 190, 36, '#ffffff', { font: '700 36px Rajdhani, sans-serif' });
   });
   // 15 (portrait): ramen down a red screen, the bowl on top
@@ -366,8 +366,8 @@ function adAtlas(w) {
     const y0 = 1280;
     c.fillStyle = '#10101a'; c.fillRect(0, y0, AW, 128);
     c.fillStyle = '#e8101e'; c.fillRect(0, y0 + 4, AW, 6); c.fillRect(0, y0 + 118, AW, 6);
-    const items = jp ? ['ネオ東京', '首都高速 環状線', '銀座 2km', '大売出し 50%OFF', '新発売 NEO COLA', 'ラーメン ¥780']
-      : ['NEO TOKYO', 'SHUTO C1', 'GINZA 2km', 'BIG SALE 50%', 'NEW NEO COLA', 'RAMEN ¥780'];
+    const items = jp ? ['ネオ東京', 'ネオ高速 環状線', '銀座 2km', '大売出し 50%OFF', '新発売 NEO COLA', 'ラーメン ¥780']
+      : ['NEO TOKYO', 'EXPWY C1', 'GINZA 2km', 'BIG SALE 50%', 'NEW NEO COLA', 'RAMEN ¥780'];
     c.font = '58px ' + JP;
     const widths = items.map((s) => c.measureText(s).width);
     const gap = 60, total = Math.max(AW, widths.reduce((a, b) => a + b, 0) + gap * items.length);

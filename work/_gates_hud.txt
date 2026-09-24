@@ -1,0 +1,17 @@
+drifts banked   2  at metres 539, 586
+peak slip       44 deg   samples in drift 147 of 302
+score           57
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- city
+drifts banked   14  at metres 145, 226, 236, 237, 239, 239, 240, 510, 510, 511, 512, 515, 538, 595
+peak slip       55 deg   samples in drift 279 of 359
+score           3970
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- city phone
+drifts banked   18  at metres 134, 144, 145, 145, 147, 147, 151, 249, 292, 409, 413, 415, 415, 420, 421, 510, 517, 576
+peak slip       50 deg   samples in drift 268 of 335
+score           10193
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.

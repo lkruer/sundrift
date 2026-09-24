@@ -1,0 +1,128 @@
+[
+ {
+  "wait": 2500
+ },
+ {
+  "js": "document.getElementById('startb').click()"
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "js": "(() => { window.__T__ = () => { const t = window.__DEBUG__.input ? window.__DEBUG__.input.t : null; return t; }; return !!window.__DEBUG__; })()"
+ },
+ {
+  "touch": [
+   "start",
+   100,
+   600
+  ]
+ },
+ {
+  "js": "(() => { const i = window.__INPUT__ || null; return null; })()"
+ },
+ {
+  "touch": [
+   "move",
+   136,
+   600
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; return s ? [s.t.steer, s.t.throttle, s.t.lift, s.t.brake, s.t.x0] : 'no ref'; })()"
+ },
+ {
+  "touch": [
+   "move",
+   200,
+   600
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; return [+s.t.steer.toFixed(3), s.t.x0]; })()"
+ },
+ {
+  "touch": [
+   "move",
+   150,
+   600
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; return [+s.t.steer.toFixed(3), s.t.x0]; })()"
+ },
+ {
+  "touch": [
+   "move",
+   150,
+   645
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; return ['lift?', s.t.lift, s.t.throttle, s.t.brake]; })()"
+ },
+ {
+  "touch": [
+   "move",
+   150,
+   691
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; const o = s.sample(0.016); return ['brake', +s.t.brake.toFixed(2), s.t.throttle, o.reverse]; })()"
+ },
+ {
+  "touch": [
+   "move",
+   150,
+   740
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; const o = s.sample(0.016); return ['full', +s.t.brake.toFixed(2), o.reverse, s.t.y0]; })()"
+ },
+ {
+  "touch": [
+   "move",
+   150,
+   500
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; return ['up', s.t.throttle, s.t.brake, s.t.y0]; })()"
+ },
+ {
+  "touch": [
+   "end",
+   150,
+   500
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; return ['end', s.t.active, s.t.steer, s.t.throttle]; })()"
+ },
+ {
+  "touch": [
+   "start",
+   100,
+   600
+  ]
+ },
+ {
+  "touch": [
+   "move",
+   175,
+   622
+  ]
+ },
+ {
+  "js": "(() => { const s = window.__DEBUG__.hud.input; return ['full lock, thumb 22 px lower', +s.t.steer.toFixed(2), 'throttle', s.t.throttle, 'lift', s.t.lift]; })()"
+ },
+ {
+  "touch": [
+   "end",
+   175,
+   622
+  ]
+ }
+]

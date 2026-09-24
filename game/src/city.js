@@ -11,15 +11,15 @@
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202609240808';
-import { buildingMaterial } from './buildings.js?v=202609240808';
-import { neonAtlas } from './neon.js?v=202609240808';
-import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609240808';
-import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202609240808';
-import { railSkip } from './citytrain.js?v=202609240808';
-import { carsLoad, parkCar } from './citycars.js?v=202609240808';
-import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202609240808';
-import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202609240808';
+import { clamp, lerp, mulberry32 } from './config.js?v=202609241743';
+import { buildingMaterial } from './buildings.js?v=202609241743';
+import { neonAtlas } from './neon.js?v=202609241743';
+import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609241743';
+import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202609241743';
+import { railSkip } from './citytrain.js?v=202609241743';
+import { carsLoad, parkCar } from './citycars.js?v=202609241743';
+import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202609241743';
+import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202609241743';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 // the points of a lot's footprint tested against the roads: [along the front (-0.5..0.5 of its width), in (0..1 of its depth)]
@@ -1201,14 +1201,14 @@ function shutoSignMaterial(w) {
   ctx.fillStyle = '#0d6b44'; ctx.fillRect(0, 0, 1024, 320);
   ctx.strokeStyle = '#f2f4f2'; ctx.lineWidth = 10; ctx.strokeRect(14, 14, 996, 292);
   const jp = '"Dela Gothic One", "Noto Serif JP", "Yu Gothic", "Hiragino Sans", sans-serif';
-  const ok = w.glyphs ? w.glyphs('44px ' + jp, '首都高速環状線銀座新宿') : false;
+  const ok = w.glyphs ? w.glyphs('44px ' + jp, 'ネオ高速環状線銀座新宿') : false;
   ctx.fillStyle = '#f2f4f2'; ctx.textBaseline = 'middle';
   // the route shield: a white rounded square with C1 in green
   ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(46, 52, 150, 108, 16); else ctx.rect(46, 52, 150, 108); ctx.fill();
   ctx.fillStyle = '#0d6b44'; ctx.textAlign = 'center'; ctx.font = '700 84px Rajdhani, sans-serif'; ctx.fillText('C1', 121, 110);
   ctx.fillStyle = '#f2f4f2'; ctx.textAlign = 'left';
-  ctx.font = ok ? '62px ' + jp : '700 58px Rajdhani, sans-serif'; ctx.fillText(ok ? '首都高速 環状線' : 'SHUTO EXPWY', 226, 92);
-  ctx.font = '700 30px Rajdhani, sans-serif'; ctx.fillText('SHUTO EXPRESSWAY  INNER CIRCULAR', 230, 150);
+  ctx.font = ok ? '62px ' + jp : '700 58px Rajdhani, sans-serif'; ctx.fillText(ok ? 'ネオ高速 環状線' : 'NEO EXPWY', 226, 92);
+  ctx.font = '700 30px Rajdhani, sans-serif'; ctx.fillText('NEO EXPRESSWAY  INNER LOOP', 230, 150);
   // the exits
   const row = (y, kanji, romaji, km, arrow) => {
     ctx.font = ok ? '56px ' + jp : '700 50px Rajdhani, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(ok ? kanji : romaji, 64, y);
@@ -1262,7 +1262,7 @@ function shutoSignMaterial(w) {
   // the stations' name boards, 512 x 128 each along the bottom: white, the line's green band, the station's number in
   // its square, the name in kanji and in romaji
   const stations = [];
-  [['新宿', 'Shinjuku', 'JY 17'], ['東京', 'Tokyo', 'JY 01'], ['大塚', 'Otsuka', 'JY 11'], ['銀座', 'Ginza', 'JY 30']].forEach(([kanji, romaji, num], k) => {
+  [['新宿', 'Shinjuku', 'NT 17'], ['東京', 'Tokyo', 'NT 01'], ['大塚', 'Otsuka', 'NT 11'], ['銀座', 'Ginza', 'NT 30']].forEach(([kanji, romaji, num], k) => {
     const x = (k % 2) * 512, y = 1024 + Math.floor(k / 2) * 128;
     ctx.fillStyle = '#f4f5f2'; ctx.fillRect(x, y, 512, 128);
     ctx.fillStyle = '#80c241'; ctx.fillRect(x, y + 104, 512, 16);

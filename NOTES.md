@@ -1,8 +1,8 @@
 # SUNDRIFT build notes (the game was called MINIDRIFT from 22 to 24 September, then SUNDRIFT again)
 
 The receipts: what was decided, what was measured, what was thrown away, what is still wrong. Dates are UTC.
-Everything was built between 21 and 25 September 2026 for the 404 game jam 001, by one person driving Claude
-Code (Claude Fable 5.1) with sub-agents for the asset loop and the critic rounds.
+Everything was built between 22 and 24 September 2026 for the 404 game jam 001, by one person driving Claude
+Code (Claude Fable 5.1, then Claude Opus 5.5) with sub-agents for the asset loop, the critic rounds and the QA.
 
 ## The plan, before anything was generated
 
@@ -396,7 +396,73 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
-## 25 September, the last pass: ready to enter
+## 24 September, afternoon: the HUD on the TV, the phone, SUNDRIFT again
+
+Asked for: the HUD to look like it is on the TV and lean more retro; the phone's UI less clunky and the car easier
+to drive on a phone; the name SUNDRIFT everywhere again; one last check that everything looks good and is allowed by
+the rules; then to enter.
+
+- **SUNDRIFT again, everywhere:** the title, the logo, the kana (サンドリフト), the favicon's letter, the city's
+  billboard, the page's words and its error messages, the storage keys. A player's bests and settings kept under the
+  two-day name are moved over once, before anything reads them (config.js).
+- **The HUD is drawn on the TV.** It was page elements (SVG seven-segment digits, DOM panels) laid flat over the canvas,
+  so the tube's curve, its rim, its scanlines and its grille stopped at their edges and every panel sat on the glass.
+  Now `hud.js` draws all of it into a small canvas at about a 90s set's resolution (360 lines on a desktop; a texel is
+  2 CSS px on a phone) in pixel type (Jersey 10 and 15, Silkscreen; DotGothic16 for its two Japanese words), and the
+  tube pass samples it through the same curve as the picture, before the scanlines, the 32-level dither and the
+  grille, with a texel or two of phosphor bleed round the bright type. Its texels are kept square and crisp with one
+  screen pixel of softening at their edges (sharp bilinear), so the type holds up through the curve. The scanline
+  veneer moved from the cel pass to the tube, after the HUD (0.036 over the picture, the old strength in display
+  terms; deeper through the type). The rim and the corners are now measured on the screen's shorter side, so a
+  phone held upright keeps its narrow picture (they were measured on the height: a 40 px dark band down each side).
+- **What it shows is what it showed,** redrawn for the tube: an eight-digit score with its unlit zeros ghosting, a gold
+  flash round it as a drift lands; the combo with the chain's time left as a row of blocks; the clock with a blinking
+  colon and a sun or a moon by it, the banked minutes flying off it; a bar-graph tach round three quarters of a dial
+  (36 blocks: amber, an orange band, the red line) with the speed and the gear inside, the telltales under it and the
+  boost's twelve blocks over it; the angle meter as a rail of blocks on its own dark glass, burning pink past 47
+  degrees; the drift count and its cash-in flying into the score; the callouts; the smash counter; the off-road
+  countdown as a ring of blocks with コースアウト; the first-run hint as a dialogue box with a blinking cursor; and,
+  new, the channel's caption as a run comes on, in the set's green (CH 01 on the pass, CH 02 in the city). The pause
+  menu is in the same pixel type, with a 90s menu cursor.
+- **What it costs.** Every string with its outline is drawn once and kept as a sprite; the canvas is redrawn only when
+  something on it changed or is moving, and at most thirty times a second. An A/B on the phone profile under 4x CPU
+  throttling, the HUD switched on and off every second of one drive: +1.9 ms of JS a frame at sixty redraws a second,
+  +1.27 ms (median +0.7) at thirty. One redraw 0.1 ms and one upload 0.1 ms (phone) to 0.36 ms (desktop, 640 x 360),
+  unthrottled.
+- **The phone's layouts.** Upright: the top row, the drift count and the angle meter under the score, the dash as a
+  strip along the bottom and the handbrake pad above its right end, where the right thumb rests (the big round tach
+  used to sit there, and the pad floated mid-screen above it). On its side: the angle meter under the drift count (at
+  the bottom it covered the car) and the strip in the bottom middle between the thumbs. A tablet or a touch laptop
+  gets the strip too. The pad, the wheel under the left thumb and the first-run hint are drawn on the TV; the page
+  keeps invisible hit areas for the two buttons, placed where the tube shows them (the curve moves a corner's content
+  by up to 5% of the screen). `work/hud_layout_check.json` lays the HUD out for 23 screen sizes, desktop and touch,
+  and checks every pair of panels for overlap in the OSD's own texels: none (it found three, fixed: a 320 px phone's
+  score ran into the clock, a square window's angle meter into the dial, a tablet's pad onto the dial).
+- **The phone's controls.** The wheel's middle follows a thumb that goes past full lock, so a flick back the other way
+  answers at once instead of first winding back through the overshoot; a hair of dead centre, then a gentle curve (45%
+  linear, 55% square), so small corrections are small and a big slide is still full lock; the reach is 18% of the
+  screen's short side (70 px on a 390 px phone, from 64). Pulling down now lifts off the gas first (from 30 px: the
+  slide closes, the car settles), then brakes (from 54), then reverses, and the knob under the thumb says which (GAS,
+  LIFT, BRAKE, REVERSE). A thumb swings from its root, so slid out to full lock its tip also drops 20 px or so: the
+  pull is measured from a third of the slide lower down, or full lock would have lifted off the gas mid-drift (the
+  first cut of this, lifting at 22 px, would have). Tested with real touches (`work/touch_test.json`): 0.36 of lock at
+  36 px, full lock and the middle following at 100, 0.15 straight back 20 px from it; lift at 45 px down, brake 0.63
+  and reverse at 91; full lock with the thumb 22 px lower still on the gas.
+- **The title on a phone.** The menu's headings and the courses' descriptions go (the buttons say what they are), the
+  help is two lines, START is last, at the thumb. On a 375 x 667 phone the car is now in view above the menu (it was
+  behind it).
+- **The rules, checked again: no trademarked names.** A concert poster's TOKYO DOME (a registered name) is NEO TOKYO
+  ARENA; the expressway's real name on its gantry and on a ticker (首都高速, SHUTO) is a made-up one (ネオ高速, NEO
+  EXPWY); the stations' JR line code (JY) is NT; a travel poster's FUJI EXPRESS (a bus company's name) is LIMITED
+  EXPRESS; the energy drink MAX (a canned coffee's name) is DRIFT. The README no longer names the skyline's two towers.
+  Every Japanese string in the game was listed and translated for the owner: place names, shop signs, road words.
+- **Measured.** The drift gate: pass desktop 2 banked, pass phone 2, 3 and 5 (three runs: this bot's count swings
+  from 1 to 15 run to run, see the earlier rounds), city 14, city phone 18; 0 slow frames in every run.
+- **Retired:** `work/qa_phone.mjs`, `qa_small_landscape.mjs` and `qa_first.mjs` measured the page-element HUD and no
+  longer run; `hud_layout_check.json` and `touch_test.json` do their work now.
+- **Dates.** Six headings below said a day later than their commits (UTC): corrected to the commits' dates.
+
+## 24 September, morning: the last pass, ready to enter
 
 - **The jam gate, run as the organisers will** (`harness/jam.mjs` against the live URL: phone, real touch, 4G, CPU
   slowed 2x): PASS, ready 13.8 s of 20, 2.3 MB of 10, 379 draws, 0.64 M triangles, no errors, no 404s; the recipe's
@@ -451,7 +517,7 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   no shader compiled in play, no errors); 60 sky rebuilds with textures 64 to 64; all four gates (drifts banked 7, 7,
   9, 12; no frame over 34 ms); the 45 s probes p99 17 ms on both maps; ready 10.8 s under the gate's conditions.
 
-## 25 September: drifting that holds, rain that behaves by day
+## 24 September, early: drifting that holds, rain that behaves by day
 
 - **The drift, held.** The owner: "rework some of the drifting physics if needed. SATISFYING PLEASE". Measured first
   (work/feel_test.mjs drives the car sim through the moves a drift is made of, with a keyboard's ramped wheel): a
@@ -548,7 +614,7 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   the bend both fit the frame; it settles back as the slide ends. Tyre smoke is shaded (lit from above, darker
   underneath) and thins away right at the lens.
 
-## 25 September, early: nothing stops dead, reverse that behaves, a city that lives
+## 23 September, late: nothing stops dead, reverse that behaves, a city that lives
 
 - **The car no longer stops dead.** The owner: "sometimes some inputs make the car just stop dead. For instance,
   sometimes reverse will be funky". The cause was the kinematic blend that keeps a slowly reversing car on its
@@ -604,7 +670,7 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   built on the first city frame; should the calls stop (the title) it fades away on its own.
 - Gates, city: peak 628 draws (was 596), 0.90 M triangles, no slow frames; on a phone 501 draws.
 
-## 24 September, night: the wheel is the player's
+## 23 September, night: the wheel is the player's
 
 - **The counter-steer assist no longer overrides the player.** In a deep slide the assist (which steers the front
   wheels toward the way the car is travelling, the catch that keeps a thumb from spinning the car) grew to 97% and
@@ -619,7 +685,7 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   because full lock now turns the car). The owner may later want EASY left as it was and HARD with lesser assists:
   the knobs are all in car.js CAR (assist, assistTouch, assistYield, lineAssist), so a per-course override is small.
 
-## 24 September, evening: power, donuts, boost, glare
+## 23 September, evening: power, donuts, boost, glare
 
 - **Motion blur** (the cel pass): each pixel's world position from the depth, through the last frame's camera,
   gives where it was on the screen; the picture is averaged along that path (six samples, a 180-degree shutter,
@@ -664,7 +730,7 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   road's direct specular now has a soft ceiling (x / (1 + 2.6x), in its own shader hook): a lamp still streaks down
   the wet asphalt, lit, never blown out. The neon's wet-road streaks top out at 60% of what they were.
 
-## 24 September: tight corners, the city's trash, rain, detail
+## 23 September, afternoon: tight corners, the city's trash, rain, detail
 
 - **NEO TOKYO, in detail** (a sub-agent, on the city's files). Rooms behind every lit window: buildings.js looks
   into an interior atlas made at load (rooms.js) with a parallax, walls, floor, ceiling and furniture shifting with
@@ -723,7 +789,7 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   the pops land in the lift, the level is within a couple of dB of the old engine.
 - **Brake lights**: the tail lamps burn brighter on the brake and the handbrake.
 
-## 23 September, night: the skid marks, the bump, the music, the air
+## 23 September, morning: the skid marks, the bump, the music, the air
 
 - **Skid marks.** The ring buffer draws a quad between every pair of neighbouring points, and two of those quads
   were never meant to be seen: the one from the newest point to the slot about to be written (stale data, or the
@@ -769,7 +835,7 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   are drawn once at the title, with the rest of the HUD.
 - **Measured.** Gates (600 m): pass EASY desktop 603 draws, 1.08 M triangles, 3 drifts banked; phone 476-484 draws, 0.72-0.74 M (1, then 8 drifts: the bot's luck with the slope walls); NEO TOKYO desktop 527-603 draws, 0.80-0.88 M (1, then 6 drifts, as many as the commit before on the same gate); phone 458 draws, 0.73 M, 2 drifts; ready 7.1-8.4 s; no slow frame in any gate (worst 17 ms). The 45 s autopilot run on HARD, three times after the fix: worst 16.9-18.1 ms.
 
-## 23 September, later: off the road, things to smash, the Shuto, and fixes
+## 23 September, early: off the road, things to smash, the Shuto, and fixes
 
 Asked for, in two messages: reflective studs down the road so the way ahead shows in the dark; hold a mouse button
 to orbit the car; no hard barrier where there is no guardrail, a five-second countdown and then a magnet (as in

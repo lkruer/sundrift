@@ -98,11 +98,18 @@ async function setKeys(want) {
       fingerX = r.x; fingerY = r.y;
       finger = await page.touchscreen.touchStart(fingerX, fingerY);
     }
-    const dx = want.left ? -60 : want.right ? 60 : 0;
+    // (a thumb slid to full lock: the stick's reach is 18% of the screen's short side, input.js)
+    const dx = want.left ? -70 : want.right ? 70 : 0;
     const dy = want.brake ? 110 : 0;             // pulling the finger down is the brake
     await finger.move(fingerX + dx, fingerY + dy);
     if (want.hand && !thumb) {
-      const b = await page.$eval('#brake .pad', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+      // (on the handbrake pad the HUD draws on the TV, where a player's thumb goes; anywhere on #brake would do)
+      const b = await page.evaluate(() => {
+        const p = window.__DEBUG__ && window.__DEBUG__.hud && window.__DEBUG__.hud.boxes().pad;
+        if (p) return { x: p.x + p.w / 2, y: p.y + p.h / 2 };
+        const r = document.getElementById('brake').getBoundingClientRect();
+        return { x: r.x + r.width * 0.6, y: r.y + r.height * 0.8 };
+      });
       thumb = await page.touchscreen.touchStart(b.x, b.y);
     } else if (!want.hand && thumb) { await thumb.end(); thumb = null; }
   } else {

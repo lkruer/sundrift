@@ -1,0 +1,11 @@
+[
+  { "wait": 2500 },
+  { "js": "document.getElementById('startb').click()" },
+  { "wait": 1000 },
+  { "keys": ["KeyW"], "ms": 2500 },
+  { "js": "document.getElementById('pauseb').click()" },
+  { "wait": 500 },
+  { "js": "document.getElementById('restartb').focus()" },
+  { "wait": 200 },
+  { "shot": "Z_pause" }
+]

@@ -11,7 +11,7 @@
  *     peopleWeather(w, wet, night);               // umbrellas up, and the light
  */
 import * as THREE from 'three';
-import { mulberry32 } from './config.js?v=202609240808';
+import { mulberry32 } from './config.js?v=202609241743';
 
 // a cell is 1.2 m by 2.4 m: 128 by 256 pixels, the feet at the bottom middle
 const CW = 128, CH = 256, PX = CH / 2.4;

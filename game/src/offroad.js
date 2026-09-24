@@ -7,122 +7,53 @@
  * leaps up and clanks onto it, and the magnet swings it back along an arc, spinning it round to face the way the
  * road runs, and drops it on the road where it left, with a thump, a ring of dust and sparkle, and a chime.
  *
- * The panel is DOM (a small one, transforms and opacity only: a full-screen layer over the canvas stalls the
- * GPU process); the magnet, its beam and its rings are a handful of meshes made once and parked out of sight.
+ * The panel is part of the HUD, drawn on the TV (hud.js); the magnet, its beam and its rings are a handful of meshes
+ * made once and parked out of sight.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep } from './config.js?v=202609240808';
+import { clamp, lerp, smoothstep } from './config.js?v=202609241743';
 
-const NS = 'http://www.w3.org/2000/svg';
 export const COURSE_OUT_S = 5;
 
 // ---------------------------------------------------------------- the countdown panel
 
+/**
+ * The countdown's state; the HUD draws it on the TV (hud.js), under the score: a ring of blocks going out a second at a
+ * time round the number, red in the last two, then the magnet's own mark shivering in it while the magnet has the car.
+ */
 export class CourseOutUI {
-  constructor(parent) {
-    const el = document.createElement('div');
-    el.id = 'courseout';
-    // (the ring, the number and every change of mood are drawn by script into a canvas; the panel itself never changes
-    // once shown. Restyling it when the count went red or the magnet came, however it was done, cost a 100 ms stall in
-    // the browser's compositor the first time, one run in two)
-    el.innerHTML = `
-      <div class="co-ring"><canvas class="co-cv"></canvas></div>
-      <div class="co-txt"><b class="jp">コースアウト</b><span>BACK TO THE ROAD</span><i class="co-sub">OR THE MAGNET TAKES YOU</i></div>
-      <div class="co-mag"><svg viewBox="0 0 40 40"><path d="M8 4 v16 a12 12 0 0 0 24 0 v-16 h-8 v16 a4 4 0 0 1 -8 0 v-16 z" fill="#e8262c"/>
-        <rect x="8" y="4" width="8" height="6" fill="#dde2e8"/><rect x="24" y="4" width="8" height="6" fill="#dde2e8"/></svg></div>`;
-    parent.appendChild(el);
-    this.el = el;
-    this.cv = el.querySelector('.co-cv');
-    const px = Math.round(52 * Math.min(3, Math.max(1, window.devicePixelRatio || 1)));
-    this.cv.width = this.cv.height = px;
-    this.ctx = this.cv.getContext('2d');
-    this.head = el.querySelector('.co-txt b'); this.line = el.querySelector('.co-txt span'); this.sub = el.querySelector('.co-sub');
+  constructor(hud) {
+    this.hud = hud; hud.courseOut = this;
     this.shown = false; this.lastN = -1; this.mode = ''; this.punch = -1e9;
-    this.dy = null;                               // how far the drift count under the score steps down while the panel is up
-    addEventListener('resize', () => { this.dy = null; });
-    // every state drawn once now, so the canvas's own drawing is ready before it is needed
-    this._draw(0.7, 4, '', 0.3, 0); this._draw(0.3, 2, 'hot', 0.6, 0); this._draw(1, null, 'mag', 0.5, 0); this._draw(0, null, '', 0, 0);
+    this.f = 1; this.n = null; this.p = 0; this.glow = 0.24;
+    this.head = 'コースアウト'; this.line = 'BACK TO THE ROAD'; this.sub = 'OR THE MAGNET TAKES YOU';
   }
 
-  /** The dial: f of the ring left (0..1), n the number (null for none), mode '' | 'hot' | 'mag'. */
-  _draw(f, n, mode, glow, punch) {
-    const c = this.ctx, k = this.cv.width / 64;
-    c.setTransform(k, 0, 0, k, 0, 0);
-    c.clearRect(0, 0, 64, 64);
-    c.beginPath(); c.arc(32, 32, 27, 0, Math.PI * 2);
-    c.fillStyle = 'rgba(0,0,0,0.35)'; c.fill();
-    c.lineWidth = 5; c.strokeStyle = 'rgba(255,255,255,0.1)'; c.stroke();
-    const col = mode === 'hot' ? '255,74,58' : mode === 'mag' ? '111,240,255' : '255,179,71';
-    if (f > 0.002) {
-      const a0 = -Math.PI / 2, a1 = a0 + f * Math.PI * 2;
-      c.lineCap = 'round';
-      c.beginPath(); c.arc(32, 32, 27, a0, a1); c.lineWidth = 11; c.strokeStyle = `rgba(${col},${glow.toFixed(2)})`; c.stroke();
-      c.beginPath(); c.arc(32, 32, 27, a0, a1); c.lineWidth = 5; c.strokeStyle = `rgb(${col})`; c.stroke();
-    }
-    if (mode === 'mag') {
-      // the magnet's own mark in the middle, shivering
-      c.save(); c.translate(32 + (glow - 0.5) * 2, 33); c.rotate((glow - 0.5) * 0.3); c.scale(0.62, 0.62); c.translate(-20, -20);
-      c.fillStyle = '#e8262c'; c.beginPath(); c.moveTo(8, 4); c.lineTo(8, 20); c.arc(20, 20, 12, Math.PI, 0, true); c.lineTo(32, 4); c.lineTo(24, 4); c.lineTo(24, 20);
-      c.arc(20, 20, 4, 0, Math.PI, false); c.lineTo(16, 4); c.closePath(); c.fill();
-      c.fillStyle = '#dde2e8'; c.fillRect(8, 4, 8, 6); c.fillRect(24, 4, 8, 6);
-      c.restore();
-      return;
-    }
-    if (n === null) return;
-    // the number, in the HUD's seven segments, punched in big on each new second (red in the last two)
-    const on = SEG_ON[n] || '';
-    const lit = mode === 'hot' ? '#ff5a48' : '#ffb347', dim = mode === 'hot' ? 'rgba(255,74,58,0.1)' : 'rgba(255,179,71,0.08)';
-    const s = 1.22 * (1 + 0.9 * punch * punch);
-    c.save();
-    c.translate(32, 32); c.scale(s, s); c.transform(1, 0, -0.123, 1, 0, 0); c.translate(-6, -11);
-    for (const key of 'abcdefg') {
-      c.fillStyle = on.includes(key) ? lit : dim;
-      c.beginPath();
-      const p = SEG_POLY[key];
-      c.moveTo(p[0], p[1]);
-      for (let i = 2; i < p.length; i += 2) c.lineTo(p[i], p[i + 1]);
-      c.closePath(); c.fill();
-    }
-    c.restore();
-  }
+  /** What the HUD has to redraw for: changes whenever the panel does. */
+  sig() { return this.mode + (this.n === null ? '-' : this.n) + Math.round(this.f * 20) + Math.round(this.p * 8) + Math.round(this.glow * 6); }
 
   /** t: seconds left (null to hide); magnet: the magnet has taken over. */
   update(t, magnet = false) {
     const want = t !== null || magnet;
-    if (want !== this.shown) { this.shown = want; this.el.classList.toggle('on', want); if (!want) this.lastN = -1; this._makeRoom(want); }
+    if (want !== this.shown) { this.shown = want; if (!want) this.lastN = -1; this.hud.dirty = true; }
     if (!want) return;
     const mode = magnet ? 'mag' : t < 2 ? 'hot' : '';
     if (mode !== this.mode) {
-      // (only the words change, never the panel's style; the magnet's words are what is happening, not an order)
+      // (the magnet's words are what is happening, not an order)
       this.mode = mode;
-      this.head.textContent = magnet ? 'マグネット' : 'コースアウト';
-      this.line.textContent = magnet ? 'HOLD ON TIGHT' : 'BACK TO THE ROAD';
-      this.sub.textContent = magnet ? 'BACK TO WHERE YOU LEFT' : mode === 'hot' ? 'THE MAGNET IS COMING' : 'OR THE MAGNET TAKES YOU';
+      this.head = magnet ? 'マグネット' : 'コースアウト';
+      this.line = magnet ? 'HOLD ON TIGHT' : 'BACK TO THE ROAD';
+      this.sub = magnet ? 'BACK TO WHERE YOU LEFT' : mode === 'hot' ? 'THE MAGNET IS COMING' : 'OR THE MAGNET TAKES YOU';
       if (magnet) buzz([40, 60, 30]);
     }
     const now = performance.now() / 1000;
-    if (magnet) { this._draw(1, null, 'mag', 0.5 + 0.5 * Math.sin(now * 40), 0); return; }
+    if (magnet) { this.f = 1; this.n = null; this.p = 0; this.glow = 0.5 + 0.5 * Math.sin(now * 40); return; }
     const n = Math.max(0, Math.ceil(t - 1e-3));
     if (n !== this.lastN) { this.lastN = n; this.punch = now; if (mode === 'hot' && n > 0) buzz(16); }
-    const p = Math.max(0, 1 - (now - this.punch) / 0.32);
-    // the last two seconds: the ring's glow throbs
-    const glow = mode === 'hot' ? 0.3 + 0.3 * (0.5 + 0.5 * Math.sin(now * 14)) : 0.24;
-    this._draw(clamp(t / COURSE_OUT_S, 0, 1), n, mode, glow, p);
-  }
-
-  /**
-   * Where the panel comes down over the drift count (on a desktop it sits just under the score, and so does the count),
-   * the count steps down below it while it is up (index.html moves the drift stack by --coY, a transform). Measured at
-   * the first showing, and again after a resize; on a phone the panel sits lower and nothing has to move.
-   */
-  _makeRoom(on) {
-    const hud = this.el.parentNode;
-    if (!hud || !hud.style) return;
-    if (on && this.dy === null) {
-      const ds = document.getElementById('dstack'), top = this.el.offsetTop, bottom = top + this.el.offsetHeight;
-      this.dy = ds && top < ds.offsetTop + ds.offsetHeight ? Math.max(0, Math.round(bottom + 6 - ds.offsetTop)) : 0;
-    }
-    hud.style.setProperty('--coY', on && this.dy ? this.dy + 'px' : '0px');
+    this.p = Math.max(0, 1 - (now - this.punch) / 0.32);
+    // the last two seconds: the ring throbs
+    this.glow = mode === 'hot' ? 0.5 + 0.5 * Math.sin(now * 14) : 0.24;
+    this.f = clamp(t / COURSE_OUT_S, 0, 1); this.n = n;
   }
 }
 
@@ -133,15 +64,6 @@ function buzz(p) {
   if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
   try { navigator.vibrate(p); } catch {}
 }
-
-// the seven segments of one digit, as in the HUD's (12 x 22, bars 2.3 thick, gaps 0.45)
-const SEG_ON = { 0: 'abcdef', 1: 'bc', 2: 'abdeg', 3: 'abcdg', 4: 'bcfg', 5: 'acdfg', 6: 'acdefg', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
-const SEG_POLY = (() => {
-  const w = 12, h = 22, t = 2.3, g = 0.45, L = t / 2, R = w - t / 2, T = t / 2, M = h / 2, B = h - t / 2;
-  const H = (x0, x1, y) => [x0, y, x0 + t / 2, y - t / 2, x1 - t / 2, y - t / 2, x1, y, x1 - t / 2, y + t / 2, x0 + t / 2, y + t / 2];
-  const V = (x, y0, y1) => [x, y0, x + t / 2, y0 + t / 2, x + t / 2, y1 - t / 2, x, y1, x - t / 2, y1 - t / 2, x - t / 2, y0 + t / 2];
-  return { a: H(L + g, R - g, T), g: H(L + g, R - g, M), d: H(L + g, R - g, B), f: V(L, T + g, M - g), b: V(R, T + g, M - g), e: V(L, M + g, B - g), c: V(R, M + g, B - g) };
-})();
 
 // ---------------------------------------------------------------- the magnet
 

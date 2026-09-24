@@ -6,22 +6,22 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609240808';
-import { createRig, detectTier } from '../rig.js?v=202609240808';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609240808';
-import { Car, gearbox } from './car.js?v=202609240808';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609240808';
-import { World, drawsGlyphs } from './world.js?v=202609240808';
-import { ChaseCam } from './camera.js?v=202609240808';
-import { Input } from './input.js?v=202609240808';
-import { Scoring } from './scoring.js?v=202609240808';
-import { Hud } from './hud.js?v=202609240808';
-import { Audio } from './audio.js?v=202609240808';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609240808';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609240808';
-import { Atmosphere } from './atmos.js?v=202609240808';
-import { Debris } from './debris.js?v=202609240808';
-import { makePost } from './post.js?v=202609240808';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609241743';
+import { createRig, detectTier } from '../rig.js?v=202609241743';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609241743';
+import { Car, gearbox } from './car.js?v=202609241743';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609241743';
+import { World, drawsGlyphs } from './world.js?v=202609241743';
+import { ChaseCam } from './camera.js?v=202609241743';
+import { Input } from './input.js?v=202609241743';
+import { Scoring } from './scoring.js?v=202609241743';
+import { Hud } from './hud.js?v=202609241743';
+import { Audio } from './audio.js?v=202609241743';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609241743';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609241743';
+import { Atmosphere } from './atmos.js?v=202609241743';
+import { Debris } from './debris.js?v=202609241743';
+import { makePost } from './post.js?v=202609241743';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
@@ -251,11 +251,15 @@ async function boot() {
   input = new Input();
   scoring = new Scoring();
   hud = new Hud();
+  // (the HUD is the TV's own display: drawn into the tube pass, through the glass's own curve)
+  const RU = post.retro.uniforms;
+  hud.attach(RU, input, { curve: RU.uCurve.value, edge: RU.uEdge.value });
+  hud.resize(innerWidth, innerHeight, renderer.getPixelRatio());
   audio = new Audio();
   audio.setMap(G.map === 'city');
   skids = new SkidMarks(scene, Q.skid);
   particles = new Particles(scene, Q.smoke);
-  courseOut = new CourseOutUI($('hud'));
+  courseOut = new CourseOutUI(hud);
   magnet = new Magnet(scene);
   debris = new Debris(scene, (x, z) => world.ground.height(x, z));
   debris.onTrail = (x, y, z) => particles.spawn({ x, y, z, vx: (Math.random() - 0.5) * 1.5, vy: 0.5 + Math.random(), vz: (Math.random() - 0.5) * 1.5, life: 0.3 + Math.random() * 0.2, s0: 0.28, s1: 0.04, r: 1, g: 0.72, b: 0.28, a0: 1, grav: 6, drag: 1.5 });
@@ -656,7 +660,8 @@ function startGame() {
   hud.show(true);
   audio.unlock();
   G.mode = 'playing';
-  hud.toast(courseLabel(), 'good', true);
+  // (the set's caption as the run comes on: the channel, and what is on it)
+  hud.channel(G.map === 'city' ? 2 : 1, courseLabel());
 }
 
 function setPaused(on) {
@@ -1613,6 +1618,7 @@ function resize() {
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
   post.resize(w, h);
+  if (hud) hud.resize(w, h, renderer.getPixelRatio());
   if (particles) particles.setScale(h);
 }
 addEventListener('resize', resize);

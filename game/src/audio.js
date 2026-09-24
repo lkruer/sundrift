@@ -20,7 +20,7 @@
  * wheels over the rail joints, and a crossing's chirp for the blind as the car passes a signal. Each is placed where it
  * is: quieter, duller and wetter (a street's own reverb) the further off, and panned to its side.
  */
-import { clamp, smoothstep } from './config.js?v=202609240808';
+import { clamp, smoothstep } from './config.js?v=202609241743';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };

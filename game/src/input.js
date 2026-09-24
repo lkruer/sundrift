@@ -3,7 +3,7 @@
  *
  * Touch is REAL input on real DOM elements, never a debug hook. The left zone (#stick) is the one-finger
  * control: touching it is the throttle, sliding the finger left or right from where it landed is the
- * steering wheel (a virtual wheel appears under the finger), pulling it down past a threshold is the brake.
+ * steering wheel (the HUD draws a wheel under the finger), pulling it down lifts off the gas and then brakes.
  * The right zone (#brake) is the handbrake for the other thumb. The jam gate lands in the middle of #stick,
  * drags up and holds, which here means "full throttle, straight", and the car moves.
  *
@@ -23,7 +23,7 @@ export class Input {
     this.keys = new Set();          // what the held keys mean (see meaning)
     this.held = new Map();          // physical key (code) -> its meaning, so a key lets go of what it pressed
     this.kSteer = 0;              // ramped keyboard steer, -1..1, left positive
-    this.t = { active: false, id: null, x0: 0, y0: 0, steer: 0, throttle: 0, brake: 0, hand: false };
+    this.t = { active: false, id: null, x0: 0, y0: 0, x: 0, y: 0, steer: 0, throttle: 0, brake: 0, hand: false, lift: false, used: false, R: 72 };
     this.touchMode = false;
     this.anyKey = false;
     this.zoom = 1;                // chase camera distance factor, mouse wheel or plus and minus
@@ -139,27 +139,22 @@ export class Input {
   _bindTouch() {
     const stick = document.getElementById('stick');
     const brake = document.getElementById('brake');
-    const wheel = document.getElementById('wheel');
-    const nub = wheel && wheel.querySelector('.nub');
     const layer = document.getElementById('touch');
     if (!stick || !brake) return;
-    const R = 64;                              // px of slide for full lock
     const t = this.t;
-    const place = (x, y) => {
-      const r = stick.getBoundingClientRect();
-      wheel.style.left = (x - r.left) + 'px';
-      wheel.style.top = (y - r.top) + 'px';
-    };
+    // px of slide for full lock: a thumb's comfortable reach, a little more on a bigger screen
+    const reach = () => Math.round(Math.min(84, Math.max(62, Math.min(innerWidth, innerHeight) * 0.18)));
+    t.R = reach();
+    addEventListener('resize', () => { t.R = reach(); });
     stick.addEventListener('touchstart', (e) => {
       // (first, for every finger that lands here: a second thumb on the stick is ignored, but left to the browser it
       // could still start a pinch-zoom, a double-tap zoom or iOS's long-press magnifier)
       e.preventDefault();
       const c = e.changedTouches[0];
       if (t.active) return;
-      t.active = true; t.id = c.identifier; t.x0 = c.clientX; t.y0 = c.clientY;
-      t.steer = 0; t.throttle = 1; t.brake = 0;
-      place(c.clientX, c.clientY);
-      wheel.style.opacity = '1'; nub.style.transform = 'translateX(0px)';
+      t.active = true; t.id = c.identifier; t.x0 = t.x = c.clientX; t.y0 = t.y = c.clientY;
+      t.steer = 0; t.throttle = 1; t.brake = 0; t.lift = false;
+      t.used = true;
       layer.classList.add('used');
       if (!this.touchMode) this.setTouchMode(true);
       if (this.onAny) this.onAny();
@@ -167,28 +162,34 @@ export class Input {
     stick.addEventListener('touchmove', (e) => {
       for (const c of e.changedTouches) {
         if (c.identifier !== t.id) continue;
-        const dx = c.clientX - t.x0, dy = c.clientY - t.y0;
-        const s = Math.max(-1, Math.min(1, dx / R));
-        t.steer = -s;                                       // slide right = steer right = negative
-        // pulling down is the brake; a small dead zone so a wobbly thumb does not brake by accident
-        const down = Math.max(0, dy - 48) / 60;
-        t.brake = Math.min(1, down);
-        t.throttle = t.brake > 0.05 ? 0 : 1;
-        nub.style.transform = `translateX(${s * (wheel.clientWidth * 0.5 - 17)}px)`;
-        // the nub goes red while the finger is pulled down into the brake, so the brake zone can be seen
-        const braking = t.brake > 0.05;
-        if (braking !== t.braking) { t.braking = braking; nub.style.background = braking ? 'rgba(255,59,48,.75)' : ''; nub.style.borderColor = braking ? '#ff3b30' : ''; }
-        // the wheel follows the finger vertically a little so it never sits far from the thumb
-        if (Math.abs(dy) > 90) { t.y0 = c.clientY - Math.sign(dy) * 90; place(t.x0, t.y0); }
+        const R = t.R;
+        t.x = c.clientX; t.y = c.clientY;
+        // the wheel's middle follows a thumb that goes past full lock, so a flick back the other way answers at once
+        // rather than first winding back through the overshoot
+        let dx = c.clientX - t.x0;
+        if (Math.abs(dx) > R) { t.x0 = c.clientX - Math.sign(dx) * R; dx = c.clientX - t.x0; }
+        // a hair of dead centre, then gentle near the middle and quick toward the lock: a thumb's small corrections are
+        // small, a big slide is still full lock
+        const n = Math.max(0, Math.abs(dx) - 3) / (R - 3);
+        t.steer = -Math.sign(dx) * Math.min(1, 0.45 * n + 0.55 * n * n);     // slide right = steer right = negative
+        // pulling down: a band that lifts off the gas (the slide closes, the car settles), then the brake (and, held,
+        // reverse); a thumb that wanders up drags the middle up with it, so the pull is always from where it rests. (A
+        // thumb swings from its root: slid out to full lock its tip also drops 20 px or so, so the pull is measured
+        // from lower down the further out it is, or full lock would lift off the gas in the middle of a drift.)
+        let dy = c.clientY - t.y0;
+        if (dy < -26) { t.y0 = c.clientY + 26; dy = -26; }
+        if (dy > 130) { t.y0 = c.clientY - 130; dy = 130; }
+        const pull = dy - 0.35 * Math.min(R, Math.abs(dx));
+        t.brake = Math.min(1, Math.max(0, pull - 54) / 48);
+        t.lift = pull > 30 && t.brake <= 0.05;
+        t.throttle = t.brake > 0.05 || t.lift ? 0 : 1;
       }
       e.preventDefault();
     }, { passive: false });
     const end = (e) => {
       for (const c of e.changedTouches) {
         if (c.identifier !== t.id) continue;
-        t.active = false; t.id = null; t.steer = 0; t.throttle = 0; t.brake = 0;
-        wheel.style.opacity = '0';
-        if (t.braking) { t.braking = false; nub.style.background = ''; nub.style.borderColor = ''; }
+        t.active = false; t.id = null; t.steer = 0; t.throttle = 0; t.brake = 0; t.lift = false;
       }
     };
     stick.addEventListener('touchend', end);
@@ -198,7 +199,7 @@ export class Input {
     // second finger on the pad does not tick again)
     const bd = (e) => {
       if (!t.hand && typeof navigator.vibrate === 'function' && !(navigator.userActivation && !navigator.userActivation.hasBeenActive)) { try { navigator.vibrate(10); } catch {} }
-      t.hand = true; brake.classList.add('dn'); layer.classList.add('used'); if (!this.touchMode) this.setTouchMode(true); if (this.onAny) this.onAny(); e.preventDefault();
+      t.hand = true; t.used = true; brake.classList.add('dn'); layer.classList.add('used'); if (!this.touchMode) this.setTouchMode(true); if (this.onAny) this.onAny(); e.preventDefault();
     };
     const bu = (e) => { if (e.touches && e.touches.length && [...e.touches].some((x) => brake.contains(x.target))) return; t.hand = false; brake.classList.remove('dn'); };
     brake.addEventListener('touchstart', bd, { passive: false });

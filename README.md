@@ -21,10 +21,10 @@ five seconds, or a giant magnet comes down and carries you back.
   of a TV. Animated LED screens and tickers hang on the fronts and stand on the roofs, concrete poles carry sagging
   power and telecom lines across the streets, a lit arch and strings of red lanterns mark a shopping street, glass
   skybridges cross between towers, a commuter train rolls along an elevated line with shops in its arches, coin
-  parkings sit between the buildings, and Tokyo Skytree stands lit on the skyline beside Tokyo Tower. Stacked neon signs hang over the street, and their light lies on the pavement
+  parkings sit between the buildings, and a tall broadcast spire stands lit on the skyline. Stacked neon signs hang over the street, and their light lies on the pavement
   and streaks across the wet asphalt. The corners are square, with crossings and signals. Now and then the road
-  climbs onto an elevated expressway (the Shuto) and weaves between the towers on banked bends, and Tokyo Tower
-  glows orange on the skyline. The sky over it all is the city's own light thrown back by the haze, magenta and
+  climbs onto an elevated expressway and weaves between the towers on banked bends, and an orange lattice tower
+  glows on the skyline. The sky over it all is the city's own light thrown back by the haze, magenta and
   sodium, under a low cloud deck lit from beneath; searchlights sweep it from the rooftops, and two holographic koi,
   a red-and-white and a gold, swim slow circles over the street ahead.
 - **Weather and time.** Rain comes and goes: the sky clouds over, the road turns glossy, and the lamps and signs
@@ -40,7 +40,11 @@ five seconds, or a giant magnet comes down and carries you back.
 - **The frame.** It is drawn as cel bands with ink outlines, halftone shade and scanlines, with a camera motion blur
   (the world streaks as the lens swings through a drift; the car stays sharp), then shown on a curved CRT whose
   picture bends at the edges and rounds into the corners, in a 90s console's dithered colour.
-- **The dash** is a 90s tuner's: a tach with a redline, amber seven-segment mph and score.
+- **The HUD is on the TV.** The score, the clock, the combo, the dash (a bar-graph tach round three quarters of a
+  dial, the speed inside it; a strip along the bottom on a phone), the drift count and its cash-in, every callout
+  and the off-road countdown are the set's own on-screen display: drawn in pixel type at a 90s set's resolution
+  and laid into the picture under the glass, so they bend with the screen, darken into its rim, take its scanlines
+  and dither, and glow a little like phosphor. A run comes on with the channel's caption, CH 01.
 - **The car.** Held in a drift, its tail lamps leave thin red light trails hanging in the air behind it, the way a
   drift anime draws a slide at night; the lamps burn brighter on the brakes. The engine is an inline four built
   from its firing pulses (see below), the revs flare as the rear tyres spin up in a slide, it cuts for a moment on
@@ -59,7 +63,7 @@ at load time.
 
 ## How it was made (the receipts)
 
-- **Who and what.** One person (lkruer) directing Claude Code, from 22 to 25 September 2026 (UTC). The code, the
+- **Who and what.** One person (lkruer) directing Claude Code, from 22 to 24 September 2026 (UTC). The code, the
   assets and the critic rounds were written by Claude Fable 5.1 and then Claude Opus 5.5, with sub-agents for the
   asset loop, the critic rounds and the late QA passes (each commit names its model). No image or audio model: the
   folder has no image or sound files at all.
@@ -73,8 +77,8 @@ at load time.
   every asset (`work/cands/`); the MEDIUM course; a counter-steer assist that overrode the player's key; a reversing
   aid that stopped a sliding car dead; a drift that unwound on its own after a second and a half (a slide now holds
   for as long as it is held); rain drawn as added light, which glowed white by day; a DOM countdown panel that
-  stalled the compositor (it is a canvas now); and the 20:36 start (runs now begin at dusk, so the first drifts
-  visibly carry the sky into the night).
+  stalled the compositor (it is a canvas now); a HUD of page elements laid flat over the curved tube (it is drawn on
+  the TV now); and the 20:36 start (runs now begin at dusk, so the first drifts visibly carry the sky into the night).
 
 ## Courses
 
@@ -106,14 +110,15 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 | | keyboard | phone |
 |---|---|---|
 | start | `Enter`, or the START button | tap START |
-| drive / brake | `W` / `S` | hold the left half of the screen |
-| steer | `A` / `D` | slide the finger left or right |
-| handbrake | `Space` | hold the right half of the screen |
+| drive | `W` | hold anywhere on the left of the screen |
+| steer | `A` / `D` | slide that finger left or right (the wheel's middle follows your thumb past full lock) |
+| lift off / brake | let go of `W` / `S` | pull the finger down a little to lift off, further to brake |
+| handbrake | `Space` | hold the right of the screen (the HAND BRAKE pad) |
 | pause | `Esc` or `P` | the pause button |
 | camera zoom | mouse wheel, `+` / `-` | |
 | orbit the camera | hold either mouse button and drag (let go: back to the chase view) | |
 | mute | `M` | the note button |
-| reverse | hold `S` when stopped (a strong gear, to about 40 mph) | pull the finger down |
+| reverse | hold `S` when stopped (a strong gear, to about 40 mph) | pull the finger well down |
 | J-turn | reverse straight and fast, let go of `S`, then full lock (held) and `W` | pull down, then push up and slide over |
 
 The keys follow what is printed on them, so on an AZERTY or a QWERTZ keyboard W, A, S and D are where the keyboard
@@ -170,7 +175,7 @@ passing 90 degrees).
   instanced pool.
 - `game/src/city.js`: NEO TOKYO beside the road: street-front buildings on their lots, neon signs from one atlas
   (`neon.js`), the light they throw on the pavement and the wet road, crossings and signals at the corners, the
-  far skyline with Tokyo Tower and the Skytree (`landmarks.js`); `buildings.js` draws every building's windows
+  far skyline with its lattice tower and its broadcast spire (`landmarks.js`); `buildings.js` draws every building's windows
   from world position, so a floor is a floor at any size, and behind each lit one a room from `rooms.js` (an atlas
   of interiors drawn at load, looked into with a parallax so the room has depth). `citydetail.js`: the LED screens
   (one ad atlas, animated in the shader), the overhead wires and their poles, the shopping arches and lantern
@@ -183,8 +188,11 @@ passing 90 degrees).
   blinking before it ends), and an airship with an LED screen along its flanks drifts over the skyline. Blue
   direction boards hang over the corners, stop lines and diamonds mark the crossings, towers stand back on podiums
   of shops with their crowns lit at night, a building site has its floodlit tower crane, the stations their name
-  boards, the Shuto its amber delineators.
-- `game/src/offroad.js`: the countdown panel and the magnet (its swoop, the flight, the drop, every beat of it).
+  boards, the expressway its amber delineators.
+- `game/src/hud.js`: the HUD, drawn into a small canvas at a 90s set's resolution in pixel type (every string with
+  its outline kept as a sprite, redrawn only when something on it changes, thirty times a second at most) and
+  laid in by the tube pass in `post.js`, through the glass's own curve; on a phone it also draws where the thumbs go.
+- `game/src/offroad.js`: the countdown's state and the magnet (its swoop, the flight, the drop, every beat of it).
 - `game/src/atmos.js`: the air: the cloud deck (moonlit wisps on the pass, lit from beneath over the city), the
   searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of
   cloud and the light shafts are drawn by the cel pass in `post.js`, from the depth buffer.
@@ -225,6 +233,7 @@ passing 90 degrees).
 | `work/qa_*.mjs` | a judge's half hour, scripted: long autopilot sessions sampling memory, GPU textures, programs and frame times; the sky-rebuild leak test; every flow (pause, restart, map switches, the phone) |
 | `work/perf/`, `work/boot_probe.mjs` | the phone performance probes (JS per frame under CPU throttling, CPU profiles, a pixel A/B that proves a change invisible) and where the load time goes under the jam gate's 4G |
 | `work/jitter.mjs`, `work/shot.mjs` | a frame-time and on-screen jitter probe, and scripted screenshots |
+| `work/hud_layout_check.json`, `work/touch_test.json` | the HUD laid out for 23 screen sizes, desktop and touch, every pair of panels checked for overlap; the phone's steering, lift and brake driven with real touches (run with `work/shot.mjs`) |
 | `gate/drift-gate.mjs` | the gate this game needs: real keys or real touches, steers by telemetry, handbrakes into corners, asserts drifts were banked, writes a filmstrip |
 | `NOTES.md` | the build log: what was measured, what was rejected, what is still wrong |
 
@@ -247,6 +256,7 @@ instanced object is a module under `game/assets/` written through the recipe loo
 ## Credits
 
 Method and harness: [404](https://404.xyz), Apache 2.0. Three.js. Fonts: Racing Sans One, Rajdhani and Share
-Tech Mono, with Dela Gothic One, Noto Serif JP and M PLUS Rounded 1c for the Japanese, fetched as subsets of only
-the characters the game draws (Google Fonts, the only non-code files the page loads besides Three.js). Built
+Tech Mono; Jersey 10, Jersey 15 and Silkscreen for the HUD; Dela Gothic One, Noto Serif JP, M PLUS Rounded 1c and
+DotGothic16 for the Japanese, fetched as subsets of only the characters the game draws (Google Fonts, the only
+non-code files the page loads besides Three.js). Built
 with Claude Code.
