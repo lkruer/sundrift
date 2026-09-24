@@ -158,6 +158,18 @@ export class PageTV {
     else c.rect(x0, y0, x1 - x0, y1 - y0);
   }
 
+  /** The box's outline added to the path being built (no beginPath). */
+  _subpath(c, q, cs) {
+    const rad = cs.borderTopLeftRadius || '0px', r = rad.endsWith('%') ? Math.min(q.w, q.h) * num(rad) / 100 : num(rad);
+    if (!q.skewed && r > 0.5 && c.roundRect) {
+      const [x0, y0] = this._p(q.pts[0][0], q.pts[0][1]), [x1, y1] = this._p(q.pts[2][0], q.pts[2][1]);
+      c.roundRect(x0, y0, x1 - x0, y1 - y0, Math.max(0, Math.min(r / this.hud.kx, (x1 - x0) / 2, (y1 - y0) / 2)));
+      return;
+    }
+    q.pts.forEach(([x, y], i) => { const [u, v] = this._p(x, y); if (i) c.lineTo(u, v); else c.moveTo(u, v); });
+    c.closePath();
+  }
+
   _path(c, q, cs) {
     const rad = cs.borderTopLeftRadius || '0px';
     const r = rad.endsWith('%') ? Math.min(q.w, q.h) * num(rad) / 100 : num(rad);
@@ -177,8 +189,9 @@ export class PageTV {
       g.pts = g.pts.map(([x, y]) => [x + sh.x, y + sh.y]);
       if (sh.blur <= 0) { c.fillStyle = sh.color; this._path(c, g, cs); c.fill(); continue; }
       c.save();
-      c.shadowColor = sh.color; c.shadowBlur = sh.blur * k; c.shadowOffsetX = 10000 * this.hud.s; c.shadowOffsetY = 0;
-      c.translate(-10000, 0); c.fillStyle = '#000'; this._path(c, g, cs); c.fill();
+      c.beginPath(); c.rect(-1e3, -1e3, this.hud.W + 2e3, this.hud.H + 2e3); this._subpath(c, q, cs); c.clip('evenodd');
+      c.shadowColor = sh.color; c.shadowBlur = sh.blur * k;
+      c.fillStyle = '#000'; this._path(c, g, cs); c.fill();
       c.restore();
     }
     this._path(c, q, cs);
@@ -294,11 +307,9 @@ export class PageTV {
       if (alphaOf(sh.color) <= 0) continue;
       c.save();
       if (sh.blur > 0) {
-        // (a soft shadow is cast by the text drawn far out of sight; that far, a turn of the word would swing it off,
-        // so the shadow keeps to the words' own row)
-        c.shadowColor = sh.color; c.shadowBlur = sh.blur * k; c.shadowOffsetX = sh.x * k + 10000 * this.hud.s; c.shadowOffsetY = sh.y * k;
-        c.fillStyle = '#000';
-        for (const [w, u, v, sx] of words) { c.save(); c.translate(u - 10000, v); c.scale(sx, 1); this._fill(c, w, 0, 0, ls / hk); c.restore(); }
+        // (a soft shadow is cast in place, by the words drawn in its colour: the words themselves cover them after)
+        c.shadowColor = sh.color; c.shadowBlur = sh.blur * k; c.shadowOffsetX = sh.x * k; c.shadowOffsetY = sh.y * k;
+        c.fillStyle = sh.color; put(0, 0);
       } else { c.fillStyle = sh.color; put(sh.x / hk, sh.y / hk); }
       c.restore();
     }
@@ -414,15 +425,18 @@ export class PageTV {
     if (mm) { const [a, b, cc, d] = mm[1].split(',').map(Number); c.transform(a, b, cc, d, 0, 0); }
     c.scale(1 / hk, 1 / hk);                                      // (from here on, CSS px about the logo's centre)
     c.font = this._font(cs, sz); c.textBaseline = 'alphabetic';
-    for (const d of drops) {
-      if (d.blur <= 0) { c.fillStyle = d.color; this._fill(c, text, left + d.x, base + d.y, ls); continue; }
-      c.save(); c.shadowColor = d.color; c.shadowBlur = d.blur * k / hk; c.shadowOffsetX = 10000 * k; c.translate(-10000 * hk, 0); c.fillStyle = '#000'; this._fill(c, text, left, base, ls); c.restore();
-    }
+    let fill = cs.color;
     if (gr) {
       const lg = c.createLinearGradient(0, -q.h / 2, 0, q.h / 2);
       for (const [col, at] of gr.stops) lg.addColorStop(Math.min(1, Math.max(0, at)), col);
-      c.fillStyle = lg;
-    } else c.fillStyle = cs.color;
+      fill = lg;
+    }
+    for (const d of drops) {
+      if (d.blur <= 0) { c.fillStyle = d.color; this._fill(c, text, left + d.x, base + d.y, ls); continue; }
+      // (a glow cast in place, round the letters drawn in their own colours, which the last pass covers)
+      c.save(); c.shadowColor = d.color; c.shadowBlur = d.blur * k / hk; c.fillStyle = fill; this._fill(c, text, left, base, ls); c.restore();
+    }
+    c.fillStyle = fill;
     this._fill(c, text, left, base, ls);
     c.restore();
   }
@@ -442,7 +456,7 @@ export class PageTV {
       const [u, v] = this._p(cx, r.top + (i + 0.5) * cell);
       for (const d of drops) {
         if (d.blur <= 0) { c.fillStyle = d.color; c.fillText(ch, u + d.x / hk, v + d.y / hk); continue; }
-        c.save(); c.shadowColor = d.color; c.shadowBlur = d.blur * k / hk; c.shadowOffsetX = 10000 * k; c.fillStyle = '#000'; c.fillText(ch, u - 10000, v); c.restore();
+        c.save(); c.shadowColor = d.color; c.shadowBlur = d.blur * k / hk; c.fillStyle = fill; c.fillText(ch, u, v); c.restore();
       }
       c.fillStyle = fill; c.fillText(ch, u, v);
     });
@@ -456,7 +470,7 @@ export class PageTV {
     const mm = /matrix\(([^)]+)\)/.exec(cs.transform || ''), rot = mm ? Math.atan2(+mm[1].split(',')[1], +mm[1].split(',')[0]) : 0;
     const w = q.w / hk, hh = q.h / hk, rad = num(cs.borderTopLeftRadius) / hk;
     const glow = parseShadows(cs.boxShadow).find((s) => !s.inset && s.blur > 0);
-    if (glow) { c.save(); c.shadowColor = glow.color; c.shadowBlur = glow.blur * k / hk; c.shadowOffsetX = 10000 * k; c.fillStyle = '#000'; c.beginPath(); c.arc(u - 10000, v, Math.min(w, hh) / 2, 0, TAU); c.fill(); c.restore(); }
+    if (glow) { c.save(); c.shadowColor = glow.color; c.shadowBlur = glow.blur * k / hk; c.fillStyle = cs.backgroundColor; c.beginPath(); c.arc(u, v, Math.min(w, hh) / 2 - 1, 0, TAU); c.fill(); c.restore(); }
     c.save();
     c.translate(u, v); c.rotate(rot);
     c.beginPath(); if (c.roundRect) c.roundRect(-w / 2, -hh / 2, w, hh, rad); else c.rect(-w / 2, -hh / 2, w, hh);

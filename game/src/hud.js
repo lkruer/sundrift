@@ -20,7 +20,7 @@
  * fly off the clock it moved. On a phone that can (Android), a short buzz goes with the big moments.
  */
 import * as THREE from 'three';
-import { SCORE, clamp, damp } from './config.js?v=202609242129';
+import { SCORE, clamp, damp } from './config.js?v=202609242150';
 
 const $ = (id) => document.getElementById(id);
 // the slide angle past which a drift scores the most: scoring.js's angle factor tops out at 1.5 x 0.55 rad, 47 degrees
@@ -174,7 +174,9 @@ export class Hud {
     // times a second while a run is on)
     const budget = this.W < 300 || this.H < 250 ? HUD_PIXELS.phone : HUD_PIXELS.desktop;
     this.s = Math.min(this.kx * pr, Math.sqrt(budget / (this.W * this.H)));
-    this.canvas.width = Math.round(this.W * this.s); this.canvas.height = Math.round(this.H * this.s);
+    const cw = Math.round(this.W * this.s), ch = Math.round(this.H * this.s);
+    // (a canvas of a new size needs a new texture: three keeps the one it made at the old size and only writes into it)
+    if (cw !== this.canvas.width || ch !== this.canvas.height) { this.canvas.width = cw; this.canvas.height = ch; this.texture.dispose(); }
     if (this.U) { this.U.uHudSize.value.set(this.canvas.width, this.canvas.height); this.U.uHudScale.value = 1; }
     this.cache.clear();
     this.touch = document.body.classList.contains('touch');

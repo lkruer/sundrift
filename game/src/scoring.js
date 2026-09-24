@@ -11,7 +11,7 @@
  * Every consequence is emitted as an event ({ type, value }) so the HUD and the audio can react without
  * this file knowing either exists.
  */
-import { SCORE, clamp } from './config.js?v=202609242129';
+import { SCORE, clamp } from './config.js?v=202609242150';
 
 export class Scoring {
   constructor() {

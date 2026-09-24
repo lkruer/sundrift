@@ -1,0 +1,27 @@
+--- gate 
+ready           6.3 s
+drifts banked   10  at metres 238, 247, 259, 278, 279, 284, 377, 423, 521, 525
+score           7505
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- gate --phone
+ready           5.8 s
+drifts banked   7  at metres 237, 247, 313, 411, 438, 547, 552
+score           1327
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- gate --city
+ready           6.4 s
+drifts banked   20  at metres 144, 145, 145, 146, 146, 150, 222, 237, 237, 238, 239, 240, 241, 251, 294, 451, 510, 511, 512, 571
+score           8271
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- gate --city --phone
+ready           5.9 s
+drifts banked   15  at metres 131, 132, 176, 236, 238, 240, 241, 243, 288, 513, 515, 527, 528, 529, 572
+score           3804
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)
+it drifts. now LOOK at the filmstrip.
+--- crash hunt
+run 1: ok after 68 s, 21 shots, last {"heapMB":136,"sprites":22,"canvas":[390,844],"mode":"playing","tex":51}
+run 2: ok after 70 s, 22 shots, last {"heapMB":82,"sprites":82,"canvas":[390,844],"mode":"playing","tex":51}

@@ -6,23 +6,23 @@
  * starts; the defaults (medium course, pearl white) mean one press is all it takes.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609242129';
-import { createRig, detectTier } from '../rig.js?v=202609242129';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242129';
-import { Car, gearbox } from './car.js?v=202609242129';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609242129';
-import { World, drawsGlyphs } from './world.js?v=202609242129';
-import { ChaseCam } from './camera.js?v=202609242129';
-import { Input } from './input.js?v=202609242129';
-import { Scoring } from './scoring.js?v=202609242129';
-import { Hud } from './hud.js?v=202609242129';
-import { PageTV } from './pagetv.js?v=202609242129';
-import { Audio } from './audio.js?v=202609242129';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609242129';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242129';
-import { Atmosphere } from './atmos.js?v=202609242129';
-import { Debris } from './debris.js?v=202609242129';
-import { makePost } from './post.js?v=202609242129';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202609242150';
+import { createRig, detectTier } from '../rig.js?v=202609242150';
+import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242150';
+import { Car, gearbox } from './car.js?v=202609242150';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609242150';
+import { World, drawsGlyphs } from './world.js?v=202609242150';
+import { ChaseCam } from './camera.js?v=202609242150';
+import { Input } from './input.js?v=202609242150';
+import { Scoring } from './scoring.js?v=202609242150';
+import { Hud } from './hud.js?v=202609242150';
+import { PageTV } from './pagetv.js?v=202609242150';
+import { Audio } from './audio.js?v=202609242150';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609242150';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242150';
+import { Atmosphere } from './atmos.js?v=202609242150';
+import { Debris } from './debris.js?v=202609242150';
+import { makePost } from './post.js?v=202609242150';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');

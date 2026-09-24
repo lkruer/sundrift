@@ -11,15 +11,15 @@
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202609242129';
-import { buildingMaterial } from './buildings.js?v=202609242129';
-import { neonAtlas } from './neon.js?v=202609242129';
-import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609242129';
-import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202609242129';
-import { railSkip } from './citytrain.js?v=202609242129';
-import { carsLoad, parkCar } from './citycars.js?v=202609242129';
-import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202609242129';
-import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202609242129';
+import { clamp, lerp, mulberry32 } from './config.js?v=202609242150';
+import { buildingMaterial } from './buildings.js?v=202609242150';
+import { neonAtlas } from './neon.js?v=202609242150';
+import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202609242150';
+import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202609242150';
+import { railSkip } from './citytrain.js?v=202609242150';
+import { carsLoad, parkCar } from './citycars.js?v=202609242150';
+import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202609242150';
+import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202609242150';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 // the points of a lot's footprint tested against the roads: [along the front (-0.5..0.5 of its width), in (0..1 of its depth)]

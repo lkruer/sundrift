@@ -242,8 +242,8 @@
      but shows none of it itself (and its pulsing and blinking stop, the TV draws them still) */
   body.tv #title .menu, body.tv #title .tatebox, body.tv #title .credit, body.tv #title #building, body.tv #title .shade, body.tv #pause { opacity:0; }
   body.tv #pause { -webkit-backdrop-filter:none; backdrop-filter:none; }
-  /* (in from the corner, where the glass rounds off: at 18 px from it the credit's last word went round the bend) */
-  body.tv #title .credit { right:calc(var(--safe-r) + 44px); bottom:calc(var(--safe-b) + 24px); }
+  /* (in from the corner, where the glass pulls in and rounds off: at 18 px from it the credit's last word went round the bend) */
+  body.tv #title .credit { right:calc(var(--safe-r) + 76px); bottom:calc(var(--safe-b) + 30px); }
   body.tv .start, body.tv #pause h2 { animation:none; }
   /* a player who has asked their system for less motion: the menus' endless pulsing and blinking stand still */
   @media (prefers-reduced-motion: reduce) { .start, #pause h2 { animation:none; } }
@@ -354,6 +354,6 @@
   </div></div>
 </div>
 
-<script type="module" src="./src/main.js?v=202609242129"></script>
+<script type="module" src="./src/main.js?v=202609242150"></script>
 </body>
 </html>

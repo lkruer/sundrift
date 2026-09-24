@@ -422,10 +422,20 @@ smaller; the TV's border smaller and more discreet, keeping its warp; the main m
 - **What it costs.** The phone profile under 4x CPU throttling, the HUD switched on and off every second: +2.5 ms of
   JS a frame (+1.3 ms for the pixel HUD at 195 x 422); with the HUD kept on screen and only its redrawing switched,
   +1.4 ms. So about 1.2 ms a frame on the jam gate's 2x phone, most of it the canvas going to the GPU.
-- **Measured.** The drift gate: pass desktop 8 banked, pass phone 2 (its first run lost its tab to the browser in a
-  screenshot, `Target closed`; the rerun was clean), city 10, city phone 10; 0 slow frames in every run. The HUD's
+- **Measured** (the build that went in): the drift gate, pass desktop 10 banked, pass phone 7, city 20, city phone 15,
+  0 slow frames in every run; the crash hunt twice more, clean; a phone turned on its side mid-run and back
+  (`work/rotate_test.mjs`): the HUD laid out again each way, its texture remade, no GL errors. Before the last fixes:
+  pass desktop 8, pass phone 2 (its first run lost its tab in a screenshot, see below), city 10, city phone 10. The HUD's
   overlap check over 23 screen sizes: none. The title's credit had gone round the glass's corner at 1280 x 720 (the
-  page set it 18 px from the corner): on the TV it sits 44 px in.
+  page set it 18 px from the corner): on the TV it sits 76 px in and 30 up.
+- **A tab lost, twice.** Two phone-profile runs in about ten (a drift gate, then the jam gate against the live URL)
+  lost the page mid-run (`Target closed`); two more live jam runs passed, and so did four local ones and a crash hunt
+  (`work/crash_hunt.mjs`: the phone profile driving for 90 s with a screenshot every two seconds, the browser's own log
+  kept) three times over, 93 screenshots, the JS heap and the sprite count steady. Not reproduced, so whatever was new
+  and unusual went: the page painter no longer casts its soft shadows from shapes drawn 10,000 px out of sight (they
+  are cast in place now, clipped out of the box where they must not show). And a real bug turned up on the way: three
+  keeps a canvas texture at the size it first had, so a phone turned on its side or a window resized left the HUD
+  drawing into a texture of the old size; the texture is thrown away and made again when the canvas changes size.
 
 ## 24 September, afternoon: the HUD on the TV, the phone, SUNDRIFT again
 
