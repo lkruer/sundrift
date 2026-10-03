@@ -2002,7 +2002,9 @@ function effects(dt, y, boost01) {
     mark(2 + i, wx, wz, a);
   });
   G.popFlame = Math.max(0, (G.popFlame || 0) - dt * 9);
-  flame.update(dt, Math.max(boost01, G.popFlame), boost01 >= G.popFlame ? 1 : 0.1);
+  // (the flame's light on the road is a night thing: by day, at full strength, it laid a blazing yellow pool on the
+  // asphalt behind the car that read as a hole burnt in the picture)
+  flame.update(dt, Math.max(boost01, G.popFlame), (boost01 >= G.popFlame ? 1 : 0.1) * lerp(0.2, 1, G.night || 0));
   if (boost01 > 0.05 && Math.random() < 0.7) {
     const [ex, ez] = car.point(EXHAUST[0], EXHAUST[1]);
     particles.flame(ex, y + EXHAUST[2], ez, -fx, -fz, boost01);
