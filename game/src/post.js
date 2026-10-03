@@ -99,6 +99,10 @@ const Cel = {
       float f = tl(vUv + vec2(-px.x, -px.y)), g = tl(vUv + vec2(0.0, -px.y)), h = tl(vUv + vec2( px.x, -px.y));
       float gx = (cc + 2.0 * e + h) - (a + 2.0 * d + f), gy = (a + 2.0 * b + cc) - (f + 2.0 * g + h);
       float crease = smoothstep(0.18, 0.5, sqrt(gx * gx + gy * gy));
+      // the highlights roll off: the sun's disc, its glint on the paint and the glass, a road at grazing light. They stay
+      // the brightest things in the frame without blowing a halo of bloom over everything round them (measured on the
+      // brightest channel, so an orange sun rolls off as a white one does; the night's lamps sit under the knee)
+      { float hl = max(max(c.r, c.g), c.b); if (hl > 2.0) c *= (2.0 + (hl - 2.0) * 0.3) / hl; }
       // bands in display space, applied as a ratio so hue survives
       vec3 tm = c / (c + 1.0);
       float l = luma(tm);
@@ -115,6 +119,7 @@ const Cel = {
       col *= 1.0 - 0.16 * shade * dots * uBands * (1.0 - sky);
       // ink
       float ink = clamp(sil + crease * 0.45 * (1.0 - sky), 0.0, 1.0) * uInk;
+      ink *= mix(1.0, 0.38, smoothstep(140.0, 700.0, d0));
       col *= 1.0 - ink * 0.92;
       // the sea of cloud: a height fog below a billowing top, integrated along this pixel's ray from the depth
       if (uMist.w > 0.001 && sky < 0.5) {
@@ -149,8 +154,10 @@ const Cel = {
           acc += step(uFar * 0.985, lin(clamp(suv, 0.002, 0.998))) * wgt;
           wsum += wgt; wgt *= 0.95;
         }
-        float fall = 1.0 - smoothstep(0.05, 0.95, length((uShaft.xy - vUv) * vec2(uRes.x / uRes.y, 1.0)));
-        col += uShaftCol * (acc / wsum) * fall * fall * uShaft.z * mix(1.0, 0.18, sky);
+        // (close round the light: reaching most of the way across the frame, they poured down every clear corridor toward
+        // a low sun, the road above all, as a white wedge of glare)
+        float fall = 1.0 - smoothstep(0.02, 0.5, length((uShaft.xy - vUv) * vec2(uRes.x / uRes.y, 1.0)));
+        col += uShaftCol * (acc / wsum) * fall * fall * uShaft.z * mix(0.7, 0.18, sky);
       }
       // the grade of the hour (daylight.js): the shade and the light each take a colour of their own, then saturation
       // and contrast, measured on the tone-mapped picture so they act the same on a lamp and on a shadow

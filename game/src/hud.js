@@ -447,10 +447,10 @@ export class Hud {
     // the callouts, above the road ahead and clear of the drift count; the smash counter just above the car
     L.toastY = Math.max(Math.round(H * (P ? 0.3 : 0.33)), (strip && !P ? L.angleBot : L.driftBot) + 8);
     L.smashY = Math.round(H * (P ? 0.45 : 0.5));
-    // the first-run hint: under the top row upright, in the drift count's place on its side, above the angle meter
+    // the first-run hint: under the top row upright, in the drift count's place under the score anywhere else
     if (S && P) L.coach = { cx: Math.round(W / 2), y: L.combo.y + L.combo.h + 6, w: right - left };
-    else if (strip) L.coach = { cx: Math.round(W / 2), y: L.drift.y, w: Math.round(W * 0.62) };
-    else L.coach = { cx: Math.round(W / 2), y: L.angle.y - 44, w: Math.round(W * 0.7) };
+    // (and on a desktop too: just over the angle meter it sat across the car's tail in the chase view)
+    else L.coach = { cx: Math.round(W / 2), y: L.drift.y, w: Math.round(W * (strip ? 0.62 : 0.56)) };
 
     // the thumbs (a phone): the handbrake's pad in the right thumb's corner, clear of the dash; the steering hint left
     const pr = Math.round((S ? 46 : 52) / this.kx);
@@ -1206,7 +1206,8 @@ export class Hud {
   /** The first-run hint, as a 90s game's dialogue box: the words, and a cursor blinking in its corner. */
   _drawCoach(now) {
     const a = this.coachA;
-    if (a <= 0.01) return;
+    // (the off-road countdown takes the same place under the score, and says something more pressing)
+    if (a <= 0.01 || (this.courseOut && this.courseOut.shown)) return;
     const c = this.ctx, r = this.L.coach, f = this.Z.coach;
     const words = this.tipStage === 2
       ? [['ANGLE', C.amber], ['AND', C.ink], ['SPEED', C.amber], ['PAY', C.ink], ['·', C.dim], ['CHAIN', C.amber], ['DRIFTS', C.ink], ['TO', C.ink], ['MULTIPLY', C.ink], ['·', C.dim], ['EVERY', C.ink], ['ONE', C.ink], ['BANKED', C.ink], ['BRINGS', C.ink], ['DAWN', C.amber], ['CLOSER', C.ink]]

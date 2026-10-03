@@ -928,7 +928,9 @@ export function createRig(THREE, renderer, scene, opts = {}) {
       scene.background.copy(fog.color);
     }
 
-    if (skyMesh) skyU.uSunDisc.value.setRGB(sunLin[0] * sunI * 0.9, sunLin[1] * sunI * 0.9, sunLin[2] * sunI * 0.9);
+    // (SUNDRIFT) the disc at a fraction of the key and never above five: at the key's own strength (thirteen at golden
+    // hour) it bloomed into a glare that ate the horizon round it
+    if (skyMesh) { const dk = Math.min(sunI, 10) * 0.5; skyU.uSunDisc.value.setRGB(sunLin[0] * dk, sunLin[1] * dk, sunLin[2] * dk); }
 
     // The environment. Rebuilt because its content is the atmosphere, and the atmosphere moved.
     const groundLin = [bounceU.uBounce.value.r * 1.6 + 0.02, bounceU.uBounce.value.g * 1.6 + 0.02, bounceU.uBounce.value.b * 1.6 + 0.02];

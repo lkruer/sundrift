@@ -92,32 +92,67 @@ function roadTexture(half, wall) {
   const rv = document.createElement('canvas'); rv.width = W; rv.height = H;
   const ctx = cv.getContext('2d'), rctx = rv.getContext('2d');
   const img = ctx.createImageData(W, H), rimg = rctx.createImageData(W, H);
-  const asphalt = [0x3a, 0x3b, 0x40], gravel = [0x86, 0x80, 0x75], line = [0xe8, 0xe4, 0xda];
+  const asphalt = [0x3a, 0x3b, 0x40], gravel = [0x86, 0x80, 0x75], line = [0xe8, 0xe4, 0xda], yellow = [0xe8, 0xb0, 0x2a];
   let seed = 7;
   const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  // a few repair patches: a shade darker than the asphalt round them
+  // repair patches: a shade darker than the asphalt round them (fresh), or a shade lighter (old and sun-bleached), with
+  // a sealed seam round their edge
   const patches = [];
-  for (let k = 0; k < 5; k++) patches.push({ u0: -half + rnd() * (2 * half - 2), du: 1 + rnd() * 2.2, v0: rnd() * LEN, dv: 2 + rnd() * 6 });
+  for (let k = 0; k < 7; k++) patches.push({ u0: -half + rnd() * (2 * half - 2), du: 1 + rnd() * 2.4, v0: rnd() * LEN, dv: 2 + rnd() * 6, k: rnd() < 0.6 ? 0.88 : 1.07 });
+  // cracks sealed with tar: wandering lines, mostly across the road and along the lane joint, glossier than the asphalt
+  const cracks = new Uint8Array(W * H);
+  const crack = (x, y, dx, dy, n) => {
+    for (let i = 0; i < n; i++) {
+      x += dx + (rnd() - 0.5) * 1.6; y += dy + (rnd() - 0.5) * 1.6;
+      const xi = Math.round(x), yi = ((Math.round(y) % H) + H) % H;
+      if (xi >= 0 && xi < W) cracks[yi * W + xi] = 1;
+      if (rnd() < 0.04) { const t = dx; dx = dy * (rnd() < 0.5 ? 1 : -1); dy = t; }
+    }
+  };
+  const uToX = (u) => (u + wall) / (2 * wall) * W;
+  for (let k = 0; k < 9; k++) crack(uToX(-half + rnd() * 2 * half), rnd() * H, (rnd() < 0.5 ? 1 : -1) * 0.9, (rnd() - 0.5) * 0.5, 40 + rnd() * 70);
+  for (let k = 0; k < 3; k++) crack(uToX((rnd() - 0.5) * 0.6), rnd() * H, (rnd() - 0.5) * 0.2, 1, 60 + rnd() * 120);
+  // the paint worn away in places: where wheels cross the edge lines on the bends, and here and there along the centre
+  const wornAt = (vm, salt) => 0.5 + 0.5 * Math.sin(vm * 0.37 + salt) * Math.sin(vm * 0.113 + salt * 2.1);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const u = ((x + 0.5) / W) * 2 * wall - wall, au = Math.abs(u);
     const vm = (y / H) * LEN;
     let c, rough;
     const grain = (rnd() - 0.5) * 10;
-    if (au > half) { c = gravel.map((v) => v + grain * 1.8); rough = 0.96; }
-    else {
+    if (au > half) {
+      // the shoulder: gravel, a few bigger stones, and grass creeping in from the outer edge
+      c = gravel.map((v) => v + grain * 1.8); rough = 0.96;
+      if (rnd() < 0.012) c = c.map((v) => v * (rnd() < 0.5 ? 0.72 : 1.18));
+      const out = (au - half) / Math.max(0.01, wall - half);
+      if (out > 0.55 && rnd() < (out - 0.55) * 0.9) c = [0x6a + grain, 0x86 + grain, 0x46 + grain * 0.5];
+    } else {
       const wear = 1 - 0.08 * Math.exp(-Math.pow((au - half * 0.36) / 0.5, 2));       // darker tyre tracks
       // (a fine grain only: on asphalt this dark, a full one scattered every band edge the cel pass draws across the
       // road into salt and pepper, and a low sun's sheen turned the tyre tracks into two ragged black lanes)
       c = asphalt.map((v) => (v + grain * 0.4) * wear);
+      // the oil line: what cars drip, down the middle of each lane, a little darker
+      c = c.map((v) => v * (1 - 0.06 * Math.exp(-Math.pow((au - half * 0.5) / 0.35, 2))));
       // an even sheen: any wave in it drew the lamps' reflections as wobbling puddles at night and the sun's as black
       // camouflage blotches by day, once the cel pass banded them
       rough = 0.55;
-      // (the patches only darken: a patch of its own roughness cut a square notch out of every highlight, and at
-      // 0.8 the cel bands turned it into a black hole in the road by day)
-      for (const p of patches) if (u > p.u0 && u < p.u0 + p.du && vm > p.v0 && vm < p.v0 + p.dv) c = c.map((v) => v * 0.9);
+      // (the patches only change the colour: a patch of its own roughness cut a square notch out of every highlight,
+      // and at 0.8 the cel bands turned it into a black hole in the road by day)
+      for (const p of patches) if (u > p.u0 && u < p.u0 + p.du && vm > p.v0 && vm < p.v0 + p.dv) {
+        c = c.map((v) => v * p.k);
+        const edge = Math.min(u - p.u0, p.u0 + p.du - u, (vm - p.v0) * 0.5, (p.v0 + p.dv - vm) * 0.5);
+        if (edge < 0.05) c = c.map((v) => v * 0.8);
+      }
+      if (cracks[y * W + x]) c = c.map((v) => v * 0.62);
+      // the lines: white edge lines, and a yellow centre line (no overtaking, the way a Japanese pass is marked), the
+      // paint worn thin where the wheels cut across it
       const onEdge = Math.abs(au - (half - 0.25)) < 0.075;
-      const onCentre = au < 0.07 && (vm % 12) < 4.0;
-      if (onEdge || onCentre) { c = line.map((v) => v * (onCentre ? 0.93 : 1) + grain * 0.5); rough = 0.62; }
+      const onCentre = au < 0.075;
+      if (onEdge || onCentre) {
+        const worn = onEdge ? smoothstep(0.78, 0.98, wornAt(vm, u > 0 ? 1.3 : 4.1)) : smoothstep(0.86, 0.99, wornAt(vm, 7.7));
+        const paint = onCentre ? yellow : line;
+        const keep = rnd() > worn * 0.85;
+        if (keep) { c = paint.map((v) => v * (onCentre ? 0.92 : 1) + grain * 0.5); rough = 0.62; }
+      }
     }
     // fallen cherry petals: blown into drifts against the edges and the gravel, a few across the lanes
     {
@@ -283,32 +318,92 @@ function warnTexture() {
  * cell of grey beams round a pocket of soil and grass, weathered, drawn once into a canvas.
  */
 function latticeTexture() {
-  const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  // (four cells of 3.2 m in a 2 x 2 block, each pocket its own: grass, a scar of bare soil with weeds, moss and a fern,
+  // and flowering weeds, so a whole cutting does not repeat one square; the beams are drawn with their relief, lit from
+  // above, and the grass spills over their edges)
+  const S = 512, C = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
   const ctx = cv.getContext('2d');
   let seed = 11;
   const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  // the pocket: dark soil with grass
-  // (kept close in value to the beams, so the ink pass draws the grid, not every blade of grass)
-  ctx.fillStyle = '#5c6545'; ctx.fillRect(0, 0, S, S);
-  for (let i = 0; i < 900; i++) {
-    const g = 40 + rnd() * 40;
-    ctx.fillStyle = `rgba(${g * 0.9 + 20 | 0},${g + 34 | 0},${g * 0.6 + 10 | 0},${0.25 + rnd() * 0.3})`;
-    ctx.fillRect(rnd() * S, rnd() * S, 2 + rnd() * 5, 2 + rnd() * 6);
-  }
-  // the beams: a band on every edge, so the tiles meet in a grid
   const B = 19;
+  const pocket = (x0, y0, kind) => {
+    // the soil and its grass (kept close in value to the beams, so the ink pass draws the grid, not every blade)
+    ctx.fillStyle = kind === 2 ? '#4f5c40' : '#5c6545'; ctx.fillRect(x0, y0, C, C);
+    if (kind === 1) {
+      // a scar where the soil slumped: bare, ochre-grey, weeds coming back at its edges
+      ctx.fillStyle = '#6e6450';
+      ctx.beginPath(); ctx.ellipse(x0 + C * (0.35 + rnd() * 0.3), y0 + C * 0.62, C * 0.26, C * 0.18, rnd() * 0.6 - 0.3, 0, Math.PI * 2); ctx.fill();
+    }
+    for (let i = 0; i < 520; i++) {
+      const g = 40 + rnd() * 40, x = x0 + B + rnd() * (C - 2 * B), y = y0 + B + rnd() * (C - 2 * B);
+      const mossy = kind === 2 ? 0.75 : 1;
+      ctx.fillStyle = `rgba(${g * 0.9 * mossy + 20 | 0},${g + 34 | 0},${g * 0.6 * mossy + 10 | 0},${0.25 + rnd() * 0.3})`;
+      ctx.fillRect(x, y, 2 + rnd() * 5, 2 + rnd() * 6);
+    }
+    if (kind === 2) {
+      // a fern: fronds from a crown low in the pocket
+      const fx = x0 + C * 0.5, fy = y0 + C * 0.78;
+      ctx.strokeStyle = 'rgba(70,104,52,0.85)'; ctx.lineWidth = 3;
+      for (let k = 0; k < 7; k++) {
+        const a = -Math.PI / 2 + (k - 3) * 0.33, L = C * (0.22 + rnd() * 0.08);
+        ctx.beginPath(); ctx.moveTo(fx, fy); ctx.quadraticCurveTo(fx + Math.cos(a) * L * 0.6, fy + Math.sin(a) * L * 0.6 - 8, fx + Math.cos(a) * L, fy + Math.sin(a) * L + 10); ctx.stroke();
+      }
+    }
+    if (kind === 3) {
+      // flowering weeds: yellow and white dots in loose clumps
+      for (let k = 0; k < 6; k++) {
+        const cx = x0 + B + 20 + rnd() * (C - 2 * B - 40), cy = y0 + B + 20 + rnd() * (C - 2 * B - 40);
+        for (let i = 0; i < 14; i++) {
+          ctx.fillStyle = rnd() < 0.6 ? 'rgba(226,200,86,0.9)' : 'rgba(232,230,214,0.9)';
+          ctx.fillRect(cx + (rnd() - 0.5) * 36, cy + (rnd() - 0.5) * 30, 3, 3);
+        }
+      }
+    }
+    // the pocket sits back from the beams: a shadow under the top beam and inside the left one (lit from above, left)
+    const sh = ctx.createLinearGradient(0, y0 + B, 0, y0 + B + 22);
+    sh.addColorStop(0, 'rgba(0,0,0,0.34)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sh; ctx.fillRect(x0 + B, y0 + B, C - 2 * B, 22);
+    const sl = ctx.createLinearGradient(x0 + B, 0, x0 + B + 12, 0);
+    sl.addColorStop(0, 'rgba(0,0,0,0.22)'); sl.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sl; ctx.fillRect(x0 + B, y0 + B, 12, C - 2 * B);
+  };
   const beam = (x, y, w, h) => {
     ctx.fillStyle = '#9d998f'; ctx.fillRect(x, y, w, h);
     for (let i = 0; i < (w * h) / 30; i++) { const v = 150 + rnd() * 40; ctx.fillStyle = `rgba(${v},${v - 4},${v - 12},0.35)`; ctx.fillRect(x + rnd() * w, y + rnd() * h, 2, 2); }
   };
-  beam(0, 0, S, B); beam(0, S - B, S, B); beam(0, 0, B, S); beam(S - B, 0, B, S);
-  // shading under the beams, and rust-dark streaks where water runs off them
-  ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.fillRect(B, B, S - 2 * B, 5); ctx.fillRect(B, B, 4, S - 2 * B);
-  for (let i = 0; i < 9; i++) {
-    const x = B + rnd() * (S - 2 * B), len = 10 + rnd() * 50;
-    const gr = ctx.createLinearGradient(0, S - B - len, 0, S - B);
-    gr.addColorStop(0, 'rgba(40,34,26,0)'); gr.addColorStop(1, 'rgba(40,34,26,0.45)');
-    ctx.fillStyle = gr; ctx.fillRect(x, S - B - len, 2 + rnd() * 3, len);
+  const kinds = [0, 1, 2, 3];
+  for (let cy = 0; cy < 2; cy++) for (let cx = 0; cx < 2; cx++) pocket(cx * C, cy * C, kinds[cy * 2 + cx]);
+  // the beams: one grid over the block, so the cells meet in it
+  for (let k = 0; k <= 2; k++) {
+    const at = k * C - B;
+    beam(0, Math.max(0, at), S, k === 0 || k === 2 ? B : 2 * B); beam(Math.max(0, at), 0, k === 0 || k === 2 ? B : 2 * B, S);
+  }
+  // their relief: a lit top and left edge, a dark bottom and right one, all along every beam
+  // (a beam on the block's edge is half here and half on the far edge, where the tile repeats: its lit edge is on the far
+  // side, so the lit lines go on the middle and the far beams' near edges, the dark ones on the near and middle beams')
+  for (const a of [C - B, S - B]) { ctx.fillStyle = 'rgba(255,250,236,0.28)'; ctx.fillRect(0, a, S, 3); ctx.fillRect(a, 0, 3, S); }
+  for (const b of [B, C + B]) { ctx.fillStyle = 'rgba(20,18,14,0.35)'; ctx.fillRect(0, b - 3, S, 3); ctx.fillRect(b - 3, 0, 3, S); }
+  // drain holes in some beams, and rust-dark streaks where water runs out of them and off the beams
+  for (let i = 0; i < 6; i++) {
+    const cx = (i % 2) * C, cy = Math.floor(i / 2) % 2 * C, x = cx + B + 30 + rnd() * (C - 2 * B - 60), y = cy + C - B - 2;
+    ctx.fillStyle = '#26241f'; ctx.fillRect(x, y - 8, 7, 7);
+    const gr = ctx.createLinearGradient(0, y, 0, y + 46);
+    gr.addColorStop(0, 'rgba(46,38,28,0.5)'); gr.addColorStop(1, 'rgba(46,38,28,0)');
+    ctx.fillStyle = gr; ctx.fillRect(x + 1, y, 5, 46);
+  }
+  for (let i = 0; i < 18; i++) {
+    const x = rnd() * S, y0 = Math.floor(rnd() * 2) * C + C - B, len = 10 + rnd() * 50;
+    const gr = ctx.createLinearGradient(0, y0 - len, 0, y0);
+    gr.addColorStop(0, 'rgba(40,34,26,0)'); gr.addColorStop(1, 'rgba(40,34,26,0.4)');
+    ctx.fillStyle = gr; ctx.fillRect(x, y0 - len, 2 + rnd() * 3, len);
+  }
+  // the grass spilling over the beams' edges, here and there
+  for (let i = 0; i < 260; i++) {
+    const vert = rnd() < 0.5, k = Math.floor(rnd() * 3), along = rnd() * S, off = (rnd() < 0.5 ? -1 : 1) * (B - 3 - rnd() * 6);
+    const g = 50 + rnd() * 40;
+    ctx.fillStyle = `rgba(${g * 0.85 + 18 | 0},${g + 38 | 0},${g * 0.55 + 10 | 0},${0.45 + rnd() * 0.35})`;
+    const x = vert ? k * C + off : along, y = vert ? along : k * C + off;
+    ctx.fillRect(x, y, vert ? 3 + rnd() * 4 : 2 + rnd() * 3, vert ? 2 + rnd() * 3 : 3 + rnd() * 5);
   }
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
@@ -442,25 +537,97 @@ export class World {
     // keeps this hook and runs it ahead of its own patches.
     {
       const lat = latticeTexture();
+      // (the pass's grass takes the shader's variation below; the city's lots and pavements do not)
+      this.groundU = { uGrassy: { value: 1 } };
       this.groundMat.onBeforeCompile = (shader) => {
         shader.uniforms.uLattice = { value: lat };
+        Object.assign(shader.uniforms, this.groundU);
         shader.vertexShader = shader.vertexShader
           .replace('#include <common>', `#include <common>
 attribute float wall;
 attribute float wallS;
 varying float vWall;
-varying vec2 vWallUv;`)
+varying vec2 vWallUv;
+varying vec3 vGPos;
+varying float vGUp;`)
           .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
-{ vec4 wp = modelMatrix * vec4(transformed, 1.0); vWallUv = vec2(wallS, wp.y * 1.3) / 3.2; vWall = wall; }`);
+{ vec4 wp = modelMatrix * vec4(transformed, 1.0); vWallUv = vec2(wallS, wp.y * 1.3) / 6.4; vWall = wall; vGPos = wp.xyz; vGUp = normalize(mat3(modelMatrix) * objectNormal).y; }`);
         shader.fragmentShader = shader.fragmentShader
           .replace('#include <common>', `#include <common>
 uniform sampler2D uLattice;
+uniform float uGrassy;
 varying float vWall;
-varying vec2 vWallUv;`)
+varying vec2 vWallUv;
+varying vec3 vGPos;
+varying float vGUp;
+// the beams' height over the slope in the lattice's block (2 x 2 cells of 3.2 m, uv in blocks), and the normal they give
+float latticeH(vec2 t) {
+  vec2 q = abs(fract(t * 2.0 + 0.5) - 0.5) * 0.5;          // distance to the nearest beam's centre line, in blocks
+  float w = 19.0 / 512.0, e = 0.006;
+  return 1.0 - smoothstep(w - e, w + e, min(q.x, q.y));
+}
+vec3 latticeNormal(vec3 N, vec2 t, float k) {
+  vec3 q0 = dFdx(-vViewPosition), q1 = dFdy(-vViewPosition);
+  vec2 st0 = dFdx(t), st1 = dFdy(t);
+  float h = latticeH(t), dx = (latticeH(t + vec2(0.002, 0.0)) - h) / 0.002, dy = (latticeH(t + vec2(0.0, 0.002)) - h) / 0.002;
+  // (a beam stands about 0.3 m proud: 0.047 of a block)
+  vec2 g = vec2(dx, dy) * 0.047 * k;
+  vec3 q1p = cross(q1, N), q0p = cross(N, q0);
+  vec3 T = q1p * st0.x + q0p * st1.x, B = q1p * st0.y + q0p * st1.y;
+  float det = max(dot(T, T), dot(B, B)), sc = det == 0.0 ? 0.0 : inversesqrt(det);
+  return normalize(N - (T * g.x + B * g.y) * sc);
+}
+float gHash(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+float gNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), u.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), u.x), u.y) * 2.0 - 1.0;
+}
+// the hills are not one green: lush hollows and paler crowns in a patchwork, drifts of last year's straw, earth showing
+// in bands on the steep ground, and close by a scatter of small flowers in the grass. Only where the ground is green
+// (not the verge's gravel, the petals or the rock the vertex colours already paint), and on the pass, not the city
+vec3 groundDetail(vec3 c, vec3 P, float up, float wall) {
+  float green = smoothstep(0.0, 0.05, c.g - max(c.r, c.b) * 0.92) * (1.0 - wall);
+  if (green < 0.01) return c;
+  float d = length(P - cameraPosition);
+  float n1 = gNoise(P.xz / 57.0), n2 = gNoise(P.xz / 19.0 + 4.7), n3 = gNoise(P.xz / 6.1 + 9.1);
+  vec3 t = mix(vec3(0.78, 0.92, 0.8), vec3(1.14, 1.07, 0.82), smoothstep(-0.55, 0.55, n1 + 0.35 * n2));
+  float dry = smoothstep(0.3, 0.8, n2 * 0.7 + n3 * 0.3) * smoothstep(-0.3, 0.3, n1);
+  t = mix(t, vec3(1.2, 1.0, 0.7), dry * 0.36);
+  t *= 1.0 - 0.09 * smoothstep(0.2, 0.8, n3) * (1.0 - smoothstep(60.0, 160.0, d));
+  // earth in bands on the steeper slopes (the vertex colours turn the steepest to rock)
+  float steep = (1.0 - smoothstep(0.7, 0.9, up)) * smoothstep(0.35, 0.6, up);
+  float strata = 0.5 + 0.5 * sin(P.y * 1.9 + n2 * 2.4);
+  t = mix(t, mix(vec3(0.86, 0.74, 0.6), vec3(0.98, 0.9, 0.78), strata), steep * smoothstep(-0.2, 0.4, n3) * 0.55);
+  c *= mix(vec3(1.0), t, green);
+  // flowers: drifts of small blooms in the grass, each drift one kind (white clover, dandelion, pink and violet vetch),
+  // a bloom in a third of the 20 cm cells inside one; on the flat and near (further off they would only shimmer)
+  float fk = green * smoothstep(0.86, 0.95, up) * (1.0 - smoothstep(22.0, 40.0, d));
+  if (fk > 0.01) {
+    float drift = smoothstep(0.15, 0.55, gNoise(P.xz / 7.0 + 3.3));
+    vec2 g = P.xz * 5.0, cell = floor(g);
+    if (gHash(cell + 17.0) < drift * 0.34) {
+      vec2 o = vec2(gHash(cell + 3.1), gHash(cell + 7.7)) * 0.6 + 0.2;
+      float r = length(fract(g) - o), pk = gHash(floor(P.xz / 3.0) + 11.3);
+      vec3 fc = pk < 0.4 ? vec3(0.95, 0.93, 0.86) : pk < 0.7 ? vec3(0.98, 0.82, 0.32) : pk < 0.88 ? vec3(0.93, 0.62, 0.74) : vec3(0.66, 0.6, 0.92);
+      c = mix(c, fc * 0.62, (1.0 - smoothstep(0.17, 0.27, r)) * fk * 0.9);
+    }
+  }
+  return c;
+}`)
+          .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+if (vWall > 0.01) normal = normalize(mix(normal, latticeNormal(normal, vWallUv, 1.0), vWall));`)
           .replace('#include <color_fragment>', `#include <color_fragment>
-if (vWall > 0.01) { diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uLattice, vWallUv).rgb, vWall); }`);
+if (vWall > 0.01) {
+  // (the lattice in its 2 x 2 block, its cells told apart a little more by the slope's own patchwork, greener and
+  // darker toward its foot where the water runs)
+  vec3 lc = texture2D(uLattice, vWallUv).rgb;
+  float ln = gNoise(vGPos.xz / 23.0 + vGPos.y / 31.0);
+  lc *= mix(vec3(0.92, 0.97, 0.9), vec3(1.05, 1.03, 0.98), 0.5 + 0.5 * ln);
+  diffuseColor.rgb = mix(diffuseColor.rgb, lc, vWall);
+}
+if (uGrassy > 0.5) diffuseColor.rgb = groundDetail(diffuseColor.rgb, vGPos, vGUp, vWall);`);
       };
-      this.groundMat.customProgramCacheKey = () => 'ground-lattice';
+      this.groundMat.customProgramCacheKey = () => 'ground-lattice-detail-relief';
     }
     this.farMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 8 });
     this.farMat.name = 'farground';
@@ -496,9 +663,10 @@ vec2 roadUv(vec2 uv) {
 #endif`)
         // (and a lamp's highlight on the road within a few metres of the lens is let go: that close, on a wet road, it
         // spread into a great white pill beside the car that the cel pass inked round like a solid thing)
-        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee) * smoothstep(3.0, 10.0, length(vViewPosition));');
+        // (and the sky's own reflection at grazing light, the bright streak of sky round a low sun, has a ceiling as well)
+        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee) * smoothstep(3.0, 10.0, length(vViewPosition));\n  reflectedLight.indirectSpecular = reflectedLight.indirectSpecular / (1.0 + reflectedLight.indirectSpecular * 1.6);');
     };
-    this.roadMat.customProgramCacheKey = () => 'road-spec-knee-fold-near';
+    this.roadMat.customProgramCacheKey = () => 'road-spec-knee-fold-near-sky';
     this.railMat = new THREE.MeshStandardMaterial({ color: PAL.galvanised, roughness: 0.42, metalness: 0.65, side: THREE.DoubleSide });
     // the lining glows faintly sodium-orange: the whole bore is lit by its lamps, not just the stretch round the car
     { const tt = tunnelTexture(); this.tunnelMat = new THREE.MeshStandardMaterial({ map: tt, emissiveMap: tt, emissive: 0xff9448, emissiveIntensity: 0.62, roughness: 0.82, metalness: 0, side: THREE.DoubleSide }); }
@@ -656,6 +824,7 @@ vec2 roadUv(vec2 uv) {
     this.ground = new Ground(track);
     this.seed = track.seed;
     this.city = !!track.city && !!this.City;
+    if (this.groundU) this.groundU.uGrassy.value = this.city ? 0 : 1;
     const rt = this.city ? this.City.cityRoadTexture(track.half, track.wall) : roadTexture(track.half, track.wall);
     // a city fence is painted white; the mountain's guardrail is bare galvanised steel
     this.railMat.color.set(this.city ? 0xd8d6ce : PAL.galvanised);
@@ -1732,8 +1901,16 @@ vec2 roadUv(vec2 uv) {
       ctx.fillRect(front * S, 0, (lw / 6.85) * S + 1, S);
       ctx.fillRect(front * S, 0, S, (lw / 2.5) * S * 0.5 + 0.5); ctx.fillRect(front * S, S - (lw / 2.5) * S * 0.5 - 0.5, S, (lw / 2.5) * S * 0.5 + 0.5);
       const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = THREE.ClampToEdgeWrapping; tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
-      this.lotMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.62, metalness: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+      this.lotMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
       this.lotMat.name = 'lot';
+      // (dry asphalt, and the road's soft ceiling on its highlights: at 0.62 with nothing to cap it, a low sun laid a
+      // white mirror of glare across the car park, the whole lot one blown-out wedge toward the sun)
+      this.lotMat.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * 7.0);
+  reflectedLight.indirectSpecular = reflectedLight.indirectSpecular / (1.0 + reflectedLight.indirectSpecular * 1.6);`);
+      };
+      this.lotMat.customProgramCacheKey = () => 'lot-spec-knee';
     }
     this.postboxMat = new THREE.MeshStandardMaterial({ color: 0xc8261e, roughness: 0.38, metalness: 0.1 });
     // a shrine's dressed stone: a shade lighter than the lanterns' and, like the portals' concrete, holding a little
@@ -2558,7 +2735,7 @@ vec2 roadUv(vec2 uv) {
     // (not quite a mirror: at 0.2 each street lamp burned a white blob into the wet asphalt; at 0.4 it is a soft
     // glow drawn out toward the lens)
     if (this.roadMat) this.roadMat.roughness = 1 - 0.6 * w;
-    if (this.lotMat) this.lotMat.roughness = 0.62 - 0.28 * w;
+    if (this.lotMat) this.lotMat.roughness = 0.9 - 0.45 * w;
     if (this.groundMat) this.groundMat.roughness = 1 - 0.4 * w;
     this.setNight(this._n ?? 1);
   }

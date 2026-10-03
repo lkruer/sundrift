@@ -1,0 +1,92 @@
+[
+ {
+  "wait": 2500
+ },
+ {
+  "js": "document.getElementById('startb').click()"
+ },
+ {
+  "wait": 2500
+ },
+ {
+  "js": "window.__DEBUG__.rainNow(0)"
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__;\n    window.__CRIT__ = (s, view, h) => {\n      // (as if dawn were already behind: a jump across 06:00 would end the run and bring up its results)\n      D.G.dawnT = D.G.dawnT || 0.01; D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9;\n      const p = D.teleport(s, 0), fx = Math.sin(p.h), fz = Math.cos(p.h), lx = Math.cos(p.h), lz = -Math.sin(p.h);\n      let pos = null, look = null, fov = 62;\n      if (view === 'side') { pos = [p.x + lx * 10, p.y + 2.4, p.z + lz * 10]; look = [p.x - lx * 8 + fx * 8, p.y + 1.2, p.z - lz * 8 + fz * 8]; fov = 58; }\n      else if (view === 'high') { pos = [p.x - fx * 35, p.y + 30, p.z - fz * 35]; look = [p.x + fx * 140, p.y - 6, p.z + fz * 140]; fov = 62; }\n      else if (view === 'low') { pos = [p.x + lx * 2.2, p.y + 0.7, p.z + lz * 2.2]; look = [p.x + fx * 40 + lx * 2.2, p.y + 0.9, p.z + fz * 40 + lz * 2.2]; fov = 55; }\n      window.__CAM__ = pos ? { pos, look, fov } : null;\n      if (!pos) { const cam = D.scene.children.find((o) => o.isPerspectiveCamera); cam.fov = 62; cam.updateProjectionMatrix(); }\n    }; })()"
+ },
+ {
+  "js": "window.__CRIT__(1900, 'side', 17.3)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1718_s1900_side"
+ },
+ {
+  "js": "window.__CRIT__(1900, 'high', 17.3)"
+ },
+ {
+  "wait": 1300
+ },
+ {
+  "shot": "moun_1718_s1900_high"
+ },
+ {
+  "js": "window.__CRIT__(1100, 'side', 17.3)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1718_s1100_side"
+ },
+ {
+  "js": "window.__CRIT__(1100, 'high', 17.3)"
+ },
+ {
+  "wait": 1300
+ },
+ {
+  "shot": "moun_1718_s1100_high"
+ },
+ {
+  "js": "window.__CRIT__(1900, 'side', 12)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1200_s1900_side"
+ },
+ {
+  "js": "window.__CRIT__(1900, 'high', 12)"
+ },
+ {
+  "wait": 1300
+ },
+ {
+  "shot": "moun_1200_s1900_high"
+ },
+ {
+  "js": "window.__CRIT__(1100, 'side', 12)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1200_s1100_side"
+ },
+ {
+  "js": "window.__CRIT__(1100, 'high', 12)"
+ },
+ {
+  "wait": 1300
+ },
+ {
+  "shot": "moun_1200_s1100_high"
+ },
+ {
+  "js": "window.__CAM__ = null"
+ }
+]

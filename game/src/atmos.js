@@ -184,10 +184,10 @@ class CloudBank {
           col = mix(col, uShade * 0.9, (1.0 - smoothstep(baseV, baseV + 0.16, V)) * 0.55);
           // the silver edge: a puff's rim where the light is behind the cloud or low beside it
           float back = clamp(-L.z * 0.75 + 0.35 * (1.0 - abs(L.y)), 0.0, 1.0);
-          col += uRim * smoothstep(0.62, 0.92, 1.0 - nrm.z) * back * 0.85;
+          col += uRim * smoothstep(0.62, 0.92, 1.0 - nrm.z) * back * 0.6;
           // toward the sun the whole heap glows a little, lit through
           float toSun = max(dot(dh, normalize(vec3(uSunDir.x, 0.0, uSunDir.z) + 1e-5)), 0.0);
-          col += uRim * pow(toSun, 6.0) * 0.22;
+          col += uRim * pow(toSun, 6.0) * 0.1;
           // the feet lost in the haze
           col = mix(col, uHaze, (1.0 - smoothstep(0.05, 0.55, V)) * 0.55);
           col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722)) * 0.85), uGrey);

@@ -1604,7 +1604,8 @@ function shafts() {
   const clear = (1 - W.rain) * (1 - (G.tunnelK || 0));
   const nightAmt = G.night ?? 1;
   const el = rig.elevation;
-  const sunK = (1 - nightAmt) * (0.12 + 0.5 * (1 - smoothstep(8, 32, el))) * clear;
+  // (gentler than they were: at golden hour the shafts laid a bright veil over half the frame whenever the sun was in it)
+  const sunK = (1 - nightAmt) * (0.05 + 0.2 * (1 - smoothstep(8, 32, el))) * clear;
   const moonK = nightAmt * 0.3 * clear * (G.map === 'city' ? 0.55 : 1);
   if (Math.max(sunK, moonK) < 0.01) return;
   const sun = sunK > moonK;
