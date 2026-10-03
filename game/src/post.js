@@ -201,10 +201,11 @@ const Retro = {
     uLevels: { value: 32 }, uMask: { value: 0.06 }, uLens: { value: 0 }, uTime: { value: 0 }, uFlow: { value: 0 },
     uScan: { value: 0.036 }, uHudScan: { value: 0.015 }, uPx: { value: 1 },
     tHud: { value: null }, uHudOn: { value: 0 }, uHudSize: { value: new THREE.Vector2(4, 4) }, uHudScale: { value: 1 },
+    uPower: { value: 1 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uZoom, uLevels, uMask, uLens, uTime, uFlow;
+    uniform sampler2D tDiffuse; uniform vec2 uRes; uniform float uCurve, uEdge, uCorner, uZoom, uLevels, uMask, uLens, uTime, uFlow, uPower;
     uniform float uScan, uHudScan, uHudOn, uHudScale, uPx; uniform sampler2D tHud; uniform vec2 uHudSize;
     varying vec2 vUv;
     // the OSD's texel under p, square and crisp, softened only over the last screen pixel at its edges
@@ -250,11 +251,22 @@ const Retro = {
     // signed distance to a rounded rectangle of half-size b and corner radius r
     float rbox(vec2 p, vec2 b, float r) { vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
     void main(){
-      vec2 c = vUv * 2.0 - 1.0;
+      // the set coming on (uPower 0 to 1): a bright line across the middle that grows out from the centre, then the
+      // picture opening out of it, overbright for a moment, as a tube's did
+      vec2 vU = vUv;
+      float pw = clamp(uPower, 0.0, 1.0), open = 1.0, beam = 0.0, wide = 1.0;
+      if (pw < 0.999) {
+        open = max(smoothstep(0.16, 0.85, pw), 0.002);
+        wide = smoothstep(0.0, 0.2, pw);
+        float dy = vUv.y - 0.5;
+        beam = (1.0 - smoothstep(0.0, 0.003 + 0.5 * open, abs(dy))) * (1.0 - smoothstep(0.45, 0.95, pw)) * step(abs(vUv.x - 0.5), wide * 0.5);
+        vU.y = 0.5 + dy / open;
+      }
+      vec2 c = vU * 2.0 - 1.0;
       float r2 = dot(c, c) * 0.5;                          // 0 at the centre, 0.5 mid-edge, 1 in the corners
       // (drawn a touch larger than the glass, so the edges bow right out to a thin dark border and only the corners
       // pull in round)
-      vec2 uv = 0.5 + (vUv - 0.5 + c * (uCurve * r2 + uEdge * r2 * r2)) * uZoom;
+      vec2 uv = 0.5 + (vU - 0.5 + c * (uCurve * r2 + uEdge * r2 * r2)) * uZoom;
       // the picture's frame, in pixels of the picture: a rounded rectangle, anti-aliased over a pixel and a half
       vec2 px = (uv - 0.5) * uRes;
       float side = min(uRes.x, uRes.y);
@@ -299,6 +311,10 @@ const Retro = {
       col *= 0.8 + 0.2 * smoothstep(0.0, 0.012, rim);
       float sheen = smoothstep(0.006, 0.0, abs(rim - 0.003)) * (0.5 + 0.5 * dot(normalize(c + 1e-4), vec2(-0.6, 0.8)));
       col += vec3(0.04, 0.05, 0.06) * sheen;
+      if (pw < 0.999) {
+        float shown = step(abs(vU.y - 0.5), 0.5) * step(abs(vUv.x - 0.5), wide * 0.5);
+        col = col * shown * (1.0 + 1.4 * (1.0 - smoothstep(0.35, 1.0, pw))) + vec3(0.92, 0.96, 1.0) * beam * 1.6;
+      }
       gl_FragColor = vec4(col * inside, 1.0);
     }`,
 };

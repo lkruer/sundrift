@@ -1,0 +1,4 @@
+[
+ {"wait": 50}, {"js": "new Promise((r) => { const i = setInterval(() => { if (window.__READY__) { clearInterval(i); r(1); } }, 5); })"},
+ {"wait": 60}, {"shot": "p1"}, {"wait": 90}, {"shot": "p2"}, {"wait": 120}, {"shot": "p3"}, {"wait": 150}, {"shot": "p4"}, {"wait": 400}, {"shot": "p5"}
+]

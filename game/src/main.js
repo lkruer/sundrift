@@ -351,6 +351,8 @@ async function boot() {
   prog(0.99, 'title');
   // the start button must be on screen the moment __READY__ is true: the harness presses it straight away
   loadEl.style.display = 'none'; showTitle();
+  // (the set comes on: the picture opens out of a bright line, as a tube's did; at once for a player who asked for less motion)
+  powerOn(0.6);
   window.__START__ = startGame;
   $('startb').addEventListener('click', startGame);
   $('startb').addEventListener('touchend', (e) => { e.preventDefault(); startGame(); }, { passive: false });
@@ -644,6 +646,8 @@ async function setMap(m) {
     $('building').classList.remove('on');
     building = false;
   }
+  // (the other channel comes on, quicker than the set itself)
+  powerOn(0.38);
   startIfWanted();
 }
 
@@ -684,6 +688,17 @@ function resetCarToStart() {
   susp.roll = susp.rollV = susp.pitch = susp.pitchV = susp.accL = susp.accF = susp.heave = susp.heaveV = 0;
   chase.snap(car, p.y);
   placeCar(p.y, 0, 0);
+}
+
+/** The TV coming on over secs (post.js uPower): at boot, and as the channel changes to the other map. */
+let powerT = -1, powerLen = 0.6;
+function powerOn(secs) { if (!post.retro) return; if (REDUCED_MOTION) { post.retro.uniforms.uPower.value = 1; return; } powerT = 0; powerLen = secs; post.retro.uniforms.uPower.value = 0; }
+function powerFollow(dt) {
+  if (powerT < 0 || !post.retro) return;
+  powerT += dt;
+  const p = Math.min(1, powerT / powerLen);
+  post.retro.uniforms.uPower.value = p;
+  if (p >= 1) powerT = -1;
 }
 
 function showTitle() {
@@ -1043,6 +1058,7 @@ function frame(now) {
   const t0 = performance.now();
   // nothing is drawn while loading: a frame drawn mid-boot compiles its shaders synchronously, on the spot
   if (G.mode === 'loading') return;
+  powerFollow(Math.min(real, 0.05));
 
   // (the clock's own pace runs on the time on the wall, not the game's: a slow frame or a hit-stop does not lengthen
   // the night; a long gap, a debugger or a stalled tab, counts as a quarter of a second)

@@ -46,7 +46,8 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 300)));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); if (m.type() === 'log' && process.argv.includes('--log')) console.log('page:', m.text().slice(0, 300)); });
 await page.goto(URL, { waitUntil: 'load' });
-await page.waitForFunction('window.__READY__ === true', { timeout: 60000 });
+// (--noready: the script starts as soon as the page has loaded, for the loading screen itself)
+if (!process.argv.includes('--noready')) await page.waitForFunction('window.__READY__ === true', { timeout: 60000 });
 for (const s of steps) {
   if (s.wait) await sleep(s.wait);
   if (s.js) { const r = await page.evaluate(s.js); if (r !== undefined) console.log(JSON.stringify(r)); }
