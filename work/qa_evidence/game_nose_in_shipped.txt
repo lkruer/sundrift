@@ -1,0 +1,42 @@
+spots [{"s":560,"side":1,"hard":0}]
+nose  30 deg, 0 m/s, wheel away    : drives off after 0.82 s  (longest stopped 0.08 s, pinned 0 s)
+nose  30 deg, 0 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 8.9 s, pinned 0.37 s)
+nose  30 deg, 0 m/s, wheel straight: drives off after 7.78 s  (longest stopped 1.5 s, pinned 0.47 s)
+nose  30 deg, 5 m/s, wheel away    : drives off after 0.38 s  (longest stopped 0 s, pinned 0 s)
+nose  30 deg, 5 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 8.1 s, pinned 0.43 s)
+nose  30 deg, 5 m/s, wheel straight: drives off after 1 s  (longest stopped 0 s, pinned 0 s)
+nose  60 deg, 0 m/s, wheel away    : drives off after 5.18 s  (longest stopped 4.13 s, pinned 0.4 s)
+nose  60 deg, 0 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 8.9 s, pinned 0.42 s)
+nose  60 deg, 0 m/s, wheel straight: NOT FREE after 9 s  (longest stopped 8.9 s, pinned 0.42 s)
+nose  60 deg, 5 m/s, wheel away    : drives off after 5.3 s  (longest stopped 4.23 s, pinned 0.42 s)
+nose  60 deg, 5 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 8.85 s, pinned 0.42 s)
+nose  60 deg, 5 m/s, wheel straight: NOT FREE after 9 s  (longest stopped 8.87 s, pinned 0.45 s)
+nose  85 deg, 0 m/s, wheel away    : drives off after 6.62 s  (longest stopped 5.48 s, pinned 0.72 s)
+nose  85 deg, 0 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 8.9 s, pinned 0.73 s)
+nose  85 deg, 0 m/s, wheel straight: NOT FREE after 9 s  (longest stopped 8.9 s, pinned 0.73 s)
+nose  85 deg, 5 m/s, wheel away    : drives off after 6.62 s  (longest stopped 5.55 s, pinned 0.73 s)
+nose  85 deg, 5 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 8.97 s, pinned 0.75 s)
+nose  85 deg, 5 m/s, wheel straight: NOT FREE after 9 s  (longest stopped 8.97 s, pinned 0.75 s)
+nose 120 deg, 0 m/s, wheel away    : NOT FREE after 9 s  (longest stopped 8.9 s, pinned 0.53 s)
+nose 120 deg, 0 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 8.88 s, pinned 0.57 s)
+nose 120 deg, 0 m/s, wheel straight: NOT FREE after 9 s  (longest stopped 8.9 s, pinned 0.55 s)
+nose 120 deg, 5 m/s, wheel away    : NOT FREE after 9 s  (longest stopped 8.85 s, pinned 0.52 s)
+nose 120 deg, 5 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 8.88 s, pinned 0.55 s)
+nose 120 deg, 5 m/s, wheel straight: NOT FREE after 9 s  (longest stopped 8.87 s, pinned 0.53 s)
+nose 150 deg, 0 m/s, wheel away    : NOT FREE after 9 s  (longest stopped 8.87 s, pinned 0.9 s)
+nose 150 deg, 0 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 0.08 s, pinned 0.08 s)
+nose 150 deg, 0 m/s, wheel straight: NOT FREE after 9 s  (longest stopped 8.78 s, pinned 0.92 s)
+nose 150 deg, 5 m/s, wheel away    : NOT FREE after 9 s  (longest stopped 8.03 s, pinned 0.48 s)
+nose 150 deg, 5 m/s, wheel toward  : NOT FREE after 9 s  (longest stopped 0.02 s, pinned 0.38 s)
+nose 150 deg, 5 m/s, wheel straight: NOT FREE after 9 s  (longest stopped 0.1 s, pinned 0.02 s, off the road)
+slide 25 deg at 16 m/s, tail into the rail: wall contacts 0, worst impact 0 m/s, crashes 0, drifting 2.48 s of 2.5, speed 16 -> 15.8
+slide 25 deg at 22 m/s, tail into the rail: wall contacts 1, worst impact 1.8 m/s, crashes 0, drifting 2.5 s of 2.5, speed 22 -> 19.8
+slide 25 deg at 28 m/s, tail into the rail: wall contacts 1, worst impact 5.7 m/s, crashes 0, drifting 2.5 s of 2.5, speed 28 -> 22.4
+slide 35 deg at 16 m/s, tail into the rail: wall contacts 1, worst impact 7.3 m/s, crashes 0, drifting 2.5 s of 2.5, speed 16 -> 8.4
+slide 35 deg at 22 m/s, tail into the rail: wall contacts 0, worst impact 0 m/s, crashes 0, drifting 2.48 s of 2.5, speed 22 -> 20.4
+slide 35 deg at 28 m/s, tail into the rail: wall contacts 1, worst impact 17.9 m/s, crashes 1, drifting 2.48 s of 2.5, speed 28 -> 10.3
+slide 45 deg at 16 m/s, tail into the rail: wall contacts 1, worst impact 11.7 m/s, crashes 1, drifting 2.33 s of 2.5, speed 16 -> 5.4
+slide 45 deg at 22 m/s, tail into the rail: wall contacts 0, worst impact 0 m/s, crashes 0, drifting 2.5 s of 2.5, speed 22 -> 20
+slide 45 deg at 28 m/s, tail into the rail: wall contacts 1, worst impact 25.6 m/s, crashes 1, drifting 2.47 s of 2.5, speed 28 -> 1.4
+
+[exited with code 0]

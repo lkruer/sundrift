@@ -1,0 +1,4 @@
+pass hard drive      13261 pts/min over 59.7 s game time  total 13195  banks 9 switches 12 clips 13 {"open":7,"rail":6} crashes 4 jturns 0 smash hits 16 (1490 pts) countdowns 5 magnets 0 dist 1105 m  biggest 3970  fps 60
+pass hard drift      10187 pts/min over 58.9 s game time  total 10000  banks 3 switches 9 clips 10 {"open":6,"rail":4} crashes 4 jturns 0 smash hits 15 (960 pts) countdowns 7 magnets 2 dist 652 m  biggest 6524  fps 60
+pass hard drift      36740 pts/min over 60 s game time  total 36740  banks 7 switches 15 clips 14 {"open":10,"rail":4} crashes 1 jturns 0 smash hits 13 (650 pts) countdowns 7 magnets 1 dist 804 m  biggest 25119  fps 60
+pass hard drift       6865 pts/min over 60 s game time  total 6865  banks 6 switches 3 clips 10 {"open":8,"rail":2} crashes 3 jturns 0 smash hits 6 (220 pts) countdowns 9 magnets 3 dist 478 m  biggest 1893  fps 60

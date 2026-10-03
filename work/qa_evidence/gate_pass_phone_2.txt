@@ -1,0 +1,12 @@
+mode            phone 390x844 @3x, real touches
+ready           6.7 s
+covered         602 m, average 101 km/h
+drifts banked   1  at metres 390
+peak slip       37 deg   samples in drift 124 of 224
+score           136
+peak draws      429   peak tris 706,273   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+filmstrip       C:\Users\liamk\sundrift\.claude\worktrees\agent-a2e38068f6586e225\game\_gate_phone\filmstrip.png
+
+problems:
+  only 1 drift(s) banked; a drift game that cannot be drifted by its gate is untested

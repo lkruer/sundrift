@@ -1,0 +1,11 @@
+straight stretches [{"s":2240,"R":143},{"s":1420,"R":118},{"s":2500,"R":109},{"s":420,"R":90},{"s":1160,"R":89}]
+pass easy straight at 2240 (R>143) wiggle +-3 deg: 105 pts/s over 14 s, 6 switches, strays 11.5 m (asphalt half 5.4, edge 7.3), 7.2 s off the road, 1 crashes, ends 94 km/h
+pass easy straight at 2240 (R>143) wiggle +-6 deg: 87 pts/s over 14 s, 5 switches, strays 10.3 m (asphalt half 5.4, edge 7.3), 7.2 s off the road, 2 crashes, ends 85 km/h
+pass easy straight at 1420 (R>118) wiggle +-3 deg: 275 pts/s over 10.9 s, 7 switches, strays 14.9 m (asphalt half 5.4, edge 7.3), 4.1 s off the road, 1 crashes, ends 88 km/h
+pass easy straight at 1420 (R>118) wiggle +-6 deg: 1 pts/s over 14 s, 3 switches, strays 11.8 m (asphalt half 5.4, edge 7.3), 0.8 s off the road, 2 crashes, ends 20 km/h
+pass easy straight at 2500 (R>109) wiggle +-3 deg: 1 pts/s over 14 s, 4 switches, strays 9.3 m (asphalt half 5.4, edge 7.3), 7.2 s off the road, 1 crashes, ends 31 km/h
+pass easy straight at 2500 (R>109) wiggle +-6 deg: 665 pts/s over 6.8 s, 3 switches, strays 5.9 m (asphalt half 5.4, edge 7.3), 0 s off the road, 0 crashes, ends 132 km/h
+pass easy straight at 420 (R>90) wiggle +-3 deg: 243 pts/s over 12.2 s, 5 switches, strays 25.6 m (asphalt half 5.4, edge 7.3), 1.5 s off the road, 2 crashes, ends 93 km/h
+pass easy straight at 420 (R>90) wiggle +-6 deg: 32 pts/s over 7.5 s, 4 switches, strays 19.2 m (asphalt half 5.4, edge 7.3), 1.2 s off the road, 1 crashes, ends 123 km/h
+pass easy straight at 1160 (R>89) wiggle +-3 deg: 198 pts/s over 7.2 s, 4 switches, strays 6.7 m (asphalt half 5.4, edge 7.3), 0 s off the road, 1 crashes, ends 120 km/h
+pass easy straight at 1160 (R>89) wiggle +-6 deg: 533 pts/s over 8 s, 5 switches, strays 14.4 m (asphalt half 5.4, edge 7.3), 0.5 s off the road, 1 crashes, ends 92 km/h

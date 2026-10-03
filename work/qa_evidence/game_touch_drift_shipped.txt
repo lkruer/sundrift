@@ -1,0 +1,5 @@
+avenue at {"s":1600,"R":100000}
+finger 35 px into the turn (wheel 0.34): slide settles at 8.0 deg (runs 8.2, 7.8, 7.9; peaks 14/14/14; wall contacts 0)
+finger 45 px into the turn (wheel 0.5): slide settles at 17.1 deg (runs 17.4, 17.2, 16.8; peaks 22/22/21; wall contacts 0)
+finger 55 px into the turn (wheel 0.68): slide settles at 27.2 deg (runs 27, 27.6, 27.1; peaks 30/31/30; wall contacts 0)
+finger 70 px into the turn (wheel 1): slide settles at 40.6 deg (runs 40.5, 40.9, 40.5; peaks 44/45/44; wall contacts 0)

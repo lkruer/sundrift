@@ -1,0 +1,4 @@
+city hard drive      11955 pts/min over 57.6 s game time  total 11477  banks 2 switches 22 clips 24 {"kerb":24} crashes 10 jturns 0 smash hits 65 (7240 pts) countdowns 14 magnets 0 dist 721 m  biggest 2333  fps 60
+city hard drift      19562 pts/min over 58.8 s game time  total 19171  banks 11 switches 7 clips 13 {"kerb":13} crashes 1 jturns 0 smash hits 28 (3990 pts) countdowns 8 magnets 0 dist 733 m  biggest 7077  fps 60
+city hard drift      23691 pts/min over 58.7 s game time  total 23178  banks 8 switches 9 clips 13 {"kerb":13} crashes 0 jturns 0 smash hits 10 (1160 pts) countdowns 8 magnets 0 dist 775 m  biggest 8438  fps 60
+city hard drift       8730 pts/min over 59.4 s game time  total 8643  banks 9 switches 9 clips 13 {"kerb":13} crashes 1 jturns 0 smash hits 19 (1480 pts) countdowns 8 magnets 0 dist 699 m  biggest 2296  fps 60

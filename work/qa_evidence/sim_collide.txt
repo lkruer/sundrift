@@ -1,0 +1,69 @@
+-- 1. a solid trunk dead ahead (or 0.5 m off the car's line), the car at speed, gas held
+   v m/s  r     off  20 fps                30 fps                60 fps                144 fps               
+     15  0.28  0.0  stopped, hit 24.1     stopped, hit 24.2     stopped, hit 24.1     stopped, hit 24.1     
+     30  0.28  0.0  stopped, hit 34.1     stopped, hit 34.1     stopped, hit 34.1     stopped, hit 34.1     
+     45  0.28  0.0  stopped, hit 46.3     stopped, hit 46.3     stopped, hit 46.3     stopped, hit 46.3     
+     60  0.28  0.0  stopped, hit 59.3     stopped, hit 59.3     stopped, hit 59.3     stopped, hit 59.3     
+     75  0.28  0.0  stopped, hit 73.2     stopped, hit 73.2     stopped, hit 73.3     stopped, hit 73.3     
+     15  0.28  0.5  stopped, hit 12.1     stopped, hit 14.5     stopped, hit 14.5     stopped, hit 20.0     
+     30  0.28  0.5  stopped, hit 20.2     stopped, hit 20.2     stopped, hit 20.2     stopped, hit 28.3     
+     45  0.28  0.5  stopped, hit 24.6     stopped, hit 27.3     stopped, hit 27.3     stopped, hit 30.2     
+     60  0.28  0.5  stopped, hit 20.8     THROUGH (hit 20.8)    stopped, hit 40.0     stopped, hit 48.3     
+     75  0.28  0.5  stopped, hit 42.8     stopped, hit 42.8     stopped, hit 42.8     stopped, hit 49.3     
+     15  0.28  0.9  THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     
+     30  0.28  0.9  THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     
+     45  0.28  0.9  THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     
+     60  0.28  0.9  THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     
+     75  0.28  0.9  THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     THROUGH (hit 0.0)     
+     15  0.42  0.0  stopped, hit 24.1     stopped, hit 24.2     stopped, hit 24.1     stopped, hit 24.0     
+     30  0.42  0.0  stopped, hit 34.1     stopped, hit 34.1     stopped, hit 34.1     stopped, hit 34.1     
+     45  0.42  0.0  stopped, hit 46.3     stopped, hit 46.3     stopped, hit 46.3     stopped, hit 46.3     
+     60  0.42  0.0  stopped, hit 59.3     stopped, hit 59.3     stopped, hit 59.3     stopped, hit 59.3     
+     75  0.42  0.0  stopped, hit 73.2     stopped, hit 73.2     stopped, hit 73.3     stopped, hit 73.3     
+     15  0.42  0.5  stopped, hit 20.3     stopped, hit 14.5     stopped, hit 20.3     stopped, hit 20.0     
+     30  0.42  0.5  stopped, hit 20.2     stopped, hit 20.2     stopped, hit 20.2     stopped, hit 28.3     
+     45  0.42  0.5  stopped, hit 24.6     stopped, hit 27.3     stopped, hit 27.3     stopped, hit 38.5     
+     60  0.42  0.5  stopped, hit 51.9     stopped, hit 51.9     stopped, hit 40.0     stopped, hit 48.3     
+     75  0.42  0.5  stopped, hit 42.8     stopped, hit 42.8     stopped, hit 63.4     stopped, hit 49.3     
+     15  0.42  0.9  THROUGH (hit 7.4)     stopped, hit 9.3      stopped, hit 9.3      stopped, hit 10.1     
+     30  0.42  0.9  stopped, hit 12.9     stopped, hit 12.9     stopped, hit 12.9     stopped, hit 16.8     
+     45  0.42  0.9  stopped, hit 15.2     stopped, hit 17.4     stopped, hit 17.4     stopped, hit 20.0     
+     60  0.42  0.9  THROUGH (hit 12.1)    THROUGH (hit 12.1)    stopped, hit 26.8     THROUGH (hit 18.3)    
+     75  0.42  0.9  stopped, hit 27.2     stopped, hit 27.2     stopped, hit 27.2     stopped, hit 33.0     
+     15  0.85  0.0  stopped, hit 24.1     stopped, hit 24.0     stopped, hit 24.0     stopped, hit 23.9     
+     30  0.85  0.0  stopped, hit 34.1     stopped, hit 34.1     stopped, hit 34.1     stopped, hit 34.0     
+     45  0.85  0.0  stopped, hit 46.3     stopped, hit 46.3     stopped, hit 46.2     stopped, hit 46.2     
+     60  0.85  0.0  stopped, hit 59.3     stopped, hit 59.3     stopped, hit 59.3     stopped, hit 59.3     
+     75  0.85  0.0  stopped, hit 73.2     stopped, hit 73.2     stopped, hit 73.3     stopped, hit 73.3     
+     15  0.85  0.5  stopped, hit 20.3     stopped, hit 22.1     stopped, hit 22.1     stopped, hit 22.2     
+     30  0.85  0.5  stopped, hit 31.0     stopped, hit 31.0     stopped, hit 30.0     stopped, hit 31.5     
+     45  0.85  0.5  stopped, hit 41.7     stopped, hit 42.0     stopped, hit 42.3     stopped, hit 41.9     
+     60  0.85  0.5  stopped, hit 51.9     stopped, hit 51.9     stopped, hit 54.6     stopped, hit 54.1     
+     75  0.85  0.5  stopped, hit 66.4     stopped, hit 66.4     stopped, hit 63.4     stopped, hit 65.1     
+     15  0.85  0.9  stopped, hit 15.7     stopped, hit 18.7     stopped, hit 15.7     stopped, hit 18.5     
+     30  0.85  0.9  stopped, hit 26.3     stopped, hit 26.3     stopped, hit 24.5     stopped, hit 25.1     
+     45  0.85  0.9  stopped, hit 34.9     stopped, hit 35.6     stopped, hit 36.3     stopped, hit 35.4     
+     60  0.85  0.9  stopped, hit 42.1     stopped, hit 42.1     stopped, hit 26.8     stopped, hit 46.2     
+     75  0.85  0.9  stopped, hit 56.2     stopped, hit 56.2     stopped, hit 50.7     stopped, hit 53.6     
+   25 of 180 runs went through the trunk
+
+-- 2. a rail met at an angle (gas held, the wheel straight): speed kept, heading after, impact, contact frames
+   v m/s ang  20 fps                              30 fps                              60 fps                              144 fps                             
+     15    5  v 30.4 hd -1 imp 2.3 in 0.08        v 30.4 hd -1 imp 2.3 in 0.04        v 30.4 hd -1 imp 2.3 in 0.04        v 30.4 hd -1 imp 2.3 in 0.00        
+     15   15  v 29.1 hd -2 imp 5.1 in 0.05        v 29.1 hd -2 imp 5.1 in 0.05        v 29.1 hd -2 imp 5.1 in 0.05        v 29.1 hd -2 imp 5.0 in 0.02        
+     15   30  v 26.2 hd -2 imp 8.8 in 0.43        v 26.3 hd -2 imp 8.7 in 0.14        v 26.3 hd -2 imp 8.7 in 0.14        v 26.3 hd -2 imp 8.7 in 0.03        
+     15   60  v 0.1 hd 69 imp 14.1 in 0.13        v 0.1 hd 69 imp 14.1 in 0.13        v 0.0 hd 69 imp 14.1 in 0.13        v 0.0 hd 69 imp 14.1 in 0.05        
+     30    5  v 39.3 hd -1 imp 3.1 in 0.14        v 39.3 hd -1 imp 3.1 in 0.04        v 39.3 hd -1 imp 3.1 in 0.04        v 39.3 hd -1 imp 3.1 in 0.02        
+     30   15  v 36.6 hd -4 imp 8.3 in 0.12        v 36.6 hd -4 imp 8.3 in 0.12        v 36.5 hd -4 imp 8.3 in 0.12        v 36.5 hd -4 imp 8.2 in 0.03        
+     30   30  v 32.3 hd -5 imp 15.5 in 0.22       v 32.3 hd -5 imp 15.5 in 0.22       v 32.3 hd -5 imp 15.5 in 0.22       v 32.3 hd -5 imp 15.5 in 0.02       
+     30   60  v 0.1 hd 82 imp 26.4 in 0.06        v 0.0 hd 82 imp 26.4 in 0.13        v 0.0 hd 82 imp 26.4 in 0.06        v 0.0 hd 82 imp 26.4 in 0.15        
+     45    5  v 46.7 hd -1 imp 4.1 in 0.11        v 46.6 hd -1 imp 4.1 in 0.04        v 46.6 hd -1 imp 4.1 in 0.04        v 46.6 hd -1 imp 4.1 in 0.01        
+     45   15  v 42.2 hd -5 imp 11.8 in 0.43       v 42.3 hd -5 imp 11.8 in 0.12       v 42.3 hd -5 imp 11.8 in 0.05       v 42.2 hd -5 imp 11.8 in 0.01       
+     45   30  v 36.4 hd -9 imp 22.7 in 0.55       v 36.4 hd -9 imp 22.6 in 0.18       v 36.4 hd -8 imp 22.6 in 0.18       v 36.4 hd -8 imp 22.6 in 0.14       
+     45   60  v 0.1 hd 100 imp 39.2 in 1.32       v 0.0 hd 98 imp 39.1 in 0.17        v 0.0 hd 98 imp 39.1 in 0.08        v 0.0 hd 98 imp 39.1 in 0.13        
+
+-- 3. a drift that swings its tail into the rail (flick right at 80 km/h with the rail on the left), held 3 s
+    20 fps: v 20.1 (min 20.1), heading -113, impact 0.0, 0.00 s on the rail, deepest 0.00 m
+    30 fps: v 20.0 (min 20.0), heading -113, impact 0.0, 0.00 s on the rail, deepest 0.00 m
+    60 fps: v 19.9 (min 19.9), heading -114, impact 0.0, 0.00 s on the rail, deepest 0.00 m
+   144 fps: v 19.8 (min 19.8), heading -114, impact 0.0, 0.00 s on the rail, deepest 0.00 m

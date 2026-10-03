@@ -1,0 +1,28 @@
+-- high speed
+flick at 144 km/h, key held, gas                             max slip   39  max yaw 1.64  no spin  turned   103  ends 125 km/h vF 27.4 heading 103  
+flick at 144 km/h, key held, gas + boost                     max slip   44  max yaw 1.65  no spin  turned   105  ends 137 km/h vF 28.1 heading 105  
+full lock at 144 km/h, no handbrake, gas + boost             max slip    7  max yaw 0.52  no spin  turned    54  ends 205 km/h vF 56.6 heading 54  
+switch L-R-L at 144 km/h, boost                              max slip   44  max yaw 1.72  no spin  turned    59  ends 177 km/h vF 39.2 heading 59  
+touch: full lock flick back and forth at 144 km/h            max slip    5  max yaw 0.74  no spin  turned     3  ends 166 km/h vF 46.1 heading 3  
+flick at 180 km/h, key held, gas                             max slip   39  max yaw 1.65  no spin  turned    89  ends 155 km/h vF 33.9 heading 89  
+flick at 180 km/h, key held, gas + boost                     max slip   44  max yaw 1.66  no spin  turned    92  ends 170 km/h vF 34.9 heading 92  
+full lock at 180 km/h, no handbrake, gas + boost             max slip   11  max yaw 0.55  no spin  turned    50  ends 216 km/h vF 59.7 heading 50  
+switch L-R-L at 180 km/h, boost                              max slip   43  max yaw 1.75  no spin  turned    55  ends 200 km/h vF 44.2 heading 55  
+touch: full lock flick back and forth at 180 km/h            max slip    6  max yaw 0.78  no spin  turned     3  ends 181 km/h vF 50.3 heading 3  
+flick at 216 km/h, key held, gas                             max slip   40  max yaw 1.68  no spin  turned    79  ends 185 km/h vF 40.0 heading 79  
+flick at 216 km/h, key held, gas + boost                     max slip   43  max yaw 1.68  no spin  turned    84  ends 203 km/h vF 41.7 heading 84  
+full lock at 216 km/h, no handbrake, gas + boost             max slip   42  max yaw 0.91  no spin  turned    82  ends 214 km/h vF 44.1 heading 82  
+switch L-R-L at 216 km/h, boost                              max slip   43  max yaw 1.79  no spin  turned    53  ends 222 km/h vF 49.1 heading 53  
+touch: full lock flick back and forth at 216 km/h            max slip    7  max yaw 0.77  no spin  turned     3  ends 195 km/h vF 54.0 heading 3  
+-- spins, and getting going again
+handbrake + full lock 1.5 s at 100, let go 1 s, then gas     max slip   51  max yaw 1.76  no spin  turned    44  ends 131 km/h vF 36.4 heading 44  (drives off: yes)
+the same spin, then S held (brake/reverse)                   max slip   51  max yaw 1.76  no spin  turned    54  ends 44 km/h vF -12.2 heading 54  
+the same spin, then gas + the wheel the other way            max slip   60  max yaw 1.99  no spin  turned   -97  ends 92 km/h vF 20.0 heading -97  (drives off: yes)
+rolling backwards at 65 km/h, gas held                       max slip    0  max yaw 0.00  no spin  turned     0  ends 69 km/h vF 19.1 heading 0  (drives off: yes)
+rolling backwards at 65 km/h, gas + full lock                max slip   83  max yaw 2.60  no spin  turned   181  ends 21 km/h vF 5.3 heading -179  (drives off: yes)
+sliding sideways at 50 km/h, spinning, gas held              max slip   87  max yaw 3.33  no spin  turned    90  ends 135 km/h vF 37.5 heading 90  (drives off: yes)
+-- landings: off a crest at speed, in the air 0.6 s, coming down turned
+take-off with yaw 0 rad/s, slip 0, key in after landing      max slip    7  max yaw 0.61  no spin  turned    29  ends 146 km/h vF 40.4 heading 29  
+take-off with yaw 1.5 rad/s, slip 0, key in after landing    max slip   38  max yaw 1.49  no spin  turned    97  ends 128 km/h vF 35.4 heading 97  
+take-off with yaw -2.5 rad/s, slip 17, key in after landing  max slip   35  max yaw 2.48  no spin  turned   -19  ends 130 km/h vF 36.2 heading -19  
+take-off with yaw 3 rad/s, slip -29, key in after landing    max slip   41  max yaw 2.98  no spin  turned   116  ends 122 km/h vF 33.9 heading 116  

@@ -1,0 +1,21 @@
+open edges [{"s":150,"side":1},{"s":420,"side":1},{"s":780,"side":-1},{"s":1230,"side":1},{"s":1500,"side":1},{"s":1770,"side":1},{"s":2130,"side":1},{"s":2670,"side":1},{"s":2940,"side":1},{"s":3210,"side":1}]
+s 150 left at 60 km/h: air 0.2 s, highest 0.24 m, landing 0.1 m/s, slip after landing 55 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 150 left at 100 km/h: air 0.22 s, highest 0.29 m, landing 0 m/s, slip after landing 69 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 420 left at 60 km/h: air 0.62 s, highest 1.08 m, landing 0.2 m/s, slip after landing 6 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 420 left at 100 km/h: air 0.17 s, highest 0.34 m, landing 2.2 m/s, slip after landing 0 deg; magnet: none
+s 780 right at 60 km/h: air 0.3 s, highest 0.37 m, landing 2.4 m/s, slip after landing 74 deg; magnet: set down at u -1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 780 right at 100 km/h: air 0.35 s, highest 0.56 m, landing 2.2 m/s, slip after landing 6 deg  UNDER THE GROUND BY 9.48; magnet: none
+s 1230 left at 60 km/h: air 0 s, highest 0 m, landing 0 m/s, slip after landing 0 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 1230 left at 100 km/h: air 0 s, highest 0 m, landing 0 m/s, slip after landing 0 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 1500 left at 60 km/h: air 0.4 s, highest 0.98 m, landing 0 m/s, slip after landing 47 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 1500 left at 100 km/h: air 0.48 s, highest 0.92 m, landing 0 m/s, slip after landing 9 deg; magnet: none
+s 1770 left at 60 km/h: air 0.4 s, highest 0.67 m, landing 0 m/s, slip after landing 12 deg; magnet: none
+s 1770 left at 100 km/h: air 0.63 s, highest 1.1 m, landing 0.2 m/s, slip after landing 1 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 2130 left at 60 km/h: air 0.43 s, highest 0.71 m, landing 0 m/s, slip after landing 10 deg; magnet: none
+s 2130 left at 100 km/h: air 0.13 s, highest 0.2 m, landing 0 m/s, slip after landing 1 deg; magnet: none
+s 2670 left at 60 km/h: air 0.6 s, highest 1.17 m, landing 0 m/s, slip after landing 52 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 2670 left at 100 km/h: air 0.52 s, highest 0.54 m, landing 0.8 m/s, slip after landing 2 deg; magnet: none
+s 2940 left at 60 km/h: air 0 s, highest 0 m, landing 0 m/s, slip after landing 0 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 2940 left at 100 km/h: air 0 s, highest 0 m, landing 0 m/s, slip after landing 0 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 3210 left at 60 km/h: air 0 s, highest 0 m, landing 0 m/s, slip after landing 0 deg; magnet: set down at u 1.62 (on the asphalt), heading off the road by 0 deg, 7 m/s; 3 s later 0 km/h
+s 3210 left at 100 km/h: air 0 s, highest 0 m, landing 0 m/s, slip after landing 0 deg  UNDER THE GROUND BY 10.39; magnet: none

@@ -1,0 +1,11 @@
+straight stretches [{"s":1220,"R":10000},{"s":1920,"R":10000},{"s":600,"R":212},{"s":240,"R":136},{"s":860,"R":96}]
+city easy straight at 1220 (R>10000) wiggle +-3 deg: 764 pts/s over 6.6 s, 3 switches, strays 7.2 m (asphalt half 6, edge 8.2), 0 s off the road, 0 crashes, ends 119 km/h
+city easy straight at 1220 (R>10000) wiggle +-6 deg: 426 pts/s over 6.6 s, 3 switches, strays 7.3 m (asphalt half 6, edge 8.2), 0 s off the road, 0 crashes, ends 124 km/h
+city easy straight at 1920 (R>10000) wiggle +-3 deg: 797 pts/s over 6.5 s, 3 switches, strays 7.9 m (asphalt half 6, edge 8.2), 0 s off the road, 0 crashes, ends 118 km/h
+city easy straight at 1920 (R>10000) wiggle +-6 deg: 975 pts/s over 7.5 s, 3 switches, strays 10.4 m (asphalt half 6, edge 8.2), 2.3 s off the road, 0 crashes, ends 40 km/h
+city easy straight at 600 (R>212) wiggle +-3 deg: 637 pts/s over 6.5 s, 4 switches, strays 6 m (asphalt half 6, edge 8.2), 0 s off the road, 0 crashes, ends 124 km/h
+city easy straight at 600 (R>212) wiggle +-6 deg: 14 pts/s over 6.7 s, 3 switches, strays 7.5 m (asphalt half 6, edge 8.2), 0 s off the road, 1 crashes, ends 120 km/h
+city easy straight at 240 (R>136) wiggle +-3 deg: 796 pts/s over 6.7 s, 3 switches, strays 6.7 m (asphalt half 6, edge 8.2), 0 s off the road, 0 crashes, ends 120 km/h
+city easy straight at 240 (R>136) wiggle +-6 deg: 362 pts/s over 10.1 s, 5 switches, strays 9.7 m (asphalt half 6, edge 8.2), 2.4 s off the road, 1 crashes, ends 79 km/h
+city easy straight at 860 (R>96) wiggle +-3 deg: 171 pts/s over 7.5 s, 5 switches, strays 7.6 m (asphalt half 6, edge 8.2), 0 s off the road, 2 crashes, ends 106 km/h
+city easy straight at 860 (R>96) wiggle +-6 deg: 200 pts/s over 7.3 s, 3 switches, strays 7.6 m (asphalt half 6, edge 8.2), 0 s off the road, 1 crashes, ends 92 km/h
