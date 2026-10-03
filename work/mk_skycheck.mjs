@@ -10,6 +10,9 @@ if (map === 'city') steps.push({ click: '.map[data-m=city]' }, { wait: 9000 });
 steps.push({ js: "document.getElementById('startb').click()" }, { wait: 2500 },
   { js: 'window.__DEBUG__.rainNow(0)' },
   { js: `(() => { const D = window.__DEBUG__; window.__HOUR__ = (h) => { D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9; };
+    // (away from the start: a great torii spans the road there, and from nine metres up its top beam, seen edge on and lit at
+    // a grazing angle, filled the lower half of the picture like a blazing road)
+    if (!window.__SKYAT__) { window.__SKYAT__ = true; D.G.dawnT = D.G.dawnT || 0.01; D.teleport(1100, 0); }
     window.__SKY__ = (off, el) => { const c = D.car, s = D.rig.sunDir, az = Math.atan2(s.x, -s.z) + off * Math.PI / 180;
     const p = [c.x, (D.G.carY || 0) + 9, c.z], e = el * Math.PI / 180;
     window.__CAM__ = { pos: p, look: [p[0] + Math.sin(az) * Math.cos(e) * 100, p[1] + Math.sin(e) * 100, p[2] - Math.cos(az) * Math.cos(e) * 100], fov: 62 }; }; })()` });

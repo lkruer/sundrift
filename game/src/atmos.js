@@ -199,6 +199,89 @@ class CloudBank {
   }
 }
 
+// ------------------------------------------------------------------------------------------------ birds
+
+/**
+ * Birds over the valley by day: a few flocks wheeling on slow loops a couple of hundred metres off, each bird a pair of
+ * wings that beat and glide, dark against the sky (crows heading home at golden hour, black on the gold). One draw: every
+ * bird's place is worked out in the vertex shader from its flock, its seed and the clock. Not by night, nor in the rain.
+ */
+class Birds {
+  constructor(n) {
+    this.n = n;
+    // a bird: two wings hinged on the body line, each a triangle (root front, root back, tip), 2.4 m from tip to tip
+    // (larger than life, so one reads as a bird and not a speck at two hundred metres)
+    const pos = new Float32Array(n * 6 * 3), seed = new Float32Array(n * 6 * 4);
+    const W = [[0, 0, 0.32], [0, 0, -0.18], [1.2, 0, -0.08]];
+    let v = 0;
+    for (let i = 0; i < n; i++) {
+      const sd = [rnd(), rnd(), rnd(), Math.floor(i / Math.ceil(n / 3))];
+      for (const side of [1, -1]) for (const [x, y, z] of W) {
+        pos.set([x * side, y, z], v * 3);
+        seed.set(sd, v * 4); v++;
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+    this.u = {
+      uTime: { value: 0 }, uFlock: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
+      uCol: { value: new THREE.Color(0.08, 0.08, 0.1) }, uHaze: { value: new THREE.Color() }, uCam: { value: new THREE.Vector3() }, uK: { value: 1 },
+    };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.u, side: THREE.DoubleSide, fog: false,
+      vertexShader: /* glsl */`
+        uniform float uTime, uK; uniform vec4 uFlock[3]; uniform vec3 uCam;
+        attribute vec4 aSeed; varying float vFar;
+        void main() {
+          int f = int(aSeed.w + 0.5);
+          vec4 F = f == 0 ? uFlock[0] : f == 1 ? uFlock[1] : uFlock[2];
+          // round the flock's centre on a loop of its own, each bird a little out of step and off the line
+          float sp = 0.16 + 0.05 * aSeed.x, a = uTime * sp + aSeed.y * 1.4 + float(f) * 2.1;
+          float r = F.w * (0.55 + 0.45 * aSeed.z);
+          vec3 c = F.xyz + vec3(cos(a) * r, sin(a * 0.7 + aSeed.x * 6.0) * 6.0 + (aSeed.z - 0.5) * 14.0, sin(a) * r * 0.6);
+          vec3 fwd = normalize(vec3(-sin(a) * r, 0.0, cos(a) * r * 0.6));
+          vec3 side = normalize(cross(vec3(0.0, 1.0, 0.0), fwd));
+          // the wings beat in bursts and glide between (a crow's flap, flap, glide), the tip swinging up and down
+          float beat = sin(uTime * (7.0 + 2.0 * aSeed.x) + aSeed.y * 30.0);
+          float glide = smoothstep(-0.2, 0.6, sin(uTime * 0.9 + aSeed.z * 20.0));
+          float tip = abs(position.x);
+          float lift = mix(beat * 0.55, 0.12, glide) * tip;
+          // (as the day goes the birds go one by one, home to roost, rather than all at once)
+          float here = step(aSeed.x, uK);
+          vec3 p = c + (side * position.x * 2.0 + fwd * position.z * 2.0 + vec3(0.0, lift * 2.0, 0.0)) * here;
+          vFar = clamp(length(p - uCam) / 900.0, 0.0, 1.0);
+          gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+        }`,
+      fragmentShader: /* glsl */`
+        uniform vec3 uCol, uHaze; varying float vFar;
+        void main() { gl_FragColor = vec4(mix(uCol, uHaze, vFar * 0.55), 1.0); }`,
+    });
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.frustumCulled = false; this.mesh.name = 'birds';
+    this.anchor = null;
+  }
+
+  /** The flocks are set out round the camera, out over the open air, and moved on once it has gone far from them. */
+  update(t, cam, viewYaw, groundY, k, haze, light) {
+    this.u.uTime.value = t; this.u.uCam.value.copy(cam);
+    if (!this.anchor || Math.hypot(cam.x - this.anchor[0], cam.z - this.anchor[1]) > 420) {
+      this.anchor = [cam.x, cam.z];
+      const F = this.u.uFlock.value;
+      for (let i = 0; i < 3; i++) {
+        // ahead of the camera, a little to either side, so a flock is in the picture more often than not
+        const a = viewYaw + (i - 1) * 0.7 + (rnd() - 0.5) * 0.5, d = 170 + rnd() * 160;
+        F[i].set(cam.x + Math.sin(a) * d, groundY + 70 + rnd() * 70, cam.z + Math.cos(a) * d, 18 + rnd() * 26);
+      }
+    }
+    this.u.uHaze.value.copy(haze);
+    // dark against the sky by day, near black against a gold one
+    this.u.uCol.value.setRGB(0.05 + 0.1 * light, 0.05 + 0.1 * light, 0.07 + 0.11 * light);
+    this.u.uK.value = k;
+    this.mesh.visible = k > 0.02;
+  }
+}
+
 // ------------------------------------------------------------------------------------------------ the sea of cloud
 
 /**
@@ -649,6 +732,7 @@ export class Atmosphere {
     this.noise = noiseTexture(128);
     this.clouds = new CloudDeck(this.noise);
     this.bank = new CloudBank();
+    this.birds = new Birds(phone ? 18 : 30);
     this.mist = new ValleyMist();
     this.flies = new Fireflies(phone ? 90 : 160);
     this.lights = new Searchlights(phone ? 4 : 6);
@@ -656,7 +740,7 @@ export class Atmosphere {
     this.star = new ShootingStar();
     this.bolt = new Lightning();
     this.group = new THREE.Group(); this.group.name = 'atmosphere';
-    for (const m of [this.bank.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh]) this.group.add(m);
+    for (const m of [this.bank.mesh, this.birds.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh]) this.group.add(m);
     scene.add(this.group);
     this.t = 0; this.city = false;
     this.mistY = null; this.deckY = null;
@@ -673,7 +757,7 @@ export class Atmosphere {
 
   /** Everything drawn once (for the warm-up frame that compiles the shaders), then back as it was. */
   warm(on, cam) {
-    const all = [this.bank.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh];
+    const all = [this.bank.mesh, this.birds.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh];
     if (on) { this._vis = all.map((m) => m.visible); all.forEach((m) => { m.visible = true; }); this.star.mesh.position.copy(cam); }
     else if (this._vis) { all.forEach((m, i) => { m.visible = this._vis[i]; }); }
   }
@@ -774,6 +858,12 @@ export class Atmosphere {
       const kI = (0.35 + 0.65 * night) * (1 - 0.3 * rain);
       this.koi.mesh.visible = kI > 0.02;
       if (this.koi.mesh.visible && s.ahead) this.koi.update(dt, t, s.ahead, kI * 0.9);
+    }
+    // ---- birds by day (crows over the city at dawn and at dusk, on the pass all day)
+    {
+      const day = 1 - smoothstep(0.35, 0.7, night), cityK = city ? smoothstep(0.1, 0.35, night) * (1 - smoothstep(0.55, 0.8, night)) + 0.25 * day : day;
+      const k = (city ? cityK : day) * (1 - smoothstep(0.15, 0.4, rain)) * (1 - (s.tunnel || 0));
+      this.birds.update(t, cam, s.viewYaw || 0, s.groundY, k, s.hazeLin || s.haze, 1 - night);
     }
     // ---- a shooting star on a clear night
     this.star.update(dt, cam, s.viewYaw, night > 0.8 && rain < 0.15 && !(s.tunnel > 0.5));
