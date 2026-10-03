@@ -351,7 +351,8 @@ const STOPS = ['horizon', 'low', 'mid', 'high', 'zenith', 'haze', 'below', 'sunG
 function overcastAtm(atm, oc) {
   const out = { ...atm };
   const grey = (c, k, dark) => { const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return [0, 1, 2].map((i) => mix(c[i], l * 0.8, k) * (1 - dark)); };
-  for (const s of STOPS) out[s] = grey(atm[s], 0.72 * oc, s === 'sunGlow' ? 0.9 * oc : 0.3 * oc);
+  // (greyed harder than the rig's own table needed: the game's clear skies are far more saturated, see daylight.js)
+  for (const s of STOPS) out[s] = grey(atm[s], Math.min(0.95, 1.2 * oc), s === 'sunGlow' ? 0.9 * oc : 0.3 * oc);
   out.sun = grey(atm.sun, 0.6 * oc, 0);
   out.intensity = atm.intensity * (1 - 0.78 * oc);
   return out;
@@ -390,19 +391,22 @@ const ATMOS_GLSL = /* glsl */`
 vec3 atmosSky(vec3 d) {
   float y = clamp(d.y, -1.0, 1.0);
   float el = asin(y);
-  vec3 col = mix(uAtmHorizon, uAtmLow, smoothstep(0.0, 0.21, el));
-  col = mix(col, uAtmMid, smoothstep(0.17, 0.61, el));
-  col = mix(col, uAtmHigh, smoothstep(0.58, 0.96, el));
-  col = mix(col, uAtmZenith, smoothstep(0.90, 1.55, el));
-  // the haze band: thickest on the horizon, gone by about eight degrees
-  float band = pow(1.0 - clamp(el / 0.14, 0.0, 1.0), 1.7);
+  // (SUNDRIFT) the stops drawn closer to the horizon: a chase camera sees the sky from 0 to about 20 degrees, and the
+  // whole of the gradient (haze, horizon, low, mid) belongs in that band, not most of it out of the top of the frame
+  vec3 col = mix(uAtmHorizon, uAtmLow, smoothstep(0.0, 0.12, el));
+  col = mix(col, uAtmMid, smoothstep(0.08, 0.38, el));
+  col = mix(col, uAtmHigh, smoothstep(0.32, 0.82, el));
+  col = mix(col, uAtmZenith, smoothstep(0.72, 1.5, el));
+  // the haze band: thickest on the horizon, gone by about six degrees
+  float band = pow(1.0 - clamp(el / 0.105, 0.0, 1.0), 1.6);
   col = mix(col, uAtmHaze, band * 0.8);
   float sd = max(dot(d, uAtmSunDir), 0.0);
   // (SUNDRIFT) a softer, tighter glow: the old one, banded by the cel pass, read as a huge glare
   float glow = pow(sd, 8.0) * 0.12 + pow(sd, 90.0) * 0.3;
   // the glow spreads along the horizon toward the sun's bearing, not just around the disc
   float az = max(dot(normalize(vec3(d.x, 0.0, d.z) + 1e-5), normalize(vec3(uAtmSunDir.x, 0.0, uAtmSunDir.z) + 1e-5)), 0.0);
-  glow += pow(az, 3.0) * 0.10 * (1.0 - smoothstep(0.0, 0.5, el));
+  // (SUNDRIFT) wider and stronger: at dusk the sun's half of the horizon burns and the far half goes blue
+  glow += pow(az, 2.5) * 0.2 * (1.0 - smoothstep(0.0, 0.42, el));
   col += uAtmSunGlow * glow;
   // (SUNDRIFT) lightning: the whole sky and the haze in it flare for a moment
   col += uAtmFlash * (0.55 + 0.45 * smoothstep(-0.05, 0.4, y));
@@ -554,7 +558,9 @@ void main() {
   vec3 d = normalize(vDir);
   vec3 col = atmosSky(d);
   float sd = max(dot(d, uAtmSunDir), 0.0);
-  col = mix(col, uSunDisc, smoothstep(0.99925, 0.99965, sd));   // about half a degree across
+  // (SUNDRIFT) the disc grows as it sinks, the big soft sun a setting sun is painted as
+  float low = 1.0 - smoothstep(0.0, 0.3, uAtmSunDir.y);
+  col = mix(col, uSunDisc, smoothstep(mix(0.99925, 0.99842, low), mix(0.99965, 0.99905, low), sd));
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -837,9 +843,10 @@ export function createRig(THREE, renderer, scene, opts = {}) {
    * colour, the haze colour and the bloom threshold are all read off the same atmosphere row, so
    * "late afternoon" is one number and the frame that comes out is coherent.
    */
-  function applyTime(env = true) {
+  function applyTime(env = true, given = null) {
     sunPos = sunPosition(THREE, { hour: time.hour, azimuth: time.azimuth, elevation: time.elevation, sunrise: o.sunrise, sunset: o.sunset, maxElevation: o.maxElevation });
-    atm = atmosphereAt(sunPos.elevation);
+    // (SUNDRIFT) the game's own table on the clock (daylight.js) when it gives one: a dawn and a dusk are different hours
+    atm = given || atmosphereAt(sunPos.elevation);
     if (o.overcast > 0) atm = overcastAtm(atm, o.overcast);
     // (SUNDRIFT) a city's light thrown back by the air: strongest at the horizon, a little of it overhead
     if (o.glow && o.glowK > 0) {
@@ -928,7 +935,19 @@ export function createRig(THREE, renderer, scene, opts = {}) {
     // (SUNDRIFT) a light update skips this: the game eases the time of day every frame and rebuilds the
     // environment every few seconds, since a PMREM build is several milliseconds and the sky itself is uniforms
     const flash = atmosU.uAtmFlash.value.clone(); atmosU.uAtmFlash.value.setRGB(0, 0, 0);
+    // (SUNDRIFT) the environment is the sky as a LIGHT, and is built from the stops at a fraction of their saturation
+    // (o.envSat). The game paints its sky as screen colours turned back through ACES (daylight.js), and a vivid blue on
+    // the screen takes radiance far more saturated than any real sky: reflected and integrated at that, it turned every
+    // wet road and every glossy wall into blue paint.
+    const envSat = Number.isFinite(o.envSat) ? o.envSat : 1, saved = [];
+    if (env && envSat !== 1) {
+      for (const s of STOPS) {
+        const u = atmosU['uAtm' + s[0].toUpperCase() + s.slice(1)].value, l = 0.2126 * u.r + 0.7152 * u.g + 0.0722 * u.b;
+        saved.push(u.clone()); u.setRGB(mix(l, u.r, envSat), mix(l, u.g, envSat), mix(l, u.b, envSat));
+      }
+    }
     const next = env ? (opts.envMap || buildEnvironment(THREE, renderer, atmosU, groundLin)) : null;
+    if (saved.length) STOPS.forEach((s, i) => atmosU['uAtm' + s[0].toUpperCase() + s.slice(1)].value.copy(saved[i]));
     atmosU.uAtmFlash.value.copy(flash);
     if (next) {
       // (SUNDRIFT) the environment is redrawn into the same texture after its first build: never dispose that one
@@ -1191,9 +1210,9 @@ export function createRig(THREE, renderer, scene, opts = {}) {
   /** (SUNDRIFT) Lightning: how bright the flash is right now (0 none); per frame, no rebuild. */
   function setFlash(k) { atmosU.uAtmFlash.value.setRGB(0.42 * k, 0.46 * k, 0.62 * k); }
 
-  function setTime(next = {}, { env = true } = {}) {
+  function setTime(next = {}, { env = true, atm = null } = {}) {
     time = { ...time, ...next };
-    applyTime(env);
+    applyTime(env, atm);
     if (csm) {
       csm.lightDirection.copy(sunPos.direction).negate();
       csm.updateFrustums();

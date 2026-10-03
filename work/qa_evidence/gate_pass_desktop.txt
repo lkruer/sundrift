@@ -1,0 +1,16 @@
+  frame 5  413 m  87 km/h  slip 3  drift 2  score 707  draws 514  tris 895586  fps 60
+  frame 6  489 m  78 km/h  slip 6  drift 0  score 1113  draws 516  tris 898579  fps 60
+  frame 7  565 m  115 km/h  slip -3  drift 0  score 1113  draws 490  tris 979334  fps 60
+
+mode            desktop 1280x720, click and keys
+ready           6.8 s
+covered         601 m, average 72 km/h
+drifts banked   8  at metres 233, 238, 263, 300, 431, 435, 437, 487
+peak slip       79 deg   samples in drift 197 of 319
+score           1113
+peak draws      561   peak tris 998,060   median fps 60
+slow frames     3 over 34 ms, worst 383 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[6.6,110,333,0.3,125.7,95.3,337],[7,112,383,1.5,99.1,72.9,381.1],[7.1,114,100,0.5,2.5,56.6,110.8]]
+filmstrip       C:\Users\liamk\sundrift\.claude\worktrees\agent-a2e38068f6586e225\game\_gate\filmstrip.png
+
+it drifts. now LOOK at the filmstrip.

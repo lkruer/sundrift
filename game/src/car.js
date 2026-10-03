@@ -50,6 +50,11 @@ export const CAR = {
   // the key held into the turn holds it (driftInto, and deeper with the throttle: driftThrottle), a key against it
   // closes it, the handbrake throws it wide; a small correction (under driftDead of the key) holds nothing
   driftThrottle: 0.48, driftInto: 0.28, driftAgainst: 0.5, driftHand: 0.22, driftMaxAngle: 0.9, driftDead: 0.3,
+  // (a thumb asks for its angle by how far out it is on the stick. input.js bends a thumb's travel n into the wheel as
+  // touchLin n + (1 - touchLin) n^2, so that small corrections stay small, and read off that wheel the dead band above
+  // was 44% of the thumb's reach: a thumb held into the turn at half its reach had its slide closed as if it had let go.
+  // So the drift reads a touch's wheel back as the thumb's travel, and the band is 30% of the reach, as it is of a key)
+  touchLin: 0.45,
   driftK: 12, driftD: 5, driftMax: 6.5,
   handKick: 3.2,                  // rad/s^2 of yaw a handbrake pull with the wheel over adds, so the tail comes out at once
   powerOver: 0.32,                // share of the rear's grip that lets go, cornering at the limit on the throttle
@@ -58,6 +63,8 @@ export const CAR = {
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const sstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+/** A touch's wheel (0..1) back to how far out the thumb is (0..1): input.js's curve w = a n + (1 - a) n^2, inverted. */
+const thumbOf = (w, a) => (a >= 1 ? w : (-a + Math.sqrt(a * a + 4 * (1 - a) * clamp(w, 0, 1))) / (2 * (1 - a)));
 
 /** Normalised tyre curve: force / peak, from slip angle. Rises to 1 at peakSlip, droops to muSlide beyond. */
 function tyre(alpha, P) {
@@ -372,7 +379,8 @@ export class Car {
     // go (it used to unwind on its own a second and a half in, whatever the hands did), and never runs on to a spin.
     if (wDrift > 0.001) {
       const aB = Math.abs(this.beta), sgn = this.beta < 0 ? 1 : -1;     // the way the nose turns to open the slide
-      const into = clamp((inp.steer * sgn - P.driftDead) / (1 - P.driftDead), 0, 1), against = clamp(-inp.steer * sgn, 0, 1);
+      const hands = inp.touch ? Math.sign(inp.steer) * thumbOf(Math.abs(inp.steer), P.touchLin) : inp.steer;
+      const into = clamp((hands * sgn - P.driftDead) / (1 - P.driftDead), 0, 1), against = clamp(-inp.steer * sgn, 0, 1);
       // (the key's hold on the slide lets go over half a second, so a keyboard's taps keep a drift alive, and letting
       // the key go brings the car straight without a lurch)
       this._into += (into - this._into) * Math.min(1, h * (into > this._into ? 8 : 2.2));

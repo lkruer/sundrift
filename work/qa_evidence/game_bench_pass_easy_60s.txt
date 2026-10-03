@@ -1,0 +1,3 @@
+pass easy clip        4996 pts/min over 59.7 s game time  total 4971  banks 5 switches 14 clips 11 {"open":10,"rail":1} crashes 7 jturns 0 smash hits 14 (1960 pts) countdowns 8 magnets 2 dist 711 m  biggest 786  fps 60
+pass easy drift      33516 pts/min over 59.8 s game time  total 33404  banks 4 switches 17 clips 7 {"rail":2,"open":5} crashes 1 jturns 0 smash hits 8 (370 pts) countdowns 4 magnets 1 dist 1343 m  biggest 16599  fps 60
+pass easy drift        812 pts/min over 60 s game time  total 812  banks 3 switches 3 clips 3 {"open":3} crashes 2 jturns 0 smash hits 7 (260 pts) countdowns 7 magnets 3 dist 431 m  biggest 298  fps 60

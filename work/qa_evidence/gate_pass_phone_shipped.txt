@@ -1,0 +1,12 @@
+mode            phone 390x844 @3x, real touches
+ready           6.7 s
+covered         602 m, average 102 km/h
+drifts banked   2  at metres 239, 406
+peak slip       41 deg   samples in drift 128 of 222
+score           318
+peak draws      432   peak tris 701,325   median fps 60
+slow frames     1 over 34 ms, worst 583 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[4.4,42,583,0.5,0.9,26.6,593.6]]
+filmstrip       C:\Users\liamk\AppData\Local\Temp\claude\C--Users-liamk-stonkr-crypto\5d56d707-7957-40ae-a6a0-1e7c3fd29e3d\scratchpad\before\game\_gate_phone\filmstrip.png
+
+it drifts. now LOOK at the filmstrip.

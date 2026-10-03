@@ -1,0 +1,6 @@
+[
+  { "wait": 2500 },
+  { "js": "document.getElementById('startb').click()" },
+  { "wait": 10500 },
+  { "shot": "qa_coach_first_run" }
+]

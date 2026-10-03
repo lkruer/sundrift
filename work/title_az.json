@@ -1,0 +1,8 @@
+[
+ {"wait": 3000},
+ {"js": "(() => { const D = window.__DEBUG__, cam = D.scene.children.find(o => o.isPerspectiveCamera); const v = new cam.position.constructor(); const out = []; for (let i = 0; i < 1; i++) { cam.getWorldDirection(v); out.push({ viewAz: (Math.atan2(v.x, -v.z) * 180 / Math.PI + 360) % 360, yaw: D.car.yaw, h: D.track.sample(8).h, carFwd: D.car.forward() }); } return out; })()"},
+ {"wait": 4000},
+ {"js": "(() => { const D = window.__DEBUG__, cam = D.scene.children.find(o => o.isPerspectiveCamera); const v = new cam.position.constructor(); cam.getWorldDirection(v); return { viewAz: (Math.atan2(v.x, -v.z) * 180 / Math.PI + 360) % 360, yaw: D.car.yaw, h: D.track.sample(8).h }; })()"},
+ {"click": ".map[data-m=city]"}, {"wait": 9000},
+ {"js": "(() => { const D = window.__DEBUG__, cam = D.scene.children.find(o => o.isPerspectiveCamera); const v = new cam.position.constructor(); cam.getWorldDirection(v); return { city: true, viewAz: (Math.atan2(v.x, -v.z) * 180 / Math.PI + 360) % 360, yaw: D.car.yaw, h: D.track.sample(8).h }; })()"}
+]

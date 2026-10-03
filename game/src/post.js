@@ -28,6 +28,7 @@ const Cel = {
     uCamPos: { value: new THREE.Vector3() }, uCamRot: { value: new THREE.Matrix3() }, uTanFov: { value: new THREE.Vector2(1, 1) },
     uMoonDir: { value: new THREE.Vector3(0, 1, 0) }, uNoise: { value: null }, uMistT: { value: 0 },
     uPrevVP: { value: new THREE.Matrix4() }, uBlur: { value: 0 },
+    uGradeLo: { value: new THREE.Color(1, 1, 1) }, uGradeHi: { value: new THREE.Color(1, 1, 1) }, uSat: { value: 1 }, uCon: { value: 1 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: `
@@ -35,6 +36,7 @@ const Cel = {
     uniform vec3 uShaft, uShaftCol;
     uniform vec4 uMist; uniform vec3 uMistCol, uMistGlow, uMistFar, uCamPos, uMoonDir; uniform mat3 uCamRot; uniform vec2 uTanFov; uniform sampler2D uNoise; uniform float uMistT;
     uniform mat4 uPrevVP; uniform float uBlur;
+    uniform vec3 uGradeLo, uGradeHi; uniform float uSat, uCon;
     // how much cloud lies between height y and the cloud's top: a ramp over soft metres, then solid
     float mistG(float y, float top, float soft) { float d = top - y; return d <= 0.0 ? 0.0 : d < soft ? d * d / (2.0 * soft) : d - 0.5 * soft; }
     varying vec2 vUv;
@@ -150,6 +152,14 @@ const Cel = {
         float fall = 1.0 - smoothstep(0.05, 0.95, length((uShaft.xy - vUv) * vec2(uRes.x / uRes.y, 1.0)));
         col += uShaftCol * (acc / wsum) * fall * fall * uShaft.z * mix(1.0, 0.18, sky);
       }
+      // the grade of the hour (daylight.js): the shade and the light each take a colour of their own, then saturation
+      // and contrast, measured on the tone-mapped picture so they act the same on a lamp and on a shadow
+      {
+        float lg = luma(col / (col + 1.0));
+        col *= mix(uGradeLo, uGradeHi, smoothstep(0.05, 0.6, lg));
+        col = max(mix(vec3(luma(col)), col, uSat), 0.0);
+        col *= pow(max(lg, 1e-3) / 0.2, uCon - 1.0);
+      }
       // grain (the scanlines are the tube's, drawn last, over the on-screen display as well)
       float gr = (hash(gl_FragCoord.xy + fract(uTime) * 61.0) - 0.5) * uGrain;
       col += gr * (0.25 + l);
@@ -157,7 +167,7 @@ const Cel = {
       // full-screen page layers, which cost the browser a 100 ms stall the first time a drift lit them
       vec2 vq = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
       float r2 = dot(vq, vq);
-      col *= 1.0 - (0.34 + 0.32 * uVig) * smoothstep(0.16, 0.62, r2);
+      col *= 1.0 - (0.24 + 0.36 * uVig) * smoothstep(0.18, 0.66, r2);
       col = mix(col, vec3(1.0, 0.23, 0.19) * (0.25 + l), uHit * 0.55 * smoothstep(0.1, 0.55, r2));
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }`,
@@ -180,7 +190,7 @@ const Cel = {
 const Retro = {
   uniforms: {
     tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(1, 1) },
-    uCurve: { value: 0.022 }, uEdge: { value: 0.055 }, uCorner: { value: 0.03 }, uZoom: { value: 0.966 },
+    uCurve: { value: 0.010 }, uEdge: { value: 0.024 }, uCorner: { value: 0.022 }, uZoom: { value: 0.985 },
     uLevels: { value: 32 }, uMask: { value: 0.06 }, uLens: { value: 0 }, uTime: { value: 0 }, uFlow: { value: 0 },
     uScan: { value: 0.036 }, uHudScan: { value: 0.015 }, uPx: { value: 1 },
     tHud: { value: null }, uHudOn: { value: 0 }, uHudSize: { value: new THREE.Vector2(4, 4) }, uHudScale: { value: 1 },
@@ -279,7 +289,7 @@ const Retro = {
       col *= mix(mask * (1.0 + uMask * 0.6), vec3(1.0), hudA);
       // set back behind the glass: darker into the rim, and a faint cold sheen along it, brightest top left
       float rim = -d / side;                               // distance in from the edge, in the screen's shorter side
-      col *= 0.68 + 0.32 * smoothstep(0.0, 0.018, rim);
+      col *= 0.8 + 0.2 * smoothstep(0.0, 0.012, rim);
       float sheen = smoothstep(0.006, 0.0, abs(rim - 0.003)) * (0.5 + 0.5 * dot(normalize(c + 1e-4), vec2(-0.6, 0.8)));
       col += vec3(0.04, 0.05, 0.06) * sheen;
       gl_FragColor = vec4(col * inside, 1.0);

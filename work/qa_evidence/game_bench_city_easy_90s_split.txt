@@ -1,0 +1,3 @@
+city easy smash      35251 pts/min over 87.4 s game time  total 51349  banks 8 switches 46 clips 18 {"kerb":18} crashes 3 jturns 0 smash hits 40 (5360 pts) countdowns 11 magnets 1 dist 940 m  biggest 23220  fps 60
+city easy clip       22661 pts/min over 87.4 s game time  total 33009  banks 6 switches 35 clips 26 {"kerb":19,"rail":7} crashes 11 jturns 0 smash hits 62 (9370 pts) countdowns 12 magnets 0 dist 1713 m  biggest 13299  fps 60
+city easy drift      25634 pts/min over 88.5 s game time  total 37810  banks 6 switches 35 clips 13 {"kerb":11,"rail":2} crashes 3 jturns 0 smash hits 37 (5710 pts) countdowns 8 magnets 0 dist 2024 m  biggest 12112  fps 60

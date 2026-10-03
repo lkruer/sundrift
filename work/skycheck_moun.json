@@ -1,0 +1,206 @@
+[
+ {
+  "wait": 2500
+ },
+ {
+  "js": "document.getElementById('startb').click()"
+ },
+ {
+  "wait": 2500
+ },
+ {
+  "js": "window.__DEBUG__.rainNow(0)"
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__; window.__SKY__ = (h, az, el) => { D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9; const c = D.car;\n    const p = [c.x, (D.G.carY || 0) + 9, c.z], a = az * Math.PI / 180, e = el * Math.PI / 180;\n    window.__CAM__ = { pos: p, look: [p[0] + Math.sin(a) * Math.cos(e) * 100, p[1] + Math.sin(e) * 100, p[2] - Math.cos(a) * Math.cos(e) * 100], fov: 62 }; }; })()"
+ },
+ {
+  "js": "window.__SKY__(17.3, 246.44444444444443, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1718_sun"
+ },
+ {
+  "js": "window.__SKY__(17.3, 426.44444444444446, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1718_away"
+ },
+ {
+  "js": "window.__SKY__(17.3, 336.44444444444446, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1718_side"
+ },
+ {
+  "js": "window.__SKY__(17.85, 253.5061728395062, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1751_sun"
+ },
+ {
+  "js": "window.__SKY__(17.85, 433.50617283950623, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1751_away"
+ },
+ {
+  "js": "window.__SKY__(17.85, 343.50617283950623, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1751_side"
+ },
+ {
+  "js": "window.__SKY__(18.2, 258.00000000000006, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1812_sun"
+ },
+ {
+  "js": "window.__SKY__(18.2, 438.00000000000006, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1812_away"
+ },
+ {
+  "js": "window.__SKY__(18.2, 348.00000000000006, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1812_side"
+ },
+ {
+  "js": "window.__SKY__(18.62, 265.2303797468355, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1837_sun"
+ },
+ {
+  "js": "window.__SKY__(18.62, 445.2303797468355, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1837_away"
+ },
+ {
+  "js": "window.__SKY__(18.62, 355.2303797468355, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1837_side"
+ },
+ {
+  "js": "window.__SKY__(5.55, 93.39240506329111, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_0533_sun"
+ },
+ {
+  "js": "window.__SKY__(5.55, 273.3924050632911, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_0533_away"
+ },
+ {
+  "js": "window.__SKY__(5.55, 183.3924050632911, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_0533_side"
+ },
+ {
+  "js": "window.__SKY__(6.05, 102.00000000000001, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_0603_sun"
+ },
+ {
+  "js": "window.__SKY__(6.05, 282, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_0603_away"
+ },
+ {
+  "js": "window.__SKY__(6.05, 192, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_0603_side"
+ },
+ {
+  "js": "window.__SKY__(12, 178.3950617283951, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1200_sun"
+ },
+ {
+  "js": "window.__SKY__(12, 358.3950617283951, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1200_away"
+ },
+ {
+  "js": "window.__SKY__(12, 268.3950617283951, 6)"
+ },
+ {
+  "wait": 2600
+ },
+ {
+  "shot": "moun_1200_side"
+ }
+]

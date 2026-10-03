@@ -1,0 +1,1 @@
+720000 frames of bang-bang touch input over 200 runs: bit-identical in every frame

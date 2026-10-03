@@ -29,6 +29,7 @@ import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242220';
 import { Atmosphere } from './atmos.js?v=202609242220';
 import { Debris } from './debris.js?v=202609242220';
 import { makePost } from './post.js?v=202609242220';
+import { sunAt, lookAt } from './daylight.js?v=202609242220';
 import { platform } from './platform.js?v=202609242220';
 import { Settings } from './settings.js?v=202609242220';
 import { loadRecords, saveRun, RECORDS_V, fmt } from './records.js?v=202609242220';
@@ -69,6 +70,8 @@ const G = {
 window.__GAME__ = { pos: [0, 0], fps: 0, speed: 0, score: 0, over: false, draws: 0, tris: 0 };
 
 // ---------------------------------------------------------------- renderer
+// the haze's density at its plainest; the hour's look (daylight.js) thins it by day and thickens it at dawn and dusk
+const AER_DENSITY = 0.00095;
 const tier = (() => {
   try { if (new URLSearchParams(location.search).has('q')) return detectTier(); } catch {}
   return settings.v.gfx === 'performance' ? 'phone' : settings.v.gfx === 'quality' ? 'high' : detectTier();
@@ -88,7 +91,7 @@ scene.matrixAutoUpdate = false;
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.3, 4500);
 scene.add(camera);
 // the camera goes in at creation, so the rig builds its shadow cascades as soon as they load, before any shader compiles
-const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 60, fogDensity: 0.00095, exposure: 1.05, post: false, camera });
+const rig = createRig(THREE, renderer, scene, { hour: G.hour, azimuth: 235, tier, fogStart: 60, fogDensity: AER_DENSITY, envSat: 0.4, post: false, camera });
 // The picture is drawn at the tier's pixel ratio (the rig's: 1 on a phone, 1.5 on a desktop), the costly part; the
 // tube's last pass, which lays in the HUD and the menus, runs at the screen's own (up to 2x, within 5.5 million
 // pixels), so their type is as sharp as the screen can show it and not a 1x picture enlarged 3x by a phone
@@ -194,7 +197,8 @@ function buildNight() {
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xdfe8ff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
-  stars.frustumCulled = false; stars.renderOrder = -1;
+  // (drawn before the cumulus on the horizon, which hide them)
+  stars.frustumCulled = false; stars.renderOrder = -700;
   scene.add(stars); night.stars = stars;
   const disc = new THREE.Group();
   const dm = new THREE.Mesh(new THREE.CircleGeometry(38, 24), new THREE.MeshBasicMaterial({ color: 0xfff4dc, transparent: true, opacity: 0, fog: false, depthWrite: false }));
@@ -229,7 +233,6 @@ function buildNight() {
   scene.add(glow); night.glow = glow;
   night.fuji = buildFuji();
   scene.add(night.fuji);
-  night.hemiDay = rig.hemi ? rig.hemi.intensity : 1;
   for (let i = 0; i < (tier === 'phone' ? 3 : 5); i++) {
     const pl = new THREE.PointLight(0xffa040, 0, 26, 2.0);
     scene.add(pl); lampLights.push(pl);
@@ -1144,7 +1147,8 @@ function idle(dt, t0 = performance.now()) {
     camera.position.x -= rx * k; camera.position.z -= rz * k;
   }
   if (night.hero) {
-    night.hero.intensity = 150;
+    // (a showroom key for the dark: by day the sun lights the car, and the two together blew its paint out white)
+    night.hero.intensity = 150 * lerp(0.12, 1, G.night ?? 1);
     night.hero.position.set(car.x - Math.sin(car.yaw + 0.6) * 6, y + 6, car.z - Math.cos(car.yaw + 0.6) * 6);
     night.hero.target.position.set(car.x, y + 0.6, car.z); night.hero.target.updateMatrixWorld();
   }
@@ -1397,18 +1401,20 @@ function nightFollow() {
  * map (a PMREM build, milliseconds) waits, and is rebuilt every two and a half seconds while the sky changes.
  */
 let sunTimer = 0, envTimer = 0;
+const _ridgeShade = new THREE.Color();
+// (all night, from the end of the blue hour to first light, the sky and the light hold still: see daylight.js)
+const deepNight = (h) => h >= 20.1 || (h >= 0 && h < 4.45);
 function applySun(dt, force = false) {
   let d = G.hour - G.hourShown;
   if (d > 12) d -= 24; else if (d < -12) d += 24;
   const move = force ? d : Math.sign(d) * Math.min(Math.abs(d), (0.02 + Math.abs(d) * 1.6) * dt);
   let shown = G.hourShown + move;
   if (shown >= 24) shown -= 24; else if (shown < 0) shown += 24;
-  const elOf = (h) => Math.max(-12, 62 * Math.sin(Math.PI * (h - 6) / 12));
   sunTimer += dt; envTimer += dt;
   if (!force && G.sunApplied) {
     // (deep in the night the sky stops changing with the hour, but never with the rain or the map: it used to
     // stay starry and clear through a whole storm)
-    const hourStill = Math.abs(shown - G.lastApplied) < 0.0025 || (elOf(shown) <= -12 && elOf(G.lastApplied) <= -12);
+    const hourStill = Math.abs(shown - G.lastApplied) < 0.0025 || (deepNight(shown) && deepNight(G.lastApplied));
     const rainStill = Math.abs(W.rain - (G.lastRain ?? 0)) < 0.01 && G.lastMap === G.map;
     if (hourStill && rainStill) { G.hourShown = shown; return; }
   }
@@ -1416,12 +1422,18 @@ function applySun(dt, force = false) {
   const full = force || envTimer > 2.5;
   if (full) envTimer = 0;
   G.lastApplied = shown; G.sunApplied = true; G.lastRain = W.rain; G.lastMap = G.map;
+  // the hour's look: the sun's place, the sky, the light, the haze, the clouds and the grade (daylight.js)
+  // (the sun sets a hundred degrees round to the right of the start line's heading: behind the title's camera, so the
+  // evening light falls on the car instead of flaring straight into the lens, and across the road as a run begins)
+  const h0 = track ? track.sample(START_S).h : 0;
+  const sun = sunAt(shown, (Math.atan2(Math.sin(h0), -Math.cos(h0)) * 180 / Math.PI + 100 + 720) % 360), look = lookAt(shown);
+  G.look = look;
+  const nightAmt = look.night;
   rig.setOvercast(W.rain * 0.9);
   // the city's own light, thrown back by the haze and the cloud: magenta and sodium over the skyline at night
-  rig.setGlow(G.map === 'city' ? CITY_GLOW : null, smoothstep(4, -3, elOf(shown)) * (0.75 + 0.3 * W.rain));
-  const t = rig.setTime({ hour: shown }, { env: full });
-  const el = t.elevation;
-  const nightAmt = smoothstep(4, -3, el);
+  rig.setGlow(G.map === 'city' ? CITY_GLOW : null, nightAmt * (0.75 + 0.3 * W.rain));
+  rig.setTime({ hour: shown, elevation: sun.el, azimuth: sun.az }, { env: full, atm: look.atm });
+  rig.atmos.uAerDensity.value = AER_DENSITY * look.aer * (1 + 0.5 * W.rain);
   G.night = nightAmt; night.amt = nightAmt;
   for (const hl of headlights) hl.intensity = 2.6 * nightAmt;
   if (night.moon) {
@@ -1433,15 +1445,23 @@ function applySun(dt, force = false) {
   }
   // (the night sky's pieces are not drawn at all while they are drawn at nothing, all day long: the horizon glow was two
   // draws a frame, each making three work its program out again, and the stars and the moon three more)
-  if (night.glow) { night.glow.material.opacity = 0.42 * smoothstep(-0.5, -5, el); night.glow.visible = night.glow.material.opacity > 0; }
+  // (the warm glow on the night's horizon takes over from the blue hour's own afterglow as it fades)
+  const deep = smoothstep(0.6, 0.97, nightAmt);
+  if (night.glow) { night.glow.material.opacity = 0.42 * deep; night.glow.visible = night.glow.material.opacity > 0; }
   if (night.tailGlow) night.tailGlow.intensity = 0.9 * nightAmt;
-  if (rig.hemi && night.hemiDay) { G.hemiNow = night.hemiDay * (1 - 0.66 * nightAmt); rig.hemi.intensity = G.hemiNow + (G.flash || 0) * 1.8; }
+  if (rig.hemi) {
+    G.hemiNow = look.fill; rig.hemi.intensity = G.hemiNow + (G.flash || 0) * 1.8;
+    // the shade's own colour (the sky's stops are far too saturated to light with), greyer under cloud
+    const f = look.fillCol, gr = W.rain * 0.6;
+    rig.hemi.color.setRGB(lerp(f[0], 1, gr), lerp(f[1], 1, gr), lerp(f[2], 1, gr));
+    rig.hemi.groundColor.setRGB(lerp(f[0], 1, 0.4) * 0.62, lerp(f[1], 1, 0.4) * 0.62, lerp(f[2], 1, 0.4) * 0.62);
+  }
   // cloud takes the stars and most of the moon
   const clear = 1 - W.rain;
-  if (night.stars) { night.stars.material.opacity = 0.9 * smoothstep(-1, -6, el) * clear * clear * (night.starK ?? 1); night.stars.visible = night.stars.material.opacity > 0; }
+  if (night.stars) { night.stars.material.opacity = 0.9 * look.stars * clear * clear * (night.starK ?? 1); night.stars.visible = night.stars.material.opacity > 0; }
   if (night.disc) {
     const { dm, halo } = night.disc.userData;
-    dm.material.opacity = smoothstep(-1, -5, el) * (1 - 0.85 * W.rain); halo.material.opacity = 0.35 * smoothstep(-1, -5, el) * (1 - 0.6 * W.rain);
+    dm.material.opacity = deep * (1 - 0.85 * W.rain); halo.material.opacity = 0.35 * deep * (1 - 0.6 * W.rain);
     dm.visible = dm.material.opacity > 0; halo.visible = halo.material.opacity > 0;
   }
   if (night.fuji) { night.fuji.material.transparent = true; night.fuji.material.opacity = 1 - 0.85 * W.rain; }
@@ -1449,7 +1469,18 @@ function applySun(dt, force = false) {
   if (night.fuji) night.fuji.material.color.setRGB(lerp(2.5, 1, nightAmt), lerp(2.45, 1, nightAmt), lerp(2.2, 1, nightAmt));
   world.setNight(nightAmt);
   sunColor.copy(rig.sun.color).lerp(new THREE.Color(0.55, 0.65, 0.95), nightAmt);
-  if (rig.fog) world.skylineTint(rig.fog.color, nightAmt);
+  if (rig.fog) world.skylineTint(rig.fog.color, nightAmt, _ridgeShade.setRGB(look.fillCol[0], look.fillCol[1], look.fillCol[2]).multiplyScalar(0.3 * (1 - 0.6 * nightAmt)));
+  // the grade the cel pass lays over the frame: the hour's own, a little greyer in the rain
+  const U = post.cel.uniforms, g = look.grade, wet = W.rain * 0.6;
+  U.uGradeLo.value.setRGB(lerp(g.lo[0], 1, wet), lerp(g.lo[1], 1, wet), lerp(g.lo[2], 1.04, wet));
+  U.uGradeHi.value.setRGB(lerp(g.hi[0], 1, wet), lerp(g.hi[1], 1, wet), lerp(g.hi[2], 1, wet));
+  U.uSat.value = lerp(g.sat, 0.92, wet); U.uCon.value = lerp(g.con, 1, wet);
+  if (post.bloomPass) {
+    post.bloomPass.strength = look.bloom * (1 - 0.3 * W.rain);
+    // the glow starts above a white face square to the sun, so by day only the sun, its glints and the lamps bloom (at a
+    // fixed 1.35, set for the night's lamps, every sunlit wall and the white paint glowed: the milk filter)
+    post.bloomPass.threshold = Math.max(1.35, (rig.sun ? rig.sun.intensity : 0) * 0.3);
+  }
 }
 
 // ---------------------------------------------------------------- the air
@@ -1473,6 +1504,7 @@ function airFollow(dt) {
   _air.viewYaw = Math.atan2(_look.x, _look.z);
   _air.groundY = G.carY ?? pa.y; _air.carY = G.carY ?? pa.y;
   _air.night = G.night ?? 1; _air.rain = W.rain; _air.tunnel = G.tunnelK || 0; _air.spot = fireflySpot;
+  _air.look = G.look || null; _air.sunDir = rig.sunDir; _air.moonDir = night.dir; _air.city = G.map === 'city';
   atmos.flies.u.uScale.value = post.sceneRT.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
   const th = atmos.update(dt, _air);
   if (th && audio && G.mode === 'playing') audio.thunder && audio.thunder(th.delay, th.k);

@@ -1,0 +1,83 @@
+[
+ {
+  "wait": 2500
+ },
+ {
+  "js": "document.getElementById('startb').click()"
+ },
+ {
+  "wait": 2500
+ },
+ {
+  "js": "window.__DEBUG__.rainNow(0)"
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__; window.__HOUR__ = (h) => { D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9; };\n    window.__SKY__ = (off, el) => { const c = D.car, s = D.rig.sunDir, az = Math.atan2(s.x, -s.z) + off * Math.PI / 180;\n    const p = [c.x, (D.G.carY || 0) + 9, c.z], e = el * Math.PI / 180;\n    window.__CAM__ = { pos: p, look: [p[0] + Math.sin(az) * Math.cos(e) * 100, p[1] + Math.sin(e) * 100, p[2] - Math.cos(az) * Math.cos(e) * 100], fov: 62 }; }; })()"
+ },
+ {
+  "js": "window.__HOUR__(17.85)"
+ },
+ {
+  "wait": 700
+ },
+ {
+  "js": "window.__SKY__(0, 6)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1751_sun"
+ },
+ {
+  "js": "window.__SKY__(180, 6)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1751_away"
+ },
+ {
+  "js": "window.__SKY__(90, 6)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1751_side"
+ },
+ {
+  "js": "window.__HOUR__(18.2)"
+ },
+ {
+  "wait": 700
+ },
+ {
+  "js": "window.__SKY__(0, 6)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1812_sun"
+ },
+ {
+  "js": "window.__SKY__(180, 6)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1812_away"
+ },
+ {
+  "js": "window.__SKY__(90, 6)"
+ },
+ {
+  "wait": 2200
+ },
+ {
+  "shot": "moun_1812_side"
+ }
+]
