@@ -199,6 +199,55 @@ class CloudBank {
   }
 }
 
+// ------------------------------------------------------------------------------------------------ the milky way
+
+/**
+ * The Milky Way on a clear dark night over the pass: a soft band of light across the sky, brighter and warmer toward
+ * the galaxy's heart, torn along its middle by dark lanes of dust, faded into the haze near the horizon. A dome round
+ * the camera, one draw, the noise looked up three ways (triplanar on the direction) so the sphere has no seam; drawn
+ * before the stars and under the cumulus. The moon washes it out, the city's own light takes it, and so does cloud.
+ */
+class MilkyWay {
+  constructor(noise) {
+    this.u = { uNoise: { value: noise }, uK: { value: 0 } };
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide, fog: false,
+      vertexShader: /* glsl */`
+        varying vec3 vDir;
+        void main() { vDir = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); p.z = p.w * 0.99999; gl_Position = p; }`,
+      fragmentShader: /* glsl */`
+        uniform sampler2D uNoise; uniform float uK; varying vec3 vDir;
+        // the noise on a direction: three projections blended by the direction's own axes
+        float tri(vec3 d, float sc, vec4 w) {
+          vec3 a = abs(d); a /= a.x + a.y + a.z;
+          return dot(texture2D(uNoise, d.yz * sc), w) * a.x + dot(texture2D(uNoise, d.zx * sc + 0.31), w) * a.y + dot(texture2D(uNoise, d.xy * sc + 0.67), w) * a.z;
+        }
+        void main() {
+          vec3 d = normalize(vDir);
+          if (d.y < 0.0) discard;
+          // the galactic plane, tilted across the sky, and its heart low in the south-west
+          vec3 n = normalize(vec3(0.42, 0.5, 0.76)), core = normalize(vec3(-0.62, 0.22, 0.75));
+          float h = dot(d, n);
+          float body = tri(d, 1.6, vec4(0.45, 0.3, 0.17, 0.08));
+          float fine = tri(d, 4.8, vec4(0.2, 0.3, 0.3, 0.2));
+          float wide = exp(-pow(h / (0.13 + 0.06 * body), 2.0));
+          float heart = pow(max(dot(d, core), 0.0), 3.0);
+          float glow = wide * (0.45 + 0.75 * body) * (0.6 + 0.9 * heart) + exp(-pow(h / 0.035, 2.0)) * 0.35 * (0.5 + body);
+          // the dust: dark lanes torn along the band's middle
+          float dust = smoothstep(0.42, 0.7, fine * 0.6 + body * 0.55) * exp(-pow((h - 0.015) / 0.05, 2.0));
+          glow *= 1.0 - 0.75 * dust;
+          // a grain of faint stars inside the band
+          glow += wide * smoothstep(0.8, 0.95, fine) * 0.35;
+          vec3 col = mix(vec3(0.52, 0.62, 0.95), vec3(1.0, 0.82, 0.64), heart * 0.8);
+          float k = uK * smoothstep(0.03, 0.3, d.y);
+          gl_FragColor = vec4(col * glow * k * 0.12, 1.0);
+        }`,
+    });
+    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(2450, 40, 20), mat);
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = -701; this.mesh.name = 'milky way';
+  }
+}
+
 // ------------------------------------------------------------------------------------------------ birds
 
 /**
@@ -733,6 +782,7 @@ export class Atmosphere {
     this.clouds = new CloudDeck(this.noise);
     this.bank = new CloudBank();
     this.birds = new Birds(phone ? 18 : 30);
+    this.milky = new MilkyWay(this.noise);
     this.mist = new ValleyMist();
     this.flies = new Fireflies(phone ? 90 : 160);
     this.lights = new Searchlights(phone ? 4 : 6);
@@ -740,7 +790,7 @@ export class Atmosphere {
     this.star = new ShootingStar();
     this.bolt = new Lightning();
     this.group = new THREE.Group(); this.group.name = 'atmosphere';
-    for (const m of [this.bank.mesh, this.birds.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh]) this.group.add(m);
+    for (const m of [this.milky.mesh, this.bank.mesh, this.birds.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh]) this.group.add(m);
     scene.add(this.group);
     this.t = 0; this.city = false;
     this.mistY = null; this.deckY = null;
@@ -757,7 +807,7 @@ export class Atmosphere {
 
   /** Everything drawn once (for the warm-up frame that compiles the shaders), then back as it was. */
   warm(on, cam) {
-    const all = [this.bank.mesh, this.birds.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh];
+    const all = [this.milky.mesh, this.bank.mesh, this.birds.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh];
     if (on) { this._vis = all.map((m) => m.visible); all.forEach((m) => { m.visible = true; }); this.star.mesh.position.copy(cam); }
     else if (this._vis) { all.forEach((m, i) => { m.visible = this._vis[i]; }); }
   }
@@ -858,6 +908,12 @@ export class Atmosphere {
       const kI = (0.35 + 0.65 * night) * (1 - 0.3 * rain);
       this.koi.mesh.visible = kI > 0.02;
       if (this.koi.mesh.visible && s.ahead) this.koi.update(dt, t, s.ahead, kI * 0.9);
+    }
+    // ---- the Milky Way: a clear dark night on the pass (the moon, s.moon 0..1, washes it out a little)
+    {
+      const k = city ? 0 : smoothstep(0.8, 0.98, night) * clear * clear * (1 - (s.tunnel || 0)) * (1 - 0.35 * (s.moon ?? 1));
+      this.milky.u.uK.value = k; this.milky.mesh.visible = k > 0.01;
+      if (this.milky.mesh.visible) this.milky.mesh.position.copy(cam);
     }
     // ---- birds by day (crows over the city at dawn and at dusk, on the pass all day)
     {
