@@ -1668,7 +1668,7 @@ const _seen = new Set();
 const COLL_TREES = new Set(['sakura', 'weeping', 'maple', 'broadleaf', 'bare', 'cedar', 'bamboo']);
 const SMASH = { pole: ['BOLLARD!', 50], bollard: ['BOLLARD!', 50], shrub: ['FLATTENED!', 20], lamp: ['LIGHTS OUT!', 150], warn: ['SIGN DOWN!', 90],
   chevron: ['SIGN DOWN!', 90], mirror: ['MIRROR!', 90], vending: ['JACKPOT!', 300],
-  bag: ['TRASH!', 15], box: ['TRASH!', 10], crate: ['CRATE!', 25], crates: ['CRATES!', 40], cone: ['CONE!', 25], aboard: ['MENU BOARD!', 40], bike: ['BIKE!', 80] };
+  bag: ['TRASH!', 15], box: ['TRASH!', 10], crate: ['CRATE!', 25], crates: ['CRATES!', 40], cone: ['CONE!', 25], aboard: ['MENU BOARD!', 40], bike: ['BIKE!', 80], grail: ['RAIL!', 40] };
 
 /** Where a side of the road has its hard edge: the road's edge (a rail, a lining), further out (a street front), or none. */
 function hardLine(q, side) {
@@ -1793,7 +1793,7 @@ function smash(rec, nx, nz, px, pz) {
   // flung along the car's travel and away from where it was struck
   let dx = (sp > 0.5 ? vx / sp : -nx) * 0.85 - nx * 0.4, dz = (sp > 0.5 ? vz / sp : -nz) * 0.85 - nz * 0.4;
   const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
-  const steel = rec.name === 'lamp' || rec.name === 'chevron' || rec.name === 'warn' || rec.name === 'mirror' || rec.name === 'vending' || rec.name === 'bike';
+  const steel = rec.name === 'lamp' || rec.name === 'chevron' || rec.name === 'warn' || rec.name === 'mirror' || rec.name === 'vending' || rec.name === 'bike' || rec.name === 'grail';
   // (thrown as the model its pool draws: a mirrored chevron scores as a chevron, but flies as the mirrored one it was)
   debris.spawn(world.parts[rec.pool] || world.parts[rec.name], world.foot[rec.pool] || world.foot[rec.name] || [0.3, 0.3, 1.5], rec, { px, pz, dx, dz, speed: Math.max(2, sp), trail: steel });
   // the car feels it by the thing's weight
