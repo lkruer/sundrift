@@ -396,6 +396,60 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 3 October: the day by the clock (golden hour, blue hour, dawn, a vivid day), cumulus, a smaller tube
+
+Asked for (after third place in the jam, with a games platform in view): "lean more heavily into the time-change
+things, make daytime look better, add a golden hour, polish environments and make the whole thing visually more
+stylish and look incredible. make the tv border much smaller".
+
+- **What was wrong.** The sun rode a plain sine (sunrise 6, sunset 18, 62 degrees at noon), so it fell from the
+  horizon to full night in about twelve minutes of the clock: 18:38 already had stars, there was no blue hour and no
+  dawn, only night and day. The rig's atmosphere was keyed on the sun's height alone, so a morning was an evening run
+  backwards. 17:12, meant as golden hour, came out a flat beige: the haze band over a pale sky. By day the sky came
+  out nearly white (the old noon "low" stop is (214, 225, 236) on the screen) and the frame washed out.
+- **daylight.js.** The sun on a monotone curve through keyed hours (it never overshoots a key): 11.5 degrees at
+  17:18, down at about 18:12, -3.4 at 18:37, -7 at 19:03, flat at -12 from 20:06 to 04:27, -8.6 at 05:00, up at about
+  06:00. Its bearing sweeps east to west by day. Fourteen looks on the clock (night, first light, dawn, sunrise,
+  morning gold, morning, noon, afternoon, late afternoon, golden hour, late gold, sunset, blue hour, late blue),
+  eased between so each holds a little. Each has its sky stops, sun colour and strength, how much of the night is on
+  (lamps, headlights, the cool tint), the fill's strength and colour, the haze's density, the glow, the cel pass's
+  grade (shade tint, light tint, saturation, contrast), the cumulus colours and cover, the deck, the valley mist and
+  the stars. The sky stops are written as the colour they should come out on the screen and turned back through
+  three's own ACES (its output matrix, the RRT fit solved as a quadratic, its input matrix and the exposure): the
+  round trip is exact. The rig's own table stays for anything that does not hand it a row.
+- **Too saturated to light with.** A vivid blue on the screen takes radiance far bluer than any real sky (ACES
+  desaturates brights): noon's mid stop is about (0.02, 0.33, 2.0). The rig's fill took its colour from those stops
+  with a 1.4 chroma boost and went negative in red: the first daytime tour was cyan and violet all over. The fill's
+  colour is now each look's own (`fillCol`, blue against a gold sun, violet at sunset); the environment map is built
+  from the stops at 0.4 of their saturation (`envSat`), or every wet road in NEO TOKYO reflected blue paint; rain
+  greys the sky harder (the old factor left 40 percent of that blue).
+- **The sky in the frame.** A chase camera sees from the horizon to about 20 degrees, so the stops were drawn closer
+  to it (low by 7 degrees, mid by 21) and the haze band thinned to six; the glow toward the sun is wider and stronger
+  along the horizon, so at dusk the sun's half burns and the far half goes blue; the disc grows as it sets.
+- **Cumulus.** A ring of anime cumulus round the horizon (atmos.js CloudBank), one pass and no texture: 24 cells of
+  15 degrees, a hash each, seven puffs per cloud on a flat base, each puff lit as a ball by the sun in three flat
+  tones with a silver edge where the light is behind, the feet lost in the haze; behind the far ridges and Fuji, over
+  the stars (which now draw first). Gold at 17:51, coral at sunset, lilac at the blue hour, rose at dawn, white at
+  noon; dark by night, the city's magenta under them. The overhead deck and the valley mist follow the hour's own
+  amounts (the mist comes with the dawn as well as the night).
+- **The title.** At 17:18 the title's camera looked straight into the low sun and the car disappeared in its bloom.
+  The sun now sets a hundred degrees round from each course's start heading, behind that camera: the golden light
+  falls on the car and lies across the road as a run begins. The showroom spotlight scales with the dark, and the
+  bloom's threshold rises with the sun (by day only the sun, its glints and the lamps glow; at a fixed 1.35, set for
+  the night's lamps, the white paint and every sunlit wall bloomed).
+- **The far ridges** take a little of the shade's colour as well as the haze's, so at dusk they stand as violet
+  silhouettes against the burning horizon instead of being painted its orange.
+- **The tube** is about a fifth as wide at the edges (curve 0.022 to 0.010, edge 0.055 to 0.024, zoom 0.966 to 0.985,
+  corner 0.03 to 0.022, the rim's darkening lighter): 7 px each side at 1920 wide, was 34. The vignette is lighter.
+- **The hour by ear** (ambience.js): higurashi at dusk, bell crickets and frogs by night, the bush warbler and
+  sparrows at dawn, crows over the city at first light, all made with Web Audio on the spot; checked offline
+  (work/amb_render.mjs renders each to a WAV, work/spectro.py draws the spectrogram, which caught a warbler that was
+  never connected and a cricket trill that clicked across the whole spectrum).
+- **Tools.** work/mk_tour.mjs (a run with the autopilot, a shot at each hour; --rain), work/mk_skycheck.mjs (the car
+  stopped, the camera toward the live sun, away and to the side), work/sheet.py (contact sheets).
+- **Measured.** Desktop gate 0 slow frames, worst 17 ms, peak 761 draws; phone gate 0 slow frames, worst 17 ms,
+  peak 432 draws.
+
 ## 24 September, night: the type as sharp as the screen
 
 Asked for: "the UI and HUD are still a little blurry and look low definition. fix and submit".
