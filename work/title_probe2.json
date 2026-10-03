@@ -1,0 +1,4 @@
+[
+ {"wait": 3500},
+ {"js": "(() => { const D = window.__DEBUG__, car = D.car, near = []; D.scene.traverse((o) => { if (!o.isMesh || o.isInstancedMesh || !o.visible || !o.geometry) return; o.geometry.computeBoundingBox(); const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); const cx = Math.max(b.min.x, Math.min(car.x, b.max.x)), cz = Math.max(b.min.z, Math.min(car.z, b.max.z)); const d = Math.hypot(cx - car.x, cz - car.z); if (d < 12 && (b.max.y - b.min.y) > 2 && o.name !== 'ribbon') near.push([o.name || o.parent && o.parent.name || '?', o.material && o.material.name, Math.round(d * 10) / 10, Math.round(b.max.y - b.min.y)]); }); return near.slice(0, 30); })()"}
+]

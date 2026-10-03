@@ -1,0 +1,15 @@
+[
+ {"wait": 3000},
+ {"js": "(() => { const D = window.__DEBUG__; D.G.hour = 17.3; D.G.hourShown = 17.3; D.G.lastApplied = -9; })()"},
+ {"wait": 2500},
+ {"shot": "s1_title"},
+ {"click": "#recordsb"}, {"wait": 1500}, {"shot": "s2_records"},
+ {"js": "(() => { const b = [...document.querySelectorAll('button')].find(b => /BACK|DONE/.test(b.textContent) && b.offsetParent); if (b) b.click(); return !!b; })()"}, {"wait": 800},
+ {"click": "#settingsb"}, {"wait": 1500}, {"shot": "s3_settings"},
+ {"js": "(() => { const b = [...document.querySelectorAll('button')].find(b => /DONE|BACK/.test(b.textContent) && b.offsetParent); if (b) b.click(); return !!b; })()"}, {"wait": 800},
+ {"click": ".map[data-m=city]"}, {"wait": 9000},
+ {"js": "(() => { const D = window.__DEBUG__; D.G.hour = 17.3; D.G.hourShown = 17.3; D.G.lastApplied = -9; })()"}, {"wait": 2500},
+ {"shot": "s4_title_city"},
+ {"js": "document.getElementById('startb').click()"}, {"wait": 4000},
+ {"js": "document.getElementById('pauseb').click()"}, {"wait": 1500}, {"shot": "s5_pause"}
+]

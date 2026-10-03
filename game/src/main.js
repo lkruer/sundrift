@@ -719,6 +719,7 @@ function startGame() {
   document.body.classList.add('playing');
   if (night.hero) night.hero.intensity = 0;
   hud.warm(false); courseOut.update(null);
+  titleClear(false);
   beginRun();
   const p = track.sample(G.s || START_S);
   chase.snap(car, p.y);
@@ -1141,8 +1142,27 @@ function frame(now) {
 
 // the title: the camera circles the car slowly, low and close, the hero shot
 let orbitT = 0.6;
+/**
+ * A great torii over the road where the car waits on the title (a shrine just past the start puts one there on the pass)
+ * stood a leg in the middle of every shot of the slow orbit: hidden while the title is up, back as a run starts.
+ */
+const _titleHidden = [];
+function titleClear(on) {
+  if (!on) { for (const m of _titleHidden) m.visible = true; _titleHidden.length = 0; return; }
+  // (a course built again, the other map and back, drops the ones hidden: look again)
+  if (_titleHidden.length) { let o = _titleHidden[0]; while (o.parent) o = o.parent; if (o === scene) return; _titleHidden.length = 0; }
+  if (!world || !car) return;
+  const box = new THREE.Box3();
+  world.root.traverse((o) => {
+    if (!o.isMesh || o.name !== 'great torii' || !o.visible) return;
+    box.setFromObject(o);
+    const cx = Math.max(box.min.x, Math.min(car.x, box.max.x)), cz = Math.max(box.min.z, Math.min(car.z, box.max.z));
+    if (Math.hypot(cx - car.x, cz - car.z) < 16) { o.visible = false; _titleHidden.push(o); }
+  });
+}
 function idle(dt, t0 = performance.now()) {
   if (!car) return;
+  titleClear(true);
   const n = track.nearest(car.x, car.z, G.idx);
   const y = n.y;
   orbitT += dt * 0.14;

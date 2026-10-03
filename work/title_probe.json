@@ -1,0 +1,4 @@
+[
+ {"wait": 3500},
+ {"js": "(() => { const D = window.__DEBUG__, car = D.car, out = []; D.scene.traverse((o) => { if (o.isMesh && o.visible) { const p = new o.position.constructor(); o.getWorldPosition(p); } }); const near = []; D.scene.traverse((o) => { if (!(o.isMesh || o.isInstancedMesh) || !o.visible) return; if (o.isInstancedMesh) { const m = new (D.scene.matrixWorld.constructor)(), v = new o.position.constructor(); for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); v.setFromMatrixPosition(m); const d = Math.hypot(v.x - car.x, v.z - car.z); if (d < 16) near.push([o.name || (o.material && o.material.name) || 'im', Math.round(d * 10) / 10, Math.round(Math.atan2(v.x - car.x, v.z - car.z) * 57)]); } } else { const b = new (D.scene.position.constructor)(); o.getWorldPosition(b); } }); return { car: [car.x.toFixed(1), car.z.toFixed(1), (car.yaw * 57).toFixed(0)], near: near.slice(0, 40) }; })()"}
+]
