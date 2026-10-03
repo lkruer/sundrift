@@ -592,6 +592,70 @@ great to add that feature to be able to see the last best run stats and share th
   big drift's boost fires on its own), p1 (README: "or just push a fast corner on the throttle" starts no drift), p3,
   p5, p6 and p7.
 
+## 3 October, night: a harsh critique, less glare, detail everywhere
+
+Asked for: "add detail to everything, make everything look better, lower glare from sun, make environment more
+detailed. do a harsh self critique of EVERYTHING". The critique is work/CRITIQUE.md; what was done about it, here.
+
+- **Glare.**
+  - The cel pass rolls highlights off before the bloom sees them: over 2.0 in the brightest channel, the excess at 30%.
+  - The sun's disc is drawn at half the key and never above 5. At the key's own 13 at golden hour, the bloom spread it
+    over a quarter of the sky.
+  - The light shafts are gentler (0.05 + 0.2 under a low sun) and stay close round it. Reaching across the frame, they
+    poured a white wedge down every clear corridor toward a low sun.
+  - The cumulus: their silver edges are calmer, and their colours are capped at 1.8. Pure white turned back through
+    the curve is 14.7, which bloomed every cloud near the sun into a blob.
+  - The day's bloom is 0.16 to 0.2.
+  - The road's sky reflection has a soft ceiling. The car parks are dry asphalt (roughness 0.9) with the road's ceiling.
+  - The boost flame's light on the road is a fifth as strong by day.
+  - A dry road's direct highlights are at a third and come up to full in the wet. On dry asphalt a lamp or the
+    headlights left a pale ellipse ahead, worst in the tunnels.
+  - The street lamps and their pools follow their own curve: on through the blue hour, off by sunrise.
+  - (A long hunt for a "blazing road" toward the sun on the sky check ended at the test itself. Its camera stood nine
+    metres up at the start, where a great torii spans the road, and the torii's top beam, edge on in a grazing sun,
+    filled half the picture. mk_skycheck now stands at 1,100 m. In play nothing like it happens:
+    work/mk_sunroad.mjs and the tours show it.)
+- **The ground (the pass).** In the ground's own shader, from world position, only where the vertex colours are green:
+  - a patchwork of lush and paler grass at 57 m and 19 m
+  - drifts of straw
+  - earth in bands on the steeper slopes
+  - close by, drifts of small flowers: clover, dandelion, pink and violet vetch, a bloom in a third of the 20 cm cells
+    inside a drift, one kind to a drift
+- **The slope lattice.** A 2 x 2 block of different pockets: grass, a slumped scar, moss and a fern, flowering weeds.
+  Drain holes and their stains, grass over the beams' edges. The beams stand proud: their edges tilt the normal from
+  the texture's own height, so the sun and the ink treat them as the concrete they are.
+- **The ink** fades with distance, to 38% by 700 m. A far forest outlined in full black was a scribble across the
+  hills from any height.
+- **The pass's road.**
+  - sealed cracks, wandering and glossier, across the lanes and along the joint
+  - an oil line down each lane
+  - fresh and sun-bleached repair patches with sealed seams
+  - paint worn thin where wheels cut across it
+  - stones and creeping grass at the shoulder's outer edge
+  - a yellow centre line, weathered (no overtaking, as a Japanese pass is marked). The bright one glowed like lava
+    under the headlights.
+- **The title.** A great torii stood a leg through the middle of the hero shot: a shrine just past the start puts one
+  over the waiting car. It is hidden while the title is up and comes back as the run starts.
+- **The first-run hint** sits under the score on a desktop too, where it was across the car's tail, and steps aside
+  for the off-road countdown.
+- **The set comes on.** At boot the picture opens out of a bright line across the tube, overbright for a moment
+  (post.js uPower). It does so quicker as the channel changes to the other map, and at once for a player who asked for
+  less motion.
+- **Tyre smoke.**
+  - It is white, tinted by the light (warm at golden hour, cool by moonlight, the tail lamps' red at night). The sun's
+    own colour had made it an orange smear.
+  - It billows out of the tyre and hangs in the air behind a deep, fast slide. Size, life, spread and density grow
+    with the slide's angle and speed.
+  - The pool is 1.6 times the tier's.
+- **Fuji catches the hour.** Its snow goes rose-gold with the sun low (alpenglow, the red Fuji of the woodblock
+  prints) and lilac in the moment after it sets.
+- **Birds** over the valley by day, in one draw, every bird placed in the vertex shader.
+  - A few flocks wheel on slow loops 170 to 330 m off.
+  - Their wings beat in bursts and glide between.
+  - They are dark against the sky: near black on a gold one, the haze taking the far ones.
+  - They go home one by one as the day goes, and keep off in the rain.
+  - Over the city they are crows at dawn and dusk.
+
 ## 3 October, late: the rounds together, the hour by ear, the QA round's last items
 
 The look (below), the QA round (work/QA_REPORT.md) and the run with an end (above) were three branches; they are one
