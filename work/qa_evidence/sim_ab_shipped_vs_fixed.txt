@@ -1,0 +1,28 @@
+feel_test              identical
+steer_test             1 line(s) differ
+   before: touch drift, flick then counter-steer            wheels against the key   1% of the time (worst 9 deg)  max slip  22 deg  no spin  end 101 km/h
+   after:  touch drift, flick then counter-steer            wheels against the key   1% of the time (worst 9 deg)  max slip  22 deg  no spin  end 95 km/h
+stop_hunt              identical
+reverse_release_test   identical
+unstick_test           identical
+qa_fps_test            identical
+qa_collide_test        identical
+qa_touch_parity        7 line(s) differ
+   before:    31 px ( 44% of the reach, wheel 0.28)   settles   4 deg, holds   3 deg      5 pts/s  (  2% of the key)  ends 143 km/h
+   after:     31 px ( 44% of the reach, wheel 0.28)   settles   6 deg, holds   3 deg      8 pts/s  (  3% of the key)  ends 142 km/h
+   before:    35 px ( 50% of the reach, wheel 0.34)   settles   5 deg, holds   3 deg      7 pts/s  (  2% of the key)  ends 140 km/h
+   after:     35 px ( 50% of the reach, wheel 0.34)   settles  11 deg, holds   3 deg     17 pts/s  (  6% of the key)  ends 137 km/h
+   before:    40 px ( 57% of the reach, wheel 0.42)   settles   8 deg, holds   4 deg     12 pts/s  (  4% of the key)  ends 135 km/h
+   after:     40 px ( 57% of the reach, wheel 0.42)   settles  16 deg, holds   9 deg     76 pts/s  ( 26% of the key)  ends 124 km/h
+   before:    45 px ( 64% of the reach, wheel 0.50)   settles  14 deg, holds   5 deg     26 pts/s  (  9% of the key)  ends 129 km/h
+   after:     45 px ( 64% of the reach, wheel 0.50)   settles  20 deg, holds  17 deg    162 pts/s  ( 56% of the key)  ends 104 km/h
+   before:    50 px ( 71% of the reach, wheel 0.59)   settles  18 deg, holds  14 deg    141 pts/s  ( 49% of the key)  ends 108 km/h
+   after:     50 px ( 71% of the reach, wheel 0.59)   settles  24 deg, holds  22 deg    197 pts/s  ( 68% of the key)  ends 93 km/h
+   before:    55 px ( 79% of the reach, wheel 0.68)   settles  24 deg, holds  21 deg    188 pts/s  ( 65% of the key)  ends 94 km/h
+   after:     55 px ( 79% of the reach, wheel 0.68)   settles  28 deg, holds  27 deg    223 pts/s  ( 78% of the key)  ends 81 km/h
+power_test             identical
+jturn_test             identical
+reverse_test           identical
+wall_test              identical
+
+10 identical, 2 differ

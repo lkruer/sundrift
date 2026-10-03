@@ -1,0 +1,3 @@
+run 1: banked 6, score 0, peak slip 51, slow frames 0 (worst 17 ms), PASS
+run 2: banked 3, score 0, peak slip 40, slow frames 0 (worst 17 ms), PASS
+agent-a2e38068f6586e225/game --phone: banked 6, 3 (mean 4.5), passed 2 of 2

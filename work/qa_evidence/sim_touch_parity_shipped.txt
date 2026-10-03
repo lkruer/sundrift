@@ -1,0 +1,13 @@
+keys: A held                       settles  38 deg, holds  40 deg    287 pts/s  ends 66 km/h
+keys, touch assist (a phone with a keyboard)  holds  40 deg    287 pts/s
+thumb held still, out to the side by (settles: mean slip 0.6-1.8 s; holds: 1.5-5 s, as the car gathers speed):
+   15 px ( 21% of the reach, wheel 0.10)   settles   1 deg, holds   1 deg      0 pts/s  (  0% of the key)  ends 150 km/h
+   25 px ( 36% of the reach, wheel 0.21)   settles   4 deg, holds   2 deg      0 pts/s  (  0% of the key)  ends 146 km/h
+   31 px ( 44% of the reach, wheel 0.28)   settles   4 deg, holds   3 deg      5 pts/s  (  2% of the key)  ends 143 km/h
+   35 px ( 50% of the reach, wheel 0.34)   settles   5 deg, holds   3 deg      7 pts/s  (  2% of the key)  ends 140 km/h
+   40 px ( 57% of the reach, wheel 0.42)   settles   8 deg, holds   4 deg     12 pts/s  (  4% of the key)  ends 135 km/h
+   45 px ( 64% of the reach, wheel 0.50)   settles  14 deg, holds   5 deg     26 pts/s  (  9% of the key)  ends 129 km/h
+   50 px ( 71% of the reach, wheel 0.59)   settles  18 deg, holds  14 deg    141 pts/s  ( 49% of the key)  ends 108 km/h
+   55 px ( 79% of the reach, wheel 0.68)   settles  24 deg, holds  21 deg    188 pts/s  ( 65% of the key)  ends 94 km/h
+   60 px ( 86% of the reach, wheel 0.78)   settles  28 deg, holds  28 deg    223 pts/s  ( 78% of the key)  ends 79 km/h
+   70 px (100% of the reach, wheel 1.00)   settles  38 deg, holds  40 deg    287 pts/s  (100% of the key)  ends 66 km/h

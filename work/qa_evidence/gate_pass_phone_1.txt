@@ -1,0 +1,16 @@
+  frame 4  339 m  136 km/h  slip -29  drift 3  score 50  draws 328  tris 567458  fps 60
+  frame 5  413 m  97 km/h  slip 5  drift 1  score 50  draws 386  tris 566016  fps 60
+  frame 6  489 m  125 km/h  slip -8  drift 2  score 100  draws 418  tris 669783  fps 60
+  frame 7  564 m  114 km/h  slip 9  drift 1  score 100  draws 367  tris 695748  fps 60
+
+mode            phone 390x844 @3x, real touches
+ready           6.7 s
+covered         602 m, average 102 km/h
+drifts banked   2  at metres 239, 431
+peak slip       41 deg   samples in drift 148 of 221
+score           100
+peak draws      437   peak tris 695,748   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+filmstrip       C:\Users\liamk\sundrift\.claude\worktrees\agent-a2e38068f6586e225\game\_gate_phone\filmstrip.png
+
+it drifts. now LOOK at the filmstrip.

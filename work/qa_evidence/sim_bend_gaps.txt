@@ -1,0 +1,5 @@
+chain reach: 3.4 s, 66 m at 70 km/h, 94 m at 100 km/h
+pass EASY       6.3 bends/km, gaps median 68 m (p25 26, p75 166); a chain crosses 50% of gaps at 70 km/h, 64% at 100
+pass HARD       13.7 bends/km, gaps median 32 m (p25 20, p75 48); a chain crosses 91% of gaps at 70 km/h, 94% at 100
+NEO TOKYO EASY  6.7 bends/km, gaps median 66 m (p25 52, p75 150); a chain crosses 51% of gaps at 70 km/h, 70% at 100
+NEO TOKYO HARD  13.3 bends/km, gaps median 36 m (p25 30, p75 50); a chain crosses 83% of gaps at 70 km/h, 89% at 100

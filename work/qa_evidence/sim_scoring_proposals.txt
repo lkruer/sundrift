@@ -1,0 +1,9 @@
+move                                                shipped (switches)    P1 earned sw.    P1b no chain step    P1c flat bonus
+wiggle every 0.7 s on a straight (gas held)        136,179 (84)     86,099 (33)    118,116 (84)       63,396 (84)
+wiggle every 1.0 s, held near 100 km/h              97,719 (59)     94,678 (56)     86,529 (59)       46,929 (59)
+S-bends: a held drift each way, 1.6 s a side       127,683 (36)    127,683 (36)    118,789 (36)       94,009 (36)
+S-bends: 2.5 s a side                              113,839 (23)    113,839 (23)    108,181 (23)       91,981 (23)
+a 5 s drift, 3 s straight, repeated                 45,936 ( 0)     45,936 ( 0)     45,936 ( 0)       45,936 ( 0)
+J-turns in place (from 8 m/s back)                  11,897 ( 0) J17/17      4,397 ( 0) J2/17      4,397 ( 0) J2/17        4,397 ( 0) J2/17
+
+(P1: a side counts after 0.6 s at 20 deg or more, one switch a 1 s at most. P1b: a switch no longer steps the chain. P1c: P1b and a flat 120 a switch. P2 (all three): a J-turn pays again after 250 m)

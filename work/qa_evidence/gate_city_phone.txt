@@ -1,0 +1,12 @@
+
+mode            phone 390x844 @3x, real touches
+ready           6.7 s
+covered         601 m, average 68 km/h
+drifts banked   15  at metres 131, 132, 180, 231, 238, 239, 242, 242, 243, 298, 511, 513, 515, 518, 518
+peak slip       84 deg   samples in drift 231 of 326
+score           4000
+peak draws      476   peak tris 698,363   median fps 60
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)
+filmstrip       C:\Users\liamk\sundrift\.claude\worktrees\agent-a2e38068f6586e225\game\_gate_phone\filmstrip.png
+
+it drifts. now LOOK at the filmstrip.

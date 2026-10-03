@@ -28,7 +28,8 @@ export async function serve(dir = 'game') {
 /** A browser and a page on the game, instrumented; phone: 390x844 touch unless a viewport is given. */
 export async function open({ phone = false, viewport = null, out = 'work/qa_out/flows', storage = null } = {}) {
   fs.mkdirSync(path.resolve(out), { recursive: true });
-  const { server, url } = await serve();
+  // --game=<dir> serves another copy of the game folder (a before/after A/B, a patched copy)
+  const { server, url } = await serve(arg('game', 'game'));
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--window-size=1280,720', '--enable-precise-memory-info', '--js-flags=--expose-gc',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage();

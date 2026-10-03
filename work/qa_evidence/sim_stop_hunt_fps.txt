@@ -1,0 +1,4 @@
+fps 20: sudden stops by kind: {"spin-stopped":5}
+fps 30: sudden stops by kind: {"spin-stopped":2}
+fps 60: sudden stops by kind: {"spin-stopped":4}
+fps 144: sudden stops by kind: {"spin-stopped":5}
