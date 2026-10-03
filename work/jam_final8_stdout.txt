@@ -1,0 +1,28 @@
+screenshots     C:\Users\liamk\sundrift\work\jam_final8\loaded.png
+                C:\Users\liamk\sundrift\work\jam_final8\started.png
+                C:\Users\liamk\sundrift\work\jam_final8\moving.png
+verdict.json    C:\Users\liamk\sundrift\work\jam_final8\verdict.json
+held            #stick dragged up and held 6 s
+path length     134.3 m over the run
+wire bytes      0.7 MB compressed, 76 responses
+renderer        ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)
+
+=== 404 JAM VERDICT ===
+url             https://lkruer.github.io/sundrift/game/
+utc             2026-09-24T22:21:29.799Z
+commit          4d76a03c6174919239daea151e4be76d77eb0bbd
+viewport        390x844 @3x phone, real touch, Android Chrome UA
+network         4G: 4 Mbps down, 1 Mbps up, 60 ms latency, CPU 2x slower
+ready           10.6 s   budget 20 s   PASS
+weight          2.0 MB   budget 10 MB   PASS
+started         yes (tap on #startb)
+moved           91.3 m   needs 1 m   PASS
+peak draws      336   budget 900   PASS
+peak tris       596,797   budget 1,500,000   PASS
+median fps      60 (ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11))
+errors          0   PASS
+404s            0   PASS
+external deps   none   cdn: fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net
+outside folder  none, every file came from the game folder
+RESULT: PASS
+=== END ===

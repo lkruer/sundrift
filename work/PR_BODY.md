@@ -2,7 +2,7 @@
 
 - Play link: https://lkruer.github.io/sundrift/game/
 - Source repo: https://github.com/lkruer/sundrift
-- Commit the verdict names: 83f608b4ee71cd503b329dc0e0073cef07f9ec45
+- Commit the verdict names: 4d76a03c6174919239daea151e4be76d77eb0bbd
 - Team (GitHub handles): lkruer
 
 ## Verdict block
@@ -12,14 +12,14 @@ Paste the block `harness/jam.mjs` printed, unedited, from `=== 404 JAM VERDICT =
 ```
 === 404 JAM VERDICT ===
 url             https://lkruer.github.io/sundrift/game/
-utc             2026-09-24T08:11:04.501Z
-commit          83f608b4ee71cd503b329dc0e0073cef07f9ec45
+utc             2026-09-24T22:21:29.799Z
+commit          4d76a03c6174919239daea151e4be76d77eb0bbd
 viewport        390x844 @3x phone, real touch, Android Chrome UA
 network         4G: 4 Mbps down, 1 Mbps up, 60 ms latency, CPU 2x slower
-ready           10.0 s   budget 20 s   PASS
-weight          1.9 MB   budget 10 MB   PASS
+ready           10.6 s   budget 20 s   PASS
+weight          2.0 MB   budget 10 MB   PASS
 started         yes (tap on #startb)
-moved           96.8 m   needs 1 m   PASS
+moved           91.3 m   needs 1 m   PASS
 peak draws      336   budget 900   PASS
 peak tris       596,797   budget 1,500,000   PASS
 median fps      60 (ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11))
@@ -33,7 +33,7 @@ RESULT: PASS
 
 ## What I found
 
-The clock is the score: every drift you bank pushes the time of day forward, so a run starts at sunset and your driving carries the pass through the night to sunrise, the sky and the light on the road turning with every good slide. Leave the road and there is no reset button: a giant horseshoe magnet swoops down, grabs the car and carries it back to where it left. On a phone it is one finger (hold to drive, slide to steer, pull down to brake) with the other thumb on the handbrake.
+The clock is the score: every drift you bank pushes the time of day forward, so a run starts at sunset and your driving carries the pass through the night to sunrise, the sky and the light on the road turning with every good slide. Leave the road and there is no reset button: a giant horseshoe magnet swoops down, grabs the car and carries it back to where it left. On a phone it is one finger (hold to drive, slide to steer, pull down to lift off or brake) with the other thumb on the handbrake.
 
 ## Declarations
 
@@ -42,3 +42,5 @@ The clock is the score: every drift you bank pushes the time of day forward, so 
 - [x] The source repo is public and its first commit is on or after 11 Sep 2026 00:00 UTC. (First commit 22 Sep 2026 00:15 UTC.)
 - [x] Nothing here copies a 404 reference game's assets or code. (The three harness files `assetlib.js`, `surfaces.js`, `rig.js` are copied in as the recipe instructs.)
 - [x] I have read the rules in README.md and I am eligible.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
