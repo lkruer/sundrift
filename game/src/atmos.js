@@ -93,6 +93,112 @@ class CloudDeck {
   }
 }
 
+// ------------------------------------------------------------------------------------------------ the cumulus
+
+/**
+ * Cumulus on the horizon, the way an anime sky paints them: heaps of round puffs on flat bases, each puff lit like a
+ * ball by the sun in three flat tones, a bright silver edge where the sun is behind them, their feet lost in the haze.
+ * One band of the sky (a ring round the camera from just under the horizon to 26 degrees up, beyond the far ridges,
+ * which stand in front of it), one pass, no texture: the clouds are cells round the horizon, each a hash, so they keep
+ * their place in the sky as the camera turns, and drift slowly on. The colours are the hour's (daylight.js).
+ */
+const BANK_R = 3900, BANK_N = 24;
+class CloudBank {
+  constructor() {
+    this.u = {
+      uCam: { value: new THREE.Vector3() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+      uLit: { value: new THREE.Color() }, uShade: { value: new THREE.Color() }, uRim: { value: new THREE.Color() },
+      uHaze: { value: new THREE.Color() }, uCover: { value: 0.5 }, uK: { value: 0 }, uTime: { value: 0 }, uGrey: { value: 0 },
+    };
+    // the band: directions from 3 degrees under the horizon to 26 over it, all the way round
+    const seg = 96, rows = 4, e0 = -3 * Math.PI / 180, e1 = 26 * Math.PI / 180;
+    const pos = new Float32Array((seg + 1) * (rows + 1) * 3), idx = [];
+    for (let i = 0; i <= seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      for (let j = 0; j <= rows; j++) {
+        const e = e0 + (e1 - e0) * (j / rows), c = Math.cos(e);
+        pos.set([Math.sin(a) * c, Math.sin(e), Math.cos(a) * c], (i * (rows + 1) + j) * 3);
+        if (i < seg && j < rows) { const v = i * (rows + 1) + j, w = v + rows + 1; idx.push(v, w, v + 1, v + 1, w, w + 1); }
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(idx);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: this.u, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
+      vertexShader: /* glsl */`
+        uniform vec3 uCam; varying vec3 vDir;
+        void main() {
+          vDir = position;
+          gl_Position = projectionMatrix * viewMatrix * vec4(uCam + position * ${BANK_R.toFixed(1)}, 1.0);
+        }`,
+      fragmentShader: /* glsl */`
+        uniform vec3 uSunDir, uLit, uShade, uRim, uHaze; uniform float uCover, uK, uTime, uGrey;
+        varying vec3 vDir;
+        float hh(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
+        void main() {
+          vec3 d = normalize(vDir);
+          const float N = ${BANK_N.toFixed(1)}, TAU = 6.2831853;
+          // in cells: round the horizon, and up by the same measure, so a puff is round in the sky
+          float U = (atan(d.x, d.z) / TAU + 0.5) * N + uTime * 0.0025;
+          float V = asin(clamp(d.y, -1.0, 1.0)) / TAU * N;
+          // (a screen pixel in cells, from the direction's own change: U itself jumps a whole turn at the seam behind)
+          float fw = max(length(fwidth(d)) / TAU * N, 1e-4) * 1.1;
+          float bestZ = -1.0, cover = 0.0, baseV = 0.0;
+          vec3 nrm = vec3(0.0, 0.0, 1.0);
+          float ci = floor(U);
+          for (int k = -1; k <= 1; k++) {
+            float c = ci + float(k), id = mod(c, N);
+            if (hh(id * 3.7 + 1.3) > uCover) continue;
+            float w = 0.3 + 0.32 * hh(id * 5.1 + 2.9);           // its half width, in cells (a cell is 15 degrees)
+            float base = 0.1 + 0.16 * hh(id * 7.3 + 4.7);        // its flat base, clear of the far ridges
+            float tall = 0.3 + 0.75 * hh(id * 9.7 + 6.1);        // how high it heaps, for its width
+            float cx = c + 0.5 + (hh(id * 11.3 + 8.3) - 0.5) * 0.35;
+            for (int j = 0; j < 7; j++) {
+              float fj = float(j);
+              float a = hh(id * 13.1 + fj * 1.7), b = hh(id * 17.9 + fj * 2.3), r0 = hh(id * 19.3 + fj * 3.1);
+              // four along the base, two heaped on them, one crown
+              float row = j < 4 ? 0.0 : (j < 6 ? 1.0 : 2.0);
+              float slot = j < 4 ? fj - 1.5 : (j < 6 ? (fj - 4.5) * 1.3 : (a - 0.5) * 0.8);
+              float pr = w * (row < 0.5 ? 0.36 + 0.14 * r0 : (row < 1.5 ? 0.32 + 0.12 * r0 : 0.27 + 0.1 * r0));
+              float px = cx + slot * w * (row < 0.5 ? 0.42 : 0.34) + (a - 0.5) * 0.22 * w;
+              float py = base + pr * 0.5 + row * tall * w * 0.42 + b * 0.05;
+              vec2 q = vec2(U - px, V - py);
+              float dl = length(q), inside = pr - dl;
+              if (inside > -fw) {
+                cover = max(cover, clamp(inside / fw + 0.5, 0.0, 1.0) * smoothstep(base - fw, base + 0.05, V));
+                float z = sqrt(max(pr * pr - dl * dl, 0.0));
+                // the puff whose ball stands furthest toward the eye is the one seen (the crown a little forward)
+                if (z + row * 0.05 * w > bestZ) { bestZ = z + row * 0.05 * w; nrm = vec3(q, z) / pr; baseV = base; }
+              }
+            }
+          }
+          if (cover < 0.004) discard;
+          // the light in the cloud's own frame: round the horizon, up, and toward the eye
+          vec3 dh = normalize(vec3(d.x, 0.0, d.z) + 1e-5);
+          vec3 L = normalize(vec3(dot(uSunDir, vec3(dh.z, 0.0, -dh.x)), uSunDir.y, -dot(uSunDir, dh)));
+          float ndl = dot(nrm, L);
+          // three flat tones, each edge a pixel soft
+          float tone = 0.45 * smoothstep(-0.12, -0.04, ndl) + 0.55 * smoothstep(0.36, 0.44, ndl);
+          vec3 col = mix(uShade, uLit, tone);
+          // the base in its own shadow
+          col = mix(col, uShade * 0.9, (1.0 - smoothstep(baseV, baseV + 0.16, V)) * 0.55);
+          // the silver edge: a puff's rim where the light is behind the cloud or low beside it
+          float back = clamp(-L.z * 0.75 + 0.35 * (1.0 - abs(L.y)), 0.0, 1.0);
+          col += uRim * smoothstep(0.62, 0.92, 1.0 - nrm.z) * back * 0.85;
+          // toward the sun the whole heap glows a little, lit through
+          float toSun = max(dot(dh, normalize(vec3(uSunDir.x, 0.0, uSunDir.z) + 1e-5)), 0.0);
+          col += uRim * pow(toSun, 6.0) * 0.22;
+          // the feet lost in the haze
+          col = mix(col, uHaze, (1.0 - smoothstep(0.05, 0.55, V)) * 0.55);
+          col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722)) * 0.85), uGrey);
+          gl_FragColor = vec4(col, cover * uK);
+        }`,
+    });
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = -600; this.mesh.name = 'cumulus';
+  }
+}
+
 // ------------------------------------------------------------------------------------------------ the sea of cloud
 
 /**
@@ -542,6 +648,7 @@ export class Atmosphere {
   constructor(scene, { phone = false } = {}) {
     this.noise = noiseTexture(128);
     this.clouds = new CloudDeck(this.noise);
+    this.bank = new CloudBank();
     this.mist = new ValleyMist();
     this.flies = new Fireflies(phone ? 90 : 160);
     this.lights = new Searchlights(phone ? 4 : 6);
@@ -549,11 +656,12 @@ export class Atmosphere {
     this.star = new ShootingStar();
     this.bolt = new Lightning();
     this.group = new THREE.Group(); this.group.name = 'atmosphere';
-    for (const m of [this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh]) this.group.add(m);
+    for (const m of [this.bank.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh]) this.group.add(m);
     scene.add(this.group);
     this.t = 0; this.city = false;
     this.mistY = null; this.deckY = null;
     this._c = new THREE.Color(); this._c2 = new THREE.Color();
+    this._l = new THREE.Vector3();
   }
 
   setMap(city) {
@@ -565,7 +673,7 @@ export class Atmosphere {
 
   /** Everything drawn once (for the warm-up frame that compiles the shaders), then back as it was. */
   warm(on, cam) {
-    const all = [this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh];
+    const all = [this.bank.mesh, this.clouds.mesh, this.flies.mesh, this.lights.mesh, this.koi.mesh, this.star.mesh, this.bolt.mesh];
     if (on) { this._vis = all.map((m) => m.visible); all.forEach((m) => { m.visible = true; }); this.star.mesh.position.copy(cam); }
     else if (this._vis) { all.forEach((m, i) => { m.visible = this._vis[i]; }); }
   }
@@ -587,7 +695,7 @@ export class Atmosphere {
     U.uHeight.value = this.deckY; U.uCenter.value.set(cam.x, 0, cam.z); U.uTime.value = t;
     U.uCover.value = city ? lerp(0.62, 0.86, rain) : lerp(0.3, 0.9, rain);
     U.uScale.value = city ? 0.8 : 1.25;
-    U.uOpacity.value = city ? lerp(0.8, 0.95, rain) : lerp(0.5, 0.92, rain) * (0.6 + 0.4 * night);
+    U.uOpacity.value = (city ? lerp(0.8, 0.95, rain) : lerp(0.5, 0.92, rain) * (0.6 + 0.4 * night)) * (s.look ? lerp(s.look.deck, 1, rain) : 1);
     if (city) {
       // lit from beneath by the city: sodium and neon at night, plain grey cloud by day
       U.uLit.value.setRGB(0.36, 0.13, 0.2).multiplyScalar(night * (1 + 0.2 * rain)).lerp(this._c.setRGB(0.62, 0.64, 0.7), 1 - night);
@@ -598,6 +706,30 @@ export class Atmosphere {
       U.uShade.value.copy(s.sun).multiplyScalar(lerp(0.75, 0.05, night) * (1 - 0.5 * rain));
     }
     U.uHaze.value.copy(s.haze);
+    // ---- the cumulus on the horizon, in the hour's colours (daylight.js); the moon lights them by night, the city's
+    // glow from beneath, and rain greys them and fills the sky with them
+    const B = this.bank.u, L = s.look;
+    B.uCam.value.copy(cam); B.uTime.value = t;
+    this.bank.mesh.visible = !!L && L.cloud.k > 0.01;
+    if (L) {
+      const c = L.cloud, dim = 1 - 0.45 * rain;
+      B.uLit.value.setRGB(c.lit[0] * dim, c.lit[1] * dim, c.lit[2] * dim);
+      B.uShade.value.setRGB(c.shade[0] * dim, c.shade[1] * dim, c.shade[2] * dim);
+      B.uRim.value.setRGB(c.rim[0], c.rim[1], c.rim[2]).multiplyScalar(1 - 0.8 * rain);
+      if (city) {
+        const g = night * (1 + 0.3 * rain);
+        B.uShade.value.r += 0.2 * g; B.uShade.value.g += 0.06 * g; B.uShade.value.b += 0.12 * g;
+        B.uLit.value.r += 0.12 * g; B.uLit.value.g += 0.04 * g; B.uLit.value.b += 0.08 * g;
+      }
+      B.uCover.value = lerp(c.cover, 0.97, rain);
+      B.uK.value = c.k;
+      B.uGrey.value = rain * 0.75;
+      B.uHaze.value.copy(s.hazeLin || s.haze);
+      // the light they take: the sun, and by night the moon
+      const moonK = smoothstep(0.55, 0.9, night);
+      this._l.copy(s.sunDir || this._l.set(0, 1, 0)).lerp(s.moonDir || s.sunDir || this._l, moonK).normalize();
+      B.uSunDir.value.copy(this._l);
+    }
     // ---- searchlights and the spots they throw on the deck (the city, at night)
     const beams = city ? night * (0.7 + 0.6 * rain) : 0;
     this.lights.mesh.visible = beams > 0.02;
@@ -619,7 +751,8 @@ export class Atmosphere {
       this.mistY = this.mistY === null ? want : lerp(this.mistY, want, 1 - Math.exp(-dt / 10));
       this.mistY = Math.min(this.mistY, s.carY - 9);
       // (a thing of the night and the dawn: gone by day, and never so thick that the hills beyond it disappear)
-      M.top = this.mistY; M.density = 0.012 * night * night * (1 + 0.5 * rain); M.soft = 18;
+      const mk = s.look ? s.look.mist : night;
+      M.top = this.mistY; M.density = 0.012 * mk * mk * (1 + 0.5 * rain); M.soft = 18;
       if (M.density < 0.0004) M.on = 0;
       // the sky's own colour at the horizon (rose at dawn, gold at dusk, white by day), silvered by the moon at
       // night, greyer in the rain

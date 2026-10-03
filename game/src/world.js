@@ -2471,12 +2471,16 @@ vec2 roadUv(vec2 uv) {
    * The far ridges in the light of the hour: each ring its own colour mixed toward the haze (the nearer ring less),
    * a little darker than the haze itself, so the ranges stand one behind another against the sky.
    */
-  skylineTint(haze, night) {
+  skylineTint(haze, night, shade = null) {
     if (!this.skyline) return;
     this.skyline.children.forEach((m, i) => {
       if (!m.userData.base) return;
       const k = i === 0 ? 0.5 : 0.7, dark = (i === 0 ? 0.78 : 0.88) - 0.12 * night;
-      m.material.color.copy(m.userData.base).lerp(haze, k).multiplyScalar(dark);
+      m.material.color.copy(m.userData.base).lerp(haze, k);
+      // (and toward the shade's own colour, the nearer ring more: at dusk the ranges stand as violet silhouettes
+      // against the burning horizon instead of being painted the horizon's orange)
+      if (shade) m.material.color.lerp(shade, i === 0 ? 0.32 : 0.18);
+      m.material.color.multiplyScalar(dark);
     });
   }
 
