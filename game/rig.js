@@ -1,7 +1,7 @@
 /**
  * A render rig, for any Three.js game in this format.
  *
- *     import { createRig } from './rig.js?v=202610032044';
+ *     import { createRig } from './rig.js?v=202610032333';
  *     const rig = createRig(THREE, renderer, scene, { hour: 16.5, azimuth: 250 });
  *     rig.render(camera, dt);        // once a frame, instead of renderer.render(scene, camera)
  *

@@ -11,7 +11,7 @@
  *     steamWeather(w, wet, night);                // the weather and the hour
  */
 import * as THREE from 'three';
-import { mulberry32 } from './config.js?v=202610032044';
+import { mulberry32 } from './config.js?v=202610032333';
 
 // puffs per emitter, by kind (a phone draws fewer)
 const PUFFS = [7, 5, 8], PUFFS_PHONE = [4, 3, 5];

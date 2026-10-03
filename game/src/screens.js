@@ -3,7 +3,7 @@
  * them out (index.html #results, #records) and pagetv.js draws them on the TV; this only writes the words and the
  * numbers, and only where they changed (every change is a redraw of the menu on the TV).
  */
-import { fmt } from './records.js?v=202610032044';
+import { fmt } from './records.js?v=202610032333';
 
 const $ = (id) => document.getElementById(id);
 function set(el, text, hi) {
