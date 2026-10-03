@@ -1547,6 +1547,7 @@ function applySun(dt, force = false) {
     night.fuji.material.color.setRGB(lerp(2.5, 1, nightAmt) * (1 + 1.8 * warm + 0.45 * lilac), lerp(2.45, 1, nightAmt) * (1 + 0.35 * warm - 0.05 * lilac), lerp(2.2, 1, nightAmt) * (1 - 0.55 * warm + 0.05 * lilac));
   }
   world.setNight(nightAmt);
+  if (world.roadSpecU) world.roadSpecU.uSkyRefl.value = 1 - 0.68 * nightAmt;
   sunColor.copy(rig.sun.color).lerp(new THREE.Color(0.55, 0.65, 0.95), nightAmt);
   if (rig.fog) world.skylineTint(rig.fog.color, nightAmt, _ridgeShade.setRGB(look.fillCol[0], look.fillCol[1], look.fillCol[2]).multiplyScalar(0.3 * (1 - 0.6 * nightAmt)));
   // the grade the cel pass lays over the frame: the hour's own, a little greyer in the rain

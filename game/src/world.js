@@ -642,7 +642,9 @@ if (uGrassy > 0.5) diffuseColor.rgb = groundDetail(diffuseColor.rgb, vGPos, vGUp
     // clamp (x 0)
     // uDrySpec: a dry road's highlights are dim and broad (a lamp or the headlights on dry asphalt made a pale ghost of an
     // ellipse on the road ahead once the cel pass banded it); in the wet they come up to full (setWet)
-    this.roadSpecU = { uSpecKnee: { value: 7 }, uFold: { value: new THREE.Vector2(0, 0.9) }, uDrySpec: { value: 0.35 } };
+    // uSkyRefl: how much of the sky the road mirrors (main.js applySun): all of it by day, a third at night, when a wet
+    // road reflecting the overcast, light-polluted sky turned into a pale grey sheet and the lamps' streaks drowned in it
+    this.roadSpecU = { uSpecKnee: { value: 7 }, uFold: { value: new THREE.Vector2(0, 0.9) }, uDrySpec: { value: 0.35 }, uSkyRefl: { value: 1 } };
     this.roadMat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.roadSpecU);
       shader.fragmentShader = shader.fragmentShader
@@ -650,6 +652,7 @@ if (uGrassy > 0.5) diffuseColor.rgb = groundDetail(diffuseColor.rgb, vGPos, vGUp
 uniform float uSpecKnee;
 uniform vec2 uFold;
 uniform float uDrySpec;
+uniform float uSkyRefl;
 vec2 roadUv(vec2 uv) {
   if (uFold.x < 0.5) return vec2(clamp(uv.x, 0.0, 1.0), uv.y);
   float e = max(uv.x - 1.0, -uv.x);
@@ -667,9 +670,9 @@ vec2 roadUv(vec2 uv) {
         // (and a lamp's highlight on the road within a few metres of the lens is let go: that close, on a wet road, it
         // spread into a great white pill beside the car that the cel pass inked round like a solid thing)
         // (and the sky's own reflection at grazing light, the bright streak of sky round a low sun, has a ceiling as well)
-        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular *= uDrySpec;\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee) * smoothstep(3.0, 10.0, length(vViewPosition));\n  reflectedLight.indirectSpecular = reflectedLight.indirectSpecular / (1.0 + reflectedLight.indirectSpecular * 1.6);');
+        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular *= uDrySpec;\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee) * smoothstep(3.0, 10.0, length(vViewPosition));\n  reflectedLight.indirectSpecular *= uSkyRefl;\n  reflectedLight.indirectSpecular = reflectedLight.indirectSpecular / (1.0 + reflectedLight.indirectSpecular * 1.6);');
     };
-    this.roadMat.customProgramCacheKey = () => 'road-spec-knee-fold-near-sky-dry';
+    this.roadMat.customProgramCacheKey = () => 'road-spec-knee-fold-near-sky-dry-refl';
     this.railMat = new THREE.MeshStandardMaterial({ color: PAL.galvanised, roughness: 0.42, metalness: 0.65, side: THREE.DoubleSide });
     // the lining glows faintly sodium-orange: the whole bore is lit by its lamps, not just the stretch round the car
     { const tt = tunnelTexture(); this.tunnelMat = new THREE.MeshStandardMaterial({ map: tt, emissiveMap: tt, emissive: 0xff9448, emissiveIntensity: 0.62, roughness: 0.82, metalness: 0, side: THREE.DoubleSide }); }
