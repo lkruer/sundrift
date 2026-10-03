@@ -12,29 +12,30 @@
  * pause menu shows its results too (RUN OVER) before the title; a restart records it without them.
  */
 import * as THREE from 'three';
-import { ASSET, bakeStatic } from '../assetlib.js?v=202609242220';
-import { createRig, detectTier } from '../rig.js?v=202609242220';
-import { PAL, ROAD, QUALITY, SCORE, CLOCK, phaseOf, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242220';
-import { Car, gearbox } from './car.js?v=202609242220';
-import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609242220';
-import { World, drawsGlyphs } from './world.js?v=202609242220';
-import { ChaseCam } from './camera.js?v=202609242220';
-import { Input } from './input.js?v=202609242220';
-import { Scoring } from './scoring.js?v=202609242220';
-import { Hud } from './hud.js?v=202609242220';
-import { PageTV } from './pagetv.js?v=202609242220';
-import { Audio } from './audio.js?v=202609242220';
-import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202609242220';
-import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242220';
-import { Atmosphere } from './atmos.js?v=202609242220';
-import { Debris } from './debris.js?v=202609242220';
-import { makePost } from './post.js?v=202609242220';
-import { sunAt, lookAt } from './daylight.js?v=202609242220';
-import { platform } from './platform.js?v=202609242220';
-import { Settings } from './settings.js?v=202609242220';
-import { loadRecords, saveRun, RECORDS_V, fmt } from './records.js?v=202609242220';
-import { fillResults, fillRecords, flashButton } from './screens.js?v=202609242220';
-import { shareRun, prepareCard } from './share.js?v=202609242220';
+import { ASSET, bakeStatic } from '../assetlib.js?v=202610032044';
+import { createRig, detectTier } from '../rig.js?v=202610032044';
+import { PAL, ROAD, QUALITY, SCORE, CLOCK, phaseOf, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202610032044';
+import { Car, gearbox } from './car.js?v=202610032044';
+import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202610032044';
+import { World, drawsGlyphs } from './world.js?v=202610032044';
+import { ChaseCam } from './camera.js?v=202610032044';
+import { Input } from './input.js?v=202610032044';
+import { Scoring } from './scoring.js?v=202610032044';
+import { Hud } from './hud.js?v=202610032044';
+import { PageTV } from './pagetv.js?v=202610032044';
+import { Audio } from './audio.js?v=202610032044';
+import { SkidMarks, Particles, ExhaustFlame, Petals, Rain, RainSplashes, RainCurtain, HeadBeams, LightTrails } from './fx.js?v=202610032044';
+import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202610032044';
+import { Atmosphere } from './atmos.js?v=202610032044';
+import { Debris } from './debris.js?v=202610032044';
+import { makePost } from './post.js?v=202610032044';
+import { sunAt, lookAt } from './daylight.js?v=202610032044';
+import { Ambience } from './ambience.js?v=202610032044';
+import { platform } from './platform.js?v=202610032044';
+import { Settings } from './settings.js?v=202610032044';
+import { loadRecords, saveRun, RECORDS_V, fmt } from './records.js?v=202610032044';
+import { fillResults, fillRecords, flashButton } from './screens.js?v=202610032044';
+import { shareRun, prepareCard } from './share.js?v=202610032044';
 
 platform.init();
 const $ = (id) => document.getElementById(id);
@@ -1081,6 +1082,7 @@ function frame(now) {
     if (paintMat) { paintMat.roughness = 0.22 - 0.12 * W.wet; paintMat.clearcoatRoughness = 0.06 - 0.035 * W.wet; }
   }
   if (atmos && car && track && !frozen && G.mode !== 'loading') airFollow(dt);
+  ambienceFollow(dt);
   // cherry petals on the air, round the camera wherever it is (not while paused, and not inside a tunnel)
   if (petals && car && !frozen) {
     camera.getWorldDirection(_fwd);
@@ -1093,7 +1095,7 @@ function frame(now) {
   const t1 = performance.now();
   renderer.info.reset();
   rig.update(camera, dt);
-  post.cel.uniforms.uSpeed.value = car && G.mode === 'playing' ? clamp((car.speed - 8) / 32, 0, 1) * (1 + 0.6 * clamp(car.boost / 1.2, 0, 1)) : 0;
+  post.cel.uniforms.uSpeed.value = car && G.mode === 'playing' ? clamp((car.speed - 8) / 32, 0, 1) * (1 + 0.6 * clamp((car.boostHeld ? 0 : car.boost) / 1.2, 0, 1)) : 0;
   post.cel.uniforms.uVig.value = hud && G.mode === 'playing' ? hud.vignette : 0;
   post.cel.uniforms.uHit.value = hud && G.mode === 'playing' ? hud.hitFlash : 0;
   shafts();
@@ -1215,6 +1217,10 @@ function step(dt, t0) {
       car.extF = ax * s + az * c; car.extL = ax * c - az * s;
     } else { car.extF = 0; car.extL = 0; }
     inp.line = { curv: track.sample(G.s + 12 + car.speed * 0.55).k, here: track.sample(G.s + 2 + car.speed * 0.12).k };
+    // the boost a drift earned waits while a bend is close ahead and fires as the road opens: it used to fire at once at
+    // the exit, and after a big drift that was 35 km/h more into the next hairpin (work/QA_REPORT.md, m3)
+    if (car.boost > 0.05) { let k = 0; for (let d = 15; d <= 75; d += 15) k = Math.max(k, Math.abs(track.sample(G.s + d).k || 0)); car.boostHeld = k > 1 / 70; }
+    else car.boostHeld = false;
     car.step(dt, inp, surface * (1 - 0.07 * W.wet));            // a wet road gives a little grip away
 
     // ---- walls, where there are walls: guardrails, tunnel linings, street fronts, and ground too steep to climb
@@ -1269,7 +1275,9 @@ function step(dt, t0) {
     // ---- off the road: the countdown, and at zero the magnet
     offRoad(dt, n, beyond);
   }
-  courseOut.update(G.off && !magnet.active ? Math.max(0, G.off.t) : null, magnet.active);
+  // (the panel only after a second off the road: a slide that brushed the pavement and came straight back raised it
+  // several times a minute in a good city run; the five seconds still run from the start)
+  courseOut.update(G.off && !magnet.active && COURSE_OUT_S - G.off.t >= 1 ? Math.max(0, G.off.t) : null, magnet.active);
   debris.update(dt);
 
   // ---- scoring and boost
@@ -1296,7 +1304,7 @@ function step(dt, t0) {
     if (e.type === 'crash') chase.kick(0.9);
   }
   if (!G.newBest && !G.completed && G.runBest > 0 && scoring.total > G.runBest) { G.newBest = true; hud.onEvent({ type: 'best' }); }
-  const boost01 = clamp(car.boost / 1.2, 0, 1);
+  const boost01 = clamp((car.boostHeld ? 0 : car.boost) / 1.2, 0, 1);
 
   weather(dt, !!track.inTunnel(G.s));
 
@@ -1524,6 +1532,18 @@ function fireflySpot() {
   const side = Math.random() < 0.5 ? 1 : -1, w = side > 0 ? p.wl : p.wr;
   const u = (w + 1.5 + Math.random() * 15) * side, x = p.x + Math.cos(p.h) * u, z = p.z - Math.sin(p.h) * u;
   return [x, world.ground.height(x, z) + 0.4 + Math.random() * 2.4, z];
+}
+/**
+ * The creatures of the hour (ambience.js): cicadas at dusk, crickets and frogs by night, the warbler at dawn, crows over
+ * the city, once the sound is awake; through the effects' level, out of the tunnels and the rain, softer on the title
+ * and on through the results (a run's results come up at sunrise, to birdsong).
+ */
+let amb = null;
+function ambienceFollow(dt) {
+  if (!audio || !audio.ready || !audio.fx) return;
+  if (!amb) amb = new Ambience(audio.ctx, audio.fx);
+  const on = G.mode === 'playing' || G.mode === 'title' || G.mode === 'results';
+  amb.update(dt, { hour: G.hourShown, city: G.map === 'city', rain: W.rain, tunnel: G.mode === 'playing' ? G.tunnelK || 0 : 0, on, level: G.mode === 'playing' ? 1 : 0.7 });
 }
 function airFollow(dt) {
   camera.getWorldDirection(_look);
@@ -1798,7 +1818,8 @@ function smashScore(name) {
 /** The countdown while the car is off the road, and at zero the magnet. */
 function offRoad(dt, n, beyond) {
   if (!G.off) {
-    if (beyond > 0.35) G.off = { t: COURSE_OUT_S, s: n.s, side: n.u >= 0 ? 1 : -1, last: COURSE_OUT_S + 1 };
+    // (the first tick with the panel, a second in)
+    if (beyond > 0.35) G.off = { t: COURSE_OUT_S, s: n.s, side: n.u >= 0 ? 1 : -1, last: COURSE_OUT_S };
     return;
   }
   if (beyond < -0.4) { G.off = null; return; }

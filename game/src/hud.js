@@ -21,7 +21,7 @@
  * fly off the clock it moved. On a phone that can (Android), a short buzz goes with the big moments.
  */
 import * as THREE from 'three';
-import { SCORE, CLOCK, clamp, damp } from './config.js?v=202609242220';
+import { SCORE, CLOCK, clamp, damp } from './config.js?v=202610032044';
 
 const $ = (id) => document.getElementById(id);
 // the slide angle past which a drift scores the most: scoring.js's angle factor tops out at 1.5 x 0.55 rad, 47 degrees
@@ -133,6 +133,9 @@ export class Hud {
     this.canBuzz = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
     this._buzzT = 0;
     try { this.coached = localStorage.getItem('sundrift.drifted') === '1'; } catch { this.coached = false; }
+    // (the second hint, what pays, once ever: a moment after the first drift banks)
+    try { this.tipped = localStorage.getItem('sundrift.tip.pays') === '1'; } catch { this.tipped = false; }
+    this.tipStage = 1; this._tipAt = 0; this._tipShown = 0;
     this.run = { t: 0, smashN: 0, smashLast: 0, newBest: false, best0: 0 };
     this.scoring = null;
     this.v = { score: 0, combo: 0, chain: 0, spd: 0, gear: 'N', rpm: 900, leds: 0, boosting: false, drifting: false, clip: false,
@@ -676,6 +679,18 @@ export class Hud {
 
   /** First run only (until a drift has been banked once, ever): how to drift, a moment after the start. */
   _coach(dt) {
+    // the second hint, a moment after the first bank: shown whenever no slide holds the meter's place, eight seconds in
+    // all, then never again
+    if (this._tipAt && !this.tipped) {
+      if (performance.now() >= this._tipAt) {
+        this.tipStage = 2; this._coachOn = !this.v.slide;
+        if (this._coachOn && (this._tipShown += dt) > 8) {
+          this._coachOn = false; this.tipped = true; this._tipAt = 0;
+          try { localStorage.setItem('sundrift.tip.pays', '1'); } catch {}
+        }
+      }
+      return;
+    }
     if (this.coached || this._coachGone) return;
     this.run.t += dt;
     // (not before nine seconds in: the title has already said how, and the first seconds of a run are the road's)
@@ -704,6 +719,7 @@ export class Hud {
         if (word) this.toast(word + ' DRIFT!', 't' + e.tier, e.tier >= 2, e.chain > 1 ? 'COMBO ×' + e.chain : '', 2);
         if (e.value >= 100) this.buzz(e.tier >= 3 ? [26, 40, 26, 40, 50] : e.tier === 2 ? [20, 40, 24] : e.tier === 1 ? 18 : 10);
         if (!this.coached) { this.coached = true; try { localStorage.setItem('sundrift.drifted', '1'); } catch {} }
+        if (!this.tipped && !this._tipAt && e.value >= 100) this._tipAt = performance.now() + 2600;
         break;
       }
       // (a transition: called out at most once in three seconds; called every time, it came every 1.7 to 2.5 s all
@@ -793,7 +809,7 @@ export class Hud {
     this.rpm = damp(this.rpm, gb.rpm, 16, dt);
     v.rpm = Math.round(clamp(this.rpm, 0, 9200) / 250) * 250;
     v.leds = Math.round(clamp(boostLeft / boostMax, 0, 1) * 12);
-    v.boosting = car.boost > 0.02; v.drifting = active;
+    v.boosting = car.boost > 0.02 && !car.boostHeld; v.drifting = active;
     this.clipT = Math.max(0, this.clipT - dt); v.clip = this.clipT > 0;
     // the drift angle
     const slide = Math.abs(car.beta) > 0.1 && car.speed > 5;
@@ -1192,16 +1208,20 @@ export class Hud {
     const a = this.coachA;
     if (a <= 0.01) return;
     const c = this.ctx, r = this.L.coach, f = this.Z.coach;
-    const words = this.touch
+    const words = this.tipStage === 2
+      ? [['ANGLE', C.amber], ['AND', C.ink], ['SPEED', C.amber], ['PAY', C.ink], ['·', C.dim], ['CHAIN', C.amber], ['DRIFTS', C.ink], ['TO', C.ink], ['MULTIPLY', C.ink], ['·', C.dim], ['EVERY', C.ink], ['ONE', C.ink], ['BANKED', C.ink], ['BRINGS', C.ink], ['DAWN', C.amber], ['CLOSER', C.ink]]
+      : this.touch
       ? [['DRIFT', C.amber], ['TAP', C.ink], ['THE', C.ink], ['HANDBRAKE', C.amber], ['INTO', C.ink], ['A', C.ink], ['CORNER,', C.ink], ['STEER', C.ink], ['INTO', C.ink], ['THE', C.ink], ['SLIDE', C.ink]]
       : [['DRIFT', C.amber], ['TAP', C.ink], ['SPACE', C.amber], ['INTO', C.ink], ['A', C.ink], ['CORNER', C.ink], ['·', C.dim], ['STEER', C.ink], ['INTO', C.ink], ['THE', C.ink], ['SLIDE', C.ink], ['·', C.dim], ['HOLD', C.ink], ['W', C.amber]];
     const sp = this._tw(' ', f) + f.ls, maxW = r.w - 16, lines = [[]];
     let lw = 0;
-    for (const [t, col] of words) {
+    words.forEach(([t, col], i) => {
       const w = this._tw(t, f);
+      // (a separator never starts or ends a line: it goes in only where the word after it fits on the line too)
+      if (t === '·' && (lw === 0 || lw + 2 * sp + w + (words[i + 1] ? this._tw(words[i + 1][0], f) : 0) > maxW)) return;
       if (lw > 0 && lw + sp + w > maxW) { lines.push([]); lw = 0; }
       lines[lines.length - 1].push([t, col, lw + (lw > 0 ? sp : 0)]); lw += (lw > 0 ? sp : 0) + w;
-    }
+    });
     const cap = this._fm(f).cap, lh = cap + 4.5;
     const bw = Math.min(r.w, Math.max(...lines.map((l) => { const e = l[l.length - 1]; return e[2] + this._tw(e[0], f); })) + 16);
     const bh = lines.length * lh + 8, bx = r.cx - bw / 2, by = r.y;

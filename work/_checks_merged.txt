@@ -1,0 +1,46 @@
+=== work/scoring_check.mjs
+ok   a switch pays a flat 120 (and the frame's slide), the chain and the multiplier untouched  {"chain":1,"mult":1,"gained":121.4}
+ok   a drift that leaves the road pays nothing more  [85,85]
+ok   ...and banks what it had after the grace  [false,85]
+ok   with no ground given, the car's own surface decides
+
+the scoring as the QA round asked
+=== work/qa_clock.mjs
+crossing GOLDEN HOUR hour now 17.11 said [[17,"golden"]]
+crossing BLUE HOUR hour now 18.35 said [[18.25,"blue"]]
+crossing NIGHT hour now 19.34 said [[19.25,"night"]]
+a bank across DAWN : hour 4.81 said [[4.78,"dawn"]]
+a bank across BLUE HOUR : hour 18.41 said [[18.38,"blue"]]
+errors 0 []
+=== work/platform_hooks.mjs
+ok   a throwing hook: the game goes on
+ok   ...and it is a warning, once, not an error  [["warn","SUNDRIFT_PLATFORM.gameplayStop failed: Error: the host broke"]]
+ok   RESTART: the abandoned run recorded as the last run, as at dawn, no results, a new run under way  {"id":1791059861214,"runId":1791059861214,"clock":6.034,"score":60000}
+errors []
+
+every hook as it should be
+=== work/share_check.mjs
+with no share sheet: the clipboard holds SUNDRIFT · YOZAKURA PASS · EASY
+0 points, drove the night to 17:21
+0.0 mi driven
+https://lkruer.github.io/sundrift/game/
+with no share sheet: saved ["results_share_with_no_share_sheet.png","sundrift-yozakura-pass-easy-0.png"]
+errors 0 []
+=== work/tv_hover_check.mjs
+transitions as they were (.15 s): the TV's border before [73,66,73,218], hovered [73,66,73,218]; the page's own, hovered: rgba(255, 179, 71, 0.6)
+transitions off (body.tv now): the TV's border before [68,62,69,218], hovered [162,113,51,235]; the page's own, hovered: rgba(255, 179, 71, 0.6)
+errors 0
+=== work/platform_flow.mjs
+ok   NEW RUN: a run from the golden hour again  ({"mode":"playing","title":false,"pause":false,"results":false,"records":false,"settings":false,"hour":17.32,"phase":"golden","dawnT":0,"completed":false,"units":"mph","curve":0.01})
+ok   the records: best, fastest dawn and last all kept
+records {"best":15000,"fastest":1.5,"last":0}
+errors 0 []
+
+every step as it should be
+=== work/platform_flow.mjs --phone
+ok   NEW RUN: a run from the golden hour again  ({"mode":"playing","title":false,"pause":false,"results":false,"records":false,"settings":false,"hour":17.32,"phase":"golden","dawnT":0,"completed":false,"units":"mph","curve":0.01})
+ok   the records: best, fastest dawn and last all kept
+records {"best":15000,"fastest":1.5,"last":0}
+errors 0 []
+
+every step as it should be

@@ -217,7 +217,8 @@ export class Car {
     const fade = clamp(1 - Math.pow(Math.max(0, this.vF) / P.engineTop, 2), 0, 1);
     const antiSpin = 1 - 0.55 * sstep(0.7, 1.1, Math.abs(this.beta)) * (1 - D);
     let Fdrive = this.throttle * P.engineForce * fade * antiSpin;
-    if (this.boost > 0) { Fdrive += P.boostForce * (0.6 + 0.4 * this.throttle); this.boost = Math.max(0, this.boost - h); }
+    // (held, by main.js, while a bend is close ahead: it fires as the road opens rather than into the next hairpin)
+    if (this.boost > 0 && !this.boostHeld) { Fdrive += P.boostForce * (0.6 + 0.4 * this.throttle); this.boost = Math.max(0, this.boost - h); }
     // in a J-turn the throttle waits for the nose to come round, then pulls away along the line
     if (this.jt) Fdrive *= this.jtRem < 0.7 ? 1 : 0.1;
     // reverse: a short, strong gear that keeps pulling (the fade is on the square of the speed) toward 45 mph

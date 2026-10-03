@@ -13,7 +13,7 @@
  * a SHARE button opens) so the share sheet is asked for inside the tap that asked for it: a browser lets a page open it
  * only then, and an await on a fresh 1200 x 630 PNG could outlast that.
  */
-import { fmt } from './records.js?v=202609242220';
+import { fmt } from './records.js?v=202610032044';
 
 export const SHARE_URL = 'https://lkruer.github.io/sundrift/game/';
 const W = 1200, H = 630;

@@ -592,6 +592,28 @@ great to add that feature to be able to see the last best run stats and share th
   big drift's boost fires on its own), p1 (README: "or just push a fast corner on the throttle" starts no drift), p3,
   p5, p6 and p7.
 
+## 3 October, late: the rounds together, the hour by ear, the QA round's last items
+
+The look (below), the QA round (work/QA_REPORT.md) and the run with an end (above) were three branches; they are one
+now, and the four drift gates passed on the three together (the pass and NEO TOKYO, desktop and phone: 5, 5, 10 and
+12 banked, 0 slow frames, peak 713 / 412 / 705 / 461 draws).
+
+- **The hour by ear** joins the sound through the effects' level (ambience.js; see below).
+- **The boost a drift earns waits for the road to open** (QA m3): while a bend tighter than 70 m lies 15 to 75 m
+  ahead the boost is held (car.js `boostHeld`, set by main.js), its bar stays full and its lamp dark, and it fires as
+  the road straightens; it used to fire at the exit, and after a 3,000-point drift that was 35 km/h more into the next
+  hairpin. On the autopilot's run, half the boost's time was spent held. The handbrake still cancels it.
+- **The off-road countdown shows after a second off the road** (QA p7), its first tick with it; the five seconds
+  still run from the start. A slide that brushes the pavement and comes back no longer raises it (the QA round's
+  drifter set it off eight times in 88 s on NEO TOKYO). Measured: the panel 1,000 ms after the car left the road.
+- **A second hint, once ever, after the first drift banks** (QA p5): ANGLE AND SPEED PAY · CHAIN DRIFTS TO MULTIPLY ·
+  EVERY ONE BANKED BRINGS DAWN CLOSER, shown whenever no slide holds the meter's place, eight seconds in all. The hint
+  box never starts or ends a line with a separator now.
+- **Left as they are, on purpose:** CLIP on the pass's open edges and the city's kerb (QA m2): sliding the rear
+  within half a metre of the edge without going over is the skill either way, and a kerb is where an inner clip is
+  marked in real drifting. The telltales' size (p3) and the busy top of a phone on its side (p6).
+- README: "or just push a fast corner on the throttle" is gone (QA p1: it peaks at 4 to 5 degrees).
+
 ## 3 October: the day by the clock (golden hour, blue hour, dawn, a vivid day), cumulus, a smaller tube
 
 Asked for (after third place in the jam, with a games platform in view): "lean more heavily into the time-change
@@ -638,7 +660,8 @@ stylish and look incredible. make the tv border much smaller".
 - **The tube** is about a fifth as wide at the edges (curve 0.022 to 0.010, edge 0.055 to 0.024, zoom 0.966 to 0.985,
   corner 0.03 to 0.022, the rim's darkening lighter): 7 px each side at 1920 wide, was 34. The vignette is lighter.
 - **The hour by ear** (ambience.js): higurashi at dusk, bell crickets and frogs by night, the bush warbler and
-  sparrows at dawn, crows over the city at first light, all made with Web Audio on the spot; checked offline
+  sparrows at dawn, crows over the city at first light, all made with Web Audio on the spot, through the EFFECTS
+  level (softer on the title, and on through the results, which come up at sunrise to birdsong); checked offline
   (work/amb_render.mjs renders each to a WAV, work/spectro.py draws the spectrogram, which caught a warbler that was
   never connected and a cricket trill that clicked across the whole spectrum).
 - **Tools.** work/mk_tour.mjs (a run with the autopilot, a shot at each hour; --rain), work/mk_skycheck.mjs (the car

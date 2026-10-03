@@ -1,0 +1,9 @@
+=== crash hunt
+run 1: ok after 68 s, 20 shots, last {"heapMB":131,"sprites":309,"canvas":[780,1688],"mode":"playing","tex":50}
+run 2: ok after 70 s, 21 shots, last {"heapMB":71,"sprites":334,"canvas":[780,1688],"mode":"playing","tex":50}
+run 3: ok after 70 s, 21 shots, last {"heapMB":66,"sprites":380,"canvas":[780,1688],"mode":"playing","tex":51}
+=== rotate
+portrait {"canvas":[780,1688],"W":195,"H":422,"glError":0}
+landscape {"canvas":[1688,780],"W":422,"H":195,"glError":0}
+portrait again {"canvas":[780,1688],"W":195,"H":422,"glError":0}
+errors none

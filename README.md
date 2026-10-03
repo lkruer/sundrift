@@ -42,7 +42,15 @@ and its fastest dawn, and its last run, under RECORDS on the title, each shareab
   streak across it. Drops ring the asphalt ahead of the car, the rain rakes back past the camera at speed, a
   curtain of it falls further off, the headlights' beams show in it, beads gather and run down the tube's glass,
   and the car's paint goes glossy. In a heavy storm lightning strikes on the horizon ahead, the sky and the haze
-  flare, and the thunder rolls in after it. The time of day moves smoothly from night through dawn and day to dusk and back.
+  flare, and the thunder rolls in after it.
+- **The hours.** Each part of the day has its own sky, light and colour: a golden hour of long shadows and amber
+  haze; a sunset that burns one half of the horizon while the far half goes blue, the sun swelling as it sinks; a
+  deep blue hour with the lamps coming on and the first stars; the night; a first light of indigo and violet; a rose
+  dawn with mist in the valleys; a clean blue day. Cumulus heap up round the horizon, painted as an anime paints
+  them (gold at golden hour, coral at sunset, lilac at the blue hour, rose at dawn, white at noon), the far ranges
+  stand as violet silhouettes at dusk, and the frame takes the hour's own grade. The hours have their sounds too:
+  higurashi at dusk, bell crickets and frogs in the night, the bush warbler and sparrows at dawn, crows over the
+  city.
 - **The music** is in the manner of an open-world game's soundtrack, slow and airy with no drums: a soft felt
   piano in D over warm analog pads on the pass (a koto figure now and then), an 80s FM electric piano in A flat
   in the city, all of it through a little old tape (a slow wow, a low-pass, a long reverb). A pulse-wave 8-bit
@@ -50,7 +58,7 @@ and its fastest dawn, and its last run, under RECORDS on the title, each shareab
   phrase picks one of its tunes or leaves the chords alone, so it never plays the same way twice.
 - **The frame.** It is drawn as cel bands with ink outlines, halftone shade and scanlines, with a camera motion blur
   (the world streaks as the lens swings through a drift; the car stays sharp), then shown on a curved CRT whose
-  picture bends out to a thin dark border and rounds into the corners, in a 90s console's dithered colour.
+  picture bends out to a hairline of dark border and rounds into the corners, in a 90s console's dithered colour.
 - **The HUD and the menus are on the TV.** The score, the clock, the combo, the dash (a bar-graph tach round three
   quarters of a dial, the speed inside it; a strip along the bottom on a phone), the drift count and its cash-in,
   every callout and the off-road countdown are the set's own display, in the 90s dash's amber seven-segment digits
@@ -147,8 +155,8 @@ SETTINGS: the master, music and effects volumes; MPH or KM/H; the camera's shake
 (a third of the tube's curve, fewer scanlines); the graphics AUTO, PERFORMANCE or QUALITY (from the next load). They
 are kept in the browser, like the records.
 
-Drift: tap the handbrake into a corner (or lift off and turn in, or flick the wheel the other way first, or just
-push a fast corner on the throttle) and keep the key held into the turn: the slide holds for as long as you hold it,
+Drift: tap the handbrake into a corner (or lift off and turn in, or flick the wheel the other way first) and keep the
+key held into the turn: the slide holds for as long as you hold it,
 at the angle your hands ask for. The throttle sets how deep (lift and it tightens up), the key held into the turn
 opens it, a tap the other way closes it, the handbrake throws it wide; let go of the key and the car comes straight
 and pulls away. Throw the key the other way mid-slide and the car swings through into a drift the other way (a
@@ -227,8 +235,13 @@ passing 90 degrees).
   share sheet, or copied and saved; `game/src/settings.js`: the settings and their panel; `game/src/platform.js`: the
   hooks a games platform can take (below).
 - `game/src/offroad.js`: the countdown's state and the magnet (its swoop, the flight, the drop, every beat of it).
-- `game/src/atmos.js`: the air: the cloud deck (moonlit wisps on the pass, lit from beneath over the city), the
-  searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of
+- `game/src/daylight.js`: the day on the clock: where the sun stands at each hour (a slow golden hour and blue hour,
+  a dawn of its own) and the look of fourteen keyed hours (the sky's colours, written as they should come out on the
+  screen and turned back through the tone curve, the sun, the night's lamps, the fill light and its colour, the haze,
+  the glow, the grade, the clouds, the mist, the stars). `game/src/ambience.js`: the creatures of each hour, made on
+  the spot.
+- `game/src/atmos.js`: the air: the cumulus on the horizon (puffs lit as balls, in three tones), the cloud deck
+  (moonlit wisps on the pass, lit from beneath over the city), the searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of
   cloud and the light shafts are drawn by the cel pass in `post.js`, from the depth buffer.
 - `game/src/debris.js`: what the car knocks over, as rigid bodies for a few seconds: the prop's own model and
   materials, a box of corners bouncing and sliding on the ground with restitution and friction, spun from where

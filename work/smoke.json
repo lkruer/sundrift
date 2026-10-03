@@ -1,0 +1,8 @@
+[
+ {"wait": 2500},
+ {"js": "document.getElementById('startb').click()"},
+ {"wait": 1500},
+ {"keys": ["KeyW"], "ms": 3000},
+ {"js": "(() => { const D = window.__DEBUG__; return { mode: D.G.mode, hour: D.G.hour.toFixed(3), shown: D.G.hourShown.toFixed(3), phase: D.G.phase, look: D.G.look && D.G.look.name, amb: typeof D.G.look, fx: !!(D.audio && D.audio.fx), ready: !!(D.audio && D.audio.ready) }; })()"},
+ {"shot": "smoke"}
+]
