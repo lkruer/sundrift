@@ -1539,8 +1539,13 @@ function applySun(dt, force = false) {
     dm.visible = dm.material.opacity > 0; halo.visible = halo.material.opacity > 0;
   }
   if (night.fuji) { night.fuji.material.transparent = true; night.fuji.material.opacity = 1 - 0.85 * W.rain; }
-  // Fuji is drawn in the night's colours; by day the same mountain, lifted into daylight
-  if (night.fuji) night.fuji.material.color.setRGB(lerp(2.5, 1, nightAmt), lerp(2.45, 1, nightAmt), lerp(2.2, 1, nightAmt));
+  // Fuji is drawn in the night's colours; by day the same mountain, lifted into daylight. And it catches the hour: its
+  // snow goes rose and gold with the sun low (alpenglow, the red Fuji of the woodblock prints), and lilac in the moment
+  // after the sun has gone (it stood cold and grey in a golden sky)
+  if (night.fuji) {
+    const warm = (1 - smoothstep(4, 22, sun.el)) * smoothstep(-1.5, 1.5, sun.el), lilac = smoothstep(1.5, -2.5, sun.el) * (1 - smoothstep(-5, -9, sun.el));
+    night.fuji.material.color.setRGB(lerp(2.5, 1, nightAmt) * (1 + 1.8 * warm + 0.45 * lilac), lerp(2.45, 1, nightAmt) * (1 + 0.35 * warm - 0.05 * lilac), lerp(2.2, 1, nightAmt) * (1 - 0.55 * warm + 0.05 * lilac));
+  }
   world.setNight(nightAmt);
   sunColor.copy(rig.sun.color).lerp(new THREE.Color(0.55, 0.65, 0.95), nightAmt);
   if (rig.fog) world.skylineTint(rig.fog.color, nightAmt, _ridgeShade.setRGB(look.fillCol[0], look.fillCol[1], look.fillCol[2]).multiplyScalar(0.3 * (1 - 0.6 * nightAmt)));
