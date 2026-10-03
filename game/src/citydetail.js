@@ -34,8 +34,8 @@
  * Nothing here stands on the road or in the first 1.3 m of pavement.
  */
 import * as THREE from 'three';
-import { mulberry32 } from './config.js?v=202610032044';
-import { railLoad, railChunk, railUpdate, railSkip } from './citytrain.js?v=202610032044';
+import { mulberry32 } from './config.js?v=202610032333';
+import { railLoad, railChunk, railUpdate, railSkip } from './citytrain.js?v=202610032333';
 
 const TAU = Math.PI * 2;
 const POLE_U = 1.35;             // the utility poles stand this far past the road's edge (the kerb zone, 1.3 m, stays clear)
@@ -724,6 +724,19 @@ export function archPosts(w, c, CH) {
     for (const u of [p.wl + 2.62, -(p.wr + 2.62)]) out.push([p.x + lx * u, p.z + lz * u]);
   }
   return out;
+}
+
+/**
+ * Whether s is within m of anything strung or built over the street, in chunk c or either side of it: a shopping
+ * street's arch or any of its strings of lanterns, or a skybridge (a street tree's crown keeps out of them).
+ */
+export function overStreetAt(w, c, CH, s, m) {
+  for (let k = c - 1; k <= c + 1; k++) {
+    const P = streetPieces(w, k, CH); if (!P) continue;
+    if (P.arch && (Math.abs(P.arch.start - s) < m || P.arch.strings.some((q) => Math.abs(q - s) < m + 3))) return true;
+    if (P.bridge && Math.abs(P.bridge.s - s) < m + 2) return true;
+  }
+  return false;
 }
 
 /** Whether anything over the street stands between s0 and s1 (an arch, a skybridge), with margin m. */

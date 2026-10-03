@@ -6,7 +6,9 @@
 // splitter and lamp band are bands swept along a plan path; flares are a four-point loop swept
 // around each arch; shut lines and the rear garnish are strips lofted along the skin; tyres,
 // rims, discs, helmet and torso are revolved loops; tread blocks, calipers and the binnacle
-// hood are partial lathes. Nose = +Z, base y = 0. Body 1.72 W x 1.28 H, about 4.3 L.
+// hood are partial lathes. Nose = +Z, base y = 0. Body 1.72 W x 1.28 H, about 4.3 L. The livery (twin stripes over
+// the top, a band along each door, their pinstripes) is vinyl lofted on the skin, in a material of its own ('livery')
+// that the game's paint never replaces.
 //
 // Moving parts: g.userData.joints = { hubFL, hubFR, wheelFL, wheelFR, wheelRL, wheelRR, popL, popR }.
 // A hub is a Group at the wheel centre (steer about y, camber baked into rotation.z) and
@@ -36,7 +38,7 @@ export default function (THREE) {
   const BRONZ2 = mk(0xb8843a, { roughness: 0.4, metalness: 0.25, side: DS });          BRONZ2.name = 'metal';
   const LIP    = mk(0xb8843a, { roughness: 0.18, metalness: 0.7 });                    LIP.name = 'metal';      // polished rim lip
   const GALV   = mk(0xb9bcc0, { roughness: 0.5, metalness: 0.6 });                     GALV.name = 'metal';
-  const DISC   = mk(0xb9bcc0, { roughness: 0.45, metalness: 0.7 });                    DISC.name = 'metal';
+  const DISC   = mk(0xb9bcc0, { roughness: 0.45, metalness: 0.7, vertexColors: true }); DISC.name = 'metal';   // (its hat and slots darker)
   const MIRROR = mk(0xb9bcc0, { roughness: 0.12, metalness: 0.8 });                    MIRROR.name = 'metal';
   const HEAD   = mk(0xffcf7a, { roughness: 0.3, emissive: new THREE.Color(0xfff1d6), emissiveIntensity: 0.8 });
   const GAUGE  = mk(0xffcf7a, { roughness: 0.5 });
@@ -53,6 +55,9 @@ export default function (THREE) {
   const STRAP  = mk(0xc9402b, { roughness: 0.9, side: DS });                           STRAP.name = 'fabric';   // tow strap
   const WAKAY  = mk(0xe8b52a, { roughness: 0.5 });                                                              // beginner leaf, yellow half
   const WAKAG  = mk(0x7a9a3e, { roughness: 0.5 });                                                              // and its green half
+  // the livery's vinyl: gunmetal, its own material so the paint selector never recolours it (it reads on the pale and
+  // the bright paints; on the dark ones its pinstripes, vermilion and silver, carry it)
+  const LIVERY = mk(0x2a2c31, { roughness: 0.42, metalness: 0.2 });                   LIVERY.name = 'livery';
 
   // ---- the skinning routine (unchanged from the previous winner) ---------------------
   // secs: S loops of N [x,y,z] points, all the same N. Consecutive loops are joined by
@@ -417,6 +422,9 @@ export default function (THREE) {
     add(pod, mergeGeo([[box(lw + 2 * bw, bw, 0.010), [0, yL + (lh + bw) / 2, bz]], [box(lw + 2 * bw, bw, 0.010), [0, yL - (lh + bw) / 2, bz]],
                        [box(bw, lh, 0.010), [(lw + bw) / 2, yL, bz]], [box(bw, lh, 0.010), [-(lw + bw) / 2, yL, bz]]]), DARK).name = 'podBezel';
     add(pod, box(lw, lh, 0.006), HEAD, 0, yL, zF + 0.003).name = 'podLens';
+    // in the lens, the lamp's own make-up: two round reflectors (low and high beam), each in its dark ring, split by a
+    // bar (dark, the housing's own material: the pod is baked into a few draws and stays so)
+    add(pod, mergeGeo([[box(0.012, lh, 0.004), [0, yL, 0]], ...[-0.055, 0.055].map((dx) => [new THREE.RingGeometry(0.036, 0.044, 16), [dx, yL, 0.0005]])]), DARK, 0, 0, zF + 0.0068);
     const mark = new THREE.Object3D(); mark.position.set(0, yL, zF + 0.006); pod.add(mark); popLens[pop.name] = mark;   // lens face centre
     topPanel(s * 0.306, s * 0.614, 1.796, 2.044, 0.0022, DARK, 3, 0.004).name = 'popRecess' + (s > 0 ? 'L' : 'R');     // the cavity
   }
@@ -461,9 +469,11 @@ export default function (THREE) {
       add(body, box(0.17, 0.012, 0.038), DARK, x, y + 0.002, z, 0.10);
       add(body, box(0.17, 0.006, 0.014), PAINT, x, y + 0.009, z + 0.016, 0.10);                // the louvre's raised lip
     }
-    const hx = flankX(s, 0.72, -0.62);                                                         // door handle, flush
-    add(body, box(0.006, 0.05, 0.16), DARK, hx + s * 0.003, 0.72, -0.62);
-    add(body, box(0.014, 0.028, 0.12), DARK, hx + s * 0.010, 0.725, -0.62);
+    const hx = flankX(s, 0.72, -0.62);                                                         // door handle: its dark pocket, the
+    add(body, box(0.006, 0.05, 0.16), DARK, hx + s * 0.003, 0.72, -0.62);                     // polished pull across it, the lock
+    add(body, mergeGeo([[box(0.016, 0.026, 0.13), [hx + s * 0.011, 0.725, -0.62]],              // barrel ahead of it (merged without
+      [cyl(0.013, 0.013, 0.012, 10), [flankX(s, 0.725, -0.48) + s * 0.004, 0.725, -0.48], [0, 0, PI / 2]]]), POLISH);   // uvs, so it bakes
+                                                                                              // with the lamps' polished surrounds)
   }
   add(body, box(1.10, 0.028, 0.10), PAINT, 0, 1.236, -0.995, 0.34);                            // roof spoiler lip, trailing edge up
   add(body, box(1.10, 0.012, 0.04), DARK, 0, 1.243, -1.03, 0.34);                              // its rubber edge
@@ -493,6 +503,10 @@ export default function (THREE) {
     onFace(nose, s * 0.31, 0.625, 0.34, 0.06, 0.024, HEAD, 0.028);                                 // inner headlamp lens
     onFace(nose, s * 0.545, 0.625, 0.13, 0.06, 0.024, HEAD, 0.028);                                // outer lens pair, following the corner
     onFace(nose, s * 0.685, 0.625, 0.12, 0.06, 0.024, HEAD, 0.028);
+    // the lamps in the band: the inner lens split into three cells by its reflectors' dark walls, and a dark lip along
+    // the top of the band's three lenses, its hood
+    for (const dx of [-0.057, 0.057]) onFace(nose, s * 0.31 + dx, 0.625, 0.008, 0.058, 0.03, DARK, 0.032);
+    for (const [x, w] of [[0.31, 0.35], [0.545, 0.14], [0.685, 0.13]]) onFace(nose, s * x, 0.6585, w, 0.009, 0.034, DARK, 0.036);
   }
   {                                                                                                  // tow hook, low on the right
     const f = faceAt(nose, -0.56), hook = new THREE.Group();
@@ -652,6 +666,15 @@ export default function (THREE) {
       }
     }
   }
+  // in the red cells on the flat of the face, a round reflector each: a dark ring sunk in the lens, the round lamp in
+  // the oblong unit (the outer unit's inner cell, the inner unit's two red ones; the cells round the corner keep plain)
+  for (const s of [-1, 1]) {
+    for (const [i0, i1, f] of [[1, 6, 0.825], [7, 10, 1 / 6], [7, 10, 0.5]]) {
+      const t0 = tOf(lerp(sOf(i0), sOf(i1), f)), t = s > 0 ? t0 : 24 - t0, i = Math.min(Math.floor(t), LP.length - 2), fr = t - i;
+      const x = lerp(LP[i][0], LP[i + 1][0], fr);
+      add(onTail(x, 0.8525, 0.0172), new THREE.RingGeometry(0.019, 0.027, 14), DARK);
+    }
+  }
   {                                                                                                 // number-plate pocket: proud rim, the plate, lamp above
     const pl = onTail(0, 0.60, 0);
     for (const [w, h, x, y] of [[0.36, 0.015, 0, 0.0925], [0.36, 0.015, 0, -0.0925], [0.015, 0.20, -0.1725, 0], [0.015, 0.20, 0.1725, 0]]) add(pl, box(w, h, 0.02), DARK, x, y, 0.006);
@@ -701,9 +724,11 @@ export default function (THREE) {
   };
   for (const s of [-1, 1]) { const sm = sideAt(s, 0.66, -1.72); add(body, box(0.012, 0.03, 0.08), TAIL, sm[0] + s * 0.003, 0.66, -1.72); }   // side markers
   {                                                                                                 // fuel filler on the left rear quarter
-    const fl = sideAt(1, 0.80, -1.64);
-    add(body, new THREE.TorusGeometry(0.052, 0.008, 8, 24), DARK, fl[0] + 0.004, 0.80, -1.64, 0, PI / 2, 0);
-    add(body, cyl(0.045, 0.045, 0.008, 24), DARK, fl[0] + 0.005, 0.80, -1.64, 0, 0, PI / 2);
+    const fl = sideAt(1, 0.80, -1.64);                                                              // (a racing quick-release cap: its
+    add(body, new THREE.TorusGeometry(0.052, 0.008, 8, 24), DARK, fl[0] + 0.004, 0.80, -1.64, 0, PI / 2, 0);   // polished face, a dark
+    add(body, cyl(0.045, 0.045, 0.008, 24), DARK, fl[0] + 0.005, 0.80, -1.64, 0, 0, PI / 2);                   // ring, the lever across)
+    add(body, cyl(0.016, 0.016, 0.012, 12), DARK, fl[0] + 0.011, 0.80, -1.64, 0, 0, PI / 2);
+    add(body, mergeGeo([[cyl(0.036, 0.036, 0.01, 20), [fl[0] + 0.009, 0.80, -1.64], [0, 0, PI / 2]], [box(0.008, 0.012, 0.06), [fl[0] + 0.016, 0.80, -1.64], [0.5, 0, 0]]]), POLISH);
   }
   {                                                                                                 // diffuser: a ramp rising to the back, five fins, two side walls
     const z0 = -1.56, z1 = -1.89, y0 = 0.17, y1 = 0.39, yb = 0.17, rampY = (z) => lerp(y0, y1, (z0 - z) / (z0 - z1));
@@ -752,6 +777,56 @@ export default function (THREE) {
       });
       add(body, loft(secs, { creaseRows: [0, 1, 2, 3], capFront: 0, capBack: 0 }), DARK);         // swan neck, hooked over onto the blade
       add(body, box(0.03, 0.01, 0.07), DARK, s * 0.40, topY(s * 0.40, -1.72) + 0.003, -1.72);     // its foot on the deck
+    }
+  }
+
+  // ---- the livery: twin stripes from the nose over the bonnet, the roof and the boot to the ducktail, a stripe along
+  //      each door, each in gunmetal vinyl with a vermilion pinstripe beside it (the chase camera sees the top and the
+  //      title's orbit the flank); and the door's bottom edge, the front mud flaps --------------------------------------
+  {
+    // the top skin with the bonnet's bulge on it (the bulge is a loft of its own over the skin: see the panel map)
+    const bulgeH = (x, z) => {
+      if (z < 0.5 || z > 1.72) return 0;
+      const h = 0.03 * Math.pow(Math.sin(PI * (z - 0.5) / 1.22), 0.6), ax = Math.abs(x);
+      return ax <= 0.13 ? h : ax < 0.25 ? lerp(h, 0.002, (ax - 0.13) / 0.12) : 0;
+    };
+    const skin = (x, z) => topY(x, z) + bulgeH(x, z);
+    // a band of vinyl from x0 to x1 over the z samples, n points across, 5 mm proud (over the shut lines it crosses, and
+    // over the bulge's twisted quads, whose triangles stand up to 4 mm off the surface the samples assume)
+    const band = (x0, x1, zs, m, n) => {
+      const secs = zs.map((z) => {
+        const lo = [], hi = [];
+        for (let j = 0; j <= n; j++) { const x = lerp(x0, x1, j / n), y = skin(x, z); lo.push([x, y - 0.004, z]); hi.push([x, y + 0.005, z]); }
+        return lo.concat(hi.reverse());
+      });
+      return add(body, loft(secs, { creaseRows: [0, n, n + 1, 2 * n + 1], capFront: 0, capBack: 0 }), m);
+    };
+    // the z samples from z0 to z1: every hull station and every section of the bulge in between (the skin is straight
+    // between them, so a band sampled there never dips under it: at the roof's peak a band sampled across it did), and
+    // a sample every `step` metres besides
+    const span = (z0, z1, step) => {
+      const lo = Math.min(z0, z1), hi = Math.max(z0, z1), set = new Set([z0, z1]);
+      for (const r of rings) if (r[8][2] > lo + 0.005 && r[8][2] < hi - 0.005) set.add(r[8][2]);
+      for (let k = 0; k <= 8; k++) { const z = lerp(0.5, 1.72, k / 8); if (z > lo + 0.005 && z < hi - 0.005) set.add(z); }
+      const n = Math.ceil((hi - lo) / step); for (let i = 1; i < n; i++) set.add(lo + (hi - lo) * i / n);
+      return [...set].sort((a, b) => (z0 > z1 ? b - a : a - b));
+    };
+    // (the pinstripes carry uvs, as the interior's vermilion boxes do, so the game bakes them all into one draw)
+    const withUV = (mesh) => { const gg = mesh.geometry; gg.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(gg.attributes.position.count * 2), 2)); return mesh; };
+    for (const zs of [span(2.05, 0.37, 0.16), span(-0.37, -0.94, 0.15), span(-1.535, -2.02, 0.1)]) {
+      for (const s of [-1, 1]) {
+        band(s * 0.035, s * 0.215, zs, LIVERY, 2);
+        withUV(band(s * 0.232, s * 0.25, zs, VERM, 1));
+      }
+    }
+    for (const s of [-1, 1]) {
+      // (along the door: the band, a silver line over it and the vermilion under it, so on a dark paint, where the
+      // gunmetal goes quiet, the two lines still draw it)
+      flankStrip(s, linePts([0.635, 0.405], [0.635, -0.915], 8), 0.06, LIVERY, 0.0032, 0.006);
+      withUV(flankStrip(s, linePts([0.593, 0.405], [0.593, -0.915], 8), 0.016, VERM, 0.0032, 0.006));
+      withUV(flankStrip(s, linePts([0.676, 0.405], [0.676, -0.915], 8), 0.014, GALV, 0.0032, 0.006));
+      flankStrip(s, linePts([0.262, 0.42], [0.262, -0.93], 8), 0.010);                              // the door's bottom edge
+      add(body, box(0.2, 0.16, 0.014), RUB2, s * 0.75, 0.19, 0.93);                                  // front mud flap
     }
   }
 
@@ -855,6 +930,26 @@ export default function (THREE) {
       geo.rotateZ(-PI / 2); at(geo, RUB2);
     }
     const bead = at(new THREE.TorusGeometry(0.262, 0.008, 6, 44), RUB, hw - 0.012); bead.rotation.y = PI / 2;
+    // the tyre's name in raised pale letters on its outer wall, twice round, opposite each other (made-up letters: the
+    // blocks of a word, some short, so it reads as lettering going by and never as a word)
+    {
+      const P = [], N = [];
+      // (on the wall's own slope, 2 mm proud of it, between the bead and the shoulder)
+      const a = (r) => side * (hw - 0.03 + (r - 0.25) / 0.042 * 0.024 + 0.0022);
+      const tri = (p, q, r) => {
+        const u = [q[0] - p[0], q[1] - p[1], q[2] - p[2]], v = [r[0] - p[0], r[1] - p[1], r[2] - p[2]];
+        const nx = u[1] * v[2] - u[2] * v[1];
+        for (const pt of nx * side >= 0 ? [p, q, r] : [p, r, q]) { P.push(...pt); N.push(side, 0, 0); }
+      };
+      for (const c0 of [PI * 0.5, PI * 1.5]) for (let k = 0; k < 9; k++) {
+        const t0 = c0 - 0.42 + k * 0.094, t1 = t0 + 0.068, r0 = 0.272, r1 = k % 3 === 1 ? 0.283 : 0.289;
+        const pt = (r, t) => [a(r), r * Math.cos(t), r * Math.sin(t)];
+        tri(pt(r0, t0), pt(r1, t0), pt(r1, t1)); tri(pt(r0, t0), pt(r1, t1), pt(r0, t1));
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+      wh.add(new THREE.Mesh(geo, GALV));
+    }
     at(rv([[0.24, -hw + 0.02], [0.222, -hw + 0.05], [0.222, hw - 0.07], [0.215, hw - 0.03]], 40), BRONZ2);        // barrel
     at(rv([[0.20, hw - 0.03], [0.238, hw - 0.03], [0.238, hw + 0.004], [0.20, hw + 0.004]], 40), LIP);            // polished lip
     at(rv([[0.194, hw - 0.034], [0.206, hw - 0.034], [0.206, hw + 0.007], [0.194, hw + 0.007]], 40), GALV);       // machined ring at the lip's inner edge
@@ -881,8 +976,23 @@ export default function (THREE) {
     const hub = new THREE.Group(); hub.name = 'hub' + name;
     hub.position.set(side * 0.75, 0.32, z); hub.rotation.z = side * camberDeg * PI / 180;
     const wh = wheel(side, w); wh.name = 'wheel' + name; hub.add(wh);
-    const disc = new THREE.Mesh(revolve(0, [[0.075, -0.062], [0.160, -0.062], [0.160, -0.038], [0.075, -0.038]].map(([r, a]) => [r, side * a]), 40), DISC); hub.add(disc);
-    const cal = new THREE.Mesh(lathe([[0.105, -0.028], [0.168, -0.028], [0.168, 0.028], [0.105, 0.028], [0.105, -0.028]], 8, -1.25, 1.0), VERM2);
+    // the disc, its outer face in rings so it can carry its slots, and its dark hat: one mesh, its shades in its vertex
+    // colours (a hub is not baked, so every mesh on it is a draw of its own)
+    const dg = revolve(0, [[0.075, -0.062], [0.160, -0.062], [0.160, -0.038], [0.13, -0.038], [0.10, -0.038], [0.075, -0.038], [0.075, -0.016]].map(([r, a]) => [r, side * a]), 32);
+    {
+      const p = dg.attributes.position, col = new Float32Array(p.count * 3), face = side * -0.038;
+      for (let v = 0; v < p.count; v += 3) {
+        const cx = (p.getX(v) + p.getX(v + 1) + p.getX(v + 2)) / 3, cy = (p.getY(v) + p.getY(v + 1) + p.getY(v + 2)) / 3, cz = (p.getZ(v) + p.getZ(v + 1) + p.getZ(v + 2)) / 3;
+        const r = Math.hypot(cy, cz), ph = (Math.atan2(cz, cy) + 2 * PI) % (2 * PI), j = Math.floor(ph / (2 * PI / 32));
+        let k = 1;
+        if (r < 0.08 && Math.abs(cx - face) > 0.001) k = 0.38;                                      // the hat
+        else if (Math.abs(cx - face) < 0.002 && r > 0.1 && (j + (r > 0.13 ? 2 : 0)) % 4 === 0) k = 0.3;   // a slot, stepping out
+        for (let q = 0; q < 3; q++) col.set([k, k, k], (v + q) * 3);
+      }
+      dg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    }
+    const disc = new THREE.Mesh(dg, DISC); hub.add(disc);
+    const cal = new THREE.Mesh(lathe([[0.1, -0.033], [0.176, -0.033], [0.176, 0.033], [0.1, 0.033], [0.1, -0.033]], 9, -1.3, 1.12), VERM2);
     cal.geometry.rotateZ(-PI / 2); cal.position.x = side * -0.05; hub.add(cal);
     g.add(hub);
     return { hub, wh };

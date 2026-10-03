@@ -6,20 +6,23 @@
  * so a floor is a floor at any size), fixes vertical and horizontal neon signs to their fronts (every sign of a
  * chunk is one merged mesh over one atlas), and lays the neon's light on the street: a coloured pool on the
  * pavement and, on a wet road, a long streak down the asphalt, the reflection a wet Tokyo street is made of.
- * Square corners get zebra crossings, a painted STOP, and a signal on the outside of the turn.
+ * Square corners get zebra crossings, a painted STOP, and a signal on the outside of the turn. The kerb's furniture
+ * (the avenues' street trees, the guard rails, the utility boxes) and the rest of the road's paint (lane arrows, the
+ * speed limits, the cycle lanes, the manhole covers) are citystreet.js's, called from here.
  *
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202610032044';
-import { buildingMaterial } from './buildings.js?v=202610032044';
-import { neonAtlas } from './neon.js?v=202610032044';
-import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202610032044';
-import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202610032044';
-import { railSkip } from './citytrain.js?v=202610032044';
-import { carsLoad, parkCar } from './citycars.js?v=202610032044';
-import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202610032044';
-import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202610032044';
+import { clamp, lerp, mulberry32 } from './config.js?v=202610032333';
+import { buildingMaterial } from './buildings.js?v=202610032333';
+import { neonAtlas } from './neon.js?v=202610032333';
+import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202610032333';
+import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202610032333';
+import { railSkip } from './citytrain.js?v=202610032333';
+import { carsLoad, parkCar } from './citycars.js?v=202610032333';
+import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202610032333';
+import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202610032333';
+import { streetLoad, streetChunk, roadPaint, inRail } from './citystreet.js?v=202610032333';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 // the points of a lot's footprint tested against the roads: [along the front (-0.5..0.5 of its width), in (0..1 of its depth)]
@@ -27,8 +30,8 @@ const FIT = [[-0.5, 0], [0, 0], [0.5, 0], [-0.5, 0.35], [0.5, 0.35], [0, 0.5], [
 // how much room each of the pavement's loose things takes (metres round its middle)
 const ITEM_R = { bag: 0.28, crate: 0.3, crates: 0.3, box: 0.3, cone: 0.22, aboard: 0.35, bike: 0.6 };
 // the share of them left out, so their pools stay under their caps (measured along 5 km: bags 1,600 of 1,600, bikes
-// 700 of 700, on HARD the cones 400 of 400, before)
-const THIN = { bag: 0.32, bike: 0.4, cone: 0.1 };
+// 700 of 700, on HARD the cones 400 of 400, before; the bicycles now stand in rows, lighter, in a pool of 1,000)
+const THIN = { bag: 0.32, bike: 0.15, cone: 0.1 };
 
 // facade colours: concrete, tile, dark glass and the odd painted block, and the pale tile a Tokyo street is so much of (by
 // day the street was all dark greys; at night a pale wall takes the neon's colour)
@@ -288,7 +291,7 @@ export function cityLoad(w, Pool, fontFamily) {
     for (const k of ['glossy', 'props']) { const m = w.propMats[k].clone(); m.name = w.propMats[k].name + ' tinted'; m.userData.tinted = true; tint[k] = m; }
     w.propMats.glossyTint = tint.glossy; w.propMats.propsTint = tint.props;
     const TINTED = new Set(['bag', 'crate', 'crates', 'bike']);
-    const CAP = { bag: 1600, crate: 300, crates: 300, box: 300, cone: 480, aboard: 360, bike: 700 };
+    const CAP = { bag: 1600, crate: 300, crates: 300, box: 300, cone: 480, aboard: 360, bike: w.q && w.q.trees < 1 ? 640 : 1000 };
     for (const [name, parts0] of Object.entries(streetItems(THREE))) {
       const parts = parts0.map((p) => ({ geometry: p.geometry, local: new THREE.Matrix4(),
         material: TINTED.has(name) && tint[p.material] ? tint[p.material] : (inst[p.material] || inst.props) }));
@@ -311,6 +314,9 @@ export function cityLoad(w, Pool, fontFamily) {
   carsLoad(w, Pool);                                              // the parked cars' pool (citycars.js)
   w.steamMat = steamLoad(w);                                      // manholes, vents and roofs (citysteam.js)
   w.peopleMat = peopleLoad(w);                                    // in the alleys and the coin parkings (citypeople.js)
+  streetLoad(w, Pool);                                            // the guard rails' and the street trees' pools (citystreet.js)
+  // (the road's paint takes a vertex colour: white, and the blue of the avenues' cycle lanes)
+  w.zebraMat.vertexColors = true;
   // (the building material is drawn only instanced, by the buildings' pool and the terrain's blocks: the pool's own
   // instanced program is compiled at load with every pool, so it is not handed over for a plain mesh's program too,
   // which nothing draws and which cost a second compile of the city's biggest shader)
@@ -814,6 +820,11 @@ export function* cityChunk(w, ch) {
   for (const [x, z] of archPosts(w, ch.c, ch.i1 - ch.i0)) solids.push([x, z, 0.35]);
   for (const [sa, , i0] of cornersOf(Math.max(1, ch.i0 - 90), Math.min(t.nFinal - 1, ch.i1 + 60))) { const [x, z] = signalSpot(pts[i0], sa); solids.push([x, z, 0.35]); }
   const paveOK = (s, side) => { const q = t.sample(s); return !(q.tunnel || (q.express && q.elev > 1) || t.markerAt(q.s, side) || t.padAt(q.s, side)); };
+  // the kerb's furniture (citystreet.js): the avenues' street trees, the utility boxes and the guard rails, which the
+  // pavement's loose things then keep clear of
+  const S = { clearAt, h01, inFoot, nearSolid, solids, clutter, D, paveOK, cornersOf, paint, tris: [] };
+  yield* streetChunk(w, ch, S);
+  yield;
   if (w.propMats) for (const side of [1, -1]) for (let s = s0; s < s1 - 4; s += 30) {
     if (!paveOK(s, side)) continue;
     // the stretch runs on while the pavement does (it used to run on straight: through a bend its bags and bicycles
@@ -829,7 +840,7 @@ export function* cityChunk(w, ch) {
     // (off every road by the thing's own size: at a square corner the stretch runs on into the street across)
     // (and the small things, the cardboard on the walls, the bollards, out of the machines, the poles and the signals)
     const clear = (qx, qz, r) => { g.sample(qx, qz, 2.2, probe); return probe.edge > 0.15 + r && !probe.tunnel && (r > 1 || !nearSolid(qx, qz, Math.min(r, 0.35))); };
-    streetProps(THREE, { ...e0, y: g.height(e0.x, e0.z), length: Math.min(len, s1 - s), along: edgeAt, heightAt: (qx, qz) => g.height(qx, qz), clear }, rng, clutter);
+    streetProps(THREE, { ...e0, y: g.height(e0.x, e0.z), length: Math.min(len, s1 - s), along: edgeAt, heightAt: (qx, qz) => g.height(qx, qz), clear, bikes: w.detail.phone ? 0.6 : 1 }, rng, clutter);
   }
   // the expressway: deck, piers, barriers and their lit strips, and a gantry at the top of the ramp
   yield;
@@ -939,13 +950,16 @@ export function* cityChunk(w, ch) {
       if (sb + 2.5 <= m.s + m.len - 6) paint.push([sb, u1 * m.side, sb + 2.5, u1 * m.side, 0.06]);
     }
   }
+  // the lane arrows, the speed limits, the avenues' blue cycle lanes and the manhole covers (citystreet.js)
+  roadPaint(w, ch, S);
   yield;
   // the red lights on the tall roofs, in the signals' mesh (its shader pulses them)
   for (const [bx, by, bz, ph, sz] of beacons) { const o = new THREE.OctahedronGeometry(sz || 0.26, 0); o.translate(bx, by, bz); lamps.push(lampAttrs(o, 5, ph)); }
   // the pavement's loose things, now that everything solid on it stands: none inside a building (at a corner the
   // pavement a stretch follows can pass behind another street's fronts), none in a coin parking's way in, none
   // standing in a utility pole, a vending machine or a signal
-  for (const [bx, by, bz] of clutter.__bollards || []) if (!inFoot(bx, bz, 0.12) && !nearSolid(bx, bz, 0.12)) w._put('bollard', own, bx, by, bz, rng() * 6.28);
+  // (and none in a guard rail: a run of bollards and a run of rails are two ways of fencing the same kerb)
+  for (const [bx, by, bz] of clutter.__bollards || []) if (!inFoot(bx, bz, 0.12) && !nearSolid(bx, bz, 0.12) && !inRail(S, bx, bz)) w._put('bollard', own, bx, by, bz, rng() * 6.28);
   for (const [name, x, y, z, ry, sc, sx, colour] of clutter.__items || []) {
     const r = (ITEM_R[name] || 0.3) * (sc || 1);
     if (inFoot(x, z, r) || nearSolid(x, z, r)) continue;
@@ -978,18 +992,26 @@ export function* cityChunk(w, ch) {
   if (streaks.length) ch.group.add(drape(w, ch, streaks, w.streakMat, 0.04, true));
   yield;
   // the crossings: a strip of zebra paint across the road, 4 m along it, on the ribbon itself; and the lines of the
-  // diamonds before them and the lay-bys' bays, in the same paint (their uv on the solid of a bar)
-  if (zebras.length || paint.length) {
-    const pos = [], uv = [], idx = [];
+  // diamonds before them and the lay-bys' bays, the arrows, the speed limits and the cycle lanes, in the same paint
+  // (their uv on the solid of a bar; a stroke or a triangle may carry a colour of its own, else white)
+  if (zebras.length || paint.length || S.tris.length) {
+    const pos = [], uv = [], col = [], idx = [];
     const onRoad = (s, u) => { const q = t.sample(s), lx = Math.cos(q.h), lz = -Math.sin(q.h); return [q.x + lx * u, q.y + 0.03 - u * Math.tan(q.bank || 0), q.z + lz * u]; };
-    for (const [sa0, ua0, sb0, ub0, hw] of paint) {
+    // (wound to face up, whichever way round its corners run)
+    const faceUp = (A, B, C) => (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]) > 0;
+    const put = (V, c) => { for (const v of V) { pos.push(v[0], v[1], v[2]); uv.push(0.3, 0.5); col.push(c ? c.r : 1, c ? c.g : 1, c ? c.b : 1); } };
+    for (const [sa0, ua0, sb0, ub0, hw, c] of paint) {
       const l = Math.hypot(sb0 - sa0, ub0 - ua0) || 1, na = -(ub0 - ua0) / l * hw, nc = (sb0 - sa0) / l * hw;
       const V = [onRoad(sa0 - na, ua0 - nc), onRoad(sb0 - na, ub0 - nc), onRoad(sb0 + na, ub0 + nc), onRoad(sa0 + na, ua0 + nc)];
-      // (wound to face up, whichever way round the line runs)
-      const up = (V[1][2] - V[0][2]) * (V[2][0] - V[0][0]) - (V[1][0] - V[0][0]) * (V[2][2] - V[0][2]) > 0;
       const b = pos.length / 3;
-      for (const v of V) { pos.push(v[0], v[1], v[2]); uv.push(0.3, 0.5); }
-      if (up) idx.push(b, b + 1, b + 2, b, b + 2, b + 3); else idx.push(b, b + 2, b + 1, b, b + 3, b + 2);
+      put(V, c);
+      if (faceUp(V[0], V[1], V[2])) idx.push(b, b + 1, b + 2, b, b + 2, b + 3); else idx.push(b, b + 2, b + 1, b, b + 3, b + 2);
+    }
+    for (const [p0, p1, p2, c] of S.tris) {
+      const V = [onRoad(p0[0], p0[1]), onRoad(p1[0], p1[1]), onRoad(p2[0], p2[1])];
+      const b = pos.length / 3;
+      put(V, c);
+      if (faceUp(V[0], V[1], V[2])) idx.push(b, b + 1, b + 2); else idx.push(b, b + 2, b + 1);
     }
     for (const [q] of zebras) {
       const base = pos.length / 3, NS = 2, NU = 8, L = 4.2;
@@ -998,7 +1020,7 @@ export function* cityChunk(w, ch) {
         const qq = t.sample(q.s - L / 2 + (jj / NS) * L), lx = Math.cos(qq.h), lz = -Math.sin(qq.h);
         for (let ii = 0; ii <= NU; ii++) {
           const u = (ii / NU - 0.5) * width;
-          pos.push(qq.x + lx * u, qq.y + 0.028, qq.z + lz * u); uv.push((u + width / 2) / 0.9, jj / NS);
+          pos.push(qq.x + lx * u, qq.y + 0.028, qq.z + lz * u); uv.push((u + width / 2) / 0.9, jj / NS); col.push(1, 1, 1);
         }
       }
       for (let jj = 0; jj < NS; jj++) for (let ii = 0; ii < NU; ii++) {
@@ -1009,6 +1031,7 @@ export function* cityChunk(w, ch) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.setIndex(idx); geo.computeVertexNormals(); geo.computeBoundingSphere();
     ch.own.add(geo);
     const m = new THREE.Mesh(geo, w.zebraMat); m.renderOrder = 1; m.receiveShadow = true; m.name = 'crossings';

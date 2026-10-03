@@ -20,7 +20,7 @@
  * wheels over the rail joints, and a crossing's chirp for the blind as the car passes a signal. Each is placed where it
  * is: quieter, duller and wetter (a street's own reverb) the further off, and panned to its side.
  */
-import { clamp, smoothstep } from './config.js?v=202610032044';
+import { clamp, smoothstep } from './config.js?v=202610032333';
 
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const NOTE_I = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -89,7 +89,7 @@ const lcg = (s) => (Math.imul(s, 1664525) + 1013904223) >>> 0;
 const walking = (clock, ph) => { const u = ((clock + ph * 22) % 22 + 22) % 22; return u >= 14 && u < 19.5; };
 
 // the things the car knocks over (their sounds are in sfx), whose chain rings a bell
-const KNOCKS = new Set(['pole', 'bollard', 'shrub', 'lamp', 'chevron', 'warn', 'mirror', 'vending', 'bag', 'box', 'crate', 'crates', 'cone', 'aboard', 'bike']);
+const KNOCKS = new Set(['pole', 'bollard', 'shrub', 'lamp', 'chevron', 'warn', 'mirror', 'vending', 'bag', 'box', 'crate', 'crates', 'cone', 'aboard', 'bike', 'grail']);
 
 export class Audio {
   constructor() {
@@ -704,7 +704,7 @@ export class Audio {
         noise(0.08, 'bandpass', 1500, 1.3, 0.55); tone('triangle', 460, 170, 0.13, 0.4); break;
       case 'shrub':                           // a bush going flat: a soft whump and a rustle
         noise(0.24, 'lowpass', 520, 0.7, 0.5); noise(0.4, 'bandpass', 3400, 0.8, 0.2, 0.02); break;
-      case 'lamp': case 'chevron': case 'warn': case 'mirror': {   // steel: a crack, then a bell of partials
+      case 'lamp': case 'chevron': case 'warn': case 'mirror': case 'grail': {   // steel: a crack, then a bell of partials (a guard rail's bay too)
         noise(0.05, 'highpass', 2600, 0.7, 0.45);
         for (const [f, p, d] of [[392, 0.24, 1.2], [1046, 0.15, 0.85], [1733, 0.1, 0.6], [2598, 0.06, 0.45]]) tone('sine', f * (0.97 + Math.random() * 0.06), f * 0.98, d, p);
         if (name === 'lamp') { tone('square', 130, 55, 0.3, 0.07); noise(0.34, 'highpass', 5200, 0.5, 0.14, 0.01); }

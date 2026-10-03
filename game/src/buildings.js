@@ -19,8 +19,19 @@
  *   - above it, floors every 3.4 m and bays of about 2.6 m (fitted to the face), in one of four facade types
  *     per building: punched windows, office ribbon windows, paired windows, a glass curtain wall; piers between
  *     the bays and a darker slab band at every floor, a parapet on top and a louvred plant level where a floor
- *     does not fit;
+ *     does not fit. A face of a block of flats is one of three: windows, balconies all across it (a sliding door
+ *     in every bay behind a balustrade of frosted glass, white bars or a solid parapet, partition boards between
+ *     the flats, the air conditioner out on the balcony, laundry on the poles, now and then a futon over the
+ *     rail), or the open corridor that runs along every floor to the flats' doors (a parapet, steel doors and
+ *     barred kitchen windows in the slab's shade, a lamp to every flat, on all night) with the stair's landing
+ *     windows up one end;
+ *   - its windows have their sills and, by day, what hangs behind them: lace or curtains drawn part way in a
+ *     home, blinds let down in an office; an air conditioner hangs under a window here and there, and an upper
+ *     floor let to a bar, a clinic or a school has its name in big characters on the glass (made-up characters:
+ *     a coloured panel, the strokes left clear, lit from behind at night);
  *   - roofs (world normal mostly up) have no windows: a coping round a dark, stained deck.
+ * A third of the plainer buildings are re-clad in the shader in the pale tile, the cream and the brick so much of
+ * Tokyo is (the instance colours are mostly greys), the tiled ones with their grout showing up close.
  * Behind the glass there are rooms (interior mapping): the view ray is followed from the glass into a box room
  * and whatever it meets first (a wall, the floor, the ceiling, or a row of furniture across the room) is drawn from
  * the room atlas (rooms.js), so a shop or a flat has depth that shifts with the camera like the real thing. A shop
@@ -33,9 +44,15 @@
  * Each window's lit or dark, its colour (warm, cool, fluorescent, now and then a coloured one), its brightness
  * and its blinds or curtains come from a hash of its integer cell and the instance's position; office floors come
  * on and go off together. Lit windows are EMISSIVE, scaled by `uNight`, so they glow with no light on them and the
- * brightest bloom a little. By day they are dark glass that reflects the sky (the shops stay lit). Every hash is fed
+ * brightest bloom a little. By day they are glass that reflects the sky (the shops stay lit). Every hash is fed
  * integers and flat (not interpolated) values, and every fine line is filtered by the pixel's footprint (inside a
  * room, the footprint where the ray lands), so nothing shimmers.
+ * At night a wall is never black, as a Tokyo wall at night is not: the city's glow in the haze lights it faintly
+ * from above (more on the upper floors, which see more of the sky, and more on the faces turned toward the city's
+ * brightest quarter, so two faces of a block meet at a visible corner), the street lights its lower floors from
+ * below (warm, or in a sign's colour), its parapet and its corners catch the glow as a pale edge, a lit window
+ * throws a little light on the wall round it, and the tall ones carry red aviation lights at their top corners,
+ * pulsing. All of it is emissive, scaled by `uNight`, so the rig's own lights are untouched.
  *
  * The facade colour is the instance colour (InstancedMesh.setColorAt): three multiplies it into the diffuse
  * colour as it does for any instanced material, and the shader builds the facade from that. Do not set
@@ -45,7 +62,7 @@
  * and every replacement here keeps the chunk it replaces, so the rig's own patches still find theirs.
  */
 import * as THREE from 'three';
-import { roomAtlas, ROOM_KINDS } from './rooms.js?v=202610032044';
+import { roomAtlas, ROOM_KINDS } from './rooms.js?v=202610032333';
 
 export const FLOOR_H = 3.4;    // metres floor to floor
 export const BAY_W = 2.6;      // target bay width (fitted per face)
@@ -133,7 +150,7 @@ float bRun(float x, float d, float period, float key, float lenK, float fwx) {
 }
 // a step and a box, each filtered over w (the pixel's footprint), so the facade does not shimmer
 float bStep(float e, float x, float w) { return clamp((x - e) / w + 0.5, 0.0, 1.0); }
-float bBox(float a, float b, float x, float w) { return bStep(a, x, w) - bStep(b, x, w); }
+float bBox(float a, float b, float x, float w) { return max(bStep(a, x, w) - bStep(b, x, w), 0.0); }
 // stripes of the given duty, fading to their average once they are finer than the pixel
 float bStripe(float x, float period, float duty, float w) {
   float f = fract(x / period), fw = w / period;
@@ -142,12 +159,29 @@ float bStripe(float x, float period, float duty, float w) {
 }
 // a round spot of radius r, filtered
 float bDisc(vec2 q, float r, float w) { return 1.0 - smoothstep(r - w, r + w, length(q)); }
+// a made-up character in heavy strokes, the way a tenant's name is cut out of the vinyl on its windows: up to three
+// bars across and three down, each there or not by the hash h (q over the character's cell, w its footprint there)
+float bGlyph(vec2 q, float h, vec2 w) {
+  float s = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    float y = 0.2 + 0.3 * fk, x = 0.22 + 0.28 * fk;
+    s = max(s, step(0.42, fract(h * (3.1 + fk * 5.3))) * bBox(0.12, 0.88, q.x, w.x) * bBox(y - 0.07, y + 0.07, q.y, w.y));
+    s = max(s, step(0.5, fract(h * (7.7 + fk * 2.9))) * bBox(x - 0.07, x + 0.07, q.x, w.x) * bBox(0.1, 0.9, q.y, w.y));
+  }
+  return s;
+}
 vec3 bAccent(float r) {
   return r < 0.2 ? ${lin(0xff6ec7)} : r < 0.4 ? ${lin(0xa878ff)} : r < 0.6 ? ${lin(0xff5a4a)} : r < 0.8 ? ${lin(0x7affb0)} : ${lin(0x6fe8ff)};
 }
 vec3 bSignCol(float r) {
   return r < 0.22 ? ${lin(0xfff4e6)} : r < 0.36 ? ${lin(0xff3a2a)} : r < 0.5 ? ${lin(0xffc21a)} : r < 0.62 ? ${lin(0x2f7bff)} :
          r < 0.74 ? ${lin(0x22d07a)} : r < 0.86 ? ${lin(0xff4fb0)} : ${lin(0xff8a24)};
+}
+// what hangs out on a balcony to dry: shirts, towels, sheets, mostly pale, now and then a colour
+vec3 bLaundry(float r) {
+  return r < 0.3 ? ${lin(0xf2efe6)} : r < 0.42 ? ${lin(0xa8c4e0)} : r < 0.52 ? ${lin(0xeab0c0)} : r < 0.62 ? ${lin(0xeedc8a)} :
+         r < 0.72 ? ${lin(0x3a4668)} : r < 0.82 ? ${lin(0x9aa2aa)} : r < 0.9 ? ${lin(0xd85a4a)} : ${lin(0x6aa87a)};
 }
 // ---------------------------------------------------------------- rooms behind the glass
 uniform sampler2D uRooms;
@@ -256,6 +290,18 @@ function fsMain() {
   float old = step(0.8, bk.x);
   float grime = mix(0.45, 0.9, bk.y) + 0.5 * old;
   if (old > 0.5) bBase = mix(bBase, bk.z < 0.5 ? ${TILE_BEIGE} : ${TILE_BROWN}, 0.55);
+  // ---- its cladding: a third of the plainer ones are re-clad in the pale tile, the cream and the brick so much of Tokyo
+  // is (the instance colours are mostly greys, and by day the street read dark from end to end); the tiled ones show
+  // their grout up close
+  float clad = fract(bk.y * 13.7 + bi.z * 3.1);
+  float ci = fract(clad * 17.3 + bj.z);
+  float reclad = step(clad, 0.36) * (1.0 - old) * step(bi.x, 0.86);
+  if (reclad > 0.5) {
+    vec3 cc = ci < 0.2 ? ${lin(0xe4e0d6)} : ci < 0.36 ? ${lin(0xd8ccb2)} : ci < 0.52 ? ${lin(0xc4b294)} : ci < 0.64 ? ${lin(0xb2b0aa)} :
+              ci < 0.76 ? ${lin(0x9aa4ae)} : ci < 0.88 ? ${lin(0x8a5e4a)} : ${lin(0xb4846e)};
+    bBase = mix(bBase, cc, 0.85);
+  }
+  float tiled = reclad * step(ci, 0.64);
   float ph = bk.z * 6.2832, ph2 = bj.x * 6.2832;
   // blotchy stains: two octaves of value noise over the face, cells of metres, different on every building
   vec2 sp = vec2(along + face * 23.0 + bk.x * 40.0, hgt + bk.y * 40.0);
@@ -379,18 +425,30 @@ function fsMain() {
     float fx = along - bay * bw;
     float st = bi.x;
     float office = ((st >= 0.4 && st < 0.7) || st >= 0.86) && old < 0.5 ? 1.0 : 0.0;
+    float curtainWall = st >= 0.86 && old < 0.5 ? 1.0 : 0.0;
+    // a face of a block of flats is one of three (the same on every floor): balconies all across it, or the open
+    // corridor that runs along every floor to the flats' doors with the stair at one end, or windows
+    float home = 1.0 - office;
+    float fk = bH1(vec3(face * 3.7 + 0.5, 7.0, 2.0) + seed * 0.31);
+    float balc = home * step(fk, 0.42) * step(9.0, bldH) * step(4.4, faceW);
+    float corr = home * (1.0 - balc) * step(fk, 0.62) * step(12.0, bldH) * step(7.6, faceW) * (1.0 - old);
     float ww, sill, wh, fxw = fx, cellX = bay, bwc = bw;
-    if (st < 0.4 || old > 0.5) { ww = bw * mix(0.44, 0.62, bj.x); sill = 0.95; wh = mix(1.4, 1.8, bj.y); }
+    if (balc > 0.5) { ww = bw - 0.44; sill = 0.36; wh = 2.28; }        // a sliding door out to the balcony in every bay
+    else if (corr > 0.5) { ww = 0.0; sill = 1.0; wh = 1.0; }          // (no windows here: the corridor is drawn below)
+    else if (st < 0.4 || old > 0.5) { ww = bw * mix(0.44, 0.62, bj.x); sill = 0.95; wh = mix(1.4, 1.8, bj.y); }
     else if (st < 0.7) { ww = bw - 0.24; sill = 0.85; wh = 2.0; }
     else if (st < 0.86) { bwc = bw * 0.5; float sb = clamp(floor(fx / bwc), 0.0, 1.0); fxw = fx - sb * bwc; cellX = bay * 2.0 + sb; ww = bwc * 0.64; sill = 1.0; wh = 1.5; }
     else { ww = bw - 0.1; sill = 0.9; wh = 2.34; }
-    float curtainWall = st >= 0.86 && old < 0.5 ? 1.0 : 0.0;
     float wx0 = (bwc - ww) * 0.5;
     float upper = step(fl + 0.5, nFl);                              // 0 on the parapet and plant level
     float win = bBox(wx0, wx0 + ww, fxw, fw.x) * bBox(sill, sill + wh, fy, fw.y) * upper;
     float fr = curtainWall > 0.5 ? 0.035 : 0.065;
     float glassA = bBox(wx0 + fr, wx0 + ww - fr, fxw, fw.x) * bBox(sill + fr, sill + wh - fr, fy, fw.y) * upper;
     float frame = max(win - glassA, 0.0);
+    // far away the cells are finer than the pixels: their average instead of a shimmer
+    float cellPx = min(bwc / fw.x, FLOOR / fw.y);
+    float farW = 1.0 - smoothstep(1.4, 3.5, cellPx);
+    float near = 1.0 - farW;
     // the wall: piers at the bay lines, a darker slab band at every floor
     float slab = 1.0 - bStep(0.34, fy, fw.y);
     float pier = 1.0 - bBox(0.2, bw - 0.2, fx, fw.x);
@@ -398,27 +456,91 @@ function fsMain() {
     wall *= 1.0 - 0.22 * bBox(0.34, 0.41, fy, fw.y);
     wall *= 1.0 - 0.18 * bBox(0.2, 0.26, fx, fw.x) - 0.18 * bBox(bw - 0.26, bw - 0.2, fx, fw.x);
     wall *= 0.95 + 0.1 * bH1(vec3(bay, fl, face) + seed * 0.13);
-    // an old building's mosaic tile, its grout showing only up close
+    // an old building's mosaic tile, its grout showing only up close; a re-clad one's long tiles in courses
     if (old > 0.5) wall *= 1.0 - 0.16 * max(bStripe(fy, 0.1, 0.14, fw.y), bStripe(along, 0.23, 0.1, fw.x)) * fine;
+    else if (tiled > 0.5) wall *= 1.0 - 0.11 * bStripe(fy, 0.068, 0.12, fw.y) * fine;
     // rain and dirt: streaks from every sill, drips from every slab and from the coping, blotches over it all
     vec3 wr = bH3(vec3(cellX + face * 61.0, fl * 1.37 + 0.5, face) + seed * 0.21);
     float key = bk.x * 97.0 + face * 13.0;
-    float sillRun = bRun(fxw, sill - fy, 0.42, key + cellX * 3.0 + fl * 29.0, 1.0, fw.x) * bBox(wx0 - 0.06, wx0 + ww + 0.06, fxw, fw.x) * step(0.34, fy) * upper;
+    float sillRun = bRun(fxw, sill - fy, 0.42, key + cellX * 3.0 + fl * 29.0, 1.0, fw.x) * bBox(wx0 - 0.06, wx0 + ww + 0.06, fxw, fw.x) * step(0.34, fy) * upper * (1.0 - corr);
     float slabRun = bRun(along, FLOOR - fy, 0.62, key + fl * 7.0 + 0.5, 0.8, fw.x) * step(fl + 0.5, nFl);
     float copeRun = bRun(along, bldH - hgt, 0.8, key + 91.0, 1.6, fw.x);
     float runs = max(max(sillRun * 0.95, slabRun * 0.7), copeRun * 0.85) * min(grime, 1.0);
     float dirt = clamp(0.55 * stainK + runs, 0.0, 0.9);
     wall = mix(wall, wall * vec3(0.36, 0.34, 0.3), dirt);
     if (curtainWall > 0.5) wall = mix(wall, glass * 1.6 + bBase * 0.12, 1.0 - slab);      // a curtain wall's spandrel glass
+    // a window's sill: a pale concrete ledge a little wider than the opening, and its shadow on the wall under it
+    float sillK = home * (1.0 - balc) * (1.0 - corr) * upper * near;
+    float sillM = sillK * bBox(wx0 - 0.07, wx0 + ww + 0.07, fxw, fw.x) * bBox(sill - 0.075, sill, fy, fw.y);
+    float sillSh = sillK * bBox(wx0 - 0.05, wx0 + ww + 0.05, fxw, fw.x) * bBox(sill - 0.19, sill - 0.075, fy, fw.y);
+    wall *= 1.0 - 0.4 * sillSh;
     // the parapet and the coping on top; a louvred plant level where a whole floor does not fit
     float plant = (1.0 - upper) * step(1.9, bldH - GF - nFl * FLOOR) * bBox(wx0, wx0 + ww, fxw, fw.x) * bBox(0.7, 2.2, fy, fw.y) * step(fh, bldH - GF - 0.6);
     wall = mix(wall, vec3(0.08, 0.085, 0.09) * (0.7 + 0.5 * bStripe(fy, 0.15, 0.5, fw.y)), plant);
     wall = mix(wall, bBase * 1.1, bBox(bldH - 0.22, bldH + 1.0, hgt, fw.y));
-    vec3 frameCol = office > 0.5 ? mix(bBase, vec3(0.55, 0.57, 0.6), 0.6) : mix(bBase, vec3(0.1), mix(0.55, 0.75, old));
+    // window frames: an office's grey aluminium, a home's white or silver sash (most) or a dark one, an old one's dark
+    float paleSash = home * (1.0 - old) * step(0.35, fract(bj.z * 5.3));
+    vec3 frameCol = office > 0.5 ? mix(bBase, vec3(0.55, 0.57, 0.6), 0.6) : paleSash > 0.5 ? vec3(0.6, 0.61, 0.6) : mix(bBase, vec3(0.1), mix(0.55, 0.75, old));
     col = mix(wall, frameCol, frame);
-    col = mix(col, glass, glassA);
+    // by day, what hangs behind the glass shows a little: a home's lace, or its curtains drawn part way in a colour; an
+    // office's blinds let down part way (at night the rooms behind take over, see below)
+    vec3 dq = bH3(vec3(cellX * 1.9 + 0.7, fl * 1.3 + 0.4, face + 2.0) + seed * 0.23);
+    float wy0 = clamp((fy - sill) / max(wh, 0.01), 0.0, 1.0), wx1 = clamp((fxw - wx0) / max(ww, 0.01), 0.0, 1.0);
+    float fwx1 = fw.x / max(ww, 0.01);
+    vec3 gday = glass;
+    if (office > 0.5) {
+      float blind = step(dq.x, 0.5) * step(1.0 - mix(0.12, 0.9, dq.y), wy0);
+      gday = mix(glass, vec3(0.3, 0.31, 0.32) * (0.78 + 0.22 * bStripe(fy, 0.07, 0.5, fw.y)), blind * 0.8 * (1.0 - curtainWall * 0.5));
+    } else {
+      float lace = step(dq.x, 0.34) * (1.0 - balc * 0.5);
+      float cw2 = mix(0.18, 0.45, dq.y);
+      float drawn = step(0.34, dq.x) * step(dq.x, 0.62) * max(1.0 - bStep(cw2, wx1, fwx1), bStep(1.0 - cw2 * 0.7, wx1, fwx1));
+      vec3 curC = dq.z < 0.4 ? vec3(0.46, 0.4, 0.3) : dq.z < 0.6 ? vec3(0.44, 0.3, 0.3) : dq.z < 0.8 ? vec3(0.3, 0.35, 0.42) : vec3(0.36, 0.39, 0.3);
+      gday = mix(glass, vec3(0.34, 0.34, 0.33), lace * 0.55);
+      gday = mix(gday, curC * 0.75, drawn);
+    }
+    col = mix(col, gday, glassA * near);
+    col = mix(col, glass, glassA * farW);
+    // the sill over it all
+    col = mix(col, bBase * 1.16 + 0.03, sillM);
     glassMask = glassA;
     rough = mix(mix(0.86, 0.6, dirt), 0.14, glassA);
+    // an air conditioner's outdoor unit on its bracket under a window now and then, its pipe up into the wall
+    vec3 aq = bH3(vec3(cellX * 2.7 + 0.9, fl * 1.1 + 0.2, face + 6.0) + seed * 0.19);
+    float acOn = home * (1.0 - balc) * (1.0 - corr) * step(aq.x, 0.2) * upper * step(0.84, sill) * near;
+    if (acOn > 0.5) {
+      float acx = aq.y < 0.5 ? wx0 + 0.02 : wx0 + ww - 0.8;
+      float acB = bBox(acx, acx + 0.78, fxw, fw.x) * bBox(sill - 0.68, sill - 0.13, fy, fw.y);
+      float acSh = bBox(acx + 0.04, acx + 0.82, fxw, fw.x) * bBox(sill - 0.76, sill - 0.68, fy, fw.y);
+      float fan = bDisc(vec2(fxw - acx - 0.3, fy - sill + 0.405), 0.19, fw.x);
+      float pipe = bBox(acx + 0.66, acx + 0.7, fxw, fw.x) * bBox(sill - 0.13, sill - 0.05, fy, fw.y);
+      vec3 acC = vec3(0.6, 0.58, 0.52) * (1.0 - 0.75 * fan * (0.8 + 0.2 * bStripe(fy, 0.05, 0.5, fw.y)));
+      col = mix(col * (1.0 - 0.45 * acSh), acC, acB);
+      col = mix(col, vec3(0.62), pipe);
+      glassMask *= 1.0 - acB;
+      rough = mix(rough, 0.55, acB);
+    }
+    // an upper floor let to a bar, a clinic, a school or a karaoke box: its name in big characters on the glass, a
+    // coloured panel with the strokes left clear, lit from behind at night
+    vec3 sg = bH3(vec3(floor(cellX * 0.5) * 0.37 + 2.1, fl * 3.1 + 1.7, face + 3.0) + seed * 0.41);
+    float signW = (1.0 - balc) * (1.0 - corr) * step(fl, 2.5) * step(sg.x, office > 0.5 ? 0.2 : 0.09) * upper * step(0.8, ww);
+    vec3 signC = vec3(0.0);
+    if (signW > 0.5) {
+      float n = max(1.0, floor(ww / 0.85));
+      float cwid = (ww - 2.0 * fr) / n;
+      float u = (fxw - wx0 - fr) / cwid, v = (fy - sill - fr) / max(wh - 2.0 * fr, 0.01);
+      vec2 gw = vec2(fw.x / cwid, fw.y / (wh * 0.64));
+      float gq = bGlyph(vec2(fract(u), (v - 0.18) / 0.64), floor(u) * 0.618 + sg.y * 17.0 + fl * 3.3 + 0.37, gw);
+      // (the strokes, until a character is a few pixels across; then the panel's own colour, a little paler)
+      gq = mix(gq, 0.3, smoothstep(0.08, 0.22, max(gw.x, gw.y))) * step(0.18, v) * step(v, 0.82);
+      vec3 pc = bSignCol(sg.z);
+      float inv = step(0.6, sg.y);                                    // (now and then white with coloured characters)
+      vec3 panel = inv > 0.5 ? vec3(0.9, 0.88, 0.84) : pc;
+      vec3 chars = inv > 0.5 ? pc : vec3(0.95, 0.94, 0.9);
+      signC = mix(panel, chars, gq * near);
+      col = mix(col, signC * 0.75, glassA);
+      rough = mix(rough, 0.35, glassA);
+    }
     // this window: lit or dark, its colour and brightness, its blinds or curtains
     vec3 fr3 = bH3(vec3(fl * 2.31 + 0.7, 11.0, 5.0) + seed * 0.17);
     float wq = bH1(vec3(cellX * 1.3 + 0.2, fl * 0.7, face + 4.0) + seed * 0.37);
@@ -426,17 +548,15 @@ function fsMain() {
     float lit;
     if (office > 0.5) lit = fr3.x < (litF - 0.08) / 0.78 ? step(wr.x, 0.86) : step(wr.x, 0.08);
     else lit = step(wr.x, clamp(litF + (fr3.y - 0.5) * 0.3, 0.05, 0.95));
+    lit *= 1.0 - signW;
     // a dark flat now and then has only its television on
-    float tv = (1.0 - lit) * (1.0 - office) * step(fract(wq * 17.3), 0.13);
+    float tv = (1.0 - lit) * (1.0 - office) * (1.0 - signW) * step(fract(wq * 17.3), 0.13);
     vec3 wc;
     if (office > 0.5) wc = wr.y < 0.45 ? ${FLUO} : wr.y < 0.8 ? ${COOL} : wr.y < 0.97 ? ${WARM} : bAccent(wr.z);
     else wc = wr.y < 0.6 ? ${WARM} : wr.y < 0.74 ? ${COOL} : wr.y < 0.93 ? ${FLUO} : bAccent(wr.z);
     float br = mix(0.5, 1.2, wr.z) * (wq > 0.93 ? 1.9 : 1.0) * mix(1.0, 0.8, old);
     float wy = clamp((fy - sill) / wh, 0.0, 1.0);
-    float wxr = clamp((fxw - wx0) / ww, 0.0, 1.0);
-    // far away the cells are finer than the pixels: their average instead of a shimmer
-    float cellPx = min(bwc / fw.x, FLOOR / fw.y);
-    float farW = 1.0 - smoothstep(1.4, 3.5, cellPx);
+    float wxr = clamp((fxw - wx0) / max(ww, 0.01), 0.0, 1.0);
     float kindW = fract(wq * 7.31);
     if (glassA > 0.001 && farW < 0.999 && lit + tv > 0.5) {
       // the room behind (traced after the branches): as wide as the bay, floor to ceiling, three to five and a half
@@ -453,7 +573,7 @@ function fsMain() {
         if (kindW < 0.35) { ov = 0.55 * bStripe(fy, 0.07, 0.55, fw.y) * smoothstep(0.0, 0.1, 1.0 - wy * 0.3); ovc = vec3(0.8) * (0.6 + 0.4 * wy); }
       } else if (kindW < 0.5 + 0.2 * old && tv < 0.5) {
         float cw = mix(0.18, 0.42, fract(kindW * 13.7));
-        ov = max(1.0 - bStep(cw, wxr, fw.x / ww), bStep(1.0 - cw * 0.6, wxr, fw.x / ww));
+        ov = max(1.0 - bStep(cw, wxr, fw.x / max(ww, 0.01)), bStep(1.0 - cw * 0.6, wxr, fw.x / max(ww, 0.01)));
         ovc = vec3(1.0, 0.72, 0.5) * mix(0.55, 0.8, wy);
       }
       vec3 lightC = wc * br;
@@ -466,8 +586,115 @@ function fsMain() {
       rMul = lightC * (1.0 - ov) * glassA * (1.0 - farW);
       em = lightC * ovc * ov * glassA;
     }
-    em = mix(em, litF * (office > 0.5 ? ${FLUO} : ${WARM}) * 0.8 * (ww * wh) / (bwc * FLOOR) * upper, farW);
-    col = mix(col, mix(wall, glass, (ww * wh) / (bwc * FLOOR) * upper), farW);
+    // a lit window throws a little of its light on the wall round it
+    if (lit > 0.5 && near > 0.001) {
+      float ddx = max(max(wx0 - fxw, fxw - wx0 - ww), 0.0), ddy = max(max(sill - fy, fy - sill - wh), 0.0);
+      em += wc * br * 0.07 * exp(-length(vec2(ddx, ddy)) / 0.38) * (1.0 - win) * upper * near;
+    }
+    // a tenant's sign glows from behind at night
+    em += signC * 0.6 * glassA * signW;
+    float area = (ww * wh) / (bwc * FLOOR) * upper;
+    em = mix(em, (litF * (office > 0.5 ? ${FLUO} : ${WARM}) * 0.8 * area + signW * signC * 0.4 * area) * (1.0 - corr), farW);
+    if (balc > 0.5) {
+      // ---- the balcony: its slab's edge standing out pale, the balustrade (frosted glass, white bars or a solid parapet,
+      // the same all over the building), the partition board between two flats, and what is out on it: the air
+      // conditioner seen through the rail, laundry on the pole, now and then a futon over the rail to air
+      float rk = fract(bj.y * 7.3 + 0.2);
+      vec3 bq = bH3(vec3(bay * 1.7 + 0.3, fl * 2.3 + 0.1, face + 9.0) + seed * 0.47);
+      float edgeB = bBox(0.0, 0.2, fy, fw.y) * upper;
+      float rail = bBox(0.2, 1.24, fy, fw.y) * upper;
+      float part = (1.0 - bBox(0.06, bw - 0.06, fx, fw.x)) * bBox(0.2, 2.7, fy, fw.y) * upper;
+      vec3 rc; float see;
+      if (rk < 0.4) { rc = vec3(0.4, 0.45, 0.48); see = 0.3; }                                     // frosted glass
+      else if (rk < 0.72) { float bars = bStripe(fx, 0.11, 0.3, fw.x); rc = mix(bBase * 0.3, vec3(0.74, 0.74, 0.72), bars); see = (1.0 - bars) * 0.6; }   // white bars
+      else { rc = bBase * 1.04; see = 0.0; }                                                         // solid
+      // behind the rail: the balcony's floor in shade and, at one end, the air conditioner
+      float acb = step(bq.x, 0.72) * bBox(bq.y < 0.5 ? 0.3 : bw - 1.1, bq.y < 0.5 ? 1.1 : bw - 0.3, fx, fw.x) * bBox(0.24, 0.84, fy, fw.y);
+      vec3 behind = mix(col * 0.55, vec3(0.6, 0.58, 0.52) * (1.0 - 0.7 * bDisc(vec2(fx - (bq.y < 0.5 ? 0.62 : bw - 0.78), fy - 0.54), 0.17, fw.x)), acb);
+      vec3 railC = mix(rc, behind, see);
+      railC = mix(railC, rk < 0.72 ? vec3(0.66, 0.67, 0.68) : bBase * 1.15, bBox(1.18, 1.24, fy, fw.y));      // its handrail
+      col = mix(col, railC, rail);
+      col = mix(col, bBase * 1.12 + 0.02, edgeB);
+      col = mix(col, col * 0.62, bBox(2.84, 3.4, fy, fw.y) * upper * (1.0 - edgeB));      // the slab above throws its shade
+      col = mix(col, vec3(0.7, 0.7, 0.68), part * 0.85);
+      // laundry: a pole across under the slab, and on it shirts, towels and sheets, each its own length and colour
+      float laun = step(bq.z, 0.42) * upper * near;
+      float pole = laun * bBox(2.6, 2.64, fy, fw.y) * bBox(0.2, bw - 0.2, fx, fw.x);
+      float gi = floor(fx / 0.36);
+      vec3 gq = bH3(vec3(gi + bay * 13.0, fl + 0.5, face + 21.0) + seed * 0.13);
+      float glen = mix(0.32, 0.8, gq.y);
+      float garment = laun * step(gq.x, 0.66) * bBox(gi * 0.36 + 0.04, gi * 0.36 + 0.32, fx, fw.x) * bBox(2.62 - glen, 2.62, fy, fw.y) * step(0.24, fx) * step(fx, bw - 0.24);
+      col = mix(col, bLaundry(gq.z) * 0.8, garment);
+      col = mix(col, vec3(0.55), pole);
+      // a futon over the rail, airing in the sun
+      float fut = step(0.86, bq.y) * upper * near * bBox(0.35, min(1.55, bw - 0.3), fx, fw.x) * bBox(0.78, 1.36, fy, fw.y);
+      col = mix(col, bLaundry(fract(bq.x * 7.0)) * 0.85, fut);
+      // the rail, the laundry and the futon stand in front of the room's light
+      float occ = (1.0 - rail * (1.0 - see * 0.8)) * (1.0 - garment) * (1.0 - fut) * (1.0 - part) * (1.0 - edgeB);
+      rMul *= occ; rTV *= occ; em *= mix(1.0, occ, near);
+      glassMask *= occ;
+      rough = mix(rough, 0.5, (1.0 - occ) * near);
+      // far away: the balconies as bands of rail and shade
+      col = mix(col, mix(mix(wall, glass, 0.35), rc, 0.33), farW);
+    } else if (corr > 0.5) {
+      // ---- the open corridor of a block of flats: the parapet along each floor, and behind it, in the slab's shade, a
+      // steel door to every flat with its barred kitchen window beside it, and the corridor's lamps under the slab above,
+      // on all night; the stair at one end, a window at every landing, lit the whole way up
+      float stairBay = fract(bk.x * 3.3) < 0.5 ? 0.0 : nb - 1.0;
+      float isStair = step(abs(bay - stairBay), 0.5);
+      float par = bBox(0.0, 1.2, fy, fw.y) * upper;
+      // (the corridor runs on unbroken from bay to bay, to the face's ends)
+      float openC = bBox(1.2, 3.12, fy, fw.y) * upper * (1.0 - isStair) * bBox(0.3, faceW - 0.3, along, fw.x);
+      float dx0 = 0.22 + 0.36 * fract(bk.z * 7.7);
+      float door = bBox(dx0, dx0 + 0.86, fx, fw.x) * bBox(1.2, 2.42, fy, fw.y);
+      float doorIn = bBox(dx0 + 0.045, dx0 + 0.815, fx, fw.x) * bBox(1.2, 2.375, fy, fw.y);
+      float kw = bBox(dx0 + 1.1, min(dx0 + 1.78, bw - 0.18), fx, fw.x) * bBox(1.62, 2.26, fy, fw.y);
+      float kBars = kw * bStripe(fx, 0.1, 0.25, fw.x) * near;
+      float dc = fract(bj.x * 11.3);
+      vec3 doorC = dc < 0.4 ? vec3(0.3, 0.34, 0.4) : dc < 0.7 ? vec3(0.34, 0.25, 0.19) : vec3(0.62, 0.6, 0.55);
+      // (all of it deep in the slab's shade by day: the corridor reads as a dark band under a pale parapet on every floor)
+      vec3 cc = bBase * 0.3;                                              // the corridor's back wall
+      cc = mix(cc, doorC * 0.2, door);
+      cc = mix(cc, doorC * 0.36, doorIn);
+      cc = mix(cc, vec3(0.16, 0.17, 0.18), kw);
+      cc = mix(cc, vec3(0.4), kBars);
+      cc *= 1.0 - 0.45 * smoothstep(2.4, 3.12, fy);                       // the soffit's shade
+      // the lamp: one to every flat, between its door and its window, under the slab
+      float lpx = dx0 + 0.98;
+      float lampFix = bBox(lpx - 0.15, lpx + 0.15, fx, fw.x) * bBox(2.96, 3.08, fy, fw.y) * upper * (1.0 - isStair);
+      cc = mix(cc, vec3(0.5), lampFix);
+      vec3 lq = bH3(vec3(bay * 3.1 + 0.4, fl * 1.7 + 0.9, face + 33.0) + seed * 0.29);
+      float on = step(lq.x, 0.94);
+      vec3 lc = fract(bk.y * 3.7) < 0.55 ? ${lin(0xe8f4ff)} : ${lin(0xffe2b0)};
+      float pool = exp(-pow((fx - lpx) / 1.1, 2.0)) * smoothstep(1.2, 3.0, fy);
+      // (the light on the back wall and the doors is their own colour, lifted: a dark wall in a lit corridor, brightest
+      // under each lamp, the doors darker shapes in it)
+      em += openC * on * lc * (cc + 0.03) * (1.0 + 3.6 * pool);
+      em += lampFix * on * lc * 2.4;
+      em += kw * openC * step(lq.y, 0.3) * ${WARM} * 0.4 * (1.0 - kBars);
+      col = mix(col, cc, openC);
+      // the parapet: a pale band along every floor (the band of a block of flats from across the street), its top
+      // catching the light
+      col = mix(col, mix(col, bBase * 1.2 + 0.04, 0.55), par * (1.0 - isStair));
+      col = mix(col, bBase * 1.3 + 0.05, bBox(1.14, 1.2, fy, fw.y) * upper * (1.0 - isStair));
+      // the stair: a narrow window at every landing, half a floor up, the flight's handrail across it; lit all night
+      if (isStair > 0.5) {
+        float sx0 = bw * 0.5 - 0.45;
+        float sw = bBox(sx0, sx0 + 0.9, fx, fw.x) * bBox(1.75, 3.05, fy, fw.y) * step(fh, bldH - GF - 0.8);
+        float swIn = bBox(sx0 + 0.05, sx0 + 0.85, fx, fw.x) * bBox(1.8, 3.0, fy, fw.y);
+        float rail = bBox(2.12, 2.17, fy - (fx - sx0) * 0.3, fw.y) * swIn * near;
+        col = mix(col, frameCol, sw);
+        col = mix(col, mix(vec3(0.3, 0.34, 0.36), vec3(0.1), rail), swIn * sw);
+        em += sw * swIn * (1.0 - 0.8 * rail) * ${lin(0xdcecff)} * 0.75;
+        glassMask = max(glassMask, swIn * sw * (1.0 - rail));
+        rough = mix(rough, 0.2, swIn * sw);
+      }
+      // far away: a lit band along every floor
+      col = mix(col, mix(wall, bBase * 0.45, 0.5), farW);
+      em = mix(em, lc * (bBase * 0.38 + 0.04) * upper, farW * 0.85);
+    } else {
+      col = mix(col, mix(wall, glass, area), farW);
+    }
   }
   // the room behind the glass, traced once for whichever branch asked for it
   if (rOn > 0.5) {
@@ -483,6 +710,36 @@ function fsMain() {
   }
   col *= 1.0 - 0.2 * wet * (1.0 - glassMask);
   rough = mix(rough, rough * 0.6, wet * (1.0 - glassMask));
+  // ---- the city's own light on the walls at night: from above, the glow of the haze over the city (more on the upper
+  // floors, which see more of the sky, more in rain, when the cloud is low, and more on the faces turned toward the city's
+  // brightest quarter, so the two faces of a corner never meet as one black); from below, the street's light up the lower
+  // floors, warm, or in the colour of the signs; a pale edge where the parapet and the corners catch the glow; the glass
+  // giving back a little of it at a grazing look
+  {
+    float hk = smoothstep(2.0, 40.0, hgt);
+    float facing = wN.y > 0.7 ? 1.25 : 0.42 + 0.58 * (0.5 + 0.5 * dot(normalize(wN.xz + vec2(1e-4)), vec2(0.6, -0.8)));
+    vec3 skyC = ${lin(0x2a2140)} * (1.0 + 0.35 * wet);
+    vec3 streetC = fract(bj.x * 9.1) < 0.6 ? ${lin(0xffb070)} : bAccent(fract(bk.z * 5.3));
+    float streetK = abs(wN.y) <= 0.7 ? exp(-max(hgt - 3.6, 0.0) / 6.0) : 0.0;
+    vec3 alb = max(col, vec3(0.06));
+    vec3 fill = alb * (skyC * (0.5 + 0.5 * hk) * facing * 2.8 + streetC * 0.42 * streetK);
+    em += fill * (1.0 - glassMask);
+    if (abs(wN.y) <= 0.7) {
+      float rimTop = 1.0 - smoothstep(0.0, max(0.3, 2.0 * fw.y), bldH - hgt);
+      float rimSide = (1.0 - smoothstep(0.0, max(0.22, 2.0 * fw.x), min(along, faceW - along))) * (0.35 + 0.65 * hk);
+      em += skyC * 0.55 * max(rimTop, rimSide);
+      em += glassMask * skyC * 0.6 * (0.35 + 0.65 * (1.0 - abs(bDir.z)));
+    }
+  }
+  // ---- red aviation lights on the tall ones, at the top corners of every face, pulsing slowly each on its own phase
+  // (never smaller than a pixel and a half, so a far tower still shows its lights)
+  if (bldH > 42.0 && abs(wN.y) <= 0.7) {
+    float r = max(0.32, 1.5 * fw0);
+    float ax = min(along, faceW - along) - 0.45;
+    float dot1 = bDisc(vec2(ax, hgt - bldH + 0.55), r, max(fw0, 0.02));
+    float k = max(0.0, sin(uTime * 1.9 + bk.y * 6.2832));
+    em += dot1 * ${lin(0xff2a1e)} * (0.3 + 3.2 * k * k);
+  }
   diffuseColor.rgb = col;
   roughnessFactor = rough;
   // (a shop is lit by day too: its light never quite goes)
@@ -522,6 +779,6 @@ export function buildingMaterial(T = THREE, { night = 1, wet = 0.5 } = {}) {
       .replace('#include <common>', '#include <common>\n' + fsP)
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + fsM);
   };
-  mat.customProgramCacheKey = () => 'bldg3';
+  mat.customProgramCacheKey = () => 'bldg4';
   return mat;
 }
