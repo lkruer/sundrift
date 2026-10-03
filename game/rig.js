@@ -558,7 +558,9 @@ void main() {
   vec3 d = normalize(vDir);
   vec3 col = atmosSky(d);
   float sd = max(dot(d, uAtmSunDir), 0.0);
-  col = mix(col, uSunDisc, smoothstep(0.99925, 0.99965, sd));   // about half a degree across
+  // (SUNDRIFT) the disc grows as it sinks, the big soft sun a setting sun is painted as
+  float low = 1.0 - smoothstep(0.0, 0.3, uAtmSunDir.y);
+  col = mix(col, uSunDisc, smoothstep(mix(0.99925, 0.99842, low), mix(0.99965, 0.99905, low), sd));
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
