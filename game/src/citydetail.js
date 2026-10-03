@@ -726,6 +726,19 @@ export function archPosts(w, c, CH) {
   return out;
 }
 
+/**
+ * Whether s is within m of anything strung or built over the street, in chunk c or either side of it: a shopping
+ * street's arch or any of its strings of lanterns, or a skybridge (a street tree's crown keeps out of them).
+ */
+export function overStreetAt(w, c, CH, s, m) {
+  for (let k = c - 1; k <= c + 1; k++) {
+    const P = streetPieces(w, k, CH); if (!P) continue;
+    if (P.arch && (Math.abs(P.arch.start - s) < m || P.arch.strings.some((q) => Math.abs(q - s) < m + 3))) return true;
+    if (P.bridge && Math.abs(P.bridge.s - s) < m + 2) return true;
+  }
+  return false;
+}
+
 /** Whether anything over the street stands between s0 and s1 (an arch, a skybridge), with margin m. */
 function overStreet(w, c, CH, a, b, m) {
   const lo = Math.min(a, b) - m, hi = Math.max(a, b) + m;

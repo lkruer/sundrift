@@ -27,7 +27,14 @@ and its fastest dawn, and its last run, under RECORDS on the title, each shareab
   under the moon and rose at dawn; by day it has burned off. Fireflies pulse over the verges, thin cloud drifts across the stars,
   now and then a shooting star falls, and the moon (or a low sun) throws shafts of light through the trees.
 - **The city.** Grimy street fronts line the road, with rain streaks, roller shutters, air conditioners, fire
-  escapes, laundry and roof tanks. Behind every lit window there is a room: shelves in the convenience stores,
+  escapes, laundry and roof tanks. Blocks of flats carry balconies across their faces with the washing out, or the
+  open corridors to their doors, lit all night, with the stair at one end; a third of the fronts are clad in the pale
+  tile and the brick so much of Tokyo is, and the tenants upstairs put their names on the glass. At night no wall is
+  black: the haze's glow lights the fronts from above, the street lights them from below, their edges catch the glow,
+  and red lights pulse on the tall roofs. Zelkovas stand in their pits along the avenues, white guard rails line the
+  kerbs into every crossing (the car can take out a bay), the power company's grey boxes stand against the fronts, and
+  the road carries lane arrows, the speed limit, blue cycle lanes and the city's cast manhole covers. Behind every lit
+  window there is a room: shelves in the convenience stores,
   counters and stools in the eateries, arcades, bars, offices, flats and tatami rooms, some dark but for the flicker
   of a TV. Animated LED screens and tickers hang on the fronts and stand on the roofs, concrete poles carry sagging
   power and telecom lines across the streets, a lit arch and strings of red lanterns mark a shopping street, glass
@@ -67,7 +74,9 @@ and its fastest dawn, and its last run, under RECORDS on the title, each shareab
   the records and the settings are drawn on the set the same way. A run comes on with the channel's caption, CH 01,
   and each phase of the night with its own (GOLDEN HOUR, BLUE HOUR, NIGHT, DAWN; FREE DRIVE once the run is over and
   you keep driving).
-- **The car.** Held in a drift, its tail lamps leave thin red light trails hanging in the air behind it, the way a
+- **The car.** It wears twin gunmetal stripes from its nose over the bonnet, the roof and the boot, and one along each
+  door, each with its pinstripe, on any paint; slotted discs and red calipers show through its wheels, and its tyres
+  carry their lettering. Held in a drift, its tail lamps leave thin red light trails hanging in the air behind it, the way a
   drift anime draws a slide at night; the lamps burn brighter on the brakes. The engine is an inline four built
   from its firing pulses (see below), the revs flare as the rear tyres spin up in a slide, it cuts for a moment on
   every upshift and bounces off the limiter, and on a lift from high revs the exhaust pops and spits flame.
@@ -214,7 +223,8 @@ passing 90 degrees).
   of interiors drawn at load, looked into with a parallax so the room has depth). `citydetail.js`: the LED screens
   (one ad atlas, animated in the shader), the overhead wires and their poles, the shopping arches and lantern
   strings, the skybridges, the pavement's paving. `citytrain.js`: the elevated line, its stations and its train.
-  `citycars.js`: the coin parkings' cars. `citysteam.js`: steam out of the manholes in the road, the kitchens'
+  `citycars.js`: the coin parkings' cars. `citystreet.js`: the kerb's furniture (the avenues' street trees, the guard
+  rails, the utility boxes) and the road's paint (lane arrows, speed limits, cycle lanes, manhole covers). `citysteam.js`: steam out of the manholes in the road, the kitchens'
   vents and the tall roofs, lit by the light nearest it. `citypeople.js`: people where a car cannot reach them, at
   the mouths of the alleys and in the coin parkings, umbrellas up in the rain (and in the rooms' atlas, customers
   at the counters, shoppers, players at the machines, someone working late). A few neon tubes are failing and

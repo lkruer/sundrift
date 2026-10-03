@@ -669,6 +669,93 @@ stylish and look incredible. make the tv border much smaller".
 - **Measured.** Desktop gate 0 slow frames, worst 17 ms, peak 761 draws; phone gate 0 slow frames, worst 17 ms,
   peak 432 draws.
 
+## 3 October, evening: NEO TOKYO by night and by day, the kerb, the car's livery
+
+Asked for: "add detail to everything, make everything look better, make environment more detailed", with a critic's
+three findings on the city (at night the facades read as black slabs; by day they are flat window grids; the street's
+furniture is thin) and a list for the car (shut lines, handles, the fuel cap, lamp internals, tips, mud flaps, the tow
+hook, the tyres' walls, discs and calipers, a livery that reads on every paint).
+
+- **Why the fronts were black at night.** The rig's fill is a third of the day's at night and the environment map is
+  the night sky's, so a wall's only light was the five real lamps near the car: the windows glowed and the walls
+  between them, their edges and their setbacks were the colour of the sky's darkest band. The building shader now
+  gives every wall the city's own light, emissive and scaled by `uNight` (the rig is untouched): the haze's glow from
+  above (violet, stronger on the upper floors, which see more sky, and in rain, under a low cloud), more on the faces
+  turned toward one quarter of the sky than the others, so the two faces of a corner never meet as one black; the
+  street's light from below, warm or in a sign's colour, fading over the first floors; a pale edge where the parapet
+  and the corners catch the glow; a lit window's light on the wall round it; the dark glass giving back a little of the
+  glow at a grazing look; and red aviation lights pulsing at the top corners of everything over 42 m (never smaller
+  than a pixel and a half, so the far towers keep theirs). The neon is as bright as it was and still the brightest
+  thing in the street.
+- **By day.** A third of the plainer buildings are re-clad in the shader in the pale tile, cream, beige, grey, blue-grey
+  and brick so much of Tokyo is (the instance colours were mostly greys: the street read dark from end to end), the
+  tiled ones with their courses showing up close. Windows have pale sills with their shadow, homes white or silver
+  sashes, and by day what hangs behind the glass (lace, curtains drawn part way in a colour, an office's blinds let
+  down); an air conditioner hangs under one window in five. A face of a block of flats is now one of three: windows;
+  balconies all across it (a sliding door in every bay behind frosted glass, white bars or a solid parapet, the
+  partition boards, the air conditioner out on the balcony, the washing on the poles, now and then a futon over the
+  rail), which sit behind lotProps' own balconies where a street front has them; or the open corridor along every
+  floor, a pale parapet band over a dark one, doors and barred kitchen windows in the slab's shade, a lamp to every
+  flat on all night, the stair's landing windows up one end. An upper floor let to a bar or a school carries its name
+  on the glass in made-up characters, lit from behind at night.
+- **The kerb** (citystreet.js, new). Zelkovas pruned to the pavement on the avenues' straights (EASY only; every 11 m,
+  16.5 m on a phone), in pits with iron grates, clear of the lamps, the poles, the signals, the signs and LED towers
+  that stand out from the fronts and anything strung over the street. Their bark and leaves are the pass's broadleaf's
+  materials, so no program is new and the night tints them; their trunks are solid, 1.6 m in from the kerb (the first
+  1.3 m stays the car's, as for the utility poles), and a hit shakes out green leaves. White guard rails (yellow now and
+  then, by a school) along every crossing's approaches, ending at it as they do in Tokyo, and in runs on the straights:
+  a bay is a knockable instance in a pool of its own (it flies like a bollard; no bollard stands where a rail does).
+  The power company's grey boxes stand against the fronts, solid. Bicycles stand in rows of three to eight (a lighter
+  bicycle, 130 triangles: its tubes open-ended, its wheels ten-sided; the pool 1,000, 640 on a phone, thinned 15 % not
+  40 %).
+- **The road.** Lane arrows before every corner (on an avenue the kerb lane turns left, the middle one right), the
+  speed limit after it (40 on the avenues, 30 in the back streets, as stroke digits), on the avenues a blue cycle lane
+  inside each edge line with its bicycle and arrows, broken at the crossings, and the city's cast manhole covers (a
+  ring of cherry blossom round a ginkgo leaf) where the road's texture always had its covers and the steam comes out.
+  All of it in the crossings' mesh, whose material now takes a vertex colour: no new material, one draw a chunk.
+- **The car.** A livery that reads on every paint: twin gunmetal stripes from the nose over the bonnet (riding its
+  bulge), the roof and the boot to the ducktail, and a band along each door, with vermilion pinstripes and a silver line
+  over the door band (the gunmetal carries it on the pale and bright paints, the lines on the dark ones); its own
+  material (`livery`), so the paint selector never recolours it. A first version of the stripes dipped under the roof's
+  peak (sampled across a hull station: the skin is straight only between stations, so the stripes are now sampled at
+  every station and every section of the bonnet's bulge, and stand 5 mm proud for the bulge's twisted quads). The door's
+  bottom edge, a polished pull and lock in each handle's pocket, a racing quick-release fuel cap, the pop-ups' twin
+  reflector rings, the bumper lamps split into cells under a hood, a round reflector in each red tail cell, front mud
+  flaps, raised lettering round the tyres' outer walls (made-up words, in the machined ring's material), slotted discs
+  with a dark hat (vertex colours: a hub is not baked, so each of its meshes is a draw), bigger calipers. Every new part
+  is in a material the body or its joint already bakes, and with the attributes its bucket has (the asset library
+  merges by material and attribute set: pinstripes without uvs were a draw of their own until they had them): the car
+  is one draw more (98 meshes, was 97) and 37,926 triangles (was 34,114, +11 %). Every name, pivot and lamp the game
+  reads is as it was.
+- **Measured.** The car in the verifier: 37,926 triangles (was 34,114, +11 %), clean, the same size; in the game 98
+  meshes (was 97) and 94 shadow casters (93). Along the city course the new pools held at most 460 rail bays of 620,
+  68 trees of 360 and 858 bicycles of 1,000, and no shader program was compiled after the city's load (100 programs
+  from the start of a run to s = 4,500 and 22:00). The drift gates, before and after (ready, peak draws, peak
+  triangles, slow frames over 34 ms; all four drifted and passed):
+
+  | gate | before | after |
+  |---|---|---|
+  | NEO TOKYO, desktop | 6.5 s, 700, 0.94 M, 0 | 8.6 s, 724, 0.98 M, 1 |
+  | NEO TOKYO, phone | 6.5 s, 622, 0.73 M, 4; again 6.1 s, 476, 0.68 M, 2 | 7.8 s, 634, 0.75 M, 4 |
+  | the pass, desktop | 6.9 s, 645, 1.08 M, 0 | 6.9 s, 634, 1.07 M, 2 |
+  | the pass, phone | 5.9 s, 415, 0.69 M, 0 | 6.5 s, 408, 0.71 M, 0 |
+
+  The machine was shared and busy (another process at up to 94 % of the CPU) while these ran, and the numbers move
+  with it and with the bot's line more than with this round: interleaved, the before and after city gates came to
+  ready 7.1 / 8.1 s against 7.0 / 7.3 s on the desktop and 6.7 / 6.1 s against 6.5 / 6.3 s on the phone; peak draws
+  831 / 710 against 829 / 714 and 464 / 618 against 507 / 469 (the peaks come where the run ends and the car stands
+  looking down an avenue, before as after); slow frames 1 / 0 against 1 / 0 and 5 / 0 against 4 / 0, every one a stall
+  between frames (the frame before it 100 to 540 ms outside the game's own work) and none at the same place twice.
+  Frame for frame at the gate's eight metres the city draws 5 to 20 more on the desktop (the trees, the rails, the
+  road's paint in chunks that had none, the livery) and 0 to 13 more on a phone, with 3 to 8 % more triangles; the pass
+  2 to 5 more. The first build of the city, cold, took 0.9 s longer in one A/B (the building shader is bigger), and
+  the same once warm.
+- **Not done, or still wrong.** Bus lanes: バス専用 is not in the fonts' character list, and adding it means changing
+  index.html's font request. A knocked guard rail scores as main.js's default, SMASH! 40 (it sounds as steel, in
+  audio.js); main.js could give it a name (`grail: ['RAIL!', 40]` in SMASH) and a spark trail (`grail` in its steel
+  list). The street trees are new solid things on the avenues' pavements: a slide that runs wide onto the pavement
+  can now meet one. The facades' night light is the shader's own, not the rig's: a wall by a lamp is lit twice.
+
 ## 24 September, night: the type as sharp as the screen
 
 Asked for: "the UI and HUD are still a little blurry and look low definition. fix and submit".

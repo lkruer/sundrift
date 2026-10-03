@@ -12,10 +12,12 @@
  * yellow gas pipe, kitchen ducts climbing from the shops, steel fire-escape stairs, balconies with laundry and
  * futons over the rail, rooftop water tanks on stands, antenna masts, billboard frames, roof railings; over the
  * shop fronts striped awnings or noren, and red paper lanterns at the izakaya doors.
- * On the pavement: garbage bags (blue and black) and crates in clumps, cardboard, parked bicycles, traffic cones,
- * A-frame boards, manhole covers, drain grates along the kerb and puddles. The loose things (bags, crates, boxes,
- * cones, boards, bicycles) are not built into the chunk: their places go to out.__items for instanced pools the car
- * can knock them out of (streetItems() gives each one's geometry), and nothing is put where a road runs.
+ * On the pavement: garbage bags (blue and black) and crates in clumps, cardboard, rows of parked bicycles, traffic
+ * cones, A-frame boards, manhole covers, drain grates along the kerb and puddles. The loose things (bags, crates,
+ * boxes, cones, boards, bicycles) are not built into the chunk: their places go to out.__items for instanced pools
+ * the car can knock them out of (streetItems() gives each one's geometry), and nothing is put where a road runs.
+ * For the kerb's furniture (citystreet.js places it): a guard rail's bay for its knockable pool, a street tree pruned
+ * to the pavement for its pool, the utility companies' boxes, a tree's pit, the manhole covers in the road.
  *
  * Every piece is written straight into arrays, one BufferGeometry per material per call, with position, normal
  * and uv, indexed. Colours come from one small shared canvas (a palette of flat swatches plus a few patterns);
@@ -74,14 +76,22 @@ function sheet(T) {
     c.fillStyle = 'rgba(0,0,0,0.5)'; for (const x of [16, 32, 48]) c.fillRect(k * 64 + x - 1, 166, 2, 26);
     c.fillStyle = 'rgba(255,255,255,0.15)'; c.fillRect(k * 64, 128, 64, 5);
   }
-  // a manhole cover: a rim, rings and a hatch of cast lines
-  { const x = 128 + 32, y = 160;
+  // a manhole cover, cast the way Tokyo's are: a rim, a ring of cherry blossoms round a ginkgo leaf (the city's own
+  // mark), raised studs between for grip
+  { const x = 128 + 32, y = 160, TAU = Math.PI * 2;
     c.fillStyle = '#3a3c40'; c.fillRect(128, 128, 64, 64);
-    c.fillStyle = '#6a6c70'; c.beginPath(); c.arc(x, y, 30, 0, Math.PI * 2); c.fill();
-    c.fillStyle = '#4a4c50'; c.beginPath(); c.arc(x, y, 26, 0, Math.PI * 2); c.fill();
-    c.strokeStyle = '#7a7c80'; c.lineWidth = 2;
-    for (const r of [8, 16, 22]) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke(); }
-    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; c.beginPath(); c.moveTo(x + Math.cos(a) * 8, y + Math.sin(a) * 8); c.lineTo(x + Math.cos(a) * 22, y + Math.sin(a) * 22); c.stroke(); } }
+    c.fillStyle = '#727478'; c.beginPath(); c.arc(x, y, 30, 0, TAU); c.fill();
+    c.fillStyle = '#4a4c50'; c.beginPath(); c.arc(x, y, 26.5, 0, TAU); c.fill();
+    c.fillStyle = '#5a5c60';
+    for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) { const dx = i * 4 + (j & 1) * 2, dy = j * 4; if (Math.hypot(dx, dy) < 25 && Math.hypot(dx, dy) > 11) { c.beginPath(); c.arc(x + dx, y + dy, 1.1, 0, TAU); c.fill(); } }
+    c.fillStyle = '#8c8e92';
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * TAU, bx = x + Math.cos(a) * 18, by = y + Math.sin(a) * 18;
+      for (let p = 0; p < 5; p++) { const b = a + (p / 5) * TAU; c.beginPath(); c.arc(bx + Math.cos(b) * 2.6, by + Math.sin(b) * 2.6, 2.2, 0, TAU); c.fill(); }
+    }
+    c.beginPath(); c.moveTo(x, y + 7); c.arc(x, y + 7, 12, -Math.PI * 0.82, -Math.PI * 0.18); c.closePath(); c.fill();
+    c.fillStyle = '#4a4c50'; c.beginPath(); c.moveTo(x - 2.2, y - 5.2); c.lineTo(x, y - 0.5); c.lineTo(x + 2.2, y - 5.2); c.closePath(); c.fill();
+    c.fillRect(x - 0.8, y + 1, 1.6, 7); }
   // a drain grate: bars
   c.fillStyle = '#16171a'; c.fillRect(192, 128, 64, 64);
   c.fillStyle = '#5a5c60'; for (let i = 0; i < 9; i++) c.fillRect(192 + 2 + i * 7, 128, 3, 64);
@@ -175,12 +185,15 @@ class Mesher {
       this.quad(mat, P, nrm(n), (faces && faces[fi]) || uv);
     }
   }
-  /** A beam between two points with a square section of side t (the section turned by `roll` round it). */
-  beam(mat, p0, p1, t, uv, up = [0, 1, 0]) {
+  /**
+   * A beam between two points with a square section of side t (the section turned by `roll` round it); caps false
+   * leaves its two ends open (a tube that runs into something at both ends: a bicycle's frame).
+   */
+  beam(mat, p0, p1, t, uv, up = [0, 1, 0], caps = true) {
     const d = sub(p1, p0), L = Math.hypot(d[0], d[1], d[2]) || 1e-6, f = mul(d, 1 / L);
     let side = cross(f, up); if (Math.hypot(side[0], side[1], side[2]) < 1e-3) side = cross(f, [1, 0, 0]);
     side = nrm(side); const up2 = nrm(cross(side, f));
-    this.box(mat, mul(add(p0, p1), 0.5), mul(f, L / 2), mul(side, t / 2), mul(up2, t / 2), uv);
+    this.box(mat, mul(add(p0, p1), 0.5), mul(f, L / 2), mul(side, t / 2), mul(up2, t / 2), uv, null, caps ? null : [0, 1]);
   }
   /** A tube of n sides from p0 to p1, radius r0 to r1, smooth sides; caps optional. */
   cyl(mat, p0, p1, r0, r1, n, uv, capTop = false, capBottom = false) {
@@ -701,7 +714,11 @@ function bag(M, P, x, z, s, h0, rng, colour) {
   M.lathe('glossy', c, [[0.0, 0.0], [0.26 * k, 0.05 * k], [0.3 * k, 0.26 * k], [0.2 * k, 0.46 * k], [0.05 * k, 0.55 * k], [0.07 * k, 0.62 * k], [0.0, 0.64 * k]], 6, sw(colour), 0.9 + rng() * 0.4, 0.8 + rng() * 0.3);
 }
 
-/** A parked bicycle (a mamachari: step-through frame, front basket), in the frame (a, b) at (x, z), turned by t. */
+/**
+ * A parked bicycle (a mamachari: step-through frame, front basket), in the frame (a, b) at (x, z), turned by t. (About
+ * 130 triangles: its tubes run open-ended into each other and its wheels have ten sides, so a row of them in front of
+ * every few shops costs what a scattering of them did.)
+ */
 function bicycle(M, F, x, z, t, rng, paintIdx = null) {
   const [ax, bx] = F.turn(t);
   const base = F.P(x, z, 0);
@@ -709,7 +726,7 @@ function bicycle(M, F, x, z, t, rng, paintIdx = null) {
   const paint = sw(paintIdx ?? pick(rng, [C.bSilver, C.bBlack, C.bRed, C.bBlue, C.bWhite, C.bPink, C.bGreen, C.bSilver]));
   // the wheels: flat rings, drawn from both sides
   for (const u of [-0.52, 0.52]) {
-    const cxz = Q(u, 0.33), n = 12;
+    const cxz = Q(u, 0.33), n = 10;
     const g = M.g('fabric'), b0 = g.p.length / 3;
     const nn = nrm(cross(ax, [0, 1, 0]));                        // the side the ring's winding faces
     for (let i = 0; i <= n; i++) {
@@ -718,17 +735,16 @@ function bicycle(M, F, x, z, t, rng, paintIdx = null) {
     }
     for (let i = 0; i < n; i++) { const a = b0 + i * 2; g.i.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
     M.tris += n * 2;
-    M.box('metal', cxz, mul(ax, 0.04), [0, 0.04, 0], mul(bx, 0.05), sw(C.silver));
   }
-  const tube = 0.035;
+  const tube = 0.035, up = [0, 1, 0];
   const BB = Q(0, 0.3), seat = Q(-0.14, 0.82), head = Q(0.38, 0.86), headLo = Q(0.42, 0.66), rear = Q(-0.52, 0.33), front = Q(0.52, 0.33);
-  M.beam('props', headLo, BB, tube, paint);                     // the step-through down tube
-  M.beam('props', BB, seat, tube, paint);
-  M.beam('props', BB, rear, tube * 0.8, paint);
-  M.beam('props', seat, rear, tube * 0.7, paint);
-  M.beam('props', head, front, tube * 0.8, paint);              // the fork
-  M.beam('metal', head, Q(0.33, 1.02), 0.03, sw(C.silver));
-  M.beam('metal', Q(0.3, 1.02, -0.28), Q(0.3, 1.02, 0.28), 0.025, sw(C.silver));           // the bars
+  M.beam('props', headLo, BB, tube, paint, up, false);          // the step-through down tube
+  M.beam('props', BB, seat, tube, paint, up, false);
+  M.beam('props', BB, rear, tube * 0.8, paint, up, false);
+  M.beam('props', seat, rear, tube * 0.7, paint, up, false);
+  M.beam('props', head, front, tube * 0.8, paint, up, false);  // the fork
+  M.beam('metal', head, Q(0.33, 1.02), 0.03, sw(C.silver), up, false);
+  M.beam('metal', Q(0.3, 1.02, -0.28), Q(0.3, 1.02, 0.28), 0.025, sw(C.silver), up, false);   // the bars
   M.box('props', Q(-0.16, 0.88), mul(ax, 0.13), [0, 0.035, 0], mul(bx, 0.07), sw(C.black));  // the saddle
   M.box('metal', Q(0.62, 0.86), mul(ax, 0.16), [0, 0.12, 0], mul(bx, 0.17), sw(C.midgrey), null, [2]);   // the basket
   M.box('metal', Q(-0.5, 0.62), mul(ax, 0.18), [0, 0.015, 0], mul(bx, 0.1), sw(C.silver));  // the rear carrier
@@ -828,12 +844,13 @@ export function streetProps(T, seg, rng, out) {
     }
   }
 
-  // parked bicycles, a row of them at an angle against the buildings
+  // parked bicycles: rows of them at an angle against the buildings, shoulder to shoulder, the way they line the front
+  // of a shop or a station (seg.bikes scales how many rows: fewer on a phone)
   const BIKES = [C.bSilver, C.bBlack, C.bRed, C.bBlue, C.bWhite, C.bPink, C.bGreen, C.bSilver];
-  for (let n = Math.round((0.6 + rng() * 0.8) * k), i = 0; i < n; i++) {
-    const s = spot(1.5, L - 3), bikes = 2 + Math.floor(rng() * 4), t = -(1.1 + rng() * 0.3);
+  for (let n = Math.round((0.45 + rng() * 0.9) * k * (seg.bikes ?? 1)), i = 0; i < n; i++) {
+    const s = spot(1.5, L - 3), bikes = 3 + Math.floor(rng() * 6), t = -(1.1 + rng() * 0.3);
     for (let j = 0; j < bikes; j++) {
-      const ss = s + j * 0.6; if (ss > L - 0.5) break;
+      const ss = s + j * 0.58; if (ss > L - 0.5) break;
       item('bike', at(ss), ss, 1.9 + (rng() - 0.5) * 0.1, t + (rng() - 0.5) * 0.12, 1, 1, PALETTE[pick(rng, BIKES)]);
     }
   }
@@ -887,6 +904,121 @@ export function streetItems(T = THREE) {
     aboard: one((M) => board(M)),
     bike: one((M) => bicycle(M, F, 0, 0, 0, rng, C.white)),
   };
+}
+
+/**
+ * One bay of a pedestrian guard rail (the white guard pipe along a Tokyo kerb; yellow ones near a school): two posts
+ * with their caps and two rails between them, 2 m long along local x, on the ground at the origin. Drawn white in the
+ * sheet, so the instance's colour paints it. For the caller's knockable instances: { geometry, material }, material a
+ * key into cityPropMaterials() (about 70 triangles).
+ */
+export function guardRailGeometry(T = THREE) {
+  const M = new Mesher();
+  const W = sw(C.white);
+  for (const x of [-0.97, 0.97]) {
+    M.cyl('glossy', [x, 0, 0], [x, 0.82, 0], 0.042, 0.042, 6, W);
+    M.cyl('glossy', [x, 0.82, 0], [x, 0.87, 0], 0.042, 0.014, 6, W);
+  }
+  for (const y of [0.42, 0.76]) M.cyl('glossy', [-1.0, y, 0], [1.0, y, 0], 0.032, 0.032, 6, W);
+  const out = {};
+  M.flush(T, out);
+  return { geometry: out.glossy[0], material: 'glossy' };
+}
+
+/**
+ * A street tree as the city keeps them, a zelkova pruned to the pavement: a clean trunk to above the awnings, three
+ * short limbs, and a crown cut narrow on the road's side and the buildings', long along the street (four icosahedron
+ * blobs, every vertex pushed in or out by a hash so none reads as a ball). Local x runs along the street, z across it,
+ * on the ground at the origin: 7.2 m tall, the crown 4.1 m along by 1.9 m across from 3.1 m up. Returns { trunk,
+ * crown }, each a BufferGeometry with position and normal (about 250 triangles in all).
+ */
+export function streetTreeGeometry(T = THREE) {
+  const flat = (g) => { const n = g.index ? g.toNonIndexed() : g; n.deleteAttribute('uv'); return n; };
+  const merge = (list) => {
+    const parts = list.map(flat);
+    let nv = 0; for (const g of parts) nv += g.attributes.position.count;
+    const pos = new Float32Array(nv * 3); let o = 0;
+    for (const g of parts) { pos.set(g.attributes.position.array, o); o += g.attributes.position.array.length; g.dispose(); }
+    const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(pos, 3)); out.computeVertexNormals(); out.computeBoundingSphere();
+    return out;
+  };
+  // the trunk, tapering, and its limbs, each a short tube from inside the trunk up and out to the crown
+  const bark = [];
+  { const c = new T.CylinderGeometry(0.1, 0.15, 3.3, 7, 1, true); c.translate(0, 1.65, 0); bark.push(c); }
+  for (const [ax, az, len, tilt] of [[1, 0.15, 1.5, 0.62], [-1, -0.1, 1.4, 0.58], [0.2, 1, 1.0, 0.4]]) {
+    const c = new T.CylinderGeometry(0.05, 0.08, len, 5, 1, true);
+    c.translate(0, len / 2, 0);
+    c.rotateZ(-Math.atan2(ax, 1) * tilt * 1.4); c.rotateX(Math.atan2(az, 1) * tilt * 0.6);
+    c.translate(0, 2.6, 0); bark.push(c);
+  }
+  // the crown: two big blobs and two small, squeezed across the street
+  const crown = [];
+  let s = 977;
+  const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  for (const [x, y, z, rx, ry, rz, det] of [[0.1, 5.0, 0, 1.3, 1.55, 0.95, 1], [-0.95, 4.25, 0.08, 1.0, 1.1, 0.82, 1], [1.0, 4.35, -0.06, 1.05, 1.1, 0.8, 0], [0.15, 6.25, 0, 0.85, 0.95, 0.66, 0]]) {
+    const g = new T.IcosahedronGeometry(1, det);
+    const p = g.attributes.position;
+    // (one push per vertex position, so the faces that share a corner still meet)
+    const pushed = new Map();
+    for (let i = 0; i < p.count; i++) {
+      const k = `${p.getX(i).toFixed(3)},${p.getY(i).toFixed(3)},${p.getZ(i).toFixed(3)}`;
+      if (!pushed.has(k)) pushed.set(k, 0.86 + rnd() * 0.26);
+      const f = pushed.get(k);
+      p.setXYZ(i, p.getX(i) * rx * f + x, p.getY(i) * ry * f + y, p.getZ(i) * rz * f + z);
+    }
+    crown.push(g);
+  }
+  return { trunk: merge(bark), crown: merge(crown) };
+}
+
+/**
+ * A pad-mounted box of the power or the telephone company on the pavement against the fronts (chijou kiki: grey-green
+ * steel on a concrete plinth, a louvre, a yellow warning plate and a number plate), facing the road. lot as lotProps
+ * ({ x, y, z, fx, fz, lx, lz }: its front's middle at the pavement, along the road, toward the building). Returns its
+ * half size [along, across] for the caller's collision box.
+ */
+export function utilityBoxProps(T, lot, rng, out) {
+  const M = new Mesher();
+  const F = frame([lot.x, lot.y, lot.z], [lot.fx, 0, lot.fz], [-lot.lx, 0, -lot.lz]);
+  const w = 0.5 + rng() * 0.18, h = 0.62 + rng() * 0.12, d = 0.26 + rng() * 0.06;      // half sizes
+  // (z runs out from the front toward the road: the box stands a hand's breadth off the wall)
+  const body = sw(pick(rng, [C.lightgrey, C.silver, C.lightgrey, C.moss])), z = d + 0.06;
+  M.box('props', F.P(0, z, 0.06), F.A(w + 0.05), F.U(0.06), F.B(d + 0.05), sw(C.concrete), null, [3]);          // the plinth
+  M.box('metal', F.P(0, z, 0.12 + h), F.A(w), F.U(h), F.B(d), body, null, [3]);
+  M.box('metal', F.P(0, z, 0.14 + 2 * h), F.A(w + 0.035), F.U(0.025), F.B(d + 0.035), sw(C.midgrey));          // its lid's lip
+  // on its face: the louvre, the door's seam, the warning plate, the number plate
+  const fz = z + d + 0.006;
+  M.box('decal', F.P(-w * 0.45, fz, 0.12 + h * 1.55), F.A(w * 0.35), F.U(h * 0.18), F.B(0.006), sw(C.darkgrey));
+  M.box('decal', F.P(0, fz, 0.12 + h), F.A(0.008), F.U(h * 0.9), F.B(0.006), sw(C.midgrey));
+  M.box('decal', F.P(w * 0.5, fz, 0.12 + h * 1.45), F.A(0.09), F.U(0.07), F.B(0.006), sw(C.yellow));
+  M.box('decal', F.P(w * 0.5, fz, 0.12 + h * 1.05), F.A(0.11), F.U(0.045), F.B(0.006), sw(C.white));
+  M.flush(T, out);
+  return [w + 0.05, d + 0.05, d + 0.06];
+}
+
+/**
+ * A street tree's pit in the pavement: the cast-iron grate round the trunk and the concrete kerb round the pit. At
+ * (x, y, z) on the pavement, turned along (fx, fz); W along the street, D across it.
+ */
+export function treePitProps(T, p, out) {
+  const M = new Mesher();
+  const F = frame([p.x, p.y, p.z], [p.fx, 0, p.fz], [-p.lx, 0, -p.lz]);
+  const W = p.W / 2, D = p.D / 2, g = PAT.grate;
+  M.quadN('decal', [F.P(-W, -D, 0.022), F.P(W, -D, 0.022), F.P(W, D, 0.022), F.P(-W, D, 0.022)], [0, 1, 0],
+    [[g[0], g[1]], [g[2], g[1]], [g[2], g[3]], [g[0], g[3]]]);
+  const k = sw(C.concrete);
+  M.box('props', F.P(0, -D - 0.05, 0.04), F.A(W + 0.1), F.U(0.04), F.B(0.05), k, null, [3]);
+  M.box('props', F.P(0, D + 0.05, 0.04), F.A(W + 0.1), F.U(0.04), F.B(0.05), k, null, [3]);
+  M.box('props', F.P(-W - 0.05, 0, 0.04), F.A(0.05), F.U(0.04), F.B(D), k, null, [3]);
+  M.box('props', F.P(W + 0.05, 0, 0.04), F.A(0.05), F.U(0.04), F.B(D), k, null, [3]);
+  M.flush(T, out);
+}
+
+/** Manhole covers on the road: [x, y, z, along x, along z] each, the cover a cast disc 0.66 m across (in the decal). */
+export function roadManholes(T, list, out) {
+  const M = new Mesher();
+  for (const [x, y, z, ax, az] of list) M.flat('decal', x, y, z, () => 0.33, 14, PAT.manhole, [ax, 0, az], [-az, 0, ax]);
+  M.flush(T, out);
 }
 
 /**

@@ -1,0 +1,302 @@
+Drift gates for the detail round (NEO TOKYO's facades, its kerb and its road; the car's livery and fittings).
+Each block is the gate's own summary. gate_before_* ran on HEAD c3911b2's game folder, gate_final_* on this
+round's; ab_base_* and ab_now_* ran interleaved, the two folders one after the other, on a shared machine with
+another process at up to 94 % of the CPU.
+
+== gate_before_city
+  frame 0  39 m  79 km/h  slip 0  drift 0  score 0  draws 668  tris 893791  fps 60
+  frame 1  113 m  72 km/h  slip -1  drift 1  score 0  draws 639  tris 937625  fps 60
+  frame 2  188 m  69 km/h  slip -19  drift 1  score 308  draws 531  tris 754437  fps 60
+  frame 3  263 m  53 km/h  slip 30  drift 1  score 1943  draws 631  tris 810809  fps 60
+  frame 4  339 m  96 km/h  slip -18  drift 2  score 1943  draws 581  tris 735844  fps 60
+  frame 5  415 m  126 km/h  slip -17  drift 2  score 1943  draws 526  tris 621653  fps 60
+  frame 6  488 m  119 km/h  slip 25  drift 3  score 1943  draws 496  tris 572070  fps 60
+  frame 7  563 m  81 km/h  slip 6  drift 0  score 2545  draws 525  tris 601213  fps 60
+mode            desktop 1280x720, click and keys
+ready           6.5 s
+covered         601 m, average 70 km/h
+drifts banked   9  at metres 175, 236, 237, 238, 239, 241, 242, 514, 556
+peak slip       43 deg   samples in drift 224 of 327
+peak draws      700   peak tris 942,330   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+
+== gate_before_city_phone
+  frame 0  39 m  81 km/h  slip 0  drift 0  score 0  draws 459  tris 663845  fps 60
+  frame 1  113 m  80 km/h  slip -7  drift 1  score 0  draws 447  tris 642599  fps 56
+  frame 2  188 m  70 km/h  slip -18  drift 1  score 671  draws 341  tris 483797  fps 60
+  frame 3  263 m  48 km/h  slip 33  drift 1  score 1301  draws 404  tris 547860  fps 60
+  frame 4  340 m  102 km/h  slip -7  drift 0  score 2341  draws 373  tris 511270  fps 60
+  frame 5  415 m  128 km/h  slip -14  drift 1  score 2341  draws 343  tris 444668  fps 60
+  frame 6  491 m  112 km/h  slip -5  drift 2  score 2341  draws 344  tris 451324  fps 60
+  frame 7  563 m  55 km/h  slip 27  drift 2  score 2731  draws 447  tris 510345  fps 60
+mode            phone 390x844 @3x, real touches
+ready           6.5 s
+covered         601 m, average 61 km/h
+drifts banked   12  at metres 131, 132, 177, 236, 238, 241, 243, 297, 514, 518, 523, 584
+peak slip       82 deg   samples in drift 208 of 374
+peak draws      622   peak tris 729,933   median fps 60
+slow frames     4 over 34 ms, worst 350 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[18.5,227,83,10.9,249.2,8.6,14.9],[18.8,227,267,1.2,0.3,8.3,268.2],[19.2,227,350,1.1,0.2,7.2,7.2],[19.6,227,333,6.4,1.5,30.9,344.5]]
+
+== gate_before_city_phone2
+  frame 0  39 m  79 km/h  slip 0  drift 0  score 0  draws 463  tris 667077  fps 60
+  frame 1  114 m  74 km/h  slip 5  drift 1  score 0  draws 443  tris 644713  fps 59
+  frame 2  190 m  68 km/h  slip -25  drift 1  score 1190  draws 348  tris 463787  fps 60
+  frame 3  263 m  60 km/h  slip 0  drift 1  score 2808  draws 417  tris 537914  fps 60
+  frame 4  338 m  102 km/h  slip 6  drift 1  score 2808  draws 362  tris 505058  fps 60
+  frame 5  413 m  123 km/h  slip -16  drift 2  score 2808  draws 360  tris 447514  fps 60
+  frame 6  490 m  108 km/h  slip -22  drift 2  score 2808  draws 343  tris 451110  fps 60
+  frame 7  564 m  65 km/h  slip 1  drift 1  score 3018  draws 341  tris 424890  fps 60
+mode            phone 390x844 @3x, real touches
+ready           6.1 s
+covered         601 m, average 69 km/h
+drifts banked   15  at metres 132, 145, 146, 147, 147, 148, 152, 227, 240, 241, 242, 252, 512, 515, 572
+peak slip       79 deg   samples in drift 204 of 336
+peak draws      476   peak tris 684,431   median fps 60
+slow frames     2 over 34 ms, worst 183 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[33.5,508,183,1.7,1.2,24.4,188.7],[33.6,509,117,0.6,1.5,24.3,115.4]]
+
+== gate_before_pass
+  frame 0  38 m  81 km/h  slip 0  drift 0  score 0  draws 522  tris 776606  fps 60
+  frame 1  114 m  124 km/h  slip 5  drift 0  score 0  draws 504  tris 947357  fps 60
+  frame 2  188 m  139 km/h  slip 16  drift 1  score 0  draws 494  tris 896872  fps 56
+  frame 3  271 m  40 km/h  slip 5  drift 1  score 20  draws 469  tris 822431  fps 60
+  frame 4  338 m  84 km/h  slip -9  drift 2  score 110  draws 455  tris 822702  fps 60
+  frame 5  413 m  92 km/h  slip -2  drift 0  score 229  draws 594  tris 877855  fps 60
+  frame 6  489 m  128 km/h  slip -1  drift 0  score 349  draws 627  tris 989643  fps 60
+  frame 7  563 m  133 km/h  slip -34  drift 0  score 814  draws 583  tris 989670  fps 60
+mode            desktop 1280x720, click and keys
+ready           6.9 s
+covered         606 m, average 66 km/h
+drifts banked   9  at metres 244, 291, 297, 391, 441, 442, 539, 563, 583
+peak slip       66 deg   samples in drift 137 of 330
+peak draws      645   peak tris 1,084,904   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+
+== gate_before_pass_phone
+  frame 0  38 m  80 km/h  slip 0  drift 0  score 0  draws 308  tris 478100  fps 60
+  frame 1  113 m  124 km/h  slip 0  drift 0  score 0  draws 304  tris 574113  fps 60
+  frame 2  190 m  145 km/h  slip 13  drift 1  score 0  draws 300  tris 570953  fps 55
+  frame 3  265 m  140 km/h  slip -30  drift 2  score 240  draws 323  tris 564266  fps 60
+  frame 4  339 m  91 km/h  slip -9  drift 2  score 240  draws 313  tris 563532  fps 60
+  frame 5  414 m  93 km/h  slip -3  drift 1  score 240  draws 400  tris 615390  fps 60
+  frame 6  489 m  130 km/h  slip 2  drift 1  score 409  draws 365  tris 611314  fps 60
+  frame 7  564 m  89 km/h  slip 21  drift 1  score 819  draws 362  tris 688367  fps 60
+mode            phone 390x844 @3x, real touches
+ready           5.9 s
+covered         602 m, average 95 km/h
+drifts banked   7  at metres 239, 248, 258, 423, 514, 519, 520
+peak slip       39 deg   samples in drift 152 of 246
+peak draws      415   peak tris 689,857   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+
+== gate_final_city
+  frame 0  39 m  81 km/h  slip 0  drift 0  score 0  draws 673  tris 928795  fps 60
+  frame 1  114 m  74 km/h  slip 0  drift 1  score 0  draws 637  tris 940689  fps 59
+  frame 2  188 m  62 km/h  slip -29  drift 1  score 270  draws 537  tris 781481  fps 60
+  frame 3  263 m  63 km/h  slip 24  drift 1  score 420  draws 627  tris 836065  fps 60
+  frame 4  339 m  90 km/h  slip 3  drift 1  score 4020  draws 567  tris 728137  fps 60
+  frame 5  414 m  119 km/h  slip -18  drift 2  score 4020  draws 549  tris 637555  fps 60
+  frame 6  488 m  107 km/h  slip -37  drift 2  score 4020  draws 527  tris 582092  fps 60
+  frame 7  563 m  40 km/h  slip -14  drift 1  score 4650  draws 633  tris 681040  fps 60
+mode            desktop 1280x720, click and keys
+ready           8.6 s
+covered         601 m, average 64 km/h
+drifts banked   19  at metres 144, 145, 145, 146, 228, 229, 297, 298, 299, 306, 307, 309, 311, 314, 522, 523, 523, 550, 553
+peak slip       83 deg   samples in drift 250 of 375
+peak draws      724   peak tris 976,510   median fps 60
+slow frames     1 over 34 ms, worst 267 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[28.3,500,267,6,1.4,47.5,274.5]]
+
+== gate_final_city_phone
+  frame 0  61 m  98 km/h  slip 0  drift 0  score 0  draws 459  tris 647783  fps 56
+  frame 1  113 m  93 km/h  slip 3  drift 1  score 0  draws 448  tris 693473  fps 60
+  frame 2  189 m  67 km/h  slip -30  drift 1  score 900  draws 345  tris 465045  fps 60
+  frame 3  264 m  61 km/h  slip -11  drift 1  score 3364  draws 414  tris 540668  fps 60
+  frame 4  340 m  108 km/h  slip -5  drift 0  score 3838  draws 379  tris 519764  fps 60
+  frame 5  413 m  130 km/h  slip 2  drift 1  score 3838  draws 364  tris 444852  fps 60
+  frame 6  489 m  122 km/h  slip -14  drift 1  score 3838  draws 349  tris 451726  fps 60
+  frame 7  564 m  62 km/h  slip -3  drift 1  score 3838  draws 459  tris 531598  fps 60
+mode            phone 390x844 @3x, real touches
+ready           7.8 s
+covered         602 m, average 56 km/h
+drifts banked   13  at metres 145, 145, 146, 151, 226, 243, 244, 249, 251, 252, 256, 302, 594
+peak slip       67 deg   samples in drift 158 of 373
+peak draws      634   peak tris 746,241   median fps 60
+slow frames     4 over 34 ms, worst 534 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[4,45,84,0.9,2.3,16.9,90.2],[17.2,230,534,2.3,0.8,70.3,543.2],[17.5,231,350,25.5,4.7,57.5,106.9],[17.6,232,67,5.8,1.9,45.4,51.5]]
+
+== gate_final_pass
+  frame 0  38 m  80 km/h  slip 0  drift 0  score 0  draws 525  tris 788042  fps 60
+  frame 1  114 m  124 km/h  slip 5  drift 0  score 0  draws 509  tris 964047  fps 60
+  frame 2  189 m  144 km/h  slip -3  drift 1  score 0  draws 497  tris 958136  fps 60
+  frame 3  263 m  73 km/h  slip -9  drift 1  score 20  draws 625  tris 980345  fps 60
+  frame 4  338 m  83 km/h  slip 6  drift 0  score 511  draws 467  tris 840905  fps 60
+  frame 5  413 m  68 km/h  slip -21  drift 1  score 511  draws 538  tris 803267  fps 58
+  frame 6  489 m  120 km/h  slip 5  drift 0  score 716  draws 616  tris 967960  fps 60
+  frame 7  570 m  40 km/h  slip 15  drift 1  score 1066  draws 552  tris 1057397  fps 60
+mode            desktop 1280x720, click and keys
+ready           6.9 s
+covered         601 m, average 71 km/h
+drifts banked   5  at metres 248, 316, 454, 550, 557
+peak slip       77 deg   samples in drift 176 of 335
+peak draws      634   peak tris 1,070,352   median fps 60
+slow frames     2 over 34 ms, worst 517 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[20.7,361,250,1.4,131.4,121.1,252.3],[21.3,362,517,20.8,1.6,91.9,510.8]]
+
+== gate_final_pass_phone
+  frame 0  38 m  80 km/h  slip 0  drift 0  score 0  draws 310  tris 485724  fps 60
+  frame 1  114 m  124 km/h  slip -1  drift 0  score 0  draws 305  tris 580297  fps 60
+  frame 2  189 m  144 km/h  slip 11  drift 1  score 0  draws 302  tris 578901  fps 56
+  frame 3  266 m  144 km/h  slip -22  drift 2  score 0  draws 316  tris 572260  fps 60
+  frame 4  338 m  109 km/h  slip 3  drift 2  score 0  draws 309  tris 572268  fps 60
+  frame 5  413 m  101 km/h  slip -7  drift 0  score 368  draws 368  tris 568547  fps 60
+  frame 6  488 m  98 km/h  slip 3  drift 1  score 458  draws 381  tris 673741  fps 60
+  frame 7  564 m  108 km/h  slip -1  drift 2  score 458  draws 362  tris 701842  fps 60
+mode            phone 390x844 @3x, real touches
+ready           6.5 s
+covered         603 m, average 97 km/h
+drifts banked   4  at metres 387, 429, 434, 588
+peak slip       44 deg   samples in drift 133 of 236
+peak draws      408   peak tris 709,966   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+
+== ab_base_city_1
+  frame 0  38 m  80 km/h  slip 0  drift 0  score 0  draws 665  tris 888303  fps 60
+  frame 1  113 m  72 km/h  slip -15  drift 1  score 0  draws 631  tris 901879  fps 56
+  frame 2  188 m  65 km/h  slip -25  drift 1  score 433  draws 529  tris 764056  fps 60
+  frame 3  263 m  62 km/h  slip 5  drift 1  score 1268  draws 624  tris 801329  fps 60
+  frame 4  338 m  109 km/h  slip 1  drift 0  score 1707  draws 568  tris 731368  fps 60
+  frame 5  414 m  116 km/h  slip -37  drift 2  score 2207  draws 551  tris 648948  fps 60
+  frame 6  489 m  79 km/h  slip -10  drift 2  score 6082  draws 533  tris 572952  fps 60
+  frame 7  563 m  45 km/h  slip -6  drift 1  score 6192  draws 604  tris 595834  fps 60
+mode            desktop 1280x720, click and keys
+ready           7.1 s
+covered         600 m, average 65 km/h
+drifts banked   20  at metres 177, 239, 240, 241, 242, 242, 278, 396, 398, 399, 400, 419, 420, 421, 422, 425, 426, 516, 545, 546
+peak slip       49 deg   samples in drift 234 of 385
+peak draws      831   peak tris 934,412   median fps 60
+slow frames     1 over 34 ms, worst 417 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[9.3,140,417,1.8,1.3,137.7,415.2]]
+
+== ab_now_city_1
+  frame 0  39 m  81 km/h  slip 0  drift 0  score 0  draws 673  tris 928795  fps 60
+  frame 1  114 m  75 km/h  slip 1  drift 1  score 0  draws 645  tris 973433  fps 60
+  frame 2  189 m  82 km/h  slip -17  drift 1  score 731  draws 546  tris 800142  fps 40
+  frame 3  263 m  52 km/h  slip 32  drift 1  score 781  draws 625  tris 804647  fps 60
+  frame 4  339 m  96 km/h  slip -2  drift 0  score 3816  draws 588  tris 749838  fps 60
+  frame 5  413 m  125 km/h  slip -18  drift 1  score 3816  draws 557  tris 687082  fps 60
+  frame 6  490 m  115 km/h  slip -29  drift 2  score 3816  draws 512  tris 589768  fps 60
+  frame 7  570 m  39 km/h  slip 7  drift 1  score 5186  draws 617  tris 638625  fps 60
+mode            desktop 1280x720, click and keys
+ready           7.0 s
+covered         601 m, average 63 km/h
+drifts banked   20  at metres 130, 171, 232, 267, 271, 272, 272, 273, 277, 279, 280, 325, 520, 521, 532, 533, 534, 555, 560, 598
+peak slip       72 deg   samples in drift 229 of 384
+peak draws      829   peak tris 978,244   median fps 60
+slow frames     1 over 34 ms, worst 150 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[11.7,180,150,0.4,1.2,14.8,10.8]]
+
+== ab_base_cityphone_1
+  frame 0  39 m  80 km/h  slip 0  drift 0  score 0  draws 462  tris 666873  fps 60
+  frame 1  113 m  74 km/h  slip -2  drift 1  score 0  draws 446  tris 653483  fps 59
+  frame 2  188 m  65 km/h  slip -14  drift 1  score 1040  draws 346  tris 461573  fps 60
+  frame 3  263 m  57 km/h  slip 15  drift 1  score 2510  draws 416  tris 549612  fps 60
+  frame 4  339 m  101 km/h  slip 5  drift 1  score 2510  draws 374  tris 521942  fps 60
+  frame 5  413 m  128 km/h  slip -1  drift 2  score 2510  draws 348  tris 446030  fps 60
+  frame 6  489 m  117 km/h  slip -26  drift 2  score 2510  draws 348  tris 457270  fps 60
+  frame 7  563 m  70 km/h  slip 2  drift 1  score 2590  draws 348  tris 445173  fps 60
+mode            phone 390x844 @3x, real touches
+ready           6.7 s
+covered         600 m, average 70 km/h
+drifts banked   14  at metres 133, 145, 145, 146, 147, 152, 221, 236, 238, 241, 242, 248, 516, 569
+peak slip       69 deg   samples in drift 209 of 333
+peak draws      464   peak tris 681,773   median fps 60
+slow frames     5 over 34 ms, worst 417 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[17.7,229,50,0.7,1.2,7.6,55.3],[17.8,230,50,6.6,1.6,10.9,47.9],[18.2,230,417,2.3,3.6,66.2,430.6],[18.4,231,233,1,0.2,63.3,15.1],[18.7,233,83,3.8,2,30,92.1]]
+
+== ab_now_cityphone_1
+  frame 0  39 m  81 km/h  slip 0  drift 0  score 0  draws 465  tris 667567  fps 60
+  frame 1  113 m  69 km/h  slip 10  drift 1  score 0  draws 451  tris 644571  fps 60
+  frame 2  188 m  67 km/h  slip -13  drift 1  score 2244  draws 347  tris 447037  fps 60
+  frame 3  263 m  62 km/h  slip 0  drift 1  score 4497  draws 420  tris 535514  fps 60
+  frame 4  339 m  105 km/h  slip 7  drift 1  score 4497  draws 365  tris 503122  fps 60
+  frame 5  413 m  126 km/h  slip -20  drift 2  score 4497  draws 361  tris 444240  fps 60
+  frame 6  491 m  112 km/h  slip 5  drift 2  score 4497  draws 348  tris 450522  fps 60
+  frame 7  565 m  68 km/h  slip 2  drift 1  score 5047  draws 446  tris 495483  fps 60
+mode            phone 390x844 @3x, real touches
+ready           6.5 s
+covered         601 m, average 70 km/h
+drifts banked   20  at metres 144, 144, 144, 145, 145, 146, 151, 155, 223, 243, 244, 245, 251, 252, 515, 516, 516, 518, 523, 571
+peak slip       77 deg   samples in drift 215 of 332
+peak draws      507   peak tris 671,997   median fps 60
+slow frames     4 over 34 ms, worst 117 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[1.2,9,50,6.1,1.6,20.2,55.7],[1.3,9,50,1.3,1.6,19.1,46],[34.4,506,117,1.6,1.5,15.3,113.3],[34.5,507,83,1.3,0.2,12.5,90.5]]
+
+== ab_base_city_2
+  frame 0  40 m  81 km/h  slip 0  drift 0  score 0  draws 665  tris 888303  fps 60
+  frame 1  113 m  72 km/h  slip -9  drift 1  score 0  draws 633  tris 910701  fps 60
+  frame 2  188 m  61 km/h  slip -29  drift 1  score 0  draws 531  tris 747665  fps 60
+  frame 3  263 m  62 km/h  slip 12  drift 1  score 1835  draws 633  tris 806421  fps 60
+  frame 4  340 m  107 km/h  slip -6  drift 0  score 2382  draws 573  tris 729104  fps 60
+  frame 5  414 m  132 km/h  slip -9  drift 1  score 2382  draws 534  tris 616959  fps 60
+  frame 6  488 m  112 km/h  slip -13  drift 2  score 2382  draws 502  tris 569546  fps 60
+  frame 7  563 m  48 km/h  slip -29  drift 1  score 2802  draws 515  tris 583641  fps 60
+mode            desktop 1280x720, click and keys
+ready           8.1 s
+covered         601 m, average 64 km/h
+drifts banked   15  at metres 236, 237, 238, 239, 239, 241, 242, 244, 301, 511, 512, 512, 513, 514, 539
+peak slip       73 deg   samples in drift 237 of 382
+peak draws      710   peak tris 936,390   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+
+== ab_now_city_2
+  frame 0  38 m  80 km/h  slip 0  drift 0  score 0  draws 673  tris 928795  fps 60
+  frame 1  113 m  73 km/h  slip -16  drift 1  score 0  draws 639  tris 941331  fps 56
+  frame 2  188 m  70 km/h  slip -15  drift 1  score 296  draws 533  tris 781865  fps 60
+  frame 3  263 m  58 km/h  slip 24  drift 1  score 341  draws 621  tris 830815  fps 60
+  frame 4  338 m  99 km/h  slip 3  drift 2  score 391  draws 555  tris 728731  fps 60
+  frame 5  414 m  111 km/h  slip -18  drift 2  score 391  draws 548  tris 663976  fps 60
+  frame 6  490 m  105 km/h  slip 32  drift 3  score 391  draws 498  tris 585368  fps 60
+  frame 7  564 m  79 km/h  slip 5  drift 0  score 900  draws 525  tris 617289  fps 60
+mode            desktop 1280x720, click and keys
+ready           7.3 s
+covered         601 m, average 70 km/h
+drifts banked   7  at metres 164, 244, 245, 309, 515, 515, 558
+peak slip       41 deg   samples in drift 217 of 341
+peak draws      714   peak tris 975,174   median fps 60
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)
+
+== ab_base_cityphone_2
+  frame 0  38 m  80 km/h  slip 0  drift 0  score 0  draws 459  tris 664001  fps 60
+  frame 1  114 m  76 km/h  slip 4  drift 1  score 0  draws 438  tris 641601  fps 59
+  frame 2  188 m  66 km/h  slip -16  drift 1  score 1520  draws 352  tris 448349  fps 60
+  frame 3  263 m  61 km/h  slip 13  drift 1  score 3027  draws 418  tris 536696  fps 60
+  frame 4  340 m  106 km/h  slip -10  drift 1  score 3279  draws 372  tris 509770  fps 60
+  frame 5  413 m  129 km/h  slip -1  drift 1  score 3279  draws 355  tris 443870  fps 60
+  frame 6  488 m  125 km/h  slip -12  drift 2  score 3279  draws 343  tris 449180  fps 60
+  frame 7  563 m  41 km/h  slip -10  drift 1  score 3429  draws 478  tris 545892  fps 60
+mode            phone 390x844 @3x, real touches
+ready           6.1 s
+covered         601 m, average 57 km/h
+drifts banked   19  at metres 132, 145, 145, 146, 147, 147, 148, 149, 152, 227, 237, 238, 241, 242, 243, 295, 511, 513, 586
+peak slip       68 deg   samples in drift 185 of 398
+peak draws      618   peak tris 719,101   median fps 60
+slow frames     0 over 34 ms, worst 34 ms (after the first second of the run)
+
+== ab_now_cityphone_2
+  frame 0  38 m  80 km/h  slip 0  drift 0  score 0  draws 465  tris 667723  fps 60
+  frame 1  114 m  77 km/h  slip 0  drift 1  score 0  draws 447  tris 652711  fps 59
+  frame 2  188 m  67 km/h  slip -16  drift 1  score 1050  draws 344  tris 446845  fps 60
+  frame 3  263 m  62 km/h  slip 2  drift 1  score 1949  draws 419  tris 542092  fps 60
+  frame 4  339 m  108 km/h  slip 5  drift 0  score 2412  draws 370  tris 509188  fps 60
+  frame 5  413 m  130 km/h  slip -8  drift 1  score 2412  draws 359  tris 443668  fps 60
+  frame 6  489 m  121 km/h  slip -25  drift 1  score 2412  draws 353  tris 461730  fps 60
+  frame 7  564 m  68 km/h  slip 4  drift 1  score 2912  draws 350  tris 450009  fps 60
+mode            phone 390x844 @3x, real touches
+ready           6.3 s
+covered         600 m, average 69 km/h
+drifts banked   18  at metres 145, 145, 146, 147, 147, 148, 152, 228, 247, 247, 248, 294, 516, 517, 517, 520, 520, 571
+peak slip       81 deg   samples in drift 178 of 339
+peak draws      469   peak tris 682,801   median fps 60
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)
