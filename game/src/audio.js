@@ -952,7 +952,9 @@ export class Audio {
       // the clock entering a phase of the night (config.js PHASES): a few notes of its own, under everything
       case 'phase': this._phase(t, e.value); break;
       case 'best': this._fanfare(t); break;
-      case 'jturn': this.whoosh(0.8); this._note(t + 0.05, this._key(0), 'triangle', 0.12, 0.1); this._note(t + 0.13, this._key(4), 'triangle', 0.3, 0.1); break;
+      // (the two notes are the J-turn's 500: one that did not pay, 250 m not yet driven since the last that did, is the
+      // whoosh alone)
+      case 'jturn': this.whoosh(0.8); if (e.value > 0) { this._note(t + 0.05, this._key(0), 'triangle', 0.12, 0.1); this._note(t + 0.13, this._key(4), 'triangle', 0.3, 0.1); } break;
     }
   }
 

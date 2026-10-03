@@ -70,12 +70,13 @@ await page.keyboard.press('Escape'); await sleep(400);
 expect('a throwing hook: the game goes on', (await ev('window.__DEBUG__.G.mode')) === 'playing');
 const warns = consoleSaid.filter((e) => /the host broke/.test(e[1]));
 expect('...and it is a warning, once, not an error', warns.length === 1 && /^warn/.test(warns[0][0]), warns);
-// RESTART: the run left behind is the last run (as it ended, carried on past dawn), with no results screen
+// RESTART: the run left behind is the last run, with no results screen; carried on past dawn, it is the run as it
+// stood at dawn (the free drive after it, here a day and a second dawn, is not the run)
 const runId = await ev('window.__DEBUG__.G.runId');
 await page.keyboard.press('Escape'); await sleep(400);
 await tap('#restartb'); await sleep(800);
 const last = await ev('window.__DEBUG__.records.last');
-expect('RESTART: the abandoned run recorded as the last run, no results, a new run under way', last && last.id === runId && last.dawn === true && last.clock > 6 && (await ev('window.__DEBUG__.G.mode')) === 'playing' && (await ev('window.__DEBUG__.G.runId')) !== runId, last && { id: last.id, runId, clock: last.clock });
+expect('RESTART: the abandoned run recorded as the last run, as at dawn, no results, a new run under way', last && last.id === runId && last.dawn === true && last.score === 60000 && last.clock > 6 && last.clock < 6.2 && (await ev('window.__DEBUG__.G.mode')) === 'playing' && (await ev('window.__DEBUG__.G.runId')) !== runId, last && { id: last.id, runId, clock: last.clock, score: last.score });
 note('errors', JSON.stringify(Q.errors.filter((e) => e[0] !== 'warning').slice(0, 5)));
 if (Q.errors.some((e) => e[0] !== 'warning')) problems.push('console errors');
 fs.writeFileSync(path.join(Q.OUT, 'hooks.txt'), Q.log.join('\n'));

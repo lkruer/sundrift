@@ -772,7 +772,7 @@ function beginRun() {
   G.hour = START_HOUR; G.dist = 0; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
   G.phase = phaseOf(START_HOUR).id; G.clockRun = 0; G.clockPts = 0;
   G.playT = 0; G.longFrames = 0; G.worstFrame = 0; G.slowLog = [];
-  G.runId = Date.now(); G.dawnT = 0; G.finishAt = 0; G.completed = false; G.lastRun = null;
+  G.runId = Date.now(); G.dawnT = 0; G.finishAt = 0; G.completed = false; G.lastRun = null; G.doneRes = null; G.clockFloor = 0;
   // (NEW BEST and FASTEST DAWN are measured against the records as they stood when the run began)
   const r = loadRecords(bestKey());
   G.runRecords = { best: Math.max(G.runBest, r.best ? r.best.score : 0), fastest: r.fastest ? r.fastest.dawnTime : Infinity };
@@ -781,6 +781,9 @@ function beginRun() {
   hud.ptsPerMin = G.ptsPerMin;
   resetWeather();
 }
+
+// the clock's own pace: the run's night (START_HOUR to 06:00) over CLOCK.stillMin real minutes, in hours a second
+const CLOCK_PACE = (24 - START_HOUR + 6) / (CLOCK.stillMin * 60);
 
 /** The course's own rates (config.js CLOCK.courses): metres of road for an hour of the night, points for a minute. */
 function courseClock() { return (CLOCK.courses && CLOCK.courses[bestKey()]) || CLOCK; }
@@ -816,7 +819,7 @@ function record(dawnNow = false) {
   const run = runRecord();
   saveRun(bestKey(), run, { dawnNow });
   G.lastRun = run;
-  return { run, flags: { newBest: run.score > 0 && run.score > G.runRecords.best, newFastest: run.dawn && run.dawnTime < G.runRecords.fastest } };
+  return { run, flags: { newBest: run.score > 0 && run.score > G.runRecords.best, newFastest: run.dawn && run.dawnTime < G.runRecords.fastest }, prev: { ...G.runRecords } };
 }
 
 /**
@@ -830,15 +833,21 @@ function completeRun(show = true) {
   // (a slide still held at the last moment counts: it is banked now, as the run ends)
   if (scoring.active && scoring.points > 0) scoring.bank();
   const res = record(true);
+  // (the run's record as it stood at dawn: KEEP DRIVING is free play after it, and nothing driven then changes it)
+  G.doneRes = res;
   platform.runComplete({ ...res.run });
   if (show) showResults(res, true);
   return res;
 }
 
-/** The run is over (quit, restarted, left from its results): recorded as it ended, the last time. */
+/**
+ * The run is over (quit, restarted, left from its results): recorded as it ended, the last time. A run complete at dawn
+ * was recorded then, and that record stands (the free drive after it is not the run); one ended between its dawn and
+ * its results completes now.
+ */
 function endRun() {
   if (!G.runId) return G.lastRes || null;
-  const res = G.dawnT && !G.completed ? completeRun(false) : record();
+  const res = G.completed ? G.doneRes : G.dawnT ? completeRun(false) : record();
   G.runId = 0; G.lastRes = res;
   return res;
 }
@@ -856,7 +865,7 @@ function quitToResults() {
 /** The results up: the run frozen under them, the car's sound gone, the card drawn ahead for SHARE. */
 function showResults(res, keep) {
   G.mode = 'results'; G.resultsKeep = keep;
-  fillResults(res.run, { ...res.flags, keep }, settings.v.units);
+  fillResults(res.run, { ...res.flags, keep, prev: res.prev }, settings.v.units);
   const el = $('results');
   el.classList.add('on', 'arming');
   // (for a moment nothing on them answers: a thumb still on the handbrake, a key still down from the last drift)
@@ -878,6 +887,7 @@ function keepDriving() {
   G.mode = 'playing';
   last = performance.now();
   platform.gameplayStart();
+  hud.free = true;
   sayPhase(false);
 }
 
@@ -1032,6 +1042,9 @@ function frame(now) {
   // nothing is drawn while loading: a frame drawn mid-boot compiles its shaders synchronously, on the spot
   if (G.mode === 'loading') return;
 
+  // (the clock's own pace runs on the time on the wall, not the game's: a slow frame or a hit-stop does not lengthen
+  // the night; a long gap, a debugger or a stalled tab, counts as a quarter of a second)
+  G.realDt = Math.min(real, 0.25);
   if (G.mode === 'playing') step(dt, t0);
   else if (G.mode === 'title') idle(dt, t0);
   else if (G.mode === 'paused' || G.mode === 'results') { if (world && car) world.update(car.x, car.z, G.s, t0 + 2); }
@@ -1210,8 +1223,14 @@ function step(dt, t0) {
       const q = track.nearest(cx, cz, G.idx);
       const lx = Math.cos(q.h), lz = -Math.sin(q.h);
       const hL = hardLine(q, 1), hR = hardLine(q, -1);
-      if (q.u > hL) { impact = Math.max(impact, car.hitWall(-lx, -lz, q.u - hL, l, f)); if (f > 0) noseIn = true; }
-      else if (q.u < -hR) { impact = Math.max(impact, car.hitWall(lx, lz, -hR - q.u, l, f)); if (f > 0) noseIn = true; }
+      // (the car's centre measured on this corner's own stretch of road: a centre already beyond a side's hard line got
+      // there over open ground, or the rail begins beside it, and that rail holds it out rather than moving it through)
+      const sa = track.pts[q.j], sb = track.pts[q.j + 1], sex = sb.x - sa.x, sez = sb.z - sa.z, sL = Math.hypot(sex, sez) || 1;
+      const uc = ((car.x - sa.x) * sez - (car.z - sa.z) * sex) / sL, behindL = uc > hL, behindR = uc < -hR;
+      if (behindL && q.u < hL) { impact = Math.max(impact, car.hitWall(lx, lz, hL - q.u, l, f)); if (f > 0) noseIn = true; }
+      else if (behindR && q.u > -hR) { impact = Math.max(impact, car.hitWall(-lx, -lz, q.u + hR, l, f)); if (f > 0) noseIn = true; }
+      else if (!behindL && q.u > hL) { impact = Math.max(impact, car.hitWall(-lx, -lz, q.u - hL, l, f)); if (f > 0) noseIn = true; }
+      else if (!behindR && q.u < -hR) { impact = Math.max(impact, car.hitWall(lx, lz, -hR - q.u, l, f)); if (f > 0) noseIn = true; }
       else if (q.u > q.wl || q.u < -q.wr) {
         // off the road: a face of ground rising more than a wheel can climb is a wall
         const gy = world.ground.height(cx, cz);
@@ -1228,7 +1247,10 @@ function step(dt, t0) {
     }
   // scrape free: nose against the wall, nearly stopped, still on the throttle: the car pivots back toward the road
   // rather than sitting there until the player thinks to reverse
-  G.pinned = noseIn && car.speed < 3 && inp.throttle > 0.5 ? (G.pinned || 0) + dt : 0;
+  // (the pivot below turns the nose away from the wall, which breaks the very contact it waits for: the contact is
+  // remembered for 0.4 s, or the pivot started over every time it began to work and a nosed-in car sat there)
+  G.noseT = noseIn ? 0.4 : Math.max(0, (G.noseT || 0) - dt);
+  G.pinned = G.noseT > 0 && car.speed < 3 && inp.throttle > 0.5 ? (G.pinned || 0) + dt : 0;
   if (G.pinned > 0.3) {
     let e = G.roadH - car.yaw; while (e > Math.PI) e -= 2 * Math.PI; while (e < -Math.PI) e += 2 * Math.PI;
     if (Math.abs(e) > Math.PI * 0.75) e = Math.sign(e) * Math.PI * 0.75;           // facing backwards: turn the short way to the wall's side
@@ -1251,16 +1273,16 @@ function step(dt, t0) {
   debris.update(dt);
 
   // ---- scoring and boost
-  scoring.update(dt, car, impact, clipping);
+  scoring.update(dt, car, impact, clipping, surface);
   const grant = scoring.takeBoost();
   if (grant > 0) { car.boost = Math.min(SCORE.boostMax, car.boost + grant); chase.kick(0.12); }
   // a pull on the handbrake cancels a boost (to set up the next corner without it)
   if (inp.hand && !G.handWas && car.boost > 0.05) { car.boost = 0; audio.sfx && audio.sfx('boostCut'); }
   G.handWas = !!inp.hand;
-  // a clean J-turn scores, and says so
+  // a clean J-turn scores, and says so (it pays once the car has driven 250 m since the last one that paid: scoring.js)
   if (car.jturnDone) {
     car.jturnDone = false;
-    const e = scoring.jturn();
+    const e = scoring.jturn(G.dist);
     hud.onEvent(e); audio.onEvent && audio.onEvent(e); chase.kick(0.15);
   }
   // (a banked drift moves the clock: a minute for every so many points, the course's own, and it may carry it into a new phase)
@@ -1269,21 +1291,26 @@ function step(dt, t0) {
     if (e.type === 'bank') {
       const dh = e.value / (G.ptsPerMin * 60);
       G.hour += dh; G.clockRun += dh; G.clockPts += dh;
-      if (scoring.total > (G.best[bestKey()] || 0)) { G.best[bestKey()] = scoring.total; store.set('best.' + bestKey(), Math.round(scoring.total)); }
+      if (!G.completed && scoring.total > (G.best[bestKey()] || 0)) { G.best[bestKey()] = scoring.total; store.set('best.' + bestKey(), Math.round(scoring.total)); }
     }
     if (e.type === 'crash') chase.kick(0.9);
   }
-  if (!G.newBest && G.runBest > 0 && scoring.total > G.runBest) { G.newBest = true; hud.onEvent({ type: 'best' }); }
+  if (!G.newBest && !G.completed && G.runBest > 0 && scoring.total > G.runBest) { G.newBest = true; hud.onEvent({ type: 'best' }); }
   const boost01 = clamp(car.boost / 1.2, 0, 1);
 
   weather(dt, !!track.inTunnel(G.s));
 
   // ---- distance, time of day
   const ds = Math.max(0, G.s - G.lastS); G.lastS = G.s;
+  // the clock's own pace, on the time on the wall: the night passes in CLOCK.stillMin minutes for a car that never
+  // moves, so a run is over within them however it is driven (config.js CLOCK); the flat middle of the day faster
+  const dayK = (G.hour >= 7.2 && G.hour < 16.6) ? CLOCK.dayRate : 1;
+  const fh = (G.realDt || 0) * CLOCK_PACE * dayK;
+  G.hour += fh; G.clockRun += fh; G.clockFloor += fh;
   if (ds < 50) {
     G.dist += ds; scoring.stats.distance = G.dist;
-    // the clock by distance: the course's own metres to the hour (config.js CLOCK), the flat middle of the day faster
-    const h = G.hour, dh = ds / G.mPerHour * ((h >= 7.2 && h < 16.6) ? CLOCK.dayRate : 1);
+    // and on top of it the road: the course's own metres to the hour
+    const dh = ds / G.mPerHour * dayK;
     G.hour += dh; G.clockRun += dh;
   }
   if (G.hour >= 24) G.hour -= 24;
@@ -1298,7 +1325,9 @@ function step(dt, t0) {
       // (recorded at once, so a run whose page is closed in the moment before its results still counts; again as it
       // completes, with whatever a slide still held banks in that moment, and then the platform is told)
       saveRun(bestKey(), runRecord(), { dawnNow: true });
-      const p = { type: 'phase', value: ph.id, name: ph.name, clock: fmt.clock(G.hour), dawn: true }, e = { type: 'sun', value: 'SUNRISE' };
+      const fast = G.dawnT < G.runRecords.fastest;
+      const p = { type: 'phase', value: ph.id, name: ph.name, clock: fmt.clock(G.hour), dawn: true };
+      const e = { type: 'sun', value: 'SUNRISE', sub: (fast ? 'FASTEST DAWN ' : 'DAWN IN ') + fmt.time(G.dawnT) };
       hud.onEvent(p); hud.onEvent(e); audio.onEvent(e);
     } else sayPhase(true);
   }

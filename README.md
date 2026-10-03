@@ -6,14 +6,16 @@ without touching it, and every banked drift pushes the night toward dawn. Where 
 leave the road: take out the bollards, the lamp posts and the signs, flatten the bushes, and get back on within
 five seconds, or a giant magnet comes down and carries you back.
 
-**A run is one night: drift until dawn.** It starts in the golden hour, 17:18, and the clock moves by the road driven
-and, much faster, by every drift you bank; the night passes through the golden hour, the blue hour, the night and the
-dawn (each comes on the TV as a caption). At 06:00 the run is complete: SUNRISE, then the results (the score, the
-drifts, the biggest, the longest, the best combo, the clips, the crashes, the J-turns, the time sliding, the biggest
-angle, the top speed, what was smashed, the distance, the real time it took), with KEEP DRIVING (the same run, on into
-the day), NEW RUN, MAIN MENU and SHARE. A player who drifts gets there in four to six minutes, one who mostly drives in
-about eleven. Each course keeps its best run, its fastest dawn and its last run, under RECORDS on the title, each
-shareable as a card.
+**A run is one night: drift until dawn.** It starts in the golden hour, 17:18. The clock keeps its own pace, so the
+night is over within fifteen minutes even if the car never moves, and the road driven and, much faster, every drift
+you bank push it on; the night passes through the golden hour, the blue hour, the night and the dawn (each comes on
+the TV as a caption). At 06:00 the run is complete: SUNRISE, with how long the night took, then the results: the score
+and the time to dawn side by side, each against its record, then the drifts, the biggest, the longest, the best combo,
+the clips, the crashes, the J-turns, the time sliding, the biggest angle, the top speed, what was smashed, the
+distance and the real time it took; with KEEP DRIVING (free drive on into the day: the run is recorded as it stood at
+dawn), NEW RUN, MAIN MENU and SHARE. A player who drifts well gets there in about five minutes, one who drifts now and
+then in about ten and a half, one who never drifts in about thirteen. Each course keeps two records, its best score
+and its fastest dawn, and its last run, under RECORDS on the title, each shareable as a card.
 
 **The look:** a playable 90s drift anime.
 - **The pass.** Cherry trees in blossom line the road and dot the cedar forest, and petals drift on the air and
@@ -55,7 +57,8 @@ shareable as a card.
   and the title's racing italic, laid into the picture under the glass: they bend with the screen, take its
   scanlines and its colour steps, and glow a little like phosphor. The title screen, the pause menu, a run's results,
   the records and the settings are drawn on the set the same way. A run comes on with the channel's caption, CH 01,
-  and each phase of the night with its own (GOLDEN HOUR, BLUE HOUR, NIGHT, DAWN).
+  and each phase of the night with its own (GOLDEN HOUR, BLUE HOUR, NIGHT, DAWN; FREE DRIVE once the run is over and
+  you keep driving).
 - **The car.** Held in a drift, its tail lamps leave thin red light trails hanging in the air behind it, the way a
   drift anime draws a slide at night; the lamps burn brighter on the brakes. The engine is an inline four built
   from its firing pulses (see below), the revs flare as the rear tyres spin up in a slide, it cuts for a moment on
@@ -115,9 +118,9 @@ bend; everywhere else (about two thirds of it) the car can drive off onto the ve
 over a crest at speed it leaves the ground. Trunks, boulders, huts and shrines stop it. In the city the street
 fronts are the edge, so the car can mount the pavement.
 
-Each is one fixed, endless course (same seed every run), so best scores and dawn times compare. Each course runs its
-clock at its own rates, measured (a course whose corners hand out drifts runs it more on the drifts), so a night takes
-about as long on any of them.
+Each is one fixed, endless course (same seed every run), so best scores and dawn times compare. Each course pays its
+drifts into the clock at its own rate, measured (a course whose corners hand out drifts pays less for each), so a
+night takes about as long on any of them.
 
 ## Controls
 
@@ -148,8 +151,10 @@ Drift: tap the handbrake into a corner (or lift off and turn in, or flick the wh
 push a fast corner on the throttle) and keep the key held into the turn: the slide holds for as long as you hold it,
 at the angle your hands ask for. The throttle sets how deep (lift and it tightens up), the key held into the turn
 opens it, a tap the other way closes it, the handbrake throws it wide; let go of the key and the car comes straight
-and pulls away. Throw the key the other way mid-slide and the car swings through into a drift the other way. A held
-slide carries its speed. The car does part of the counter-steer for you (more on a phone), and
+and pulls away. Throw the key the other way mid-slide and the car swings through into a drift the other way (a
+switch, 120 points). A held slide carries its speed. A drift scores on the road and its gravel shoulder: off it, on
+the verge or the city's pavement, the slide stops scoring and what it had is banked. The car does part of the
+counter-steer for you (more on a phone), and
 A and D ask for as much lock as the corner ahead needs. Nothing steers the car when no key is held, and the help
 never overrides you: steer into the turn and the wheels go where you steer, the counter-steer stepping aside as
 the key goes down. In a tight
@@ -170,7 +175,8 @@ parked bicycles, each with its own burst and sound.
 
 J-turn: back up straight past about 10 mph, let go of the reverse, throw the wheel to full lock, hold it, and get on
 the gas. The nose swings out, the car comes round to face the way it is travelling and pulls away; the camera looks
-where you are going while you reverse and swings round with the car. A clean one scores 500. It takes that: back
+where you are going while you reverse and swings round with the car. A clean one scores 500, once the car has driven
+250 m since the last one that paid (one after another on the spot pays nothing more). It takes that: back
 up round something with the wheel turned and let go of `S`, and the car just rolls to a stop following its wheels;
 a quick tap on the wheel is only ever a correction. Whatever you press, the car never stops dead: a slide or a spin
 is always slowed by its tyres, even when it is going a little backwards (braking on `S` in a slide, or a spin
@@ -247,7 +253,8 @@ The game calls a small set of hooks (`game/src/platform.js`), each a no-op on it
 `window.SUNDRIFT_PLATFORM` before the game's script runs, with any of: `init()`, `loadingProgress(f)` (0 to 1),
 `loadingDone()` (the title is up), `gameplayStart()` and `gameplayStop()` (a run is or is not under way: started,
 paused, the tab hidden, the results up, carried on past dawn), `runComplete(stats)` (a run reached dawn: its whole
-breakdown, as `records.js` describes it), and `share(payload)` (return `true` to take over sharing; the payload has the
+breakdown, as `records.js` describes it, once; what is driven after it is free drive and is not the run), and
+`share(payload)` (return `true` to take over sharing; the payload has the
 text, the URL, the run and the PNG card). A hook that throws is reported once as a console warning and never stops the
 game. The run pauses itself when the tab is hidden.
 
@@ -272,7 +279,8 @@ game. The run pauses itself when the tab is hidden.
 | `work/perf/`, `work/boot_probe.mjs` | the phone performance probes (JS per frame under CPU throttling, CPU profiles, a pixel A/B that proves a change invisible) and where the load time goes under the jam gate's 4G |
 | `work/jitter.mjs`, `work/shot.mjs` | a frame-time and on-screen jitter probe, and scripted screenshots |
 | `work/hud_layout_check.json`, `work/touch_test.json` | the HUD laid out for 23 screen sizes, desktop and touch, every pair of panels checked for overlap; the phone's steering, lift and brake driven with real touches (run with `work/shot.mjs`) |
-| `work/dawn_time.mjs` | how long a run takes to reach dawn, driven by an autopilot in real time, on any course: what the clock was tuned by |
+| `work/dawn_time.mjs` | how long a run takes to reach dawn, driven in real time on any course by the mediocre autopilot the clock was tuned by, the QA round's drifter, a driver who never drifts, or nobody at all |
+| `work/scoring_check.mjs` | the QA round's scoring changes checked on scoring.js alone, in node: the J-turn's 250 m, the switch's flat 120, a drift only on the road |
 | `work/platform_flow.mjs`, `work/platform_hooks.mjs`, `work/share_check.mjs`, `work/tv_hover_check.mjs` | the run's whole loop driven with real keys or real touches and checked step by step, every screen photographed at a desktop's, an upright phone's and a phone on its side's size (the title's records and settings, the phases, the pause's settings, RUN OVER, dawn and its results, KEEP DRIVING, NEW RUN); the platform's hooks against a stub platform, and stored data that does not read back; the share cards drawn, the share's fallback (clipboard and download) pressed for real; a hover read back from the TV's canvas |
 | `gate/drift-gate.mjs` | the gate this game needs: real keys or real touches, steers by telemetry, handbrakes into corners, asserts drifts were banked, writes a filmstrip |
 | `NOTES.md` | the build log: what was measured, what was rejected, what is still wrong |

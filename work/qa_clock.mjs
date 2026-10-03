@@ -31,16 +31,16 @@ for (const h of hours) {
   await shot(`h${String(h).replace('.', '_')}`);
 }
 note('phases said while setting hours:', JSON.stringify(await ev('window.__SUN__.splice(0)')));
-// crossings by distance alone
+// crossings by the clock's own pace and the road
 for (const [h, want] of [[23.97, 'midnight (no phase)'], [4.74, 'DAWN'], [5.99, 'DAY'], [16.99, 'GOLDEN HOUR'], [18.24, 'BLUE HOUR'], [19.24, 'NIGHT']]) {
   await ev(`window.__DEBUG__.clockTo(${h})`); await sleep(6000);
   await carryOn();
   note('crossing', want, 'hour now', await ev('window.__DEBUG__.G.hour.toFixed(2)'), 'said', JSON.stringify(await ev('window.__SUN__.splice(0)')));
 }
-// a banked drift carrying the clock across: 2,400 points is ten minutes
+// a banked drift carrying the clock across: 3,000 points is 11 minutes on the easy pass
 await ev('window.__AUTOPILOT__ = null');
 for (const [h, want] of [[4.6, 'DAWN'], [18.2, 'BLUE HOUR']]) {
-  await ev(`(() => { const D = window.__DEBUG__, s = D.scoring; D.clockTo(${h}); s.active = true; s.points = 2400; s.time = 3; s.bank(); })()`);
+  await ev(`(() => { const D = window.__DEBUG__, s = D.scoring; D.clockTo(${h}); s.active = true; s.points = 3000; s.time = 3; s.bank(); })()`);
   await sleep(1500);
   note('a bank across', want, ': hour', await ev('window.__DEBUG__.G.hour.toFixed(2)'), 'said', JSON.stringify(await ev('window.__SUN__.splice(0)')));
 }

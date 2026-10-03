@@ -236,13 +236,18 @@
                   background:linear-gradient(180deg,#fffaf0 0%,#ffe0a8 38%,#ff9a3d 52%,#ff4f9a 70%,#7a4dff 100%); -webkit-background-clip:text; background-clip:text;
                   filter:drop-shadow(0 3px 0 #1a0f24) drop-shadow(0 0 22px rgba(255,90,140,.35)); }
   .r-sub { font-family:"Share Tech Mono",monospace; font-size:13px; letter-spacing:.3em; color:#ffb3cc; text-align:center; }
-  .r-card { width:100%; padding:12px 20px 14px; display:grid; grid-template-columns:auto 1fr; gap:10px 24px; align-items:end; }
+  /* (the run's two records side by side, the score and the time the night took, each over the record it was measured
+     against; the run's time and the clock it reached small beside them) */
+  .r-card { width:100%; padding:12px 20px 14px; display:grid; grid-template-columns:auto auto 1fr; gap:10px 30px; align-items:end; }
   .r-score { display:flex; flex-direction:column; align-items:flex-start; }
   .r-score i { font-style:normal; font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.3em; color:var(--dim); white-space:nowrap; }
   .r-score b { font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:56px; line-height:1; letter-spacing:.02em; color:var(--amber);
                text-shadow:0 3px 0 #1a0f24, 0 0 20px rgba(255,138,42,.4); white-space:nowrap; }
   .r-score b.hi { color:var(--gold); text-shadow:0 3px 0 #1a0f24, 0 0 22px rgba(255,210,63,.55); }
-  .r-times { display:grid; grid-template-columns:repeat(3,auto); justify-content:end; gap:4px 24px; padding-bottom:4px; }
+  .r-score b.none { color:var(--dim); text-shadow:none; }
+  .r-rec { margin-top:3px; font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.2em; color:#ffb3cc; white-space:nowrap; min-height:14px; }
+  .r-rec.hi { color:var(--gold); }
+  .r-times { display:grid; grid-template-columns:repeat(2,auto); justify-content:end; gap:4px 24px; padding-bottom:4px; }
   .r-grid { grid-column:1 / -1; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:9px 8px; padding-top:10px; border-top:1px solid rgba(255,179,71,.22); }
   .r-btns { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
   .r-btns .pbtn { width:auto; min-width:150px; padding:9px 22px 7px; font-size:19px; white-space:nowrap; }
@@ -287,9 +292,10 @@
      each card's SHARE up beside its score; the settings' labels over their controls */
   @media (max-width: 560px) {
     .r-sub { font-size:11px; letter-spacing:.22em; }
-    .r-card { grid-template-columns:1fr; padding:10px 14px 12px; gap:8px; align-items:start; }
-    .r-score { align-items:center; } .r-score b { font-size:50px; }
-    .r-times { justify-content:center; gap:4px 26px; }
+    .r-card { grid-template-columns:1fr 1fr; padding:10px 14px 12px; gap:8px 10px; align-items:start; }
+    .r-score { align-items:center; } .r-score b { font-size:42px; }
+    .r-rec { font-size:10px; letter-spacing:.14em; }
+    .r-times { grid-column:1 / -1; justify-content:center; gap:4px 26px; }
     .r-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px 6px; }
     .r-btns { display:grid; grid-template-columns:1fr 1fr; width:100%; gap:9px; }
     .r-btns .pbtn { min-width:0; width:100%; padding:9px 0 7px; padding-left:20px !important; padding-right:12px !important; font-size:17px; letter-spacing:.08em; }
@@ -309,11 +315,11 @@
      three cards side by side, six numbers each; the settings in two columns of rows */
   @media (max-height: 500px) and (orientation: landscape) {
     .rbox { width:min(860px,100%); display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); grid-template-areas:"head card" "btns card"; gap:10px 18px; align-items:center; }
-    .r-head { grid-area:head; } .r-card { grid-area:card; padding:8px 14px 10px; gap:6px 16px; } .r-btns { grid-area:btns; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .r-head { grid-area:head; } .r-card { grid-area:card; padding:8px 14px 10px; gap:6px 26px; } .r-btns { grid-area:btns; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .r-btns .pbtn { min-width:0; width:100%; padding:6px 0 5px; font-size:16px; }
     .r-btns.three .share { grid-column:1 / -1; }
     .r-title { font-size:40px; } .r-sub { font-size:10px; letter-spacing:.2em; }
-    .r-score b { font-size:40px; } .r-times { gap:2px 16px; }
+    .r-score b { font-size:36px; } .r-rec { font-size:10px; letter-spacing:.14em; } .r-times { gap:2px 16px; }
     .r-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px 6px; padding-top:6px; }
     .cells b { font-size:17px; }
     .m-title { font-size:32px; }
@@ -523,9 +529,10 @@
       <div class="r-course" id="r-course"></div>
     </div>
     <div class="r-card card">
-      <div class="r-score"><i id="r-scorel">SCORE</i><b id="r-score">0</b></div>
+      <div class="r-score"><i id="r-scorel">SCORE</i><b id="r-score">0</b><span class="r-rec" id="r-bestrec"></span></div>
+      <div class="r-score r-dawnb"><i id="r-dawnl">DAWN IN</i><b id="r-dawn">—</b><span class="r-rec" id="r-fastrec"></span></div>
       <div class="r-times cells">
-        <div><i>TIME</i><b id="r-time">0:00</b></div><div><i id="r-dawnl">DAWN IN</i><b id="r-dawn">—</b></div><div><i>CLOCK</i><b id="r-clock">00:00</b></div>
+        <div><i>TIME</i><b id="r-time">0:00</b></div><div><i>CLOCK</i><b id="r-clock">00:00</b></div>
       </div>
       <div class="r-grid cells" id="r-grid"></div>
     </div>
@@ -544,7 +551,7 @@
     <h2 class="m-title" id="rec-title">RECORDS</h2>
     <div class="r-course" id="rec-course"></div>
     <div class="rcards">
-      <div class="rcard card" id="rc-best"><i class="rc-lab">BEST RUN</i><b class="rc-big" id="rc-best-big">—</b><div class="rc-line" id="rc-best-line"></div><div class="rc-grid cells" id="rc-best-grid"></div><button class="pbtn rc-share" id="rc-best-share" data-sfx="sel">SHARE</button></div>
+      <div class="rcard card" id="rc-best"><i class="rc-lab">BEST SCORE</i><b class="rc-big" id="rc-best-big">—</b><div class="rc-line" id="rc-best-line"></div><div class="rc-grid cells" id="rc-best-grid"></div><button class="pbtn rc-share" id="rc-best-share" data-sfx="sel">SHARE</button></div>
       <div class="rcard card" id="rc-fast"><i class="rc-lab">FASTEST DAWN</i><b class="rc-big" id="rc-fast-big">—</b><div class="rc-line" id="rc-fast-line"></div><div class="rc-grid cells" id="rc-fast-grid"></div><button class="pbtn rc-share" id="rc-fast-share" data-sfx="sel">SHARE</button></div>
       <div class="rcard card" id="rc-last"><i class="rc-lab">LAST RUN</i><b class="rc-big" id="rc-last-big">—</b><div class="rc-line" id="rc-last-line"></div><div class="rc-grid cells" id="rc-last-grid"></div><button class="pbtn rc-share" id="rc-last-share" data-sfx="sel">SHARE</button></div>
     </div>

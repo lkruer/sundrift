@@ -65,23 +65,26 @@ export const SCORE = {
 };
 
 /**
- * The clock, which is the score: a run is one night, from the golden hour until dawn. It moves by distance (the road
- * driven) and by every banked drift, and the drifts are what make it fast: an autopilot that drifts only into the
- * tightest corners (work/dawn_time.mjs) gets to dawn in about eleven minutes on any course; a player who drifts on
- * purpose, banking 300 to 550 points a second, gets there in four to six, most of it by points. (Before: a hundred
- * points a minute and 3,000 m an hour, from 18:12. That autopilot's night was about the same, but a player who never
- * drifted needed 26 minutes and one who drifted well under three: NOTES.md, 3 October.)
+ * The clock: a run is one night, from the golden hour until dawn, and it is bounded on the wall. The clock keeps its own
+ * pace in real time, so a car that never moves still sees 06:00 after stillMin minutes; the road driven and every banked
+ * drift move it on top of that, and the drifts are what make it fast. Measured (work/dawn_time.mjs, NOTES.md 3 October):
+ * an autopilot that drifts only into the tightest corners gets to dawn in about ten and a half minutes on any course; a
+ * car driven without a drift, in thirteen; a player banking 300 to 500 points a second on the easy pass, in six and a
+ * quarter to four and a half. A run's score is so bounded by the minutes the night lasts, and the fastest dawn rewards
+ * the drifting itself.
+ * (Before it, the clock moved only by the road and the drifts, and a slow farmer had the longest night: a J-turn loop
+ * reached dawn after twenty minutes with three times a skilled run's score. work/QA_REPORT.md, C1.)
  */
 export const CLOCK = {
   start: 17.3,          // 17:18, the golden hour: the first drifts carry the sun down (the run ends at DAY, below)
-  ptsPerMin: 240,       // banked drift points for a minute of the clock
-  mPerHour: 1500,       // metres of road for an hour of the clock, at night and in the golden hour
-  dayRate: 7,           // the flat middle of the day goes this much faster (07:12 to 16:36)
-  // each course's own rates (by main.js's bestKey), measured so the same driver's night takes about as long on any:
-  // the hard pass's hairpins hand out drifts, so its road gives a little less of an hour; the narrow back streets are
-  // driven slower, so theirs gives more; and the city's broad square corners hand out drifts at about three times the
-  // easy pass's rate, so a drift there is worth two thirds of the pass's minute
-  courses: { easy: { mPerHour: 1500 }, hard: { mPerHour: 1750 }, 'city.easy': { mPerHour: 2250, ptsPerMin: 360 }, 'city.hard': { mPerHour: 950 } },
+  stillMin: 15,         // real minutes from the start to 06:00 for a car that never moves: the clock's own pace
+  ptsPerMin: 280,       // banked drift points for a further minute of the clock
+  mPerHour: 10000,      // metres of road for a further hour of the clock
+  dayRate: 7,           // the flat middle of the day goes this much faster (07:12 to 16:36), after a run, in free drive
+  // each course's own rate for the drifts (by main.js's bestKey), so the same driver's night takes about as long on any:
+  // the autopilot banks half as much again on the hard pass's hairpins as on the easy pass, and more on the city's broad
+  // square corners too, while in the narrow back streets it crashes more than it drifts
+  courses: { hard: { ptsPerMin: 400 }, 'city.easy': { ptsPerMin: 350 }, 'city.hard': { ptsPerMin: 175 } },
 };
 
 /**

@@ -54,20 +54,27 @@ function fillGrid(grid, keys, run, units) {
 }
 
 /**
- * The results: kind 'dawn' (the run reached 06:00, from that moment or as it ended later) or 'over' (quit before dawn);
- * flags { newBest, newFastest } against the records as they stood when the run began; keep: KEEP DRIVING is offered.
+ * The results: kind 'dawn' (the run reached 06:00: as it stood then, whenever it ended) or 'over' (quit before dawn);
+ * flags { newBest, newFastest } against the records as they stood when the run began, prev ({ best, fastest }: a score,
+ * seconds, 0 and Infinity for none); keep: KEEP DRIVING is offered. The score and the time the night took are the two
+ * records, each shown over the one it was measured against: BEST 41,200, or WAS 41,200 when it is the new one.
  */
-export function fillResults(run, { newBest = false, newFastest = false, keep = false } = {}, units = 'mph') {
+export function fillResults(run, { newBest = false, newFastest = false, keep = false, prev = {} } = {}, units = 'mph') {
   const dawn = !!run.dawn, title = $('r-title');
   set(title, dawn ? 'DAWN' : 'RUN OVER');
   if (title) title.classList.toggle('dawn', dawn);
   set('r-sub', dawn ? 'YOU DROVE THROUGH THE NIGHT' : `THE CLOCK REACHED ${fmt.clock(run.clock)}`);
   set('r-course', run.course || '');
+  const best = prev.best > 0 ? prev.best : 0, fast = Number.isFinite(prev.fastest) ? prev.fastest : 0;
   set('r-scorel', newBest ? 'NEW BEST' : 'SCORE', newBest);
   set('r-score', fmt.int(run.score), newBest);
+  set('r-bestrec', newBest ? (best ? 'WAS ' + fmt.int(best) : 'FIRST RECORD') : best ? 'BEST ' + fmt.int(best) : '', newBest);
   set('r-time', fmt.time(run.time));
   set('r-dawnl', newFastest ? 'FASTEST DAWN' : 'DAWN IN', newFastest);
   set('r-dawn', dawn ? fmt.time(run.dawnTime) : '—', newFastest);
+  const dn = $('r-dawn');
+  if (dn) dn.classList.toggle('none', !dawn);                     // (a run over before dawn: a dim dash)
+  set('r-fastrec', newFastest ? (fast ? 'WAS ' + fmt.time(fast) : 'FIRST RECORD') : fast ? 'FASTEST ' + fmt.time(fast) : dawn ? '' : 'NO DAWN YET', newFastest);
   set('r-clock', fmt.clock(run.clock));
   fillGrid($('r-grid'), RESULTS, run, units);
   const k = $('r-keep');

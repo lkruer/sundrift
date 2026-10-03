@@ -543,6 +543,7 @@ export class Hud {
     this.run = { t: 0, smashN: 0, smashLast: 0, newBest: false, best0: this._storedBest() };
     this._coachOn = false; this._coachGone = false; this.coachA = 0;
     this.newBestLab = false;
+    this.free = false;                       // the run complete and driven on into the day (main.js keepDriving)
     this.dirty = true; this.sig = '';
   }
 
@@ -633,10 +634,11 @@ export class Hud {
    * The clock has entered a phase of the night (config.js PHASES, main.js says when): the TV's caption again, in the
    * phase's colour, its name over the time and a word. It waits for a caption already up (the channel's, at the start),
    * and a newer phase replaces one still waiting, so a bank that carries the clock through two says only where it is.
+   * After the run, driven on into the day, the word is FREE DRIVE whatever the phase: the night's goal is behind it.
    */
   phase(id, name, clock) {
     const look = PHASE_LOOK[id] || PHASE_LOOK.night;
-    const cap = this._caption(name, (clock ? clock + ' · ' : '') + look[2], look[0], look[1], 3400);
+    const cap = this._caption(name, (clock ? clock + ' · ' : '') + (this.free ? 'FREE DRIVE' : look[2]), look[0], look[1], 3400);
     this.tvQ = [cap];
     if (!this.tv && this._captionFree()) { this.tv = { ...this.tvQ.shift(), t0: performance.now() }; }
     this.dirty = true;
@@ -656,7 +658,8 @@ export class Hud {
   _clockAdd(points) {
     const min = Math.round(points / this.ptsPerMin);
     if (min < 1) return;
-    this.clockAddS = { text: '+' + (min < 60 ? min + ' MIN' : Math.floor(min / 60) + ':' + String(min % 60).padStart(2, '0')), t0: performance.now() };
+    // (an hour and more as +1H05: written +1:05 beside a clock that reads 18:41 it was a minute and five seconds)
+    this.clockAddS = { text: '+' + (min < 60 ? min + ' MIN' : Math.floor(min / 60) + 'H' + String(min % 60).padStart(2, '0')), t0: performance.now() };
     this._anim('clock', 480);
   }
 
@@ -703,7 +706,9 @@ export class Hud {
         if (!this.coached) { this.coached = true; try { localStorage.setItem('sundrift.drifted', '1'); } catch {} }
         break;
       }
-      case 'switch': this._anim('combo', 340); this.toast('SWITCH!', 'good', false, '', 1); break;
+      // (a transition: called out at most once in three seconds; called every time, it came every 1.7 to 2.5 s all
+      // through a city run. It no longer punches the combo: a switch does not step the chain now)
+      case 'switch': { const now = performance.now(); if (now - (this._switchT || -1e9) >= 3000) { this._switchT = now; this.toast('SWITCH!', 'good', false, '', 1); } break; }
       case 'clip': this.toast('CLIP!', 'clip', false, '+' + Math.round(e.value).toLocaleString('en-US'), 1); this.clipT = 0.9; this.buzz(14); break;
       case 'crash': this.toast('CRASH', 'bad', true, '-' + Math.round(e.value).toLocaleString('en-US') + ' LOST', 3); this.hitFlash = 1; this.buzz(70); break;
       case 'bump': this.hitFlash = Math.max(this.hitFlash, 0.5); break;
@@ -711,7 +716,8 @@ export class Hud {
       case 'phase': if (!e.dawn) this.phase(e.value, e.name, e.clock); break;
       // (sunrise is the night driven through, the run's goal and the find's own reward, and is called out as one)
       case 'sun':
-        if (e.value === 'SUNRISE') { this.toast('SUNRISE!', 't3', true, 'YOU DROVE THROUGH THE NIGHT', 3); this.buzz([30, 60, 30, 60, 90]); }
+        // (under it, how long the night took on the wall, main.js's word: DAWN IN 6:12, or FASTEST DAWN 4:58)
+        if (e.value === 'SUNRISE') { this.toast('SUNRISE!', 't3', true, e.sub || 'YOU DROVE THROUGH THE NIGHT', 3); this.buzz([30, 60, 30, 60, 90]); }
         else this.toast(e.value, 'calm', false, '', 0);
         break;
       case 'best': {
@@ -723,7 +729,10 @@ export class Hud {
         dispatchEvent(new CustomEvent('sundrift:best'));
         break;
       }
-      case 'jturn': this.toast('J-TURN!', 'good', true, '+' + Math.round(e.value), 2); this.buzz([20, 30, 30]); break;
+      case 'jturn':
+        if (e.value > 0) { this.toast('J-TURN!', 'good', true, '+' + Math.round(e.value), 2); this.buzz([20, 30, 30]); }
+        else this.toast('J-TURN!', 'good', false, '', 1);         // (one that did not pay: 250 m since the last that did)
+        break;
     }
   }
 
@@ -734,7 +743,7 @@ export class Hud {
     const fmt = (n) => Math.round(n).toLocaleString('en-US');
     const st = s.stats, set = (id, v, hi) => { const e = $(id); if (e) { e.textContent = v; if (hi !== undefined) e.classList.toggle('hi', hi); } };
     const m = document.querySelector('.map.sel span'), d = document.querySelector('.diff.sel b');
-    set('pc-course', (m ? m.textContent : '') + (d ? ' · ' + d.textContent : ''));
+    set('pc-course', (m ? m.textContent : '') + (d ? ' · ' + d.textContent : '') + (this.free ? ' · FREE DRIVE' : ''));
     set('pc-score', fmt(s.total), this.run.newBest);
     set('pc-bestl', this.run.newBest ? 'NEW BEST' : 'BEST', this.run.newBest);
     // (a new best shows by how much it beat the old one)
@@ -753,7 +762,7 @@ export class Hud {
    * @param s Scoring; car; rpm and gear from the gearbox; hour 0..24; distance m; boost seconds left and max
    */
   update(dt, s, car, gb, hour, dist, boostLeft, boostMax, perf) {
-    this.scoring = s;
+    this.scoring = s; this.carVF = car.vF;
     const now = performance.now(), v = this.v;
     const touch = document.body.classList.contains('touch');
     if (touch !== this.touch) { this.touch = touch; this._layout(); this.dirty = true; }
@@ -871,7 +880,8 @@ export class Hud {
         this._rr(c, r.x - 0.5, r.y - 0.5, r.w + 1, r.h + 1, 2); c.stroke(); c.restore();
       }
       this._txt(this.newBestLab ? 'NEW BEST' : 'SCORE', Z.lab, this.newBestLab ? C.gold : C.dim, r.x + r.w / 2, r.y + 3, 0.5, 0);
-      const str = String(Math.max(0, v.score)).slice(-8).padStart(8, ' ');
+      // (held at eight nines rather than wrapping round to the low digits)
+      const str = String(Math.min(99999999, Math.max(0, v.score))).padStart(8, ' ');
       const sc = pk >= 0 ? 1 + 0.1 * Math.sin(pk * Math.PI) : 1;
       this._seg(str, r.x + r.w / 2, r.y + 3 + lab + 4, this.scH, C.amber, { center: true, sc });
     }
@@ -882,7 +892,8 @@ export class Hud {
       this._txt('COMBO', Z.lab, C.dim, r.x + 6, r.y + 3);
       const cap = this._fm(Z.combo).cap, y = r.y + 3 + lab + 4;
       const xs = this._txt('×', Z.x, C.amber, r.x + 6, y + cap, 0, 1);
-      this._txt(String(v.combo), Z.combo, v.combo > 1 ? C.ink : C.dim, r.x + 6 + xs.w + 1.5, y + cap, 0, 1, pk >= 0 ? pop(pk, 1.9) : 1);
+      // (x1 when no chain is running, dimmed: x0 read as a broken counter)
+      this._txt(String(Math.max(1, v.combo)), Z.combo, v.combo > 1 ? C.ink : C.dim, r.x + 6 + xs.w + 1.5, y + cap, 0, 1, pk >= 0 ? pop(pk, 1.9) : 1);
       const by = y + cap + 4, bh = S ? 2 : 2.5, bw = r.w - 12;
       c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(r.x + 6, by, bw, bh);
       if (v.chain > 0) {
@@ -1256,7 +1267,9 @@ export class Hud {
       const kr = 15 / this.kx;
       c.fillStyle = fill; c.beginPath(); c.arc(nx, ny, kr, 0, TAU); c.fill();
       c.lineWidth = 1; c.strokeStyle = state === 'brake' ? C.red : 'rgba(246,239,226,0.9)'; c.beginPath(); c.arc(nx, ny, kr - 0.5, 0, TAU); c.stroke();
-      this._txt(state === 'brake' ? (t.brake > 0.5 ? 'REVERSE' : 'BRAKE') : state === 'lift' ? 'LIFT' : 'GAS', Z.lab, state === 'brake' ? '#ff7a6a' : C.ink, nx, ny + kr + 3, 0.5, 0, 1, 1, 0.6);
+      // (REVERSE once the car is all but stopped, as car.js engages it below 1 m/s; pulled well down at speed it is
+      // BRAKE)
+      this._txt(state === 'brake' ? (t.brake > 0.5 && (this.carVF ?? 0) < 1 ? 'REVERSE' : 'BRAKE') : state === 'lift' ? 'LIFT' : 'GAS', Z.lab, state === 'brake' ? '#ff7a6a' : C.ink, nx, ny + kr + 3, 0.5, 0, 1, 1, 0.6);
     } else if (!t.used) {
       // before the first touch of a session: what the thumbs do
       const x = L.hint.x, y = L.hint.y, lh = this.labCap + 5;

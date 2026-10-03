@@ -5,8 +5,9 @@
 //   node work/platform_flow.mjs --vp=844x390     a phone on its side, touches
 // Steps: the title (RECORDS and SETTINGS beside START), the records empty, the settings (KM/H and LIGHT chosen and
 // seen on the HUD), a run with its phase captions, the pause's settings, MAIN MENU to RUN OVER, the records with that
-// run, a run carried to dawn (SUNRISE, the results with KEEP DRIVING), KEEP DRIVING into the day, a quit after dawn,
-// NEW RUN. Fails loudly on a state that is wrong or a console error.
+// run, a run carried to dawn (SUNRISE, the results with KEEP DRIVING and both records' lines), KEEP DRIVING into the
+// day (free drive: what it scores changes no record), a quit after dawn, NEW RUN. Fails loudly on a state that is
+// wrong or a console error.
 import fs from 'fs';
 import path from 'path';
 import { open, sleep, arg } from './qa_lib.mjs';
@@ -20,7 +21,9 @@ const problems = [];
 const expect = (what, ok, got) => { note(`${ok ? 'ok  ' : 'FAIL'} ${what}${got !== undefined ? '  (' + JSON.stringify(got) + ')' : ''}`); if (!ok) problems.push(what); };
 const state = () => ev(`(() => { const D = window.__DEBUG__, G = D.G; const on = (id) => document.getElementById(id).classList.contains('on');
   return { mode: G.mode, title: on('title'), pause: on('pause'), results: on('results'), records: on('records'), settings: on('settings'),
-    hour: +G.hour.toFixed(2), phase: G.phase, dawnT: G.dawnT, completed: G.completed, units: D.hud.units, curve: +D.post.retro.uniforms.uCurve.value.toFixed(4) }; })()`);
+    hour: +G.hour.toFixed(2), phase: G.phase, dawnT: G.dawnT, completed: G.completed, units: D.hud.units, curve: +D.post.retro.uniforms.uCurve.value.toFixed(5) }; })()`);
+// (the tube as post.js makes it: FULL is that, LIGHT a third of its curve)
+const curve0 = await ev("+window.__DEBUG__.post.retro.uniforms.uCurve.value.toFixed(5)");
 const press = async (key) => { await page.keyboard.press(key); await sleep(350); };
 // (a real finger on a phone, a real click on a desktop)
 const hit = async (sel, wait = 450) => { await tap(sel); await sleep(wait); };
@@ -44,7 +47,7 @@ await hit('.seg[data-k=units] button[data-v=kmh]', 250);
 await hit('.seg[data-k=tv] button[data-v=light]', 250);
 await hit('.vol[data-k=music] .vstep[data-d="-1"]', 250);
 await shot('03_settings_title');
-s = await state(); expect('KM/H and LIGHT taken', s.units === 'kmh' && s.curve < 0.02, { units: s.units, curve: s.curve });
+s = await state(); expect('KM/H and LIGHT taken', s.units === 'kmh' && s.curve < curve0 * 0.5, { units: s.units, curve: s.curve, full: curve0 });
 expect('the settings kept', await ev(`JSON.parse(localStorage.getItem('sundrift.settings')).music === 9`));
 await hit('#set-back');
 s = await state(); expect('the settings close', !s.settings && s.title);
@@ -63,8 +66,8 @@ await ev('window.__DEBUG__.clockTo(18.26)');
 await sleep(1200);
 s = await state(); expect('the clock entered the blue hour', s.phase === 'blue', s.phase);
 await shot('06_run_blue_hour');
-// a bank that carries the clock into the next phase says it too (2,400 points: ten minutes over 19:15)
-await ev('(() => { const D = window.__DEBUG__, s = D.scoring; D.clockTo(19.2); s.active = true; s.points = 2400; s.time = 3; s.bank(); })()');
+// a bank that carries the clock into the next phase says it too (3,000 points: 11 minutes on the easy pass, over 19:15)
+await ev('(() => { const D = window.__DEBUG__, s = D.scoring; D.clockTo(19.2); s.active = true; s.points = 3000; s.time = 3; s.bank(); })()');
 await sleep(2600);
 s = await state(); expect('a banked drift carried the clock into the night', s.phase === 'night' && s.hour > 19.25, s);
 await shot('06b_run_night_by_bank');
@@ -79,7 +82,7 @@ await shot('08_settings_pause');
 await hit('.seg[data-k=units] button[data-v=mph]', 250);
 await hit('.seg[data-k=tv] button[data-v=full]', 250);
 if (PHONE) await hit('#set-back'); else await press('Escape');
-s = await state(); expect('back to the pause menu', !s.settings && s.pause && s.units === 'mph' && s.curve > 0.02);
+s = await state(); expect('back to the pause menu, MPH and the whole tube again', !s.settings && s.pause && s.units === 'mph' && Math.abs(s.curve - curve0) < 1e-5, { curve: s.curve, full: curve0 });
 await hit('#quitb', 1200);
 s = await state(); expect('MAIN MENU shows the results first (RUN OVER)', s.mode === 'results' && s.results && !s.title);
 expect('RUN OVER, no KEEP DRIVING', await ev(`document.getElementById('r-title').textContent === 'RUN OVER' && getComputedStyle(document.getElementById('r-keep')).display === 'none'`));
@@ -102,14 +105,23 @@ await sleep(3200);
 s = await state(); expect('the run complete: the results', s.mode === 'results' && s.completed && s.results);
 expect('DAWN, with KEEP DRIVING', await ev(`document.getElementById('r-title').textContent === 'DAWN' && getComputedStyle(document.getElementById('r-keep')).display !== 'none'`));
 expect('a new best score and the fastest dawn marked', await ev(`document.getElementById('r-score').classList.contains('hi') && document.getElementById('r-dawn').classList.contains('hi')`));
+// (each over the record it beat: the run quit before it scored 3,000; no dawn before this one)
+const lines = await ev(`[document.getElementById('r-bestrec').textContent, document.getElementById('r-fastrec').textContent]`);
+expect('the records it beat, under each', /^WAS 3,0\d\d$/.test(lines[0]) && lines[1] === 'FIRST RECORD', lines);
 await shot('12_results_dawn');
 // (on a desktop the keys: Enter takes the first choice, KEEP DRIVING at dawn)
 if (PHONE) await hit('#r-keep', 1200); else { await press('Enter'); await sleep(850); }
 s = await state(); expect('KEEP DRIVING: the same run, on into the day', s.mode === 'playing' && s.completed && s.phase === 'day', s);
+expect('the caption says FREE DRIVE', await ev(`(() => { const h = window.__DEBUG__.hud, c = h.tv || h.tvQ[0]; return !!c && c.label.includes('FREE DRIVE'); })()`));
 await shot('13_keep_driving');
+// (free drive: points scored now are not the run's, and set no record; banked, as a drift's would be)
+await ev('(() => { const s = window.__DEBUG__.scoring; s.active = true; s.points = 40000; s.time = 3; s.bank(); })()');
+await sleep(600);
 if (PHONE) await hit('#pauseb'); else await press('Escape');
 await hit('#quitb', 1200);
 s = await state(); expect('a quit after dawn: its results, DAWN, no KEEP DRIVING', s.mode === 'results' && await ev(`document.getElementById('r-title').textContent === 'DAWN' && getComputedStyle(document.getElementById('r-keep')).display === 'none'`));
+const kept = await ev(`[document.getElementById('r-score').textContent, window.__DEBUG__.records.best.score, window.__DEBUG__.records.last.score, +(localStorage.getItem('sundrift.best.easy') || 0)]`);
+expect('the run as it stood at dawn: the free drive changed no record', kept[0] === '15,000' && kept[1] === 15000 && kept[2] === 15000 && kept[3] === 15000, kept);
 await shot('14_results_after_day');
 await hit('#r-new', 1200);
 s = await state(); expect('NEW RUN: a run from the golden hour again', s.mode === 'playing' && s.hour < 17.5 && s.hour > 17.2 && !s.completed, s);
