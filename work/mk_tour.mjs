@@ -14,7 +14,8 @@ if (map === 'city') steps.push({ click: '.map[data-m=city]' }, { wait: 9000 });
 const rainArg = process.argv.find((a) => a.startsWith('--rain='));
 steps.push({ js: "document.getElementById('startb').click()" }, { wait: 1200 }, autopilot,
   ...(rainArg ? [{ js: `window.__DEBUG__.rainNow(${Number(rainArg.split('=')[1])})` }] : []),
-  { js: '(() => { window.__SUNCAM__ = (h) => { const D = window.__DEBUG__; D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9; }; })()' });
+  // (as if dawn were already behind: a jump across 06:00 would end the run and bring up its results)
+  { js: '(() => { window.__SUNCAM__ = (h) => { const D = window.__DEBUG__; D.G.dawnT = D.G.dawnT || 0.01; D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9; }; })()' });
 const name = (h) => `${map}_${String(Math.floor(h)).padStart(2, '0')}${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
 for (const h of HOURS) steps.push({ js: `window.__SUNCAM__(${h})` }, { wait: hold }, { shot: name(h) });
 steps.push({ js: 'window.__AUTOPILOT__ = null' });
