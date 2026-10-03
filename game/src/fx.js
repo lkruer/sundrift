@@ -184,14 +184,15 @@ export class Particles {
     Object.assign(p, { alive: true, age: 0, grav: 0, drag: 1 }, o);
   }
 
-  smoke(x, y, z, vx, vz, strength, warm) {
-    // tyre smoke: rises, drifts back with the car's slip, tinted by the light
+  smoke(x, y, z, vx, vz, strength, warm, deep = 0) {
+    // tyre smoke: billows out of the tyre, drifts back with the car's slip and hangs in the air behind a drift, tinted
+    // by the light; deep (0..1, the slide's angle and speed) makes it a cloud, the drift anime's signature
     const n = strength > 0.7 ? 2 : 1;
     for (let i = 0; i < n; i++) this.spawn({
       x: x + (Math.random() - 0.5) * 0.3, y: y + 0.1, z: z + (Math.random() - 0.5) * 0.3,
-      vx: vx * 0.35 + (Math.random() - 0.5) * 1.2, vy: 0.9 + Math.random() * 1.3, vz: vz * 0.35 + (Math.random() - 0.5) * 1.2,
-      life: 0.9 + Math.random() * 0.7, s0: 0.3, s1: 1.1 + strength * 0.6,
-      r: warm.r, g: warm.g, b: warm.b, a0: 0.10 + 0.13 * strength, drag: 1.6,
+      vx: vx * 0.3 + (Math.random() - 0.5) * (1.6 + 1.4 * deep), vy: 0.7 + Math.random() * (1.1 + 0.9 * deep), vz: vz * 0.3 + (Math.random() - 0.5) * (1.6 + 1.4 * deep),
+      life: 1.1 + Math.random() * 0.8 + deep * 1.2, s0: 0.5 + 0.3 * deep, s1: 1.4 + strength * 0.8 + deep * 2.4,
+      r: warm.r, g: warm.g, b: warm.b, a0: 0.12 + 0.14 * strength + 0.1 * deep, drag: 1.9 - 0.6 * deep,
     });
   }
 

@@ -294,7 +294,8 @@ async function boot() {
   settings.onChange = applySetting;
   for (const k of ['master', 'units', 'shake', 'tv', 'gfx']) applySetting(k);
   skids = new SkidMarks(scene, Q.skid);
-  particles = new Particles(scene, Q.smoke);
+  // (room for a drift's cloud to hang behind the car: the smoke lives longer than it did)
+  particles = new Particles(scene, Math.round(Q.smoke * 1.6));
   courseOut = new CourseOutUI(hud);
   magnet = new Magnet(scene);
   debris = new Debris(scene, (x, z) => world.ground.height(x, z));
@@ -1036,7 +1037,7 @@ let perfLine = '';
 
 const _fwd = new THREE.Vector3(), _carAt = { x: 0, y: 0, z: 0, vx: 0, vz: 0 };
 const _camVel = new THREE.Vector3(), _rainCol = new THREE.Color(), _cityRain = new THREE.Color();
-const _smoke = new THREE.Color(), _tailSmoke = new THREE.Color(1.0, 0.32, 0.3), _neonSmoke = new THREE.Color(0.75, 0.45, 1.0);
+const _smoke = new THREE.Color(), _white = new THREE.Color(0.92, 0.92, 0.95), _tailSmoke = new THREE.Color(1.0, 0.32, 0.3), _neonSmoke = new THREE.Color(0.75, 0.45, 1.0);
 /** Where a drop lands for a splash: on the road ahead of the car or just behind it, across its whole width. */
 function splashSpot() {
   const s = G.s + Math.random() * 60 - 8;
@@ -1986,7 +1987,11 @@ function effects(dt, y, boost01) {
     const a = onRoad ? clamp(slip * 1.2 + (car.hand ? 0.5 : 0) * clamp(car.speed / 8, 0, 1), 0, 1) : 0;
     mark(i, wx, wz, a);
     // (at night the smoke pouring past the tail lamps catches their red; in the city, some of the neon too)
-    if (a > 0.25 && car.speed > 6 && Math.random() < a * 0.9) particles.smoke(wx, y, wz, vx, vz, a, _smoke.copy(sunColor).lerp(G.map === 'city' && Math.random() < 0.4 ? _neonSmoke : _tailSmoke, 0.32 * (G.night || 0)));
+    // (how deep the slide is, its angle and its speed: a big one at speed pours out a cloud that hangs behind the car)
+    const deep = clamp((Math.abs(car.beta) - 0.25) / 0.45, 0, 1) * clamp((car.speed - 8) / 14, 0, 1);
+    // (tyre smoke is white: the light only tints it, warm at golden hour, cool by moonlight, and it is dim at night but for
+    // the tail lamps' red; the sun's own colour made it an orange smear on the road)
+    if (a > 0.25 && car.speed > 6 && Math.random() < a * 0.9 + deep * 0.6) particles.smoke(wx, y, wz, vx, vz, a, _smoke.copy(sunColor).lerp(_white, 0.6).multiplyScalar(lerp(1.15, 0.5, G.night || 0)).lerp(G.map === 'city' && Math.random() < 0.4 ? _neonSmoke : _tailSmoke, 0.32 * (G.night || 0)), deep);
     // on a wet road the tyres throw spray
     if (W.wet > 0.3 && onRoad && car.speed > 8 && Math.random() < W.wet * 0.55) particles.spray(wx, y, wz, vx, vz, W.wet * clamp(car.speed / 30, 0, 1), sunColor);
     if (!onRoad && car.speed > 4 && Math.random() < 0.45) particles.dust(wx, y, wz, vx, vz, clamp(car.speed / 20, 0, 1), sunColor);
