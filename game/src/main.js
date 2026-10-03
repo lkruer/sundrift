@@ -867,7 +867,8 @@ function idle(dt, t0 = performance.now()) {
     camera.position.x -= rx * k; camera.position.z -= rz * k;
   }
   if (night.hero) {
-    night.hero.intensity = 150;
+    // (a showroom key for the dark: by day the sun lights the car, and the two together blew its paint out white)
+    night.hero.intensity = 150 * lerp(0.12, 1, G.night ?? 1);
     night.hero.position.set(car.x - Math.sin(car.yaw + 0.6) * 6, y + 6, car.z - Math.cos(car.yaw + 0.6) * 6);
     night.hero.target.position.set(car.x, y + 0.6, car.z); night.hero.target.updateMatrixWorld();
   }
@@ -1126,7 +1127,10 @@ function applySun(dt, force = false) {
   if (full) envTimer = 0;
   G.lastApplied = shown; G.sunApplied = true; G.lastRain = W.rain; G.lastMap = G.map;
   // the hour's look: the sun's place, the sky, the light, the haze, the clouds and the grade (daylight.js)
-  const sun = sunAt(shown), look = lookAt(shown);
+  // (the sun sets a hundred degrees round to the right of the start line's heading: behind the title's camera, so the
+  // evening light falls on the car instead of flaring straight into the lens, and across the road as a run begins)
+  const h0 = track ? track.sample(START_S).h : 0;
+  const sun = sunAt(shown, (Math.atan2(Math.sin(h0), -Math.cos(h0)) * 180 / Math.PI + 100 + 720) % 360), look = lookAt(shown);
   G.look = look;
   const nightAmt = look.night;
   rig.setOvercast(W.rain * 0.9);
@@ -1175,7 +1179,12 @@ function applySun(dt, force = false) {
   U.uGradeLo.value.setRGB(lerp(g.lo[0], 1, wet), lerp(g.lo[1], 1, wet), lerp(g.lo[2], 1.04, wet));
   U.uGradeHi.value.setRGB(lerp(g.hi[0], 1, wet), lerp(g.hi[1], 1, wet), lerp(g.hi[2], 1, wet));
   U.uSat.value = lerp(g.sat, 0.92, wet); U.uCon.value = lerp(g.con, 1, wet);
-  if (post.bloomPass) post.bloomPass.strength = look.bloom * (1 - 0.3 * W.rain);
+  if (post.bloomPass) {
+    post.bloomPass.strength = look.bloom * (1 - 0.3 * W.rain);
+    // the glow starts above a white face square to the sun, so by day only the sun, its glints and the lamps bloom (at a
+    // fixed 1.35, set for the night's lamps, every sunlit wall and the white paint glowed: the milk filter)
+    post.bloomPass.threshold = Math.max(1.35, (rig.sun ? rig.sun.intensity : 0) * 0.3);
+  }
 }
 
 // ---------------------------------------------------------------- the air

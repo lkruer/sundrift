@@ -21,14 +21,16 @@ const SUN = [
   [13.7, 49], [14.8, 37], [16.4, 20.5], [17.3, 11.5], [17.85, 5.3], [18.2, 0.9], [18.62, -3.4], [19.05, -7.1],
   [19.55, -10.6], [20.1, -12],
 ];
-// the sun's bearing (clockwise from north): rising a little south of east, setting a little south of west... then on
-// round under the world by night, which nobody sees
-const AZ_RISE = 102, AZ_SET = 258, H_RISE = 6.05, H_SET = 18.2;
+// the sun's bearing (clockwise from north): it sets at `azSet` and rose 156 degrees round from there, then goes on round
+// under the world by night, which nobody sees. The game sets each course's sunset bearing from its start line (see
+// main.js), so the evening sun stands behind the title's camera and lights the car instead of blinding it.
+const AZ_SWEEP = 156, H_RISE = 6.05, H_SET = 18.2;
 
 const _sunTan = monotoneTangents(SUN);
 
-/** Where the sun is at an hour: { el (degrees), az (degrees) }. */
-export function sunAt(hour) {
+/** Where the sun is at an hour: { el (degrees), az (degrees) }, for a sunset bearing of azSet. */
+export function sunAt(hour, azSet = 258) {
+  const AZ_SET = azSet, AZ_RISE = azSet - AZ_SWEEP;
   const h = ((hour % 24) + 24) % 24;
   let el;
   if (h <= SUN[0][0] || h >= SUN[SUN.length - 1][0]) el = -12;
@@ -37,9 +39,9 @@ export function sunAt(hour) {
   if (h >= H_RISE && h <= H_SET) az = AZ_RISE + (h - H_RISE) * (AZ_SET - AZ_RISE) / (H_SET - H_RISE);
   else {
     const since = (h - H_SET + 24) % 24, night = 24 - (H_SET - H_RISE);
-    az = (AZ_SET + since * (360 - AZ_SET + AZ_RISE) / night) % 360;
+    az = AZ_SET + since * (360 - AZ_SWEEP) / night;
   }
-  return { el, az };
+  return { el, az: ((az % 360) + 360) % 360 };
 }
 
 /* ------------------------------------------------------- the colour maths */

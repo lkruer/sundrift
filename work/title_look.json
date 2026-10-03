@@ -1,0 +1,8 @@
+[
+ {"wait": 2500},
+ {"js": "(() => { window.__SUNCAM__ = (h) => { const D = window.__DEBUG__; D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9; }; })()"},
+ {"js": "window.__SUNCAM__(17.3)"}, {"wait": 3000}, {"shot": "title_1718"},
+ {"js": "window.__SUNCAM__(18.2)"}, {"wait": 3000}, {"shot": "title_1812"},
+ {"js": "window.__SUNCAM__(18.62)"}, {"wait": 3000}, {"shot": "title_1837"},
+ {"js": "window.__SUNCAM__(5.55)"}, {"wait": 3000}, {"shot": "title_0533"}
+]
