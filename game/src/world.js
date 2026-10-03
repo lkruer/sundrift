@@ -92,7 +92,7 @@ function roadTexture(half, wall) {
   const rv = document.createElement('canvas'); rv.width = W; rv.height = H;
   const ctx = cv.getContext('2d'), rctx = rv.getContext('2d');
   const img = ctx.createImageData(W, H), rimg = rctx.createImageData(W, H);
-  const asphalt = [0x3a, 0x3b, 0x40], gravel = [0x86, 0x80, 0x75], line = [0xe8, 0xe4, 0xda], yellow = [0xe8, 0xb0, 0x2a];
+  const asphalt = [0x3a, 0x3b, 0x40], gravel = [0x86, 0x80, 0x75], line = [0xe8, 0xe4, 0xda], yellow = [0xd2, 0x96, 0x2c];
   let seed = 7;
   const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
   // repair patches: a shade darker than the asphalt round them (fresh), or a shade lighter (old and sun-bleached), with
