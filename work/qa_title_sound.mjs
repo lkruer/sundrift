@@ -17,7 +17,7 @@ await tap('#pauseb'); await sleep(400);
 note('paused (button):', JSON.stringify(await ev(rmsJs)));
 await Q.page.keyboard.press('KeyA'); await sleep(500);
 note('paused, then a key:', JSON.stringify(await ev(rmsJs)));
-await tap('#quitb'); await sleep(2000);
+await tap('#quitb'); await sleep(1000); await tap('#r-menu'); await sleep(1000);   // (the run's results first, then the title)
 await ev('window.__AUTOPILOT__ = null');
 note('title after MAIN MENU:', JSON.stringify(await ev(rmsJs)));
 await sleep(5000);

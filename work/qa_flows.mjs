@@ -86,7 +86,7 @@ await ev(`window.__AUTOPILOT__ = (dt) => ({ throttle: 1, brake: 0, steer: 1, han
 await sleep(2500);
 note('mid-slide:', await ev(rmsJs));
 await ev('window.__AUTOPILOT__ = null');
-await tap('#pauseb'); await sleep(400); await tap('#quitb'); await sleep(1500);
+await tap('#pauseb'); await sleep(400); await tap('#quitb'); await sleep(1000); await tap('#r-menu'); await sleep(500);
 note('title after MAIN MENU:', await ev('({ mode: window.__DEBUG__.G.mode, title: document.getElementById("title").classList.contains("on") })'), await ev(rmsJs));
 await sleep(4000);
 note('title 5 s later:', await ev(rmsJs));
@@ -108,7 +108,7 @@ for (const [m, d, paint] of rounds) {
   await drive(20, 'smash,offroad,crash');
   await shot(`06_run_${k}_${m}_${d}`);
   await census(`run ${k} ${m} ${d}`);
-  await tap('#pauseb'); await sleep(400); await tap('#quitb'); await sleep(1200);
+  await tap('#pauseb'); await sleep(400); await tap('#quitb'); await sleep(1000); await tap('#r-menu'); await sleep(500);
 }
 await census('final title');
 

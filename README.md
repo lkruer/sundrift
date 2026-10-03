@@ -1,10 +1,19 @@
 # SUNDRIFT
 
-Endless night drifting in Japan, on two maps: a mountain pass in cherry-blossom season (夜桜峠, Yozakura Pass)
+Night drifting in Japan, on two maps: a mountain pass in cherry-blossom season (夜桜峠, Yozakura Pass)
 or the rain-slick neon streets of NEO TOKYO (ネオ東京). Chain drifts to bank score and boost, clip the guardrail
 without touching it, and every banked drift pushes the night toward dawn. Where there is no guardrail the car can
 leave the road: take out the bollards, the lamp posts and the signs, flatten the bushes, and get back on within
 five seconds, or a giant magnet comes down and carries you back.
+
+**A run is one night: drift until dawn.** It starts in the golden hour, 17:18, and the clock moves by the road driven
+and, much faster, by every drift you bank; the night passes through the golden hour, the blue hour, the night and the
+dawn (each comes on the TV as a caption). At 06:00 the run is complete: SUNRISE, then the results (the score, the
+drifts, the biggest, the longest, the best combo, the clips, the crashes, the J-turns, the time sliding, the biggest
+angle, the top speed, what was smashed, the distance, the real time it took), with KEEP DRIVING (the same run, on into
+the day), NEW RUN, MAIN MENU and SHARE. A player who drifts gets there in four to six minutes, one who mostly drives in
+about eleven. Each course keeps its best run, its fastest dawn and its last run, under RECORDS on the title, each
+shareable as a card.
 
 **The look:** a playable 90s drift anime.
 - **The pass.** Cherry trees in blossom line the road and dot the cedar forest, and petals drift on the air and
@@ -44,8 +53,9 @@ five seconds, or a giant magnet comes down and carries you back.
   quarters of a dial, the speed inside it; a strip along the bottom on a phone), the drift count and its cash-in,
   every callout and the off-road countdown are the set's own display, in the 90s dash's amber seven-segment digits
   and the title's racing italic, laid into the picture under the glass: they bend with the screen, take its
-  scanlines and its colour steps, and glow a little like phosphor. The title screen and the pause menu are drawn on
-  the set the same way. A run comes on with the channel's caption, CH 01.
+  scanlines and its colour steps, and glow a little like phosphor. The title screen, the pause menu, a run's results,
+  the records and the settings are drawn on the set the same way. A run comes on with the channel's caption, CH 01,
+  and each phase of the night with its own (GOLDEN HOUR, BLUE HOUR, NIGHT, DAWN).
 - **The car.** Held in a drift, its tail lamps leave thin red light trails hanging in the air behind it, the way a
   drift anime draws a slide at night; the lamps burn brighter on the brakes. The engine is an inline four built
   from its firing pulses (see below), the revs flare as the rear tyres spin up in a slide, it cuts for a moment on
@@ -105,7 +115,9 @@ bend; everywhere else (about two thirds of it) the car can drive off onto the ve
 over a crest at speed it leaves the ground. Trunks, boulders, huts and shrines stop it. In the city the street
 fronts are the edge, so the car can mount the pavement.
 
-Each is one fixed, endless course (same seed every run), so best scores compare.
+Each is one fixed, endless course (same seed every run), so best scores and dawn times compare. Each course runs its
+clock at its own rates, measured (a course whose corners hand out drifts runs it more on the drifts), so a night takes
+about as long on any of them.
 
 ## Controls
 
@@ -117,6 +129,8 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 | lift off / brake | let go of `W` / `S` | pull the finger down a little to lift off, further to brake |
 | handbrake | `Space` | hold the right of the screen (the HAND BRAKE pad) |
 | pause | `Esc` or `P` | the pause button |
+| the results | `Enter`: KEEP DRIVING at dawn, else NEW RUN; `Esc`: back to the road at dawn, else MAIN MENU | tap a button |
+| records, settings | the buttons beside START (settings also in the pause menu); `Esc` closes them | tap |
 | camera zoom | mouse wheel, `+` / `-` | |
 | orbit the camera | hold either mouse button and drag (let go: back to the chase view) | |
 | mute | `M` | the note button |
@@ -125,6 +139,10 @@ Each is one fixed, endless course (same seed every run), so best scores compare.
 
 The keys follow what is printed on them, so on an AZERTY or a QWERTZ keyboard W, A, S and D are where the keyboard
 says (the arrow keys work too).
+
+SETTINGS: the master, music and effects volumes; MPH or KM/H; the camera's shake on or off; the TV effect FULL or LIGHT
+(a third of the tube's curve, fewer scanlines); the graphics AUTO, PERFORMANCE or QUALITY (from the next load). They
+are kept in the browser, like the records.
 
 Drift: tap the handbrake into a corner (or lift off and turn in, or flick the wheel the other way first, or just
 push a fast corner on the throttle) and keep the key held into the turn: the slide holds for as long as you hold it,
@@ -194,9 +212,14 @@ passing 90 degrees).
 - `game/src/hud.js`: the HUD, drawn into a canvas at the screen's resolution (every string with its outline kept as a
   sprite, the digits as seven-segment polygons, redrawn only when something on it changes, thirty times a second at
   most) and laid in by the tube pass in `post.js`, through the glass's own curve; on a phone it also draws where
-  the thumbs go. `game/src/pagetv.js`: the title and the pause menu, laid out by the page, which keeps their buttons
-  (invisible) for every click, tap and key, and drawn into the same canvas from the page's own computed styles, each
-  box and each word where the tube shows its place.
+  the thumbs go. `game/src/pagetv.js`: the title, the pause menu, the results, the records and the settings, laid out
+  by the page, which keeps their buttons (invisible) for every click, tap and key, and drawn into the same canvas from
+  the page's own computed styles, each box and each word where the tube shows its place.
+- `game/src/records.js`: each course's best run, fastest dawn and last run, kept in the browser; `game/src/screens.js`
+  fills the results and the records from them; `game/src/share.js`: the share text and the 1200 x 630 share card (the
+  sky at the hour the run reached, the logo, the score, the clock in the dash's digits), shared through the system's
+  share sheet, or copied and saved; `game/src/settings.js`: the settings and their panel; `game/src/platform.js`: the
+  hooks a games platform can take (below).
 - `game/src/offroad.js`: the countdown's state and the magnet (its swoop, the flight, the drop, every beat of it).
 - `game/src/atmos.js`: the air: the cloud deck (moonlit wisps on the pass, lit from beneath over the city), the
   searchlights, the holographic koi, the fireflies, the shooting stars, and lightning with its bolt. The sea of
@@ -217,6 +240,16 @@ passing 90 degrees).
   a bus going by on the next street, horns now and then, an ambulance passing, the elevated train with its wheels
   clacking over the rail joints in time with the train you see, and the crossings' bird-call chirps (piyo or the
   cuckoo's kak-koo) while the walkers have green, with a short street echo off the fronts.
+
+## On a games platform
+
+The game calls a small set of hooks (`game/src/platform.js`), each a no-op on its own page. A host sets
+`window.SUNDRIFT_PLATFORM` before the game's script runs, with any of: `init()`, `loadingProgress(f)` (0 to 1),
+`loadingDone()` (the title is up), `gameplayStart()` and `gameplayStop()` (a run is or is not under way: started,
+paused, the tab hidden, the results up, carried on past dawn), `runComplete(stats)` (a run reached dawn: its whole
+breakdown, as `records.js` describes it), and `share(payload)` (return `true` to take over sharing; the payload has the
+text, the URL, the run and the PNG card). A hook that throws is reported once as a console warning and never stops the
+game. The run pauses itself when the tab is hidden.
 
 ## What is in the repo
 
@@ -239,6 +272,8 @@ passing 90 degrees).
 | `work/perf/`, `work/boot_probe.mjs` | the phone performance probes (JS per frame under CPU throttling, CPU profiles, a pixel A/B that proves a change invisible) and where the load time goes under the jam gate's 4G |
 | `work/jitter.mjs`, `work/shot.mjs` | a frame-time and on-screen jitter probe, and scripted screenshots |
 | `work/hud_layout_check.json`, `work/touch_test.json` | the HUD laid out for 23 screen sizes, desktop and touch, every pair of panels checked for overlap; the phone's steering, lift and brake driven with real touches (run with `work/shot.mjs`) |
+| `work/dawn_time.mjs` | how long a run takes to reach dawn, driven by an autopilot in real time, on any course: what the clock was tuned by |
+| `work/platform_flow.mjs`, `work/platform_hooks.mjs`, `work/share_check.mjs`, `work/tv_hover_check.mjs` | the run's whole loop driven with real keys or real touches and checked step by step, every screen photographed at a desktop's, an upright phone's and a phone on its side's size (the title's records and settings, the phases, the pause's settings, RUN OVER, dawn and its results, KEEP DRIVING, NEW RUN); the platform's hooks against a stub platform, and stored data that does not read back; the share cards drawn, the share's fallback (clipboard and download) pressed for real; a hover read back from the TV's canvas |
 | `gate/drift-gate.mjs` | the gate this game needs: real keys or real touches, steers by telemetry, handbrakes into corners, asserts drifts were banked, writes a filmstrip |
 | `NOTES.md` | the build log: what was measured, what was rejected, what is still wrong |
 

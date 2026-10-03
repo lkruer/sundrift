@@ -1,14 +1,20 @@
 /**
- * SUNDRIFT — boot, the title screen, the frame loop, pause, and the contract the harness steers by.
+ * SUNDRIFT — boot, the title screen, the frame loop, pause, a run from the golden hour to dawn and its results, and the
+ * contract the harness steers by.
  *
  * window.__GAME__ is refreshed every frame: `pos` in metres (the gate drives by it), `fps` from REAL elapsed
  * time, draws and tris straight from renderer.info. The start button is #startb and it is the only way a run
- * starts; the defaults (medium course, pearl white) mean one press is all it takes.
+ * starts; the defaults (easy course, pearl white) mean one press is all it takes.
+ *
+ * A run is one night: it starts in the golden hour (CLOCK.start) and is complete when the clock reaches dawn, 06:00.
+ * Then it is recorded (records.js), the platform is told (platform.js), and the results come up: KEEP DRIVING carries
+ * the same run on into the day (recorded, it does not complete again), NEW RUN, MAIN MENU, SHARE. A run quit from the
+ * pause menu shows its results too (RUN OVER) before the title; a restart records it without them.
  */
 import * as THREE from 'three';
 import { ASSET, bakeStatic } from '../assetlib.js?v=202609242220';
 import { createRig, detectTier } from '../rig.js?v=202609242220';
-import { PAL, ROAD, QUALITY, SCORE, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242220';
+import { PAL, ROAD, QUALITY, SCORE, CLOCK, phaseOf, MAX_DT, CAR_SCALE, REDUCED_MOTION, clamp, damp, lerp, smoothstep } from './config.js?v=202609242220';
 import { Car, gearbox } from './car.js?v=202609242220';
 import { Track, DIFFS, CITY_DIFFS } from './track.js?v=202609242220';
 import { World, drawsGlyphs } from './world.js?v=202609242220';
@@ -23,7 +29,13 @@ import { CourseOutUI, Magnet, COURSE_OUT_S } from './offroad.js?v=202609242220';
 import { Atmosphere } from './atmos.js?v=202609242220';
 import { Debris } from './debris.js?v=202609242220';
 import { makePost } from './post.js?v=202609242220';
+import { platform } from './platform.js?v=202609242220';
+import { Settings } from './settings.js?v=202609242220';
+import { loadRecords, saveRun, RECORDS_V, fmt } from './records.js?v=202609242220';
+import { fillResults, fillRecords, flashButton } from './screens.js?v=202609242220';
+import { shareRun, prepareCard } from './share.js?v=202609242220';
 
+platform.init();
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
 const loadEl = $('load'), barf = $('barf'), loadmsg = $('loadmsg');
@@ -40,9 +52,13 @@ const PAINTS = [
 const SEED = 20260921;
 const START_S = 8;
 
-// A run starts just after sunset, the sky still warm and the lamps already lit: the first drifts carry it on into the
-// night (the clock is the score), so the find is on screen from the first minute; at 20:36 the night had already fallen
-const START_HOUR = 18.2;
+// A run starts in the golden hour, the sun low and the lamps coming on: the first drifts carry the sun down and the
+// night on toward dawn, the run's goal (the clock is the score), so the find is on screen from the first minute. (It
+// started at 20:36, when the night had already fallen, then at 18:12, just after sunset.)
+const START_HOUR = CLOCK.start;
+// the player's settings, read before anything is built: the graphics choice decides the renderer's tier (so a change
+// to it takes effect the next time the game loads; a ?q= in the address still wins, for testing)
+const settings = new Settings();
 const G = {
   mode: 'loading', hour: START_HOUR, hourShown: 0, fps: 60, frameAvg: 1 / 60, s: 0, u: 0, idx: 0, dist: 0, lastS: 0, night: 0,
   diff: store.get('diff', 'easy') === 'hard' ? 'hard' : 'easy',
@@ -53,7 +69,10 @@ const G = {
 window.__GAME__ = { pos: [0, 0], fps: 0, speed: 0, score: 0, over: false, draws: 0, tris: 0 };
 
 // ---------------------------------------------------------------- renderer
-const tier = detectTier();
+const tier = (() => {
+  try { if (new URLSearchParams(location.search).has('q')) return detectTier(); } catch {}
+  return settings.v.gfx === 'performance' ? 'phone' : settings.v.gfx === 'quality' ? 'high' : detectTier();
+})();
 const Q = QUALITY[tier === 'phone' ? 'phone' : 'high'];
 // (no antialiasing on the canvas: the scene is drawn into the post chain's own target, and the canvas only ever gets
 // the chain's full-screen triangle, whose multisampled copy was memory and a resolve a frame for an identical picture)
@@ -220,7 +239,7 @@ function buildNight() {
 // ---------------------------------------------------------------- boot
 async function boot() {
   const tb = performance.now(); window.__BOOT__ = [];
-  const prog = (f, msg) => { barf.style.width = (f * 100).toFixed(0) + '%'; if (msg) loadmsg.textContent = msg; window.__BOOT__.push([msg, Math.round(performance.now() - tb)]); };
+  const prog = (f, msg) => { barf.style.width = (f * 100).toFixed(0) + '%'; if (msg) loadmsg.textContent = msg; window.__BOOT__.push([msg, Math.round(performance.now() - tb)]); platform.loadingProgress(f); };
   prog(0.02, 'laying the road');
   for (const m of ['mountain', 'city']) for (const k of Object.keys(DIFFS)) G.best[bestKey(m, k)] = Number(store.get('best.' + bestKey(m, k), 0)) || 0;
   track = new Track(SEED, G.diff, G.map);
@@ -266,6 +285,10 @@ async function boot() {
   new PageTV(hud);
   audio = new Audio();
   audio.setMap(G.map === 'city');
+  // the settings as they were left, and from now on as they change (the panel: settings.js, index.html #settings)
+  TUBE0 = { curve: RU.uCurve.value, edge: RU.uEdge.value, zoom: RU.uZoom.value, corner: RU.uCorner.value, scan: RU.uScan.value, hudScan: RU.uHudScan.value, mask: RU.uMask.value };
+  settings.onChange = applySetting;
+  for (const k of ['master', 'units', 'shake', 'tv', 'gfx']) applySetting(k);
   skids = new SkidMarks(scene, Q.skid);
   particles = new Particles(scene, Q.smoke);
   courseOut = new CourseOutUI(hud);
@@ -296,13 +319,31 @@ async function boot() {
       G.idx = track.index(s); G.s = s; G.lastS = s; G.carY = p.y; G.vy = 0; G.off = null; G.floor = null;
       world.prime(p.x, p.z, s); chase.snap(car, p.y); placeCar(p.y, 0, 0);
       return p;
-    } };
+    },
+    // the clock, the run's records and the settings, for the checks in work/ (dawn_time.mjs, platform_flow.mjs, platform_hooks.mjs)
+    CLOCK, settings, platform, get records() { return loadRecords(bestKey()); }, get mPerHour() { return G.mPerHour; }, get ptsPerMin() { return G.ptsPerMin; },
+    // the clock put at an hour (the next frame says the phase it is in, and at 06:00 the run completes)
+    clockTo(h) { G.hour = ((h % 24) + 24) % 24; },
+  };
   input.onAny = () => audio.unlock();
-  input.onPause = () => { if (G.mode === 'playing') setPaused(true); else if (G.mode === 'paused') setPaused(false); };
-  // (Enter or Space on the title, from input.js; true when a run started, so the key does nothing else)
-  input.onStart = () => { if (building) { startWanted = true; return true; } if (G.mode !== 'title') return false; startGame(); return true; };
+  // Escape or P: a panel closes, the results say MAIN MENU or carry on (KEEP DRIVING at dawn), a run pauses and resumes
+  input.onPause = () => {
+    if (panel) { closePanel(); return; }
+    if (G.mode === 'results') { if (Date.now() >= G.armedAt) resultsBack(); return; }
+    if (G.mode === 'playing') setPaused(true); else if (G.mode === 'paused') setPaused(false);
+  };
+  // (Enter or Space on the title, from input.js; true when a run started, so the key does nothing else. On the results,
+  // Enter takes the first choice: Space is the handbrake, and a slide may still be held as they come up)
+  input.onStart = (code) => {
+    if (G.mode === 'results') { if (code !== 'Space' && Date.now() >= G.armedAt) { resultsPrimary(); return true; } return false; }
+    if (panel) return false;
+    if (building) { startWanted = true; return true; }
+    if (G.mode !== 'title') return false;
+    startGame(); return true;
+  };
   input.onMute = () => toggleMute();
   buildTitle();
+  settings.bind($('settings'));
   prog(0.99, 'title');
   // the start button must be on screen the moment __READY__ is true: the harness presses it straight away
   loadEl.style.display = 'none'; showTitle();
@@ -314,10 +355,23 @@ async function boot() {
   $('pauseb').addEventListener('click', () => setPaused(G.mode === 'playing'));
   $('resumeb').addEventListener('click', () => setPaused(false));
   $('restartb').addEventListener('click', () => { restartRun(); setPaused(false); });
-  $('quitb').addEventListener('click', quitToTitle);
+  $('psetb').addEventListener('click', () => openPanel('settings'));
+  $('quitb').addEventListener('click', quitToResults);
+  // the results
+  $('r-keep').addEventListener('click', keepDriving);
+  $('r-new').addEventListener('click', () => resultsTo('run'));
+  $('r-menu').addEventListener('click', () => resultsTo('title'));
+  $('r-share').addEventListener('click', (e) => share(G.lastRun, e.currentTarget));
+  // the title's records and settings, and their way back
+  $('recordsb').addEventListener('click', () => openPanel('records'));
+  $('settingsb').addEventListener('click', () => openPanel('settings'));
+  $('rec-back').addEventListener('click', closePanel);
+  $('set-back').addEventListener('click', closePanel);
+  for (const k of ['best', 'fast', 'last']) $('rc-' + k + '-share').addEventListener('click', (e) => share(shownRecords[k], e.currentTarget));
   document.addEventListener('visibilitychange', () => { if (document.hidden && G.mode === 'playing') setPaused(true); });
   window.__READY__ = true;
   prog(1, 'ready');
+  platform.loadingDone();
 }
 
 // a frame, or a moment if the tab is hidden (a hidden tab never runs requestAnimationFrame, and the boot must not wait on it)
@@ -656,21 +710,21 @@ function showTitle() {
 function startGame() {
   if (building) { startWanted = true; return; }
   if (G.mode !== 'title') return;
+  if (panel) closePanel(true);
   $('title').classList.remove('on');
   document.body.classList.add('playing');
   if (night.hero) night.hero.intensity = 0;
   hud.warm(false); courseOut.update(null);
-  scoring.reset(); hud.reset();
-  G.hour = START_HOUR; G.dist = 0; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
-  resetWeather();
-  G.playT = 0; G.longFrames = 0; G.worstFrame = 0;
+  beginRun();
   const p = track.sample(G.s || START_S);
   chase.snap(car, p.y);
   hud.show(true);
   audio.unlock();
   G.mode = 'playing';
-  // (the set's caption as the run comes on: the channel, and what is on it)
+  platform.gameplayStart();
+  // (the set's caption as the run comes on: the channel, and what is on it; then the hour it starts in, and its goal)
   hud.channel(G.map === 'city' ? 2 : 1, courseLabel());
+  sayPhase(false);
 }
 
 function setPaused(on) {
@@ -678,13 +732,16 @@ function setPaused(on) {
     G.mode = 'paused';
     $('pause').classList.add('on');
     const st = scoring.stats;
-    $('pstats').textContent = `${courseLabel()}   SCORE ${Math.round(scoring.total).toLocaleString('en-US')}   ${(G.dist / 1609.344).toFixed(1)} MI   ${st.drifts} DRIFTS`;
+    $('pstats').textContent = `${courseLabel()}   SCORE ${Math.round(scoring.total).toLocaleString('en-US')}   ${fmt.dist(G.dist, settings.v.units)}   ${st.drifts} DRIFTS`;
     audio.pause && audio.pause(true);
+    platform.gameplayStop();
   } else if (!on && G.mode === 'paused') {
+    if (panel) closePanel(true);
     $('pause').classList.remove('on');
     G.mode = 'playing';
     last = performance.now();
     audio.pause && audio.pause(false);
+    platform.gameplayStart();
   }
 }
 
@@ -695,25 +752,245 @@ function saveBest() {
 }
 
 function restartRun() {
-  saveBest();
-  scoring.reset(); hud.reset();
-  G.hour = START_HOUR; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
-  resetWeather();
+  // (the run left behind is the course's last run: recorded, with no results for it)
+  endRun();
+  beginRun();
   resetCarToStart();
   world.prime(car.x, car.z, START_S);
   hud.toast('NEW RUN', '', false);
+  sayPhase(false);
 }
 
-function quitToTitle() {
+// ---------------------------------------------------------------- a run: from the golden hour to dawn, and its end
+
+/** A run begins (from START, a restart, NEW RUN): the clock in the golden hour, the score and the run's numbers at nothing. */
+function beginRun() {
+  scoring.reset(); hud.reset();
+  G.hour = START_HOUR; G.dist = 0; G.newBest = false; G.runBest = G.best[bestKey()] || 0;
+  G.phase = phaseOf(START_HOUR).id; G.clockRun = 0; G.clockPts = 0;
+  G.playT = 0; G.longFrames = 0; G.worstFrame = 0; G.slowLog = [];
+  G.runId = Date.now(); G.dawnT = 0; G.finishAt = 0; G.completed = false; G.lastRun = null;
+  // (NEW BEST and FASTEST DAWN are measured against the records as they stood when the run began)
+  const r = loadRecords(bestKey());
+  G.runRecords = { best: Math.max(G.runBest, r.best ? r.best.score : 0), fastest: r.fastest ? r.fastest.dawnTime : Infinity };
+  const cc = courseClock();
+  G.mPerHour = cc.mPerHour || CLOCK.mPerHour; G.ptsPerMin = cc.ptsPerMin || CLOCK.ptsPerMin;
+  hud.ptsPerMin = G.ptsPerMin;
+  resetWeather();
+}
+
+/** The course's own rates (config.js CLOCK.courses): metres of road for an hour of the night, points for a minute. */
+function courseClock() { return (CLOCK.courses && CLOCK.courses[bestKey()]) || CLOCK; }
+
+/** The course as a run record names it: YOZAKURA PASS · EASY, NEO TOKYO · HARD. */
+function courseName() { const D = (G.map === 'city' ? CITY_DIFFS : DIFFS)[G.diff]; return (G.map === 'city' ? 'NEO TOKYO' : 'YOZAKURA PASS') + ' · ' + D.label; }
+
+/** The phase the clock is in, said on the TV's caption (and, as it is entered, heard: audio.js). */
+function sayPhase(entered) {
+  const ph = phaseOf(G.hour), e = { type: 'phase', value: ph.id, name: ph.name, clock: fmt.clock(G.hour) };
+  hud.onEvent(e);
+  if (entered) audio.onEvent(e);
+}
+
+/** The run as it stands, as a record (records.js says what each field is). */
+function runRecord() {
+  const st = scoring.stats, r1 = (x) => Math.round(x * 10) / 10;
+  return {
+    v: RECORDS_V, id: G.runId, at: Date.now(), map: G.map, diff: G.diff, course: courseName(),
+    score: Math.round(scoring.total), drifts: st.drifts, biggest: Math.round(st.biggest), longest: r1(st.longest), combo: st.combo,
+    clips: st.clips, crashes: st.crashes, jturns: st.jturns, driftTime: r1(st.driftTime), angle: Math.round(st.angle), topKmh: Math.round(st.topKmh),
+    smashes: hud.run.smashN, distance: Math.round(G.dist), clock: Math.round(G.hour * 1000) / 1000, hours: Math.round(G.clockRun * 1000) / 1000,
+    time: r1(G.playT), dawn: G.dawnT > 0, dawnTime: G.dawnT > 0 ? r1(G.dawnT) : null,
+  };
+}
+
+/**
+ * The run recorded as it stands: { run, flags } (flags: a new best score, a new fastest dawn, as the run began). dawnNow:
+ * recorded at its dawn (records.js saveRun).
+ */
+function record(dawnNow = false) {
   saveBest();
+  const run = runRecord();
+  saveRun(bestKey(), run, { dawnNow });
+  G.lastRun = run;
+  return { run, flags: { newBest: run.score > 0 && run.score > G.runRecords.best, newFastest: run.dawn && run.dawnTime < G.runRecords.fastest } };
+}
+
+/**
+ * Dawn, the run's goal, reached a moment ago (the SUNRISE callout has had its moment, and a slide still held has had its
+ * chance to bank): the run is complete. It is recorded, the platform is told, and the results come up with KEEP DRIVING.
+ * Once only: carried on into the day it does not complete again.
+ */
+function completeRun(show = true) {
+  if (G.completed) return null;
+  G.completed = true; G.finishAt = 0;
+  // (a slide still held at the last moment counts: it is banked now, as the run ends)
+  if (scoring.active && scoring.points > 0) scoring.bank();
+  const res = record(true);
+  platform.runComplete({ ...res.run });
+  if (show) showResults(res, true);
+  return res;
+}
+
+/** The run is over (quit, restarted, left from its results): recorded as it ended, the last time. */
+function endRun() {
+  if (!G.runId) return G.lastRes || null;
+  const res = G.dawnT && !G.completed ? completeRun(false) : record();
+  G.runId = 0; G.lastRes = res;
+  return res;
+}
+
+/** The pause menu's MAIN MENU: the run's results first (RUN OVER, or DAWN if it got there), then the title. */
+function quitToResults() {
+  if (G.mode !== 'paused') return;
+  if (panel) closePanel(true);
+  const res = endRun();
   $('pause').classList.remove('on');
   audio.pause && audio.pause(false);
-  // (the engine, the tyres and the wind fade out: they droned on under the title after a quit)
+  if (res) showResults(res, false); else toTitle();
+}
+
+/** The results up: the run frozen under them, the car's sound gone, the card drawn ahead for SHARE. */
+function showResults(res, keep) {
+  G.mode = 'results'; G.resultsKeep = keep;
+  fillResults(res.run, { ...res.flags, keep }, settings.v.units);
+  const el = $('results');
+  el.classList.add('on', 'arming');
+  // (for a moment nothing on them answers: a thumb still on the handbrake, a key still down from the last drift)
+  G.armedAt = Date.now() + 700;
+  clearTimeout(G.armTimer); G.armTimer = setTimeout(() => el.classList.remove('arming'), 700);
+  // (the engine, the tyres and the wind fade out: they droned on under a menu after a run)
+  audio.quiet && audio.quiet();
+  platform.gameplayStop();
+  prepareCard(res.run, settings.v.units);
+  try { $(keep ? 'r-keep' : 'r-new').focus({ preventScroll: true }); } catch {}
+}
+
+const armed = () => G.mode === 'results' && Date.now() >= G.armedAt;
+
+/** KEEP DRIVING: the same run, on into the day; recorded already, it will not complete again. */
+function keepDriving() {
+  if (!armed() || !G.resultsKeep) return;
+  $('results').classList.remove('on');
+  G.mode = 'playing';
+  last = performance.now();
+  platform.gameplayStart();
+  sayPhase(false);
+}
+
+/** NEW RUN or MAIN MENU from the results. */
+function resultsTo(where) {
+  if (!armed()) return;
+  $('results').classList.remove('on');
+  if (where === 'run') {
+    restartRun();
+    G.mode = 'playing';
+    last = performance.now();
+    platform.gameplayStart();
+  } else toTitle();
+}
+// (the keys on the results: Enter takes the first choice, Escape the way out, which at dawn is back to the road)
+function resultsPrimary() { if (G.resultsKeep) keepDriving(); else resultsTo('run'); }
+function resultsBack() { if (G.resultsKeep) keepDriving(); else resultsTo('title'); }
+
+/**
+ * Back to the title, the run over. The clock goes back to the golden hour, where the next run starts: the sky winds back
+ * to it under the menu (left at dawn, the next START swept it through the whole day in the run's first seconds).
+ */
+function toTitle() {
+  endRun();
+  audio.pause && audio.pause(false);
   audio.quiet && audio.quiet();
   scoring.reset(); hud.reset();
+  G.hour = START_HOUR;
   resetCarToStart();
   world.prime(car.x, car.z, START_S);
   showTitle();
+  platform.gameplayStop();
+}
+
+// ---------------------------------------------------------------- the records and the settings, over the title or the pause
+
+let panel = null, panelFrom = null;
+const shownRecords = { best: null, fast: null, last: null };
+
+function openPanel(which) {
+  if (panel) closePanel(true);
+  if (which === 'records') {
+    if (G.mode !== 'title' || building) return;
+    const recs = loadRecords(bestKey()), legacy = Math.round(G.best[bestKey()] || 0);
+    fillRecords(recs, legacy, courseName(), settings.v.units);
+    shownRecords.best = recs.best && !(legacy > recs.best.score) ? recs.best : null;
+    shownRecords.fast = recs.fastest; shownRecords.last = recs.last;
+    // (their share cards drawn ahead, one at a time, so the title's camera does not stall on all three at once)
+    Object.values(shownRecords).filter(Boolean).forEach((r, i) => setTimeout(() => prepareCard(r, settings.v.units), 150 + i * 200));
+  } else if (which === 'settings') {
+    if (G.mode !== 'title' && G.mode !== 'paused') return;
+    settings.render(); noteGfx();
+  } else return;
+  panel = which; panelFrom = document.activeElement;
+  const el = $(which);
+  el.classList.add('on');
+  // (the keyboard lands in the panel; a click or a tap shows no ring for it)
+  const first = el.querySelector(which === 'records' ? '#rec-back' : '.vstep');
+  try { if (first) first.focus({ preventScroll: true }); } catch {}
+}
+
+function closePanel(quiet = false) {
+  if (!panel) return;
+  $(panel).classList.remove('on');
+  const back = panelFrom;
+  panel = null; panelFrom = null;
+  if (!quiet && back && back.focus) try { back.focus({ preventScroll: true }); } catch {}
+}
+
+/** A run record shared (share.js); its button says what happened. */
+async function share(run, btn) {
+  if (!run || (G.mode === 'results' && !armed())) return;
+  const r = await shareRun(run, { units: settings.v.units, platform });
+  const say = { platform: 'SHARED!', shared: 'SHARED!', copied: 'COPIED!', saved: 'SAVED!', failed: 'NOT SHARED' }[r];
+  if (say) flashButton(btn, say);
+}
+
+// the tube's uniforms as post.js made them: the settings' TV EFFECT scales them from these
+let TUBE0 = null;
+
+/** A setting, as it now stands, put into effect (settings.js calls this as it changes; boot, for each as it was left). */
+function applySetting(k) {
+  const v = settings.v;
+  if (k === 'master' || k === 'music' || k === 'fx') audio.setLevels({ master: settings.level('master'), music: settings.level('music'), fx: settings.level('fx') });
+  else if (k === 'units') { hud.setUnits(v.units); if (G.mode === 'paused') hud.fillCard(); }
+  else if (k === 'shake') chase.kickK = v.shake === 'off' ? 0 : 1;
+  else if (k === 'tv') applyTube(v.tv === 'light');
+  else if (k === 'gfx') noteGfx();
+}
+
+/**
+ * TV EFFECT: FULL is the tube as it is; LIGHT keeps it but takes most of it away: a third of the curve, less of the
+ * scanlines and the grille, smaller corners. The picture is drawn a touch larger than the glass so its edges bow out
+ * to a thin border (post.js uZoom), by as much as the curve bends them, so the zoom follows the curve. The HUD and the
+ * menus are laid out through the same curve (hud.js setTube), so what is drawn and what is pressed stay together.
+ */
+function applyTube(light) {
+  const U = post.retro && post.retro.uniforms;
+  if (!U || !TUBE0) return;
+  const k = light ? 0.35 : 1;
+  U.uCurve.value = TUBE0.curve * k; U.uEdge.value = TUBE0.edge * k;
+  U.uScan.value = TUBE0.scan * (light ? 0.4 : 1); U.uHudScan.value = TUBE0.hudScan * (light ? 0.4 : 1);
+  U.uMask.value = TUBE0.mask * (light ? 0.3 : 1); U.uCorner.value = TUBE0.corner * (light ? 0.6 : 1);
+  const bow = (c, e) => 0.5 + 0.5 * c + 0.25 * e;
+  U.uZoom.value = TUBE0.zoom * bow(TUBE0.curve, TUBE0.edge) / bow(U.uCurve.value, U.uEdge.value);
+  hud.setTube({ curve: U.uCurve.value, edge: U.uEdge.value, zoom: U.uZoom.value });
+}
+
+/** The settings' word on the graphics: it takes effect on the next load, and says so louder when it differs from now. */
+function noteGfx() {
+  const g = settings.v.gfx, want = g === 'performance' ? 'phone' : g === 'quality' ? 'high' : detectTier();
+  const n = $('set-note');
+  if (!n) return;
+  const differs = want !== tier;
+  n.textContent = differs ? 'RELOAD THE GAME FOR THE NEW GRAPHICS' : 'GRAPHICS TAKES EFFECT THE NEXT TIME THE GAME LOADS';
+  n.classList.toggle('hi', differs);
 }
 
 // ---------------------------------------------------------------- frame
@@ -754,8 +1031,10 @@ function frame(now) {
 
   if (G.mode === 'playing') step(dt, t0);
   else if (G.mode === 'title') idle(dt, t0);
-  else if (G.mode === 'paused') { if (world && car) world.update(car.x, car.z, G.s, t0 + 2); }
-  // the title or the pause menu, drawn on the TV when something on it changed
+  else if (G.mode === 'paused' || G.mode === 'results') { if (world && car) world.update(car.x, car.z, G.s, t0 + 2); }
+  // (the pause and the results hold the run where it was: no rain, no petals, no air moving under them)
+  const frozen = G.mode === 'paused' || G.mode === 'results';
+  // the menu that is up, drawn on the TV when something on it changed
   if (hud) hud.pageFrame();
 
   // a debug camera for inspecting the world from anywhere (set window.__CAM__ = { pos: [x,y,z], look: [x,y,z], fov })
@@ -763,7 +1042,7 @@ function frame(now) {
   // the road studs light up where the car is pointing
   if (car && world) { const [sfx, sfz] = car.forward(); world.setStudView(car.x, carRoot ? carRoot.position.y : 0, car.z, sfx, sfz, G.night, post.sceneRT.height); }
   // rain, lit by the headlights and the lamps near the car
-  if (rain && car && G.mode !== 'paused') {
+  if (rain && car && !frozen) {
     camera.getWorldDirection(_fwd);
     const hh = Math.hypot(_fwd.x, _fwd.z) || 1;
     const [cfx, cfz] = car.forward();
@@ -785,9 +1064,9 @@ function frame(now) {
     // the paint beads up and shines in the wet
     if (paintMat) { paintMat.roughness = 0.22 - 0.12 * W.wet; paintMat.clearcoatRoughness = 0.06 - 0.035 * W.wet; }
   }
-  if (atmos && car && track && G.mode !== 'paused' && G.mode !== 'loading') airFollow(dt);
+  if (atmos && car && track && !frozen && G.mode !== 'loading') airFollow(dt);
   // cherry petals on the air, round the camera wherever it is (not while paused, and not inside a tunnel)
-  if (petals && car && G.mode !== 'paused') {
+  if (petals && car && !frozen) {
     camera.getWorldDirection(_fwd);
     const h = Math.hypot(_fwd.x, _fwd.z) || 1;
     const [cfx, cfz] = car.forward(), [clx, clz] = car.left();
@@ -808,13 +1087,14 @@ function frame(now) {
 
   const g = window.__GAME__;
   g.pos[0] = car ? car.x : 0; g.pos[1] = car ? car.z : 0;
-  g.fps = G.fps; g.speed = car ? Math.round(car.speed * 10) / 10 : 0; g.score = scoring ? scoring.total : 0; g.over = false;
+  // (over: a run has ended and its results are up, at dawn or quit)
+  g.fps = G.fps; g.speed = car ? Math.round(car.speed * 10) / 10 : 0; g.score = scoring ? scoring.total : 0; g.over = G.mode === 'results';
   g.draws = renderer.info.render.calls; g.tris = renderer.info.render.triangles;
   if (car && track && scoring) {
     g.drift = scoring.active ? 1 + scoring.tier : 0; g.combo = scoring.chain; g.slip = Math.round(car.beta * 180 / Math.PI); g.heading = car.yaw;
     g.progress = Math.round(G.s); g.lat = Math.round(G.u * 100) / 100; g.roadHeading = G.roadH ?? track.pts[G.idx].h;
     g.curvAhead = Math.round(track.sample(G.s + 22).k * 1000) / 1000; g.walls = [track.pts[G.idx].wl, track.pts[G.idx].wr];
-    g.kmh = Math.round(car.kmh); g.boost = Math.round(car.boost * 10) / 10; g.hour = Math.round(G.hour * 100) / 100; g.mode = G.mode; g.diff = G.diff;
+    g.kmh = Math.round(car.kmh); g.boost = Math.round(car.boost * 10) / 10; g.hour = Math.round(G.hour * 100) / 100; g.mode = G.mode; g.diff = G.diff; g.phase = G.phase; g.dawn = G.dawnT || 0;
   }
   if (prof.on) {
     const ms = real * 1000;
@@ -976,15 +1256,17 @@ function step(dt, t0) {
   // a clean J-turn scores, and says so
   if (car.jturnDone) {
     car.jturnDone = false;
-    scoring.total += 500;
-    const e = { type: 'jturn', value: 500 };
+    const e = scoring.jturn();
     hud.onEvent(e); audio.onEvent && audio.onEvent(e); chase.kick(0.15);
   }
-  // (the clock before this frame's banks: a banked drift moves it too, and may carry it over sunrise or sunset)
-  const h0 = G.hour;
+  // (a banked drift moves the clock: a minute for every so many points, the course's own, and it may carry it into a new phase)
   for (const e of scoring.drain()) {
     hud.onEvent(e); audio.onEvent(e);
-    if (e.type === 'bank') { G.hour += e.value / 6000; if (scoring.total > (G.best[bestKey()] || 0)) { G.best[bestKey()] = scoring.total; store.set('best.' + bestKey(), Math.round(scoring.total)); } }
+    if (e.type === 'bank') {
+      const dh = e.value / (G.ptsPerMin * 60);
+      G.hour += dh; G.clockRun += dh; G.clockPts += dh;
+      if (scoring.total > (G.best[bestKey()] || 0)) { G.best[bestKey()] = scoring.total; store.set('best.' + bestKey(), Math.round(scoring.total)); }
+    }
     if (e.type === 'crash') chase.kick(0.9);
   }
   if (!G.newBest && G.runBest > 0 && scoring.total > G.runBest) { G.newBest = true; hud.onEvent({ type: 'best' }); }
@@ -994,17 +1276,28 @@ function step(dt, t0) {
 
   // ---- distance, time of day
   const ds = Math.max(0, G.s - G.lastS); G.lastS = G.s;
-  if (ds < 50) { G.dist += ds; scoring.stats.distance = G.dist; }
-  const h = G.hour;
-  const rate = (h >= 7.2 && h < 16.6) ? 7 : 1;
-  G.hour += ds / 3000 * rate;
+  if (ds < 50) {
+    G.dist += ds; scoring.stats.distance = G.dist;
+    // the clock by distance: the course's own metres to the hour (config.js CLOCK), the flat middle of the day faster
+    const h = G.hour, dh = ds / G.mPerHour * ((h >= 7.2 && h < 16.6) ? CLOCK.dayRate : 1);
+    G.hour += dh; G.clockRun += dh;
+  }
   if (G.hour >= 24) G.hour -= 24;
-  // an edge the clock passed this frame, on the road or by a bank, and across midnight too, counts once (tested only
-  // against the road's share, a bank carrying the clock over sunrise let the SUNRISE callout go by)
-  const moved = (G.hour - h0 + 24) % 24;
-  const crossed = (edge) => { const d = (edge - h0 + 24) % 24; return d > 0 && d <= moved; };
-  if (crossed(18.05)) { const e = { type: 'sun', value: 'SUNSET' }; hud.onEvent(e); audio.onEvent(e); }
-  if (crossed(5.95)) { const e = { type: 'sun', value: 'SUNRISE' }; hud.onEvent(e); audio.onEvent(e); }
+  // the phase the clock is in now, on the road or by a bank (and across midnight): entered, it is said once. Dawn, the
+  // first time in a run, is the run's goal: SUNRISE, and a moment later the run is complete (completeRun). (The clock
+  // used to call SUNSET at 18:03 and SUNRISE at 05:57 on their own; the phases say the one and the run's end the other.)
+  const ph = phaseOf(G.hour);
+  if (ph.id !== G.phase) {
+    G.phase = ph.id;
+    if (ph.id === 'day' && !G.dawnT) {
+      G.dawnT = G.playT; G.finishAt = G.playT + 2.4;
+      // (recorded at once, so a run whose page is closed in the moment before its results still counts; again as it
+      // completes, with whatever a slide still held banks in that moment, and then the platform is told)
+      saveRun(bestKey(), runRecord(), { dawnNow: true });
+      const p = { type: 'phase', value: ph.id, name: ph.name, clock: fmt.clock(G.hour), dawn: true }, e = { type: 'sun', value: 'SUNRISE' };
+      hud.onEvent(p); hud.onEvent(e); audio.onEvent(e);
+    } else sayPhase(true);
+  }
   applySun(dt);
 
   // ---- car placement, fx, audio
@@ -1070,6 +1363,9 @@ function step(dt, t0) {
   lampsFollow();
   hud.update(dt, scoring, car, gbShown, G.hourShown, G.dist, car.boost, SCORE.boostMax, perfLine);
   G.simMs = t1 - t0; G.worldMs = performance.now() - t1;
+  // dawn reached: the results wait for the SUNRISE callout's moment and for a slide still held to bank (four seconds
+  // at most), and come up last thing in the frame, after the car's sound has had its last word (they silence it)
+  if (G.finishAt && G.playT >= G.finishAt && (!scoring.active || G.playT >= G.finishAt + 4)) completeRun();
 }
 
 // the ground the camera keeps clear of: in a tunnel that is the road, not the hill over it
@@ -1536,7 +1832,7 @@ function placeCar(y, grade, dt, roll = 0, pose = null) {
   // the pop-ups flip up once the run is under way at night (with a little overshoot, as a motor stops), and fold
   // away by day; the headlights move up into them as they rise
   if (pops.list.length && dt > 0) {
-    const want = (G.mode === 'playing' || G.mode === 'paused') && G.night > 0.3 ? 1 : 0;
+    const want = (G.mode === 'playing' || G.mode === 'paused' || G.mode === 'results') && G.night > 0.3 ? 1 : 0;
     pops.t = clamp(pops.t + (want ? dt : -dt) / 0.45, 0, 1);
     const e = pops.t < 1 ? pops.t * pops.t * (3 - 2 * pops.t) * (1 + 0.12 * Math.sin(pops.t * Math.PI)) : 1;
     for (const p of pops.list) p.rotation.x = pops.open * e;

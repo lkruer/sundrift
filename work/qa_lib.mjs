@@ -26,7 +26,7 @@ export async function serve(dir = 'game') {
 }
 
 /** A browser and a page on the game, instrumented; phone: 390x844 touch unless a viewport is given. */
-export async function open({ phone = false, viewport = null, out = 'work/qa_out/flows', storage = null } = {}) {
+export async function open({ phone = false, viewport = null, out = 'work/qa_out/flows', storage = null, init = null } = {}) {
   fs.mkdirSync(path.resolve(out), { recursive: true });
   const { server, url } = await serve();
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--window-size=1280,720', '--enable-precise-memory-info', '--js-flags=--expose-gc',
@@ -41,6 +41,8 @@ export async function open({ phone = false, viewport = null, out = 'work/qa_out/
   page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push([m.type(), m.text().slice(0, 300)]); });
   await page.evaluateOnNewDocument(fs.readFileSync(path.resolve('work/qa_instrument.js'), 'utf8'));
   if (storage) await page.evaluateOnNewDocument(`(() => { const s = ${JSON.stringify(storage)}; for (const k in s) try { localStorage.setItem(k, s[k]); } catch {} })()`);
+  // (a script of the test's own, run before the page's: a stub platform, say)
+  if (init) await page.evaluateOnNewDocument(init);
   const cdp = await page.target().createCDPSession();
   const t0 = performance.now();
   await page.goto(url, { waitUntil: 'load' });

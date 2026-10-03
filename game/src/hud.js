@@ -2,8 +2,9 @@
  * The HUD, on the TV.
  *
  * Everything a run shows (the score, the combo and the distance, the clock, the dash, the drift count and its cash-in,
- * the callouts, the angle meter, the off-road countdown, the first-run hint, the two buttons, and on a phone where the
- * thumbs go) is drawn by script into a canvas the size of the screen, and the tube pass (post.js) lays it over the
+ * the callouts, the angle meter, the off-road countdown, the first-run hint, the two buttons, the TV's captions (the
+ * channel as a run comes on, each phase of the night as the clock enters it), and on a phone where the thumbs go) is
+ * drawn by script into a canvas the size of the screen, and the tube pass (post.js) lays it over the
  * picture before the glass does anything to it: so it bends with the screen's curve, darkens into the rim, takes the
  * scanlines, the colour steps and the grille, and glows a little the way a CRT's phosphor bleeds. It is the set's own
  * display rather than a sticker on the glass. The type is the 90s dash's and the arcade's (amber seven-segment digits,
@@ -20,7 +21,7 @@
  * fly off the clock it moved. On a phone that can (Android), a short buzz goes with the big moments.
  */
 import * as THREE from 'three';
-import { SCORE, clamp, damp } from './config.js?v=202609242220';
+import { SCORE, CLOCK, clamp, damp } from './config.js?v=202609242220';
 
 const $ = (id) => document.getElementById(id);
 // the slide angle past which a drift scores the most: scoring.js's angle factor tops out at 1.5 x 0.55 rad, 47 degrees
@@ -70,6 +71,12 @@ const TOAST = { '': [C.gold, 'rgba(255,138,42,0.5)'], good: ['#7ff0e0', 'rgba(11
   calm: ['#ffd9e8', 'rgba(255,127,174,0.45)'], t1: ['#8ff5e6', 'rgba(111,227,214,0.5)'], t2: ['#ffd23f', 'rgba(255,138,42,0.5)'],
   t3: ['#ff5fa0', 'rgba(255,79,154,0.6)'], clip: ['#9ff0b8', 'rgba(159,240,184,0.5)'] };
 const TIER = ['', '#8ff5e6', '#ffd23f', '#ff5fa0'];
+// the night's phases on the TV's caption (config.js PHASES): each in its own colour and glow, with a word under it
+const PHASE_LOOK = {
+  golden: ['#ffd23f', 'rgba(255,190,60,0.55)', 'DRIFT UNTIL DAWN'], blue: ['#8fd0ff', 'rgba(90,170,255,0.55)', 'THE SUN HAS SET'],
+  night: ['#c9b8ff', 'rgba(150,120,255,0.55)', 'DAWN AT 06:00'], dawn: ['#ff9ccb', 'rgba(255,120,180,0.55)', 'FIRST LIGHT'],
+  day: ['#fff3b0', 'rgba(255,230,140,0.5)', 'A NEW DAY'],
+};
 // (the callouts are drawn in faces without a middle dot or a times sign in every browser's fallback)
 const clean = (s) => String(s).replace(/×/g, 'x').replace(/—/g, '-');
 
@@ -120,12 +127,15 @@ export class Hud {
     this.anims = new Map();
     this.holdScore = 0;                  // the score's roll waits for the banked points to fly in
     this.bank = null; this.smashS = null; this.clockAddS = null; this.tv = null;
+    this.tvQ = [];                       // captions waiting their turn (a phase's, after the channel's)
+    this.units = 'mph';                  // the speed and the distance: 'mph' (and miles) or 'kmh' (and kilometres)
+    this.ptsPerMin = CLOCK.ptsPerMin;    // what a banked drift is worth on the clock on this course (main.js sets it)
     this.canBuzz = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
     this._buzzT = 0;
     try { this.coached = localStorage.getItem('sundrift.drifted') === '1'; } catch { this.coached = false; }
     this.run = { t: 0, smashN: 0, smashLast: 0, newBest: false, best0: 0 };
     this.scoring = null;
-    this.v = { score: 0, combo: 0, chain: 0, mph: 0, gear: 'N', rpm: 900, leds: 0, boosting: false, drifting: false, clip: false,
+    this.v = { score: 0, combo: 0, chain: 0, spd: 0, gear: 'N', rpm: 900, leds: 0, boosting: false, drifting: false, clip: false,
                slide: false, deg: 0, side: 1, hot: false, hh: 18, mm: 0, day: true, dist: 0, pts: 0, mult: 1, tier: 0, active: false, colon: true };
     this.driftA = 0; this.angleA = 0; this.coachA = 0; this.coY = 0;
     // the run card on the pause screen is filled in the moment the pause opens (main.js adds the class)
@@ -144,6 +154,24 @@ export class Hud {
   }
 
   _on() { if (this.U) this.U.uHudOn.value = this.visible || this.pageOn ? 1 : 0; }
+
+  /**
+   * The glass's curve changed (the settings' TV EFFECT, main.js): everything on the OSD is laid out again through the new
+   * one, and so are the page's invisible buttons, so what is drawn and what is pressed stay in the same place.
+   */
+  setTube(tube) {
+    this.tube = { ...this.tube, ...tube };
+    this._layout();
+    if (this.page) this.page.dirty = true;
+    this.dirty = true; this.sig = '';
+  }
+
+  /** The units the speed and the distance are shown in: 'mph' (miles) or 'kmh' (kilometres). */
+  setUnits(u) {
+    const v = u === 'kmh' ? 'kmh' : 'mph';
+    if (v === this.units) return;
+    this.units = v; this.dirty = true; this.sig = '';
+  }
 
   // ---------------------------------------------------------------- the screen
 
@@ -490,7 +518,7 @@ export class Hud {
       this._showToast('WARM', 'good', true, 'COMBO x2', 1);
       this.smash('SMASH!', 1234, 2); this._bankFly(1234, 2); this._clockAdd(1234);
       for (const k of ['mult', 'tier', 'combo', 'deg', 'boost']) this._anim(k, 300);
-      this.tv = { n: 1, label: 'WARM', t0: now };
+      this.tv = this._caption('CH 01', 'WARM', C.green, 'rgba(125,255,138,0.5)', 3000, now);
       this._coachOn = true; this.coachA = 1;
       const was = this.visible; this.visible = true;
       this._draw(now);
@@ -499,7 +527,7 @@ export class Hud {
       if (this.page) this.page.dirty = true;
     } else {
       this.anims.clear(); this.cur = this.prev = null; this.queue = [];
-      this.bank = this.smashS = this.clockAddS = this.tv = null;
+      this.bank = this.smashS = this.clockAddS = this.tv = null; this.tvQ = [];
       Object.assign(this.v, { active: false, pts: 0, slide: false, hot: false, drifting: false, clip: false, boosting: false, leds: 0 });
       this.driftA = this.angleA = this.coachA = 0; this._coachOn = false; this.holdScore = 0;
       this.dirty = true; this.sig = '';
@@ -511,7 +539,7 @@ export class Hud {
     this.shown = 0; this.holdScore = 0;
     // (nothing from the last run carries over: its callouts, its cash-in, its smash counter)
     this.anims.clear(); this.cur = this.prev = null; this.queue = [];
-    this.bank = this.smashS = this.clockAddS = null;
+    this.bank = this.smashS = this.clockAddS = this.tv = null; this.tvQ = [];
     this.run = { t: 0, smashN: 0, smashLast: 0, newBest: false, best0: this._storedBest() };
     this._coachOn = false; this._coachGone = false; this.coachA = 0;
     this.newBestLab = false;
@@ -592,15 +620,41 @@ export class Hud {
     this._showToast(...this.queue.shift());
   }
 
+  _caption(head, label, col, glow, ms, t0 = performance.now()) { return { head: clean(head), label: clean(label), col, glow, ms, t0 }; }
+
   /** The TV's own caption as a run starts: the channel and what is on it, in the set's green, for a few seconds. */
-  channel(n, label) { this.tv = { n, label: String(label), t0: performance.now() }; this.dirty = true; }
+  channel(n, label) {
+    this.tv = this._caption('CH ' + String(n).padStart(2, '0'), String(label), C.green, 'rgba(125,255,138,0.5)', 3000);
+    this.tvQ = [];
+    this.dirty = true;
+  }
 
   /**
-   * The clock is the score: a banked drift pushes the hour on (a minute for every hundred points, main.js), and says so
-   * here, the minutes flying off the clock as it rolls forward, so the find is seen and not only read about.
+   * The clock has entered a phase of the night (config.js PHASES, main.js says when): the TV's caption again, in the
+   * phase's colour, its name over the time and a word. It waits for a caption already up (the channel's, at the start),
+   * and a newer phase replaces one still waiting, so a bank that carries the clock through two says only where it is.
+   */
+  phase(id, name, clock) {
+    const look = PHASE_LOOK[id] || PHASE_LOOK.night;
+    const cap = this._caption(name, (clock ? clock + ' · ' : '') + look[2], look[0], look[1], 3400);
+    this.tvQ = [cap];
+    if (!this.tv && this._captionFree()) { this.tv = { ...this.tvQ.shift(), t0: performance.now() }; }
+    this.dirty = true;
+  }
+
+  /**
+   * Whether the caption's corner is free: on a phone or a tablet (the strip layouts) the first-run hint sits at the top,
+   * where the caption does upright and beside it on its side, so a caption waits for it; on a desktop it is at the bottom.
+   */
+  _captionFree() { return !(this.coachA > 0.01 && this.L.strip0); }
+
+  /**
+   * The clock is the score: a banked drift pushes the hour on (a minute for every so many points, the course's own,
+   * config.js CLOCK), and says so here, the minutes flying off the clock as it rolls forward, so the find is seen and
+   * not only read about.
    */
   _clockAdd(points) {
-    const min = Math.round(points / 100);
+    const min = Math.round(points / this.ptsPerMin);
     if (min < 1) return;
     this.clockAddS = { text: '+' + (min < 60 ? min + ' MIN' : Math.floor(min / 60) + ':' + String(min % 60).padStart(2, '0')), t0: performance.now() };
     this._anim('clock', 480);
@@ -653,7 +707,9 @@ export class Hud {
       case 'clip': this.toast('CLIP!', 'clip', false, '+' + Math.round(e.value).toLocaleString('en-US'), 1); this.clipT = 0.9; this.buzz(14); break;
       case 'crash': this.toast('CRASH', 'bad', true, '-' + Math.round(e.value).toLocaleString('en-US') + ' LOST', 3); this.hitFlash = 1; this.buzz(70); break;
       case 'bump': this.hitFlash = Math.max(this.hitFlash, 0.5); break;
-      // (a run starts at dusk: sunrise is the night driven through, the find's own reward, and is called out as one)
+      // the clock entering a phase of the night (main.js): the TV's caption; dawn, the run's goal, is SUNRISE's to say
+      case 'phase': if (!e.dawn) this.phase(e.value, e.name, e.clock); break;
+      // (sunrise is the night driven through, the run's goal and the find's own reward, and is called out as one)
       case 'sun':
         if (e.value === 'SUNRISE') { this.toast('SUNRISE!', 't3', true, 'YOU DROVE THROUGH THE NIGHT', 3); this.buzz([30, 60, 30, 60, 90]); }
         else this.toast(e.value, 'calm', false, '', 0);
@@ -688,7 +744,7 @@ export class Hud {
     set('pc-long', st.longest.toFixed(1) + ' s');
     set('pc-clips', String(st.clips));
     set('pc-smash', String(this.run.smashN));
-    set('pc-dist', (st.distance / 1609.344).toFixed(1) + ' MI');
+    set('pc-dist', this.units === 'kmh' ? (st.distance / 1000).toFixed(1) + ' KM' : (st.distance / 1609.344).toFixed(1) + ' MI');
   }
 
   // ---------------------------------------------------------------- every frame
@@ -723,8 +779,8 @@ export class Hud {
     v.combo = s.active ? s.chain : (s.chainTimer > 0 ? s.chain : 0);
     v.chain = Math.round((s.active ? 1 : (s.chainTimer > 0 ? s.chainTimer / SCORE.chainGrace : 0)) * 20) / 20;
     // the dash
-    v.mph = Math.round(car.kmh / 1.609344);
-    v.gear = car.vF < -0.3 ? 'R' : (v.mph < 2 && car.throttle < 0.1 ? 'N' : String(gb.gear + 1));
+    v.spd = Math.round(this.units === 'kmh' ? car.kmh : car.kmh / 1.609344);
+    v.gear = car.vF < -0.3 ? 'R' : (car.kmh < 3.2 && car.throttle < 0.1 ? 'N' : String(gb.gear + 1));
     this.rpm = damp(this.rpm, gb.rpm, 16, dt);
     v.rpm = Math.round(clamp(this.rpm, 0, 9200) / 250) * 250;
     v.leds = Math.round(clamp(boostLeft / boostMax, 0, 1) * 12);
@@ -742,7 +798,7 @@ export class Hud {
     // the clock (its colon blinks every half second, as a clock's did) and the distance
     v.hh = Math.floor(hour) % 24; v.mm = Math.floor((hour % 1) * 60); v.day = hour >= 6 && hour < 18;
     v.colon = Math.floor(now / 500) % 2 === 0;
-    v.dist = Math.floor(dist / 160.9344);
+    v.dist = Math.floor(dist / (this.units === 'kmh' ? 100 : 160.9344));
     this._coach(dt);
     this.coachA = this._coachOn ? Math.min(1, this.coachA + dt / 0.45) : Math.max(0, this.coachA - dt / 0.45);
     this._nextToast(now);
@@ -758,14 +814,14 @@ export class Hud {
     if (!this.visible || this.pageOn) return;
     // redrawn only when something on it has changed or is moving
     const t = this.input && this.input.t;
-    const sig = [v.score, v.active ? v.pts + '/' + v.mult + '/' + v.tier : '', v.combo, v.chain, v.mph, v.gear, v.rpm, v.leds, v.boosting, v.clip,
+    const sig = [v.score, v.active ? v.pts + '/' + v.mult + '/' + v.tier : '', v.combo, v.chain, v.spd, v.gear, v.rpm, v.leds, v.boosting, v.clip,
       v.slide ? v.deg + '/' + v.side + '/' + v.hot : '', this.angleA > 0 && this.angleA < 1 ? this.angleA.toFixed(2) : this.angleA > 0,
       v.hh, v.mm, v.colon, v.dist, this.driftA < 1 && this.driftA > 0 ? this.driftA.toFixed(2) : this.driftA > 0,
       this.coachA > 0 && this.coachA < 1 ? this.coachA.toFixed(2) : this.coachA > 0, this.newBestLab, Math.round(this.coY),
       co && co.shown ? co.sig() : '', this.el.mute && this.el.mute.classList.contains('off'),
       touch && t ? [t.active, Math.round(t.x0), Math.round(t.y0), Math.round(t.x || 0), Math.round(t.y || 0), t.hand, t.lift, t.brake > 0.05, t.used].join(',') : '',
       this._coachOn ? Math.floor(now / 400) % 2 : ''].join('|');
-    const moving = this.anims.size > 0 || this.bank || this.smashS || this.clockAddS || this.tv || this.cur || this.prev;
+    const moving = this.anims.size > 0 || this.bank || this.smashS || this.clockAddS || this.tv || (this.tvQ.length && this._captionFree()) || this.cur || this.prev;
     // (thirty times a second at most, as a set's display was drawn: half the work, and nobody reads a digit faster)
     if ((sig !== this.sig || moving || this.dirty) && (this.dirty || now - (this._drawT || 0) > 30)) {
       this.sig = sig; this.dirty = false; this._drawT = now;
@@ -798,7 +854,7 @@ export class Hud {
     if (this.bank && now - this.bank.t0 > 700) this.bank = null;
     if (this.smashS && now - this.smashS.t0 > 1700) this.smashS = null;
     if (this.clockAddS && now - this.clockAddS.t0 > 1700) this.clockAddS = null;
-    if (this.tv && now - this.tv.t0 > 3000) this.tv = null;
+    if (this.tv && now - this.tv.t0 > this.tv.ms) this.tv = null;
     if (this.cur && now - this.cur.t0 > 1400) this.cur = null;
     if (this.prev && now - this.prev.out0 > 180) this.prev = null;
   }
@@ -834,7 +890,7 @@ export class Hud {
         c.fillStyle = g; c.fillRect(r.x + 6, by, bw * v.chain, bh);
       }
       const dy = by + bh + 4;
-      this._txt('MI', Z.lab, C.dim, r.x + 6, dy + Z.ds, 0, 1);
+      this._txt(this.units === 'kmh' ? 'KM' : 'MI', Z.lab, C.dim, r.x + 6, dy + Z.ds, 0, 1);
       const miles = String(v.dist).padStart(2, '0').slice(-4).padStart(4, ' ');
       this._seg(miles, r.x + r.w - 5, dy, Z.ds, C.amber, { right: true, dot: 2 });
     }
@@ -920,9 +976,9 @@ export class Hud {
     // the shift light, the gear, the speed and its unit
     c.fillStyle = v.rpm > 7700 ? C.red : 'rgba(255,74,58,0.18)'; c.beginPath(); c.arc(d.cx, d.cy - R + t + 5, 1.8, 0, TAU); c.fill();
     this._seg(v.gear, d.cx, d.cy - R * 0.4, Z.gear, v.gear === 'R' ? C.red : C.ink, { center: true, ghost: 0.06 });
-    const spd = String(v.mph).padStart(3, ' ');
+    const spd = String(v.spd).padStart(3, ' ');
     this._seg(spd, d.cx, d.cy - Z.spd * 0.35, Z.spd, C.amber, { center: true });
-    this._txt('MPH', Z.lab, C.dim, d.cx, d.cy + Z.spd * 0.65 + 3, 0.5, 0);
+    this._txt(this.units === 'kmh' ? 'KM/H' : 'MPH', Z.lab, C.dim, d.cx, d.cy + Z.spd * 0.65 + 3, 0.5, 0);
     // the three telltales under it, and the boost it has banked above it
     const lamps = [['DRIFT', v.drifting, C.amber], ['CLIP', v.clip, C.mint], ['BOOST', v.boosting, C.cyan]];
     const lw = lamps.reduce((s, l) => s + this._tw(l[0], Z.labS) + 5 + 2.5, -2.5);
@@ -964,8 +1020,8 @@ export class Hud {
     this._seg(v.gear, gx + gw / 2, gy + (gh - Z.gear) / 2, Z.gear, v.gear === 'R' ? C.red : C.ink, { center: true, ghost: 0.06 });
     // the speed, three digits, and its unit under it
     const sw = this._segW(3, Z.spd), sx = gx + gw + 4 + sw, top = r.y + (r.h - Z.spd - lab - 2.5) / 2;
-    this._seg(String(v.mph).padStart(3, ' '), sx, top, Z.spd, C.amber, { right: true });
-    this._txt('MPH', Z.lab, C.dim, sx, top + Z.spd + 2.5, 1, 0);
+    this._seg(String(v.spd).padStart(3, ' '), sx, top, Z.spd, C.amber, { right: true });
+    this._txt(this.units === 'kmh' ? 'KM/H' : 'MPH', Z.lab, C.dim, sx, top + Z.spd + 2.5, 1, 0);
     // the tach: a row of blocks, amber to the orange band to the red line
     const tx = sx + 6, tw = r.x + r.w - 5 - tx, n = Math.max(12, Math.floor((tw + 1) / 5)), bw = (tw - (n - 1)) / n, ty = r.y + 4, th = 7;
     const lit = v.rpm / 9000 * n;
@@ -1148,17 +1204,18 @@ export class Hud {
     }
   }
 
-  /** The set's caption as a run starts: the channel in its green, what is on under it. */
+  /** The set's caption: the channel in its green as a run starts, what is on under it; a phase of the night in its colour. */
   _drawTV(now) {
+    if (this.tv && now - this.tv.t0 > this.tv.ms) this.tv = null;
+    if (!this.tv && this.tvQ.length && this._captionFree()) this.tv = { ...this.tvQ.shift(), t0: now };
     const tv = this.tv;
     if (!tv) return;
-    const p = (now - tv.t0) / 3000;
-    if (p >= 1) return;
+    const p = (now - tv.t0) / tv.ms;
     // (it comes on at once and blinks off at the end, as a set's caption did)
-    if (p > 0.82 && Math.floor(p * 40) % 2 === 1) return;
+    if (p > 0.82 && Math.floor((now - tv.t0) / 75) % 2 === 1) return;
     const r = this.L.tv, Z = this.Z;
-    const s = this._txt('CH ' + String(tv.n).padStart(2, '0'), Z.ch, C.green, r.x + 1, r.y, 0, 0, 1, 1, 0.7, 'rgba(125,255,138,0.5)');
-    this._txt(tv.label, Z.chLab, C.green, r.x + 1, r.y + s.h + 4, 0, 0, 1, 1, 0.6);
+    const s = this._txt(tv.head, Z.ch, tv.col, r.x + 1, r.y, 0, 0, 1, 1, 0.7, tv.glow);
+    this._txt(tv.label, Z.chLab, tv.col, r.x + 1, r.y + s.h + 4, 0, 0, 1, 1, 0.6);
   }
 
   // the thumbs ------------------------------------------------------------------------------------------------

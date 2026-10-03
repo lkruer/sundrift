@@ -98,14 +98,18 @@ export class Audio {
     try { this.muted = localStorage.getItem('sundrift.mute') === '1'; } catch {}
     this.rpm = 900; this.throttle = 0; this.lastThrottle = 0; this.lastRpm = 900;
     this.music = { on: true, next: 0, step: 0, tempo: 128, intensity: 0 };
+    // the settings' three levels, 0..1 (setLevels): the master over everything, the music, and every other sound
+    this.levels = { master: 1, music: 1, fx: 1 };
     // the menus' buttons click: a mouse on the press, a finger on the release (a browser lets a page make sound from a
-    // finger only once it lifts). The first click wakes the sound; nothing plays on the title but these
+    // finger only once it lifts). The first click wakes the sound; nothing plays on the title but these. A button says
+    // which click it wants (data-sfx: start, back, sel); START, MAIN MENU and the title's choices are known by name
     const ui = (e) => {
       if ((e.pointerType === 'mouse') !== (e.type === 'pointerdown')) return;
-      const b = e.target && e.target.closest ? e.target.closest('button') : null;
+      const b = e.target && e.target.closest ? e.target.closest('button, .pips i') : null;
       if (!b) return;
       this.unlock();
-      this.sfx(b.id === 'startb' ? 'uiStart' : b.id === 'quitb' ? 'uiBack' : b.matches('.map, .diff, .sw') ? 'uiSel' : 'ui');
+      const kind = (b.dataset && b.dataset.sfx) || (b.id === 'startb' ? 'start' : b.id === 'quitb' ? 'back' : b.matches('.map, .diff, .sw, .pips i') ? 'sel' : '');
+      this.sfx(kind === 'start' ? 'uiStart' : kind === 'back' ? 'uiBack' : kind === 'sel' ? 'uiSel' : 'ui');
     };
     addEventListener('pointerdown', ui, true); addEventListener('pointerup', ui, true);
     // a new best is the HUD's to notice (main.js hands it only the HUD); it says so with a window event
@@ -154,10 +158,13 @@ export class Audio {
     let ctx;
     try { ctx = new AC({ latencyHint: 'interactive' }); } catch { try { ctx = new AC(); } catch { return; } }
     this.ctx = ctx;
-    this.master = ctx.createGain(); this.master.gain.value = this.muted ? 0 : 0.9;
+    // the levels: every sound but the music goes into fx (the effects' level), the music into its own bus (_musicBus),
+    // and both into out, the master level and the mute, then through the compressor
+    this.out = ctx.createGain(); this.out.gain.value = this._outLevel();
+    this.fx = ctx.createGain(); this.fx.gain.value = this.levels.fx;
     this.comp = ctx.createDynamicsCompressor();
     this.comp.threshold.value = -14; this.comp.knee.value = 18; this.comp.ratio.value = 4; this.comp.attack.value = 0.004; this.comp.release.value = 0.18;
-    this.master.connect(this.comp); this.comp.connect(ctx.destination);
+    this.fx.connect(this.out); this.out.connect(this.comp); this.comp.connect(ctx.destination);
     this.noiseBuf = this._noise(2.0);
     // the tunnel's echo: a short feedback delay the engine and the tyres are sent into while the car is inside
     this.echoIn = ctx.createGain(); this.echoIn.gain.value = 0;
@@ -165,7 +172,7 @@ export class Audio {
     this.echoFb = ctx.createGain(); this.echoFb.gain.value = 0.45;
     this.echoLP = ctx.createBiquadFilter(); this.echoLP.type = 'lowpass'; this.echoLP.frequency.value = 2200;
     this.echoIn.connect(this.echoDelay); this.echoDelay.connect(this.echoLP); this.echoLP.connect(this.echoFb); this.echoFb.connect(this.echoDelay);
-    this.echoLP.connect(this.master);
+    this.echoLP.connect(this.fx);
     this._engine(); this._tyres(); this._wind(); this._rain(); this._musicBus();
     for (const g of [this.engGain, this.raspGain, this.turboGain, this.screechGain]) if (g) g.connect(this.echoIn);
     this.ready = true;
@@ -203,19 +210,19 @@ export class Audio {
     const c = this.ctx;
     this.engGain = this._gain(0);
     this.engFilter = c.createBiquadFilter(); this.engFilter.type = 'lowpass'; this.engFilter.frequency.value = 2400; this.engFilter.Q.value = 0.6;
-    this.engFilter.connect(this.engGain); this.engGain.connect(this.master);
+    this.engFilter.connect(this.engGain); this.engGain.connect(this.fx);
     // the induction roar
     this.rasp = this._noiseSource();
     this.intakeF = c.createBiquadFilter(); this.intakeF.type = 'bandpass'; this.intakeF.frequency.value = 480; this.intakeF.Q.value = 1.1;
-    this.raspGain = this._gain(0); this.rasp.connect(this.intakeF); this.intakeF.connect(this.raspGain); this.raspGain.connect(this.master);
+    this.raspGain = this._gain(0); this.rasp.connect(this.intakeF); this.intakeF.connect(this.raspGain); this.raspGain.connect(this.fx);
     // the gears' whine, with the road speed
     this.whine = this._osc('triangle', 300); this.whineGain = this._gain(0);
     const wf = c.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 900; wf.Q.value = 0.8;
-    this.whine.connect(wf); wf.connect(this.whineGain); this.whineGain.connect(this.master);
+    this.whine.connect(wf); wf.connect(this.whineGain); this.whineGain.connect(this.fx);
     // the turbo's whistle
     this.turbo = this._osc('sine', 1400); this.turboGain = this._gain(0);
     const tf = c.createBiquadFilter(); tf.type = 'highpass'; tf.frequency.value = 900;
-    this.turbo.connect(tf); tf.connect(this.turboGain); this.turboGain.connect(this.master);
+    this.turbo.connect(tf); tf.connect(this.turboGain); this.turboGain.connect(this.fx);
     this.engNode = null; this.voices = [];
     this.gearShown = -1; this.cutUntil = 0;
     if (c.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
@@ -269,20 +276,20 @@ export class Audio {
       return { bp, f, w: 0 };
     });
     this.screechF = this.squeal[0].bp;
-    this.screechGain.connect(this.master);
+    this.screechGain.connect(this.fx);
     const sc = c.createBiquadFilter(); sc.type = 'bandpass'; sc.frequency.value = 560; sc.Q.value = 0.6;
-    this.scrubGain = this._gain(0); this.screech.connect(sc); sc.connect(this.scrubGain); this.scrubGain.connect(this.master);
+    this.scrubGain = this._gain(0); this.screech.connect(sc); sc.connect(this.scrubGain); this.scrubGain.connect(this.fx);
     // gravel: low rumble when off the asphalt
     this.gravel = this._noiseSource();
     const gf = c.createBiquadFilter(); gf.type = 'lowpass'; gf.frequency.value = 380;
-    this.gravelGain = this._gain(0); this.gravel.connect(gf); gf.connect(this.gravelGain); this.gravelGain.connect(this.master);
+    this.gravelGain = this._gain(0); this.gravel.connect(gf); gf.connect(this.gravelGain); this.gravelGain.connect(this.fx);
   }
 
   _wind() {
     const c = this.ctx;
     this.wind = this._noiseSource();
     const wf = c.createBiquadFilter(); wf.type = 'lowpass'; wf.frequency.value = 500; wf.Q.value = 0.5;
-    this.windGain = this._gain(0); this.wind.connect(wf); wf.connect(this.windGain); this.windGain.connect(this.master);
+    this.windGain = this._gain(0); this.wind.connect(wf); wf.connect(this.windGain); this.windGain.connect(this.fx);
   }
 
   /** Rain: a hiss of high noise over a soft low roar, both following how hard it rains. */
@@ -294,7 +301,7 @@ export class Audio {
     this.rainGain = this._gain(0);
     this.rainSrc.connect(hi); hi.connect(this.rainGain);
     const lg = this._gain(0.9); this.rainSrc.connect(lo); lo.connect(lg); lg.connect(this.rainGain);
-    this.rainGain.connect(this.master);
+    this.rainGain.connect(this.fx);
   }
 
   /** Which map: each has its own song (a new one starts from its first phrase), and the city its own sounds. */
@@ -314,7 +321,7 @@ export class Audio {
 
   _musicBus() {
     const c = this.ctx;
-    this.musicGain = this._gain(0.95); this.musicGain.connect(this.master);
+    this.musicGain = this._gain(0.95 * this.levels.music); this.musicGain.connect(this.out);
     // everything in the music goes in here, and through a little old tape: a slow wow and a faster flutter on a
     // short modulated delay, a gentle low-pass, then dry and into a long dark reverb
     this.musicIn = this._gain(1);
@@ -389,7 +396,22 @@ export class Audio {
     this.muted = m;
     try { localStorage.setItem('sundrift.mute', m ? '1' : '0'); } catch {}
     if (!m) this._session();
-    if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.05);
+    if (this.out) this.out.gain.setTargetAtTime(this._outLevel(), this.ctx.currentTime, 0.05);
+  }
+
+  /** The master's gain: the mix's own 0.9 at full, nothing while muted. */
+  _outLevel() { return this.muted ? 0 : 0.9 * this.levels.master; }
+
+  /** The settings' levels, each 0..1 (settings.js): the master, the music, the effects (everything but the music). */
+  setLevels({ master = this.levels.master, music = this.levels.music, fx = this.levels.fx } = {}) {
+    const k = (v) => Math.max(0, Math.min(1, Number(v) || 0));
+    // (a level's gain on the square of its setting, as a volume knob is turned: half way is a quarter, not half)
+    this.levels = { master: k(master) ** 2, music: k(music) ** 2, fx: k(fx) ** 2 };
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.out.gain.setTargetAtTime(this._outLevel(), t, 0.05);
+    this.fx.gain.setTargetAtTime(this.levels.fx, t, 0.05);
+    if (this.musicGain) this.musicGain.gain.setTargetAtTime(0.95 * this.levels.music, t, 0.05);
   }
 
   /** Per frame. */
@@ -628,12 +650,12 @@ export class Audio {
     const s = c.createBufferSource(); s.buffer = this.noiseBuf;
     const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.5;
     f.frequency.setValueAtTime(3400, t); f.frequency.exponentialRampToValueAtTime(800, t + 0.3);
-    const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.master);
+    const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.fx);
     this._env(g, t, 0.005, 0.26, 0.07 * strength, 0, 0.05); s.start(t, Math.random()); s.stop(t + 0.4);
     // the flutter: the compressor surging against the shut throttle, chu-tu-tu-tu, slowing as it dies
     const s2 = c.createBufferSource(); s2.buffer = this.noiseBuf;
     const f2 = c.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 1500; f2.Q.value = 1.6;
-    const g2 = this._gain(0); s2.connect(f2); f2.connect(g2); g2.connect(this.master);
+    const g2 = this._gain(0); s2.connect(f2); f2.connect(g2); g2.connect(this.fx);
     let tt = t + 0.015;
     for (let k = 0; k < 9; k++) {
       const a = 0.17 * strength * Math.exp(-k / 3.4);
@@ -645,7 +667,7 @@ export class Audio {
   /** One-shots for smashing things, landing, the countdown and the magnet; k scales the loudness. */
   sfx(name, k = 1) {
     if (!this.ready || !this.ctx) return;
-    const c = this.ctx, t = c.currentTime, out = this.master;
+    const c = this.ctx, t = c.currentTime, out = this.fx;
     const noise = (dur, type, f, q, peak, a = 0.002, f1 = 0) => {
       const s = c.createBufferSource(); s.buffer = this.noiseBuf;
       const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
@@ -740,13 +762,13 @@ export class Audio {
     const s = c.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true;
     const lp = c.createBiquadFilter(); lp.type = 'lowpass';
     lp.frequency.setValueAtTime(260 + 1100 * k, t); lp.frequency.exponentialRampToValueAtTime(80, t + 3.4);
-    const g = this._gain(0); s.connect(lp); lp.connect(g); g.connect(this.master);
+    const g = this._gain(0); s.connect(lp); lp.connect(g); g.connect(this.fx);
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.55 * k, t + 0.06 + (1 - k) * 0.3);
     for (let i = 1; i <= 3; i++) g.gain.linearRampToValueAtTime((0.5 - i * 0.1) * k * (0.7 + Math.random() * 0.6), t + 0.4 * i + Math.random() * 0.3);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 3.8);
     s.start(t, Math.random()); s.stop(t + 4);
     const o = c.createOscillator(); o.frequency.setValueAtTime(58, t); o.frequency.exponentialRampToValueAtTime(27, t + 2.2);
-    const og = this._gain(0); o.connect(og); og.connect(this.master);
+    const og = this._gain(0); o.connect(og); og.connect(this.fx);
     og.gain.setValueAtTime(0, t); og.gain.linearRampToValueAtTime(0.4 * k, t + 0.12); og.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
     o.start(t); o.stop(t + 2.7);
   }
@@ -756,10 +778,10 @@ export class Audio {
     freqs.forEach((f, i) => {
       const t = t0 + i * gap;
       const o = c.createOscillator(); o.type = type; o.frequency.value = f;
-      const g = this._gain(0); o.connect(g); g.connect(this.master);
+      const g = this._gain(0); o.connect(g); g.connect(this.fx);
       this._env(g, t, 0.004, len, vol, 0.25, 0.12); o.start(t); o.stop(t + len + 0.2);
       const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = f * 2; const g2 = this._gain(0);
-      o2.connect(g2); g2.connect(this.master); this._env(g2, t, 0.004, len * 0.6, vol * 0.35, 0.1, 0.1); o2.start(t); o2.stop(t + len + 0.2);
+      o2.connect(g2); g2.connect(this.fx); this._env(g2, t, 0.004, len * 0.6, vol * 0.35, 0.1, 0.1); o2.start(t); o2.stop(t + len + 0.2);
     });
   }
   whoosh(len = 1.2) {
@@ -767,31 +789,31 @@ export class Audio {
     const s = c.createBufferSource(); s.buffer = this.noiseBuf;
     const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
     f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(2600, t + len * 0.5); f.frequency.exponentialRampToValueAtTime(500, t + len);
-    const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.master);
+    const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.fx);
     this._env(g, t, 0.08, len * 0.6, 0.3, 0.3, len * 0.4); s.start(t); s.stop(t + len + 0.1);
     const o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(900, t + len * 0.5);
-    const g2 = this._gain(0); o.connect(g2); g2.connect(this.master); this._env(g2, t, 0.05, len * 0.5, 0.12, 0, 0.2); o.start(t); o.stop(t + len);
+    const g2 = this._gain(0); o.connect(g2); g2.connect(this.fx); this._env(g2, t, 0.05, len * 0.5, 0.12, 0, 0.2); o.start(t); o.stop(t + len);
   }
   impact(v) {
     const c = this.ctx, t = c.currentTime, k = clamp(v / 12, 0.2, 1);
     const s = c.createBufferSource(); s.buffer = this.noiseBuf;
     const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1200 + 2000 * k;
-    const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.master);
+    const g = this._gain(0); s.connect(f); f.connect(g); g.connect(this.fx);
     this._env(g, t, 0.002, 0.18 * k + 0.05, 0.6 * k, 0, 0.08); s.start(t); s.stop(t + 0.4);
     const o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(35, t + 0.25);
-    const g2 = this._gain(0); o.connect(g2); g2.connect(this.master); this._env(g2, t, 0.002, 0.25, 0.7 * k); o.start(t); o.stop(t + 0.35);
+    const g2 = this._gain(0); o.connect(g2); g2.connect(this.fx); this._env(g2, t, 0.002, 0.25, 0.7 * k); o.start(t); o.stop(t + 0.35);
     // the crunch: panels and plastic giving, a few small breaks after the first
     for (let i = 1; i <= 3; i++) {
       const tt = t + 0.025 * i + Math.random() * 0.02;
       const sN = c.createBufferSource(); sN.buffer = this.noiseBuf;
       const fN = c.createBiquadFilter(); fN.type = 'bandpass'; fN.frequency.value = 1400 + Math.random() * 1800; fN.Q.value = 1.3;
-      const gN = this._gain(0); sN.connect(fN); fN.connect(gN); gN.connect(this.master);
+      const gN = this._gain(0); sN.connect(fN); fN.connect(gN); gN.connect(this.fx);
       this._env(gN, tt, 0.001, 0.035, 0.3 * k / i, 0, 0.02); sN.start(tt, Math.random()); sN.stop(tt + 0.1);
     }
     // a metallic ring for the guardrail
     for (const [fr, vol] of [[2200, 0.08], [3100, 0.05], [4700, 0.03]]) {
       const r = c.createOscillator(); r.type = 'sine'; r.frequency.value = fr * (0.95 + Math.random() * 0.1);
-      const g3 = this._gain(0); r.connect(g3); g3.connect(this.master); this._env(g3, t, 0.002, 0.5 * k, vol * k, 0.05, 0.3); r.start(t); r.stop(t + 1);
+      const g3 = this._gain(0); r.connect(g3); g3.connect(this.fx); this._env(g3, t, 0.002, 0.5 * k, vol * k, 0.05, 0.3); r.start(t); r.stop(t + 1);
     }
   }
   tick() { if (this.ready) this.chime([this._key(1), this._key(3)], this.ctx.currentTime, 0.05, 0.12, 0.12, 'sine'); }
@@ -807,7 +829,7 @@ export class Audio {
     if (f1) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
     const g = this._gain(0);
     if (lp) { const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = lp; o.connect(fl); fl.connect(g); } else o.connect(g);
-    g.connect(this.master);
+    g.connect(this.fx);
     this._env(g, t, a, dur, vol, 0, 0.04); o.start(t); o.stop(t + a + dur + 0.1);
   }
 
@@ -816,7 +838,7 @@ export class Audio {
     const c = this.ctx, s = c.createBufferSource(); s.buffer = this.noiseBuf;
     const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
     if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
-    const g = this._gain(0); s.connect(fl); fl.connect(g); g.connect(this.master);
+    const g = this._gain(0); s.connect(fl); fl.connect(g); g.connect(this.fx);
     this._env(g, t, a, dur, vol, 0, 0.04); s.start(t, Math.random()); s.stop(t + a + dur + 0.1);
   }
 
@@ -874,6 +896,31 @@ export class Audio {
     this._bellHit(t + 0.27, top * 2, 0.09, 0.8);
   }
 
+  /**
+   * The clock entering a phase of the night, in the music's key and quieter than a drift's notes: the golden hour's
+   * chord broken slowly upward; the blue hour's cool falling fifth; the night's low chord and a far temple bell; dawn,
+   * three bells climbing; the day, a bright chime.
+   */
+  _phase(t, id) {
+    const [a, b, c] = this._tonic(0);
+    switch (id) {
+      case 'golden': [a, b, c, a * 2].forEach((f, i) => this._note(t + i * 0.14, f, 'triangle', 0.9, 0.06, 0.02)); break;
+      case 'blue': this._note(t, c * 2, 'sine', 1.4, 0.07, 0.03); this._note(t + 0.22, a * 2, 'sine', 1.8, 0.07, 0.03); this._bellHit(t + 0.22, c * 4, 0.035, 1.2); break;
+      case 'night': [a / 2, b / 2, c / 2].forEach((f) => this._note(t, f, 'triangle', 2.2, 0.05, 0.25)); this._bellHit(t + 0.1, a, 0.06, 2.2); break;
+      case 'dawn': [this._key(2, 1), this._key(4, 1), this._key(6, 1)].forEach((f, i) => this._bellHit(t + i * 0.18, f, 0.06, 1.1)); break;
+      case 'day': this.chime([a * 2, c * 2, a * 4], t, 0.1, 0.5, 0.08, 'triangle'); break;
+    }
+  }
+
+  /** Dawn, the night driven through: a riser into the key's chord broken up two octaves, held, and a bell over it. */
+  _dawn(t) {
+    this._hiss(t, 0.8, 'bandpass', 500, 1.1, 0.06, 0.5, 5200);
+    const [a, b, c] = this._tonic(0);
+    [a, b, c, a * 2, b * 2, c * 2, a * 4].forEach((f, i) => this._note(t + 0.45 + i * 0.075, f, 'coin', i === 6 ? 1.3 : 0.2, 0.14, 0.003));
+    [a, b, c].forEach((f) => this._note(t + 0.98, f, 'triangle', 2.0, 0.07, 0.04));
+    this._bellHit(t + 0.98, a * 4, 0.1, 1.4);
+  }
+
   /** React to scoring events (and a new best, which the HUD announces with a window event 'sundrift:best'). */
   onEvent(e) {
     if (!this.ready) return;
@@ -897,7 +944,13 @@ export class Audio {
       case 'angle': this._hiss(t, 0.28, 'bandpass', 1800, 2.2, 0.16, 0.03, 9000); this._bellHit(t + 0.08, this._key(5), 0.16, 0.5); break;
       case 'crash': this.impact(12); { const [a] = this._tonic(-2); this.chime([a * 1.5, a], t, 0.12, 0.35, 0.14, 'sawtooth'); } break;
       case 'bump': this.impact(e.value); break;
-      case 'sun': { const [a, , c2] = this._tonic(-1); this.chime([a, c2, a * 2], t, 0.16, 0.6, 0.1, 'sine'); break; }
+      // the weather turning (a chime), and dawn, the run's goal: the night driven through gets a fanfare of its own
+      case 'sun':
+        if (e.value === 'SUNRISE') this._dawn(t);
+        else { const [a, , c2] = this._tonic(-1); this.chime([a, c2, a * 2], t, 0.16, 0.6, 0.1, 'sine'); }
+        break;
+      // the clock entering a phase of the night (config.js PHASES): a few notes of its own, under everything
+      case 'phase': this._phase(t, e.value); break;
       case 'best': this._fanfare(t); break;
       case 'jturn': this.whoosh(0.8); this._note(t + 0.05, this._key(0), 'triangle', 0.12, 0.1); this._note(t + 0.13, this._key(4), 'triangle', 0.3, 0.1); break;
     }
@@ -1029,7 +1082,7 @@ export class Audio {
     // everything the city makes goes through one bus: faded in and out as a whole, muffled inside a tunnel
     C.bus = this._gain(0);
     C.muff = c.createBiquadFilter(); C.muff.type = 'lowpass'; C.muff.frequency.value = 18000; C.muff.Q.value = 0.5;
-    C.bus.connect(C.muff); C.muff.connect(this.master);
+    C.bus.connect(C.muff); C.muff.connect(this.fx);
     // a street's reverb: early echoes off the fronts, then a short dark tail
     if (!this.streetIR) this.streetIR = this._streetImpulse(1.8);
     C.verb = c.createConvolver(); C.verb.buffer = this.streetIR;

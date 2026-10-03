@@ -396,6 +396,140 @@ Tokyo downtown with neon; a faster reverse; smooth gradients between night, dawn
   Jitter probe: frames p50 16.7 ms, p99 16.8; the car on screen wobbles 0.3-0.5 thousandths of the view.
 
 
+## 3 October: drift until dawn, a run with an end (for the 404 games platform)
+
+Asked for: the entry (third place in the jam) is to be featured on the 404 team's games platform, which wants a
+session with an end, not an endless loop, built round the game's own mechanic, the time of day. And the first player
+feedback (issue #1): "I have got a great score but I cant view the breakdown again after the main title, would be
+great to add that feature to be able to see the last best run stats and share them online!"
+
+- **A run is one night: drift until dawn** (the title has said so since the jam). It starts at 17:18 in the golden
+  hour (it was 18:12, just after sunset) and is complete when the clock reaches 06:00. Then SUNRISE (the callout it
+  always had, YOU DROVE THROUGH THE NIGHT, now with a fanfare of its own) and 2.4 s later, or once a slide still held
+  has banked (four seconds more at most; one still held then is banked as the run ends), the run is recorded (it was
+  saved the moment the clock got there too, so a page closed in that moment keeps it), the platform is told
+  (runComplete), and the results come up: KEEP DRIVING (the same run on into the day; recorded already, it does not
+  complete again, and a later dawn is only a caption), NEW RUN, MAIN MENU, SHARE. They come up last thing in the frame,
+  after the car's sound has had its update, because they silence it. A run quit from the pause menu shows its results
+  too, RUN OVER (THE CLOCK REACHED 02:14), before the title; RESTART records the run it leaves as the last run, with no
+  screen. Back at the title the clock winds back to the golden hour under the menu, where the next run starts.
+- **The clock, by measurement** (`work/dawn_time.mjs`: the autopilot of `work/shots_hud_desk.json`, which handbrakes
+  into the tight corners only, a mediocre driver, drives a whole night in real time, headless at 60 fps; a watchdog
+  would carry it on 60 m if it sat for 20 s, which none of the whole nights needed). A banked drift moves the clock
+  a minute for every 240 points (the +N MIN that flies off the clock), the road an hour for every 1,500 m, each course
+  with its own rates so the same driver's night takes about as long anywhere:
+
+  | course | road (m an hour) | points a minute | the autopilot's speed | it banks | its dawn | from points |
+  |---|---|---|---|---|---|---|
+  | the pass, EASY | 1,500 | 240 | 80 km/h | 62 a second | **11:04** | 22% |
+  | the pass, HARD | 1,750 (2,800: 13:57) | 240 | 64 km/h | 107 a second | **12:01** | 42% |
+  | NEO TOKYO, EASY | 2,250 | 360 (240: 8:50) | 79 km/h | 170 a second | **11:59** | 45% |
+  | NEO TOKYO, HARD | 950 | 240 | 50 km/h | 61 a second | **11:08** | 22% |
+
+  The courses differ because the driver does: it handbrakes into the hard pass's hairpins every few hundred metres and
+  banks twice what it does on the easy one, it drifts the city's broad square corners at about three times the easy
+  pass's rate (209 a second one night, 170 another: the first, at these rates, comes to 10:57), and it crawls the
+  narrow back streets. So the hard pass's road gives a little less of an hour, the back streets' more, and a drift in
+  the easy city two thirds of a minute's worth. (One points value everywhere would have needed 4,600 m an hour in the
+  easy city, and a night there for a player who never drifts of 45 minutes.)
+  Drifting stays the accelerator. On the easy pass, at the autopilot's 80 km/h, by banked points a second:
+
+  | banked a second | 0 (never drifts) | 62 (the autopilot) | 150 | 300 | 400 | 550 | 800 |
+  |---|---|---|---|---|---|---|---|
+  | dawn | 14:14 | 11:02 | 8:22 | 5:56 | 4:58 | 3:59 | 3:00 |
+  | of the clock from points | 0% | 22% | 41% | 58% | 65% | 72% | 79% |
+
+  A skilled drifter, 300 to 550 a second (a GREAT drift, 2,500 points, every five to eight seconds), gets there in six to
+  four minutes. Worked through the old clock (100 points a minute, 3,000 m an hour, from 18:12), the same autopilot's
+  rates come to about the same night, 11:04; what had to change was the spread. A player who never drifted took 26
+  minutes, and one banking 400 a second 2:39; now 14 and 5. (A second autopilot that flicks into every bend, `--bot=keen`,
+  banked hardly more than the first, 78 a second to 70 over four minutes, so a skilled player is worked out from the
+  points rate rather than driven.)
+- **The phases**: GOLDEN HOUR from 17:00, BLUE HOUR 18:15, NIGHT 19:15, DAWN 04:45, DAY 06:00 (config.js PHASES), from
+  the run's own clock. Entered by the road or carried into by a bank (a bank that carries the clock through two says
+  only where it is), a phase is said once: as the TV's caption, like the channel's (in the phase's own colour, its name
+  over the time and a word, 18:15 · THE SUN HAS SET), and in a few notes in the music's key. A run's first caption,
+  after the channel's, is the hour it starts in and its goal: GOLDEN HOUR, 17:18 · DRIFT UNTIL DAWN. SUNSET, a callout
+  of its own at 18:03, is gone (the blue hour says it); SUNRISE is the run's end. On a phone or a tablet a caption
+  waits for the first-run hint, which sits at the top there.
+- **The breakdown** (scoring.js stats, main.js runRecord): the score, the drifts, the biggest, the longest (s), the
+  best combo (the longest chain), the clips, the crashes, the J-turns (counted now: they only scored), the time sliding
+  in banked drifts, the biggest angle held in one, the top speed, what was smashed, the distance, the clock reached,
+  the real time of play (paused time left out), whether it reached dawn and how long that took.
+- **Records** (records.js): per course (the key the best score was always kept under), the best run by score with its
+  whole breakdown, the fastest dawn (its real time and its score) and the last run, under sundrift.records.<key> as one
+  JSON object with a version; anything that does not read back is no record rather than an error. sundrift.best.<key>
+  is kept as it was: the title's BEST, and a best from before this round, which has no breakdown, still shows as the
+  course's best run (SET BEFORE RUNS WERE BROKEN DOWN). NEW BEST and FASTEST DAWN are measured against the records as
+  they stood when the run began, so a run recorded twice (at dawn, then again as it ends after KEEP DRIVING) says the
+  same both times.
+- **The results** (index.html #results, screens.js): DAWN in the logo's sunset gradient, or RUN OVER in the pause
+  menu's amber; the course; the score (gold, NEW BEST, when it is one); the time, the time to dawn (gold, FASTEST
+  DAWN), the clock; twelve numbers in the pause card's type; the buttons, with the menu's cursor. For 0.7 s after they
+  come up their buttons take nothing (a thumb still on the handbrake, a key still held from the last drift); Enter takes
+  the first choice and Escape the way out (at dawn, back to the road); Space, the handbrake, does nothing there.
+- **The title**: RECORDS and SETTINGS beside START, which keeps the place it had (the jam's checker taps it there); on
+  a phone held upright they sit in a row above it, START still the last thing, at the thumb. RECORDS shows the chosen
+  course's three cards (best, fastest dawn, last), each with SHARE.
+- **SHARE** (share.js): the text (SUNDRIFT · YOZAKURA PASS · EASY / 123,456 points, reached dawn in 9:08 / 34 drifts ·
+  biggest 12,345 · combo x7 · 8.8 mi) and the URL go to the platform first, then to the system's share sheet with a
+  1200 x 630 PNG card when the browser can take a file; where there is no sheet the text goes to the clipboard and the
+  card is saved as a download, and the button says COPIED! (or SHARED!, SAVED!). The card is drawn as the screen opens,
+  so the sheet is asked for inside the tap that asked for it. It is the game's look in canvas, nothing fetched and only
+  the page's fonts: the sky at the hour the run reached (the golden hour's amber, the blue hour, the night with its
+  stars and moon, dawn's pink, the day), the pass's ridges or the city's skyline and its lattice tower, the logo in its
+  gradient with its two shadows, the kana, the course, the score, the clock in the dash's amber seven segments, four
+  of the pause card's boxes, scanlines and a rim. (Headless Chrome has a share sheet that never answers; the fallback
+  was pressed for real with it taken away: `work/share_check.mjs`.)
+- **SETTINGS** (settings.js, a panel from the title and the pause menu): MASTER, MUSIC and EFFECTS as rows of ten pips
+  (audio.js has three levels now: every sound but the music into an effects bus, the music into its own, both into the
+  master and the mute; a level's gain is the square of its setting, as a volume knob turns); MPH or KM/H (the dash, the
+  distance, the pause card, the results, the card); CAMERA SHAKE (chase.kick scaled to nothing); TV EFFECT FULL or LIGHT
+  (from main.js alone, post.js untouched: a third of the curve, two fifths of the scanlines, less grille, smaller
+  corners, the picture's zoom following the curve so its border stays thin, and the HUD and the menus laid out through
+  the new curve, so what is drawn and what is pressed stay together); GRAPHICS AUTO, PERFORMANCE (the phone tier) or
+  QUALITY (the desktop tier), read before the renderer is made, so it takes effect on the next load (the panel says so,
+  louder when the choice differs from what is running; a ?q= in the address still wins). Kept under sundrift.settings
+  with a version. The defaults are the game as it was.
+- **The platform's hooks** (platform.js): init, loadingProgress, loadingDone, gameplayStart, gameplayStop,
+  runComplete(stats), share(payload), each a no-op unless window.SUNDRIFT_PLATFORM has it, each guarded (a hook that
+  throws is a console warning, once), gameplayStart and gameplayStop said once per change. The run already paused itself
+  when the tab is hidden; that is a gameplayStop now too. __GAME__.over is true while a run's results are up.
+  `work/platform_hooks.mjs` checks every call against a stub platform.
+- **What the TV could not draw, now drawn** (pagetv.js): it knows five pages (the title, the pause menu, the results,
+  the records, the settings) and paints the one on top; a run's pages (the pause menu, the results, the settings over the
+  pause menu) over the HUD as the run left it, a copy taken once as the first of them comes up (taken again from the
+  canvas as the second came up, it would have been a copy of the first menu); gradient type anywhere (the results'
+  DAWN, the logo's way); a border on some sides only (a rule over a grid was drawn as a whole box); the menu buttons'
+  cursor, the CSS's ::before triangle, which the pause menu has had since the jam and the TV never drew; a panel that
+  scrolls, shown only inside its own box. And no CSS transitions under body.tv: the painter reads a style once, when
+  something changed, which was as a transition began, so the title's map and course buttons never showed their hover on
+  the TV (`work/tv_hover_check.mjs`: the hovered border read back from the TV's canvas, unchanged with the transitions,
+  amber without).
+- **Measured.** The drift gate, from 17:18 now, with the sun up and its shadow cascades drawn: desktop 10 drifts banked (a first run banked 6 and sat 3 s wedged off the road, the bot's own driving), 0 slow
+  frames, the worst 17 ms, 769 peak draws (550 to 600 when a run began at dusk: the sun's cascades), 1.06 M triangles;
+  phone 4 banked (1 and 6 in two earlier runs), 0 slow frames, 417 draws, 0.70 M. The jam's gate
+  (`harness/jam.mjs`, the phone, 4G, the CPU slowed 2x, against a local server; the live URL is still the jam's build):
+  PASS, ready 12.4 s of 20, 2.1 MB, started by a tap on #startb, 85 m moved with #stick held, 325 draws, 0.59 M
+  triangles, 0 errors, 0 404s. `work/platform_flow.mjs` on a desktop (keys and clicks), an upright phone and one on its side (touches): every
+  step as it should be, no console errors. `work/platform_hooks.mjs`: every call in its place and once (init, the loading, loadingDone; gameplayStart and Stop through a pause, a hidden
+  tab, dawn and KEEP DRIVING; runComplete once with the whole record; a share the platform took, with the PNG), a hook
+  that throws a warning once with the game going on, a RESTART recording the run it left; an old best shown without a
+  breakdown, records that do not parse shown as none, settings of an unknown version read as the defaults. `work/share_check.mjs`: the cards
+  drawn for five runs; with no share sheet a real press copied the text and the URL and saved the PNG. `work/qa_clock.mjs`
+  (brought up to date: it read the old pixel HUD's clock): every phase said once as the clock entered it, by the road and by a bank, across midnight too; the run
+  complete at the first dawn and carried on; no errors.
+- **Not done, or still wrong.** A skilled player's four to six minutes is worked out from the points rate, not driven:
+  no autopilot drifts like a person (the keen one tried). Each course's rates rest on one or two whole nights of one
+  autopilot, whose points come in bursts (17,000 in half a minute on the hard pass) and whose nights on one course differ
+  by a minute or more. The module stamp (?v=202609242220) is not bumped: every import carries it, the files being
+  reworked elsewhere too (world.js, rig.js, post.js and the rest), so it is for the release to bump everywhere, or a
+  returning player's cached modules are mixed with new ones for the ten minutes Pages caches them. The system share
+  sheet itself is untested here (headless Chrome's never answers). GRAPHICS takes effect on the next load only. The
+  pause menu's and the results' copy of the HUD keeps whatever was on it as they came up (a caption, a callout). The
+  music stops under the results, as it does under the title.
+
+
 ## 24 September, night: the type as sharp as the screen
 
 Asked for: "the UI and HUD are still a little blurry and look low definition. fix and submit".

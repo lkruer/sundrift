@@ -10,13 +10,17 @@
  *
  * Every consequence is emitted as an event ({ type, value }) so the HUD and the audio can react without
  * this file knowing either exists.
+ *
+ * stats is the run's breakdown as the results screen shows it: drifts (started), biggest (points banked in one),
+ * longest (seconds of slide in one banked drift), combo (the longest chain), clips, crashes, jturns, driftTime (seconds
+ * sliding in banked drifts), angle (the biggest angle held in a banked drift, degrees, a spin's counted as 90) and topKmh;
+ * main.js keeps distance in it.
  */
 import { SCORE, clamp } from './config.js?v=202609242220';
 
 export class Scoring {
   constructor() {
     this.total = 0;
-    this.best = 0;
     this.best = 0;
     this.reset();
   }
@@ -30,10 +34,21 @@ export class Scoring {
     this.clipCooldown = 0;
     this.tier = 0;
     this.bigT = 0; this.bigDone = false;     // a big angle held (the HUD's callout; see update)
+    this.peak = 0;                           // the biggest angle in the drift held now (rad)
     this.events = [];
-    this.stats = { drifts: 0, longest: 0, biggest: 0, clips: 0, crashes: 0, distance: 0 };
+    this.stats = { drifts: 0, longest: 0, biggest: 0, clips: 0, crashes: 0, distance: 0, combo: 0, jturns: 0, driftTime: 0, angle: 0, topKmh: 0 };
     this.boostGrant = 0;
   }
+
+  /** A clean J-turn (car.js says when): it scores, and it is counted. */
+  jturn() {
+    this.total += 500;
+    this.stats.jturns++;
+    return { type: 'jturn', value: 500 };
+  }
+
+  /** The chain grew (a drift inside the chain's grace, or a switch): the run's longest is kept. */
+  _chained() { if (this.chain > this.stats.combo) this.stats.combo = this.chain; }
 
   emit(type, value = 0, extra = {}) { this.events.push({ type, value, ...extra }); }
   drain() { const e = this.events; this.events = []; return e; }
@@ -49,6 +64,7 @@ export class Scoring {
     const slip = Math.abs(car.beta);
     const kmh = speed * 3.6;
     this.clipCooldown = Math.max(0, this.clipCooldown - dt);
+    if (kmh > this.stats.topKmh && kmh < 400) this.stats.topKmh = kmh;
 
     // ---- crash: a hard lateral hit drops the drift and the chain
     if (impact > SCORE.crashSpeed) {
@@ -76,7 +92,8 @@ export class Scoring {
         this.mult = 1 + Math.min(4, (this.chain - 1) * 0.5);
         this.chainTimer = 0;
         this.stats.drifts++;
-        this.bigT = 0; this.bigDone = false;
+        this._chained();
+        this.bigT = 0; this.bigDone = false; this.peak = slip;
         this.emit('start', this.chain);
       }
       return;
@@ -87,6 +104,7 @@ export class Scoring {
     if (sliding) {
       this.endTimer = 0;
       this.time += dt;
+      if (slip > this.peak) this.peak = slip;
       const angleFactor = clamp(slip / 0.55, 0.25, 1.5);
       const rate = SCORE.rate * kmh * angleFactor * this.mult;
       this.points += rate * dt;
@@ -97,6 +115,7 @@ export class Scoring {
       if (d !== 0 && d !== this.dir && slip > SCORE.minSlip) {
         this.dir = d;
         this.chain++;
+        this._chained();
         this.points += 120 * this.mult;
         this.emit('switch', this.chain);
       }
@@ -136,6 +155,8 @@ export class Scoring {
       const boost = this.boostGiven;
       this.stats.longest = Math.max(this.stats.longest, this.time);
       this.stats.biggest = Math.max(this.stats.biggest, banked);
+      this.stats.driftTime += this.time;
+      this.stats.angle = Math.max(this.stats.angle, Math.min(90, this.peak * 180 / Math.PI));
       this.emit('bank', banked, { tier: this.tier, boost, chain: this.chain, mult: this.mult });
       if (this.total > this.best) this.best = this.total;
     }

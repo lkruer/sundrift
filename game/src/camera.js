@@ -23,7 +23,7 @@ export class ChaseCam {
     this.dir = 0;
     this.dirVel = 0;
     this.fov = CAM.fov;
-    this.shake = 0; this.t = 0;
+    this.shake = 0; this.t = 0; this.kickK = 1;
     this.roll = 0;
     this.lift = 0;               // extra height pushed on by the ground, eased off again
     this.yS = 0;                 // smoothed road height
@@ -50,8 +50,9 @@ export class ChaseCam {
     this._place(car, 1);
   }
 
-  // (a player who asked their system for less motion gets a third of the shake)
-  kick(amount) { this.shake = Math.min(1, this.shake + amount * (REDUCED_MOTION ? 0.3 : 1)); }
+  // (a player who asked their system for less motion gets a third of the shake; kickK is the settings' CAMERA SHAKE,
+  // 1 or 0, main.js)
+  kick(amount) { this.shake = Math.min(1, this.shake + amount * (this.kickK ?? 1) * (REDUCED_MOTION ? 0.3 : 1)); }
 
   /**
    * @param car the Car; y the road height under it; groundAt (x, z) => ground height; boost01 0..1; zoom factor;

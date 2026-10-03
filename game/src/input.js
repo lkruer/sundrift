@@ -33,6 +33,8 @@ export class Input {
     // on a trackpad arrives as ctrl + wheel (Chrome, Firefox): the camera's zoom too, never the page's.
     // (deltaMode is read before deltaY: Firefox reports lines only to a page that asks what unit it is using)
     addEventListener('wheel', (e) => {
+      // (a wheel over a menu that scrolls, a short screen's title or a panel, scrolls the menu and leaves the lens alone)
+      if (e.target && e.target.closest && e.target.closest('#title .menu, #results, #records, #settings')) return;
       const unit = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1, px = e.deltaY * unit;
       if (!px) return;
       const step = unit > 1 || Math.abs(px) >= 40 ? 0.12 : Math.min(0.12, Math.abs(px) * (e.ctrlKey ? 0.01 : 0.0025));
@@ -94,7 +96,7 @@ export class Input {
         const f = document.activeElement;
         const choice = f && f.closest && f.closest('.map, .diff, .sw');
         if (choice || !(f && f.closest && f.closest('button, a, input, select, textarea'))) {
-          if (this.onStart() && choice) e.preventDefault();
+          if (this.onStart(e.code) && choice) e.preventDefault();
         }
       }
       this.anyKey = true;
@@ -113,7 +115,7 @@ export class Input {
   }
 
   _bindOrbit() {
-    const ui = (t) => !!(t && t.closest && t.closest('button, a, input, #title .menu, #pause, #touch'));
+    const ui = (t) => !!(t && t.closest && t.closest('button, a, input, #title .menu, #pause, #results, #records, #settings, #touch'));
     const o = this.orbit;
     addEventListener('mousedown', (e) => {
       if ((e.button !== 0 && e.button !== 2) || ui(e.target)) return;

@@ -191,6 +191,145 @@
   @media (max-height: 500px) { #pause { gap:8px; } #pause h2 { font-size:34px; margin:0; } #pause .kana { display:none; } .pbtn { padding:5px 0 4px; font-size:18px; }
                                #pcard { padding:6px 14px 7px; } #pcard b { font-size:18px; } }
 
+  /* ---- the title's smaller buttons, RECORDS and SETTINGS: beside START, which keeps the place it always had (a jam's
+     checker taps it there); over it on a phone held upright, where START stays the last thing on the screen ---- */
+  .startrow { display:flex; align-items:center; gap:14px; }
+  .more { display:flex; gap:8px; margin-top:6px; }
+  .mbtn { position:relative; padding:8px 13px 7px; border:1.5px solid rgba(246,239,226,.24); background:rgba(12,8,20,.6); color:var(--ink); cursor:pointer;
+          font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:15px; line-height:1.15; letter-spacing:.1em; transform:skewX(-10deg); }
+  .mbtn > span { display:inline-block; transform:skewX(10deg); }
+  .mbtn:hover, .mbtn:focus-visible { border-color:var(--amber); color:var(--amber); }
+  .mbtn:active { transform:skewX(-10deg) scale(.97); }
+
+  /* ---- the results, the records and the settings: page elements drawn on the TV like the pause menu (src/pagetv.js),
+     in its type and its card ---- */
+  #results, #records, #settings { position:fixed; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+      padding:calc(var(--safe-t) + 14px) calc(var(--safe-r) + 16px) calc(var(--safe-b) + 14px) calc(var(--safe-l) + 16px);
+      background:repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 4px), rgba(10,6,18,.72); }
+  #results { z-index:37; } #records { z-index:38; } #settings { z-index:39; }
+  #results.on, #records.on, #settings.on { display:flex; }
+  /* (for a moment after the results come up their buttons take nothing: a thumb still on the handbrake, a key still held
+     from the last drift, must not choose for the player) */
+  #results.arming .r-btns { pointer-events:none; }
+  .card { background:rgba(12,8,20,.78); border:2px solid rgba(255,179,71,.35); box-shadow:4px 4px 0 rgba(0,0,0,.45); }
+  .cells > div { display:flex; flex-direction:column; align-items:center; min-width:0; }
+  .cells i { font-style:normal; font-family:"Share Tech Mono",monospace; font-size:10px; letter-spacing:.24em; color:var(--dim); white-space:nowrap; }
+  .cells b { font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:21px; line-height:1.15; color:var(--ink); letter-spacing:.03em; white-space:nowrap; }
+  .cells .hi, .r-score .hi { color:var(--gold); }
+  .m-title { margin:0; font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:clamp(36px,6vw,58px); line-height:1.1;
+             letter-spacing:.08em; color:var(--amber); text-shadow:0 3px 0 #1a0f24, 0 0 24px rgba(255,138,42,.45); }
+  .r-course { font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.34em; color:var(--dim); text-align:center; }
+  /* (a button as wide as its word: the menu's cursor sits in its own margin, clear of the word) */
+  .r-btns .pbtn, .rc-share { padding-left:30px !important; padding-right:24px !important; }
+  .r-btns .pbtn:hover::before, .r-btns .pbtn:focus-visible::before, .rc-share:hover::before, .rc-share:focus-visible::before { left:10px; }
+  .pbtn.share { border-color:rgba(255,95,160,.5); color:#ffc2d9; }
+  .pbtn.share:hover, .pbtn.share:focus-visible { border-color:var(--pink); color:var(--pink); }
+  .pbtn.share:hover::before, .pbtn.share:focus-visible::before { border-left-color:var(--pink); }
+
+  /* the results */
+  .rbox { width:min(780px,100%); display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .r-head { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .r-title { margin:0; display:inline-block; width:max-content; padding:0 .12em 0 .02em; font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400;
+             font-size:clamp(46px,8vw,80px); line-height:1.02; letter-spacing:.06em; color:var(--amber); text-shadow:0 3px 0 #1a0f24, 0 0 24px rgba(255,138,42,.45); }
+  /* (dawn, in the logo's own sunset) */
+  .r-title.dawn { transform:skewX(-6deg); text-shadow:none; color:transparent;
+                  background:linear-gradient(180deg,#fffaf0 0%,#ffe0a8 38%,#ff9a3d 52%,#ff4f9a 70%,#7a4dff 100%); -webkit-background-clip:text; background-clip:text;
+                  filter:drop-shadow(0 3px 0 #1a0f24) drop-shadow(0 0 22px rgba(255,90,140,.35)); }
+  .r-sub { font-family:"Share Tech Mono",monospace; font-size:13px; letter-spacing:.3em; color:#ffb3cc; text-align:center; }
+  .r-card { width:100%; padding:12px 20px 14px; display:grid; grid-template-columns:auto 1fr; gap:10px 24px; align-items:end; }
+  .r-score { display:flex; flex-direction:column; align-items:flex-start; }
+  .r-score i { font-style:normal; font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.3em; color:var(--dim); white-space:nowrap; }
+  .r-score b { font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:56px; line-height:1; letter-spacing:.02em; color:var(--amber);
+               text-shadow:0 3px 0 #1a0f24, 0 0 20px rgba(255,138,42,.4); white-space:nowrap; }
+  .r-score b.hi { color:var(--gold); text-shadow:0 3px 0 #1a0f24, 0 0 22px rgba(255,210,63,.55); }
+  .r-times { display:grid; grid-template-columns:repeat(3,auto); justify-content:end; gap:4px 24px; padding-bottom:4px; }
+  .r-grid { grid-column:1 / -1; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:9px 8px; padding-top:10px; border-top:1px solid rgba(255,179,71,.22); }
+  .r-btns { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
+  .r-btns .pbtn { width:auto; min-width:150px; padding:9px 22px 7px; font-size:19px; white-space:nowrap; }
+
+  /* the records */
+  .recbox { width:min(1000px,100%); display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .rcards { width:100%; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:4px; }
+  .rcard { position:relative; padding:12px 14px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .rc-lab { font-style:normal; font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.3em; color:var(--dim); }
+  .rc-big { font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:40px; line-height:1.05; color:var(--amber);
+            text-shadow:0 3px 0 #1a0f24, 0 0 18px rgba(255,138,42,.4); white-space:nowrap; }
+  .rcard.empty .rc-big { color:var(--dim); text-shadow:none; }
+  .rc-line { font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.14em; color:#ffb3cc; text-align:center; min-height:14px; }
+  .rc-grid { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px 10px; padding-top:8px; border-top:1px solid rgba(255,179,71,.2); }
+  .rc-grid b { font-size:19px; }
+  .rc-share { width:auto; min-width:120px; padding:6px 18px 5px; font-size:16px; margin-top:4px; }
+  .rcard.empty .rc-grid, .rcard.empty .rc-share, .rcard.noshare .rc-grid, .rcard.noshare .rc-share { display:none; }
+
+  /* the settings */
+  .setbox { width:min(620px,100%); display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .set-rows { width:100%; padding:14px 20px; display:flex; flex-direction:column; gap:10px; }
+  .srow { display:grid; grid-template-columns:150px 1fr; align-items:center; gap:4px 14px; }
+  .slab { font-family:"Share Tech Mono",monospace; font-size:12px; letter-spacing:.24em; color:var(--dim); white-space:nowrap; }
+  .vol { display:flex; align-items:center; gap:8px; }
+  .vstep { width:32px; height:28px; padding:0; border:1.5px solid rgba(246,239,226,.3); background:rgba(12,8,20,.78); color:var(--ink); cursor:pointer;
+           font-family:"Share Tech Mono",monospace; font-size:18px; line-height:1; }
+  .vstep:hover, .vstep:focus-visible { border-color:var(--amber); color:var(--amber); }
+  .vstep.end { opacity:.4; }
+  .pips { display:flex; gap:4px; }
+  .pips i { display:block; width:14px; height:20px; background:rgba(255,179,71,.14); transform:skewX(-10deg); cursor:pointer; }
+  .pips i.on { background:linear-gradient(180deg,#ffe3a6,#ffb347 45%,#ff8a2a); }
+  .sval { min-width:26px; text-align:right; font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:20px; color:var(--ink); }
+  .seg { display:flex; flex-wrap:wrap; gap:6px; }
+  .seg button { padding:6px 12px 5px; border:1.5px solid rgba(246,239,226,.22); background:rgba(12,8,20,.6); color:var(--dim); cursor:pointer;
+                font-family:"Racing Sans One",sans-serif; font-style:italic; font-weight:400; font-size:16px; line-height:1.15; letter-spacing:.08em; }
+  .seg button:hover, .seg button:focus-visible { border-color:rgba(255,179,71,.7); color:var(--ink); }
+  .seg button.sel { border-color:var(--amber); color:#1a0f1f; background:linear-gradient(180deg,#ffe3a6,#ffb347 45%,#ff8a2a); }
+  .snote { font-family:"Share Tech Mono",monospace; font-size:11px; letter-spacing:.18em; color:var(--dim); text-align:center; }
+  .snote.hi { color:var(--amber); }
+
+  /* a phone held upright: the results in one column, their numbers three a row and the buttons two; the records stacked,
+     each card's SHARE up beside its score; the settings' labels over their controls */
+  @media (max-width: 560px) {
+    .r-sub { font-size:11px; letter-spacing:.22em; }
+    .r-card { grid-template-columns:1fr; padding:10px 14px 12px; gap:8px; align-items:start; }
+    .r-score { align-items:center; } .r-score b { font-size:50px; }
+    .r-times { justify-content:center; gap:4px 26px; }
+    .r-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px 6px; }
+    .r-btns { display:grid; grid-template-columns:1fr 1fr; width:100%; gap:9px; }
+    .r-btns .pbtn { min-width:0; width:100%; padding:9px 0 7px; padding-left:20px !important; padding-right:12px !important; font-size:17px; letter-spacing:.08em; }
+    .r-btns.three .share { grid-column:1 / -1; }
+    .rcards { grid-template-columns:1fr; gap:10px; }
+    .rcard { display:grid; grid-template-columns:1fr auto; align-items:center; justify-items:start; gap:2px 10px; padding:9px 12px 10px; }
+    .rc-share { grid-column:2; grid-row:1 / span 2; align-self:center; margin:0; min-width:0; padding:6px 14px 5px; }
+    .rc-line { grid-column:1 / -1; text-align:left; }
+    .rc-grid { grid-column:1 / -1; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px 4px; padding-top:6px; }
+    .rc-grid b { font-size:16px; } .rc-grid i { font-size:9px; letter-spacing:.14em; }
+    .rc-big { font-size:32px; }
+    .srow { grid-template-columns:1fr; }
+    .set-rows { padding:12px 14px; gap:9px; }
+    .seg button { font-size:15px; padding:6px 10px 5px; }
+  }
+  /* a phone on its side: the results in two columns, the heading and the buttons left, the numbers right; the records'
+     three cards side by side, six numbers each; the settings in two columns of rows */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .rbox { width:min(860px,100%); display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); grid-template-areas:"head card" "btns card"; gap:10px 18px; align-items:center; }
+    .r-head { grid-area:head; } .r-card { grid-area:card; padding:8px 14px 10px; gap:6px 16px; } .r-btns { grid-area:btns; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .r-btns .pbtn { min-width:0; width:100%; padding:6px 0 5px; font-size:16px; }
+    .r-btns.three .share { grid-column:1 / -1; }
+    .r-title { font-size:40px; } .r-sub { font-size:10px; letter-spacing:.2em; }
+    .r-score b { font-size:40px; } .r-times { gap:2px 16px; }
+    .r-grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px 6px; padding-top:6px; }
+    .cells b { font-size:17px; }
+    .m-title { font-size:32px; }
+    .recbox { gap:6px; } .rcards { gap:10px; margin-top:0; }
+    .rcard { padding:8px 10px; gap:3px; } .rc-big { font-size:28px; }
+    .rc-grid { gap:4px 8px; padding-top:5px; } .rc-grid b { font-size:16px; }
+    .rc-grid > div:nth-child(n+7) { display:none; }
+    .rc-share { padding:4px 14px 3px; font-size:14px; margin-top:2px; }
+    .setbox { width:min(860px,100%); gap:6px; }
+    .set-rows { display:grid; grid-template-columns:1fr 1fr; gap:8px 26px; padding:10px 16px; }
+    .srow { grid-template-columns:96px 1fr; gap:4px 8px; }
+    .slab { font-size:10px; letter-spacing:.16em; }
+    .pips i { width:11px; height:17px; } .vstep { width:26px; height:24px; font-size:15px; }
+    .seg button { font-size:13px; padding:4px 8px 3px; }
+  }
+
   /* ---- hud: drawn on the TV (hud.js into a canvas, post.js lays it in under the glass). The page keeps its two buttons,
      invisible over where the tube shows them, and the perf line ---- */
   #hud { position:fixed; inset:0; z-index:12; display:none; pointer-events:none; }
@@ -222,10 +361,20 @@
     .diff { padding:8px 12px 7px; } .diff b { font-size:19px; } .diff span { display:none; } .diff i { margin-top:1px; }
     .keys.f { order:2; font-size:12px; gap:1px 10px; } .keys.f .how { font-size:13px; margin-bottom:0; }
     .start { order:3; align-self:stretch; text-align:center; font-size:24px; padding:14px 0 12px; margin-top:2px; }
+    /* (START is still the last thing on the screen, at the thumb: the records and the settings go in a row over it;
+       START's own order, 3 above, puts it after them in the row too) */
+    #title .startrow { order:3; flex-direction:column; align-items:stretch; gap:8px; }
+    #title .more { margin-top:0; } #title .more .mbtn { flex:1; padding:7px 0 6px; }
     #title .credit { display:none; }
   }
-  /* (a short phone: the tagline goes too, so the car stays in view above the menu) */
-  @media (max-width: 720px) and (orientation: portrait) and (max-height: 720px) { #tagline { display:none; } #title .kana { margin-top:-8px; } }
+  /* (a short phone: the tagline goes too, so the car stays in view above the menu; and for the records' and settings' row
+     the menu closes up a little and the thumbs' line goes, which the HUD draws itself before the first touch) */
+  @media (max-width: 720px) and (orientation: portrait) and (max-height: 720px) {
+    #tagline { display:none; } #title .kana { margin-top:-8px; }
+    #title .menu { gap:6px; } #title .startrow { gap:6px; }
+    #title .more .mbtn { padding:5px 0 4px; font-size:13px; }
+    .keys.f > div:not(.how) { display:none; }
+  }
   /* a phone on its side: the title compacts to fit the height */
   @media (max-height: 500px) and (orientation: landscape) {
     #title .logo { font-size:40px; }
@@ -236,12 +385,18 @@
     .diff { padding:6px 10px 5px; } .diff b { font-size:18px; } .diff span { display:none; } .diff i { margin-top:2px; }
     .sw { width:28px; height:28px; }
     .start { font-size:20px; padding:10px 38px 9px; margin-top:2px; }
+    .more { margin-top:2px; } .mbtn { font-size:13px; padding:6px 10px 5px; }
     .keys { font-size:11px; gap:3px 12px; }
   }
   /* the menus are drawn on the TV (src/pagetv.js): the page keeps laying them out and taking every click, tap and key,
      but shows none of it itself (and its pulsing and blinking stop, the TV draws them still) */
-  body.tv #title .menu, body.tv #title .tatebox, body.tv #title .credit, body.tv #title #building, body.tv #title .shade, body.tv #pause { opacity:0; }
+  body.tv #title .menu, body.tv #title .tatebox, body.tv #title .credit, body.tv #title #building, body.tv #title .shade, body.tv #pause,
+  body.tv #results, body.tv #records, body.tv #settings { opacity:0; }
   body.tv #pause { -webkit-backdrop-filter:none; backdrop-filter:none; }
+  /* (and nothing on them eases from one look to the next: the painter reads a style once, when something changed, which
+     was as a transition began, so the title's map and course buttons never showed their hover on the TV; measured with
+     work/tv_hover_check.mjs) */
+  body.tv #title *, body.tv #pause *, body.tv #results *, body.tv #records *, body.tv #settings * { transition:none !important; }
   /* (in from the corner, where the glass pulls in and rounds off: at 18 px from it the credit's last word went round the bend) */
   body.tv #title .credit { right:calc(var(--safe-r) + 76px); bottom:calc(var(--safe-b) + 30px); }
   body.tv .start, body.tv #pause h2 { animation:none; }
@@ -332,7 +487,11 @@
     </div>
     <div class="sect">PAINT <span id="paintname">PEARL WHITE</span></div>
     <div class="swatches" id="swatches"></div>
-    <button class="start" id="startb"><span>START</span></button>
+    <!-- (START keeps its place; the course's records and the settings sit beside it, or over it on a phone held upright) -->
+    <div class="startrow">
+      <button class="start" id="startb"><span>START</span></button>
+      <div class="more"><button class="mbtn" id="recordsb" data-sfx="sel"><span>RECORDS</span></button><button class="mbtn" id="settingsb" data-sfx="sel"><span>SETTINGS</span></button></div>
+    </div>
     <div class="keys k"><div class="how"><b>DRIFT</b>tap <kbd>SPACE</kbd> into a corner, <span class="nw">steer into the slide,</span> <span class="nw">hold <kbd>W</kbd></span></div><div><kbd>W</kbd><kbd>S</kbd>gas · brake · reverse</div><div><kbd>A</kbd><kbd>D</kbd>steer</div><div><kbd>SPACE</kbd>handbrake</div><div><kbd>ESC</kbd>pause</div><div>wheel · zoom</div><div>hold mouse · orbit</div><div class="tip">back up fast, let go of <kbd>S</kbd>, full lock and gas: J-TURN</div></div>
     <div class="keys f"><div class="how"><b>DRIFT</b>tap the handbrake into a corner, <span class="nw">steer into the slide</span></div><div>left thumb drives and steers <span class="nw">· right thumb is the handbrake</span></div></div>
   </div>
@@ -345,6 +504,7 @@
   <div class="kana jp" style="margin:-14px 0 6px">一時停止</div>
   <button class="pbtn" id="resumeb">RESUME</button>
   <button class="pbtn" id="restartb">RESTART</button>
+  <button class="pbtn" id="psetb" data-sfx="sel">SETTINGS</button>
   <button class="pbtn" id="quitb">MAIN MENU</button>
   <div class="stats" id="pstats"></div>
   <!-- the run so far, filled in by the HUD the moment the pause opens -->
@@ -352,6 +512,62 @@
     <div><i>SCORE</i><b id="pc-score">0</b></div><div><i id="pc-bestl">BEST</i><b id="pc-best">—</b></div><div><i>DRIFTS</i><b id="pc-drifts">0</b></div><div><i>BIGGEST</i><b id="pc-big">0</b></div>
     <div><i>LONGEST</i><b id="pc-long">0.0 s</b></div><div><i>CLIPS</i><b id="pc-clips">0</b></div><div><i>SMASHED</i><b id="pc-smash">0</b></div><div><i>DISTANCE</i><b id="pc-dist">0.0 MI</b></div>
   </div></div>
+</div>
+
+<!-- a run's end: at dawn (the run complete) or quit from the pause menu; filled in by src/screens.js, drawn on the TV -->
+<div id="results" role="dialog" aria-modal="true" aria-labelledby="r-title">
+  <div class="rbox">
+    <div class="r-head">
+      <h2 class="r-title" id="r-title">DAWN</h2>
+      <div class="r-sub" id="r-sub">YOU DROVE THROUGH THE NIGHT</div>
+      <div class="r-course" id="r-course"></div>
+    </div>
+    <div class="r-card card">
+      <div class="r-score"><i id="r-scorel">SCORE</i><b id="r-score">0</b></div>
+      <div class="r-times cells">
+        <div><i>TIME</i><b id="r-time">0:00</b></div><div><i id="r-dawnl">DAWN IN</i><b id="r-dawn">—</b></div><div><i>CLOCK</i><b id="r-clock">00:00</b></div>
+      </div>
+      <div class="r-grid cells" id="r-grid"></div>
+    </div>
+    <div class="r-btns">
+      <button class="pbtn" id="r-keep" data-sfx="start">KEEP DRIVING</button>
+      <button class="pbtn" id="r-new" data-sfx="start">NEW RUN</button>
+      <button class="pbtn" id="r-menu" data-sfx="back">MAIN MENU</button>
+      <button class="pbtn share" id="r-share" data-sfx="sel">SHARE</button>
+    </div>
+  </div>
+</div>
+
+<!-- the course's records, from the title: the best run, the fastest dawn, the last run -->
+<div id="records" role="dialog" aria-modal="true" aria-labelledby="rec-title">
+  <div class="recbox">
+    <h2 class="m-title" id="rec-title">RECORDS</h2>
+    <div class="r-course" id="rec-course"></div>
+    <div class="rcards">
+      <div class="rcard card" id="rc-best"><i class="rc-lab">BEST RUN</i><b class="rc-big" id="rc-best-big">—</b><div class="rc-line" id="rc-best-line"></div><div class="rc-grid cells" id="rc-best-grid"></div><button class="pbtn rc-share" id="rc-best-share" data-sfx="sel">SHARE</button></div>
+      <div class="rcard card" id="rc-fast"><i class="rc-lab">FASTEST DAWN</i><b class="rc-big" id="rc-fast-big">—</b><div class="rc-line" id="rc-fast-line"></div><div class="rc-grid cells" id="rc-fast-grid"></div><button class="pbtn rc-share" id="rc-fast-share" data-sfx="sel">SHARE</button></div>
+      <div class="rcard card" id="rc-last"><i class="rc-lab">LAST RUN</i><b class="rc-big" id="rc-last-big">—</b><div class="rc-line" id="rc-last-line"></div><div class="rc-grid cells" id="rc-last-grid"></div><button class="pbtn rc-share" id="rc-last-share" data-sfx="sel">SHARE</button></div>
+    </div>
+    <button class="pbtn" id="rec-back" data-sfx="back">BACK</button>
+  </div>
+</div>
+
+<!-- the settings, from the title or the pause menu (src/settings.js) -->
+<div id="settings" role="dialog" aria-modal="true" aria-labelledby="set-title">
+  <div class="setbox">
+    <h2 class="m-title" id="set-title">SETTINGS</h2>
+    <div class="set-rows card">
+      <div class="srow"><span class="slab">MASTER</span><div class="vol" data-k="master"><button class="vstep" data-d="-1" data-sfx="sel" aria-label="master volume down">-</button><span class="pips"></span><button class="vstep" data-d="1" data-sfx="sel" aria-label="master volume up">+</button><b class="sval">10</b></div></div>
+      <div class="srow"><span class="slab">MUSIC</span><div class="vol" data-k="music"><button class="vstep" data-d="-1" data-sfx="sel" aria-label="music volume down">-</button><span class="pips"></span><button class="vstep" data-d="1" data-sfx="sel" aria-label="music volume up">+</button><b class="sval">10</b></div></div>
+      <div class="srow"><span class="slab">EFFECTS</span><div class="vol" data-k="fx"><button class="vstep" data-d="-1" data-sfx="sel" aria-label="effects volume down">-</button><span class="pips"></span><button class="vstep" data-d="1" data-sfx="sel" aria-label="effects volume up">+</button><b class="sval">10</b></div></div>
+      <div class="srow"><span class="slab">UNITS</span><div class="seg" data-k="units"><button data-v="mph" data-sfx="sel">MPH</button><button data-v="kmh" data-sfx="sel">KM/H</button></div></div>
+      <div class="srow"><span class="slab">CAMERA SHAKE</span><div class="seg" data-k="shake"><button data-v="on" data-sfx="sel">ON</button><button data-v="off" data-sfx="sel">OFF</button></div></div>
+      <div class="srow"><span class="slab">TV EFFECT</span><div class="seg" data-k="tv"><button data-v="full" data-sfx="sel">FULL</button><button data-v="light" data-sfx="sel">LIGHT</button></div></div>
+      <div class="srow"><span class="slab">GRAPHICS</span><div class="seg" data-k="gfx"><button data-v="auto" data-sfx="sel">AUTO</button><button data-v="performance" data-sfx="sel">PERFORMANCE</button><button data-v="quality" data-sfx="sel">QUALITY</button></div></div>
+    </div>
+    <div class="snote" id="set-note">GRAPHICS TAKES EFFECT THE NEXT TIME THE GAME LOADS</div>
+    <button class="pbtn" id="set-back" data-sfx="back">DONE</button>
+  </div>
 </div>
 
 <script type="module" src="./src/main.js?v=202609242220"></script>

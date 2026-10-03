@@ -64,6 +64,48 @@ export const SCORE = {
   crashSpeed: 8.0,       // m/s of lateral impact that drops the held drift
 };
 
+/**
+ * The clock, which is the score: a run is one night, from the golden hour until dawn. It moves by distance (the road
+ * driven) and by every banked drift, and the drifts are what make it fast: an autopilot that drifts only into the
+ * tightest corners (work/dawn_time.mjs) gets to dawn in about eleven minutes on any course; a player who drifts on
+ * purpose, banking 300 to 550 points a second, gets there in four to six, most of it by points. (Before: a hundred
+ * points a minute and 3,000 m an hour, from 18:12. That autopilot's night was about the same, but a player who never
+ * drifted needed 26 minutes and one who drifted well under three: NOTES.md, 3 October.)
+ */
+export const CLOCK = {
+  start: 17.3,          // 17:18, the golden hour: the first drifts carry the sun down (the run ends at DAY, below)
+  ptsPerMin: 240,       // banked drift points for a minute of the clock
+  mPerHour: 1500,       // metres of road for an hour of the clock, at night and in the golden hour
+  dayRate: 7,           // the flat middle of the day goes this much faster (07:12 to 16:36)
+  // each course's own rates (by main.js's bestKey), measured so the same driver's night takes about as long on any:
+  // the hard pass's hairpins hand out drifts, so its road gives a little less of an hour; the narrow back streets are
+  // driven slower, so theirs gives more; and the city's broad square corners hand out drifts at about three times the
+  // easy pass's rate, so a drift there is worth two thirds of the pass's minute
+  courses: { easy: { mPerHour: 1500 }, hard: { mPerHour: 1750 }, 'city.easy': { mPerHour: 2250, ptsPerMin: 360 }, 'city.hard': { mPerHour: 950 } },
+};
+
+/**
+ * The night's phases, each from the hour it begins: a caption on the TV as the clock enters one (main.js, hud.js). The
+ * first time a run's clock enters DAY, at 06:00, the run is complete.
+ */
+export const PHASES = [
+  { id: 'golden', name: 'GOLDEN HOUR', at: 17 },
+  { id: 'blue', name: 'BLUE HOUR', at: 18.25 },
+  { id: 'night', name: 'NIGHT', at: 19.25 },
+  { id: 'dawn', name: 'DAWN', at: 4.75 },
+  { id: 'day', name: 'DAY', at: 6 },
+];
+/** The phase the clock (0..24) is in: the last one begun by that hour, round the clock (at 03:00, the night of 19:15). */
+export function phaseOf(h) {
+  h = ((h % 24) + 24) % 24;
+  let now = null, last = PHASES[0];
+  for (const p of PHASES) {
+    if (p.at <= h && (!now || p.at > now.at)) now = p;
+    if (p.at > last.at) last = p;
+  }
+  return now || last;
+}
+
 export const QUALITY = {
   high:  { pixelRatio: 1.5, shadow: true, smoke: 420, skid: 900, trees: 1.0, far: 900, petals: 800, rain: 2400 },
   phone: { pixelRatio: 1.5, shadow: true, smoke: 200, skid: 500, trees: 0.7, far: 700, petals: 450, rain: 1300 },

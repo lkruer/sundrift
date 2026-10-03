@@ -1,18 +1,23 @@
 /**
  * The page's menus, on the TV.
  *
- * The title screen and the pause menu are laid out by the page (index.html), and the page keeps them: its buttons take
- * the clicks, the taps and the keys, and a screen reader reads them. But the page draws none of it. This paints what
- * the page lays out into the HUD's canvas, every box and every run of text where the tube shows its place on the
- * screen (each point goes through the glass's curve on its way in, hud.js _toTex), at the screen's own resolution, and
- * the tube lays it into the picture with the scanlines, the phosphor's glow and the colour steps. So the menu is on the
- * set, in the set's light, and where a thumb lands is where it is drawn.
+ * The title screen, the pause menu, a run's results, the course's records and the settings are laid out by the page
+ * (index.html), and the page keeps them: its buttons take the clicks, the taps and the keys, and a screen reader reads
+ * them. But the page draws none of it. This paints what the page lays out into the HUD's canvas, every box and every run
+ * of text where the tube shows its place on the screen (each point goes through the glass's curve on its way in, hud.js
+ * _toTex), at the screen's own resolution, and the tube lays it into the picture with the scanlines, the phosphor's
+ * glow and the colour steps. So the menu is on the set, in the set's light, and where a thumb lands is where it is drawn.
  *
  * It reads what it draws from the page as the page shows it (computed colours, borders, gradients, shadows, fonts,
  * transforms, hover and focus), so a change to the page's CSS shows on the TV as it is. A few things the canvas cannot
- * take from CSS it draws its own way: the logo's and the vertical title's gradient type, the paints' round swatches, the
- * red seal, and the shade behind the menu. It draws again only when something changed: a choice, a hover, a focus, a
- * resize, a font arriving.
+ * take from CSS it draws its own way: gradient type (the logo, the vertical title, the results' DAWN), the paints' round
+ * swatches, the red seal, a menu button's cursor (its ::before), a panel that scrolls (shown only inside its own box),
+ * and the shade behind a menu. It draws again only when something changed: a choice, a hover, a focus, a resize, a
+ * font arriving.
+ *
+ * Which page is up decides what is under it: the title's own shade over the scene; or, for the pages of a run (the
+ * pause menu, the results, the settings opened from the pause menu), the HUD as the run left it, a copy taken as the
+ * first of them came up and kept until the run is back on screen or over.
  */
 const TAU = Math.PI * 2;
 const num = (v) => parseFloat(v) || 0;
@@ -74,43 +79,51 @@ function parseDrops(v) {
 export class PageTV {
   constructor(hud) {
     this.hud = hud; hud.page = this;
-    this.title = document.getElementById('title');
-    this.pause = document.getElementById('pause');
+    const $ = (id) => document.getElementById(id);
+    this.title = $('title'); this.pause = $('pause'); this.results = $('results'); this.records = $('records'); this.settings = $('settings');
     this.mc = document.createElement('canvas').getContext('2d');
     this.dirty = true; this.shot = null; this.mode = '';
     const mark = () => { this.dirty = true; };
     const watch = { subtree: true, attributes: true, childList: true, characterData: true, attributeFilter: ['class', 'style'] };
-    for (const root of [this.title, this.pause]) {
+    for (const root of [this.title, this.pause, this.results, this.records, this.settings]) {
       if (!root) continue;
       new MutationObserver(mark).observe(root, watch);
       for (const ev of ['pointerover', 'pointerout', 'pointerdown', 'pointerup', 'focusin', 'focusout']) root.addEventListener(ev, mark, { passive: true });
+      // (a panel that scrolls on a short screen: the TV follows it)
+      root.addEventListener('scroll', mark, { passive: true, capture: true });
     }
-    const menu = this.title && this.title.querySelector('.menu');
-    if (menu) menu.addEventListener('scroll', mark, { passive: true });
     addEventListener('resize', mark);
     // (what the page hides for the TV, index.html: body.tv; their own opacity is the TV's switch, not a look to copy)
-    this.hidden = new Set(document.querySelectorAll('#title .menu, #title .tatebox, #title .credit, #title #building, #title .shade, #pause'));
+    this.hidden = new Set(document.querySelectorAll('#title .menu, #title .tatebox, #title .credit, #title #building, #title .shade, #pause, #results, #records, #settings'));
     document.body.classList.add('tv');
   }
 
-  /** Which page is up: the title, the pause menu, or neither. */
+  /** Which page is up, the one on top: the settings, the records, the results, the pause menu, the title, or none. */
   _which() {
-    if (this.pause && this.pause.classList.contains('on')) return 'pause';
-    if (this.title && this.title.classList.contains('on')) return 'title';
+    for (const [k, el] of [['settings', this.settings], ['records', this.records], ['results', this.results], ['pause', this.pause], ['title', this.title]]) {
+      if (el && el.classList.contains('on')) return k;
+    }
     return '';
+  }
+
+  /** A page of a run (drawn over the HUD as the run left it), or of the title (over the scene, under its shade). */
+  _inRun(which) {
+    return which === 'pause' || which === 'results' || (which === 'settings' && !!this.pause && this.pause.classList.contains('on'));
   }
 
   /** Once a frame: draws the page that is up when something on it changed; true when the canvas was drawn. */
   frame() {
     const which = this._which();
     if (which !== this.mode) {
-      // (the pause menu is drawn over the HUD as the run left it: a copy of it kept for every redraw of the menu)
-      if (which === 'pause') {
+      // (a run's pages are drawn over the HUD as the run left it: a copy of it, taken as the first of them comes up while
+      // the HUD is still on the canvas, kept for every redraw of them; it goes when the run is back on screen or over)
+      if (this._inRun(which) && !this.mode) {
         const cv = this.hud.canvas;
         this.shot = this.shot || document.createElement('canvas');
         this.shot.width = cv.width; this.shot.height = cv.height;
         this.shot.getContext('2d').drawImage(cv, 0, 0);
-      }
+        this.hasShot = true;
+      } else if (!this._inRun(which)) this.hasShot = false;
       this.mode = which; this.dirty = true;
       this.hud.showPage(!!which);
       if (!which) { this.hud.dirty = true; return false; }
@@ -206,7 +219,8 @@ export class PageTV {
       c.fillStyle = lg; c.fill();
     }
     const bw = num(cs.borderTopWidth);
-    if (bw > 0 && alphaOf(cs.borderTopColor) > 0) {
+    const full = bw > 0 && Math.abs(num(cs.borderLeftWidth) - bw) < 0.01 && Math.abs(num(cs.borderRightWidth) - bw) < 0.01;
+    if (full && alphaOf(cs.borderTopColor) > 0) {
       const inner = this._quad(el, cs, -bw / 2);
       c.lineWidth = bw / this.hud.kx; c.strokeStyle = cs.borderTopColor;
       this._path(c, inner, cs); c.stroke();
@@ -215,6 +229,16 @@ export class PageTV {
       if (bb > bw + 0.5) {
         const [ax, ay] = this._p(q.pts[3][0] + 2, q.pts[3][1] - bb / 2), [bx, by] = this._p(q.pts[2][0] - 2, q.pts[2][1] - bb / 2);
         c.lineWidth = bb / this.hud.kx; c.strokeStyle = cs.borderBottomColor; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+      }
+    } else if (!full) {
+      // (a border on some sides only, a rule over a grid: each side that has one, along its own edge)
+      for (const [side, a, b] of [['Top', 0, 1], ['Right', 1, 2], ['Bottom', 2, 3], ['Left', 3, 0]]) {
+        const w = num(cs['border' + side + 'Width']), col = cs['border' + side + 'Color'];
+        if (w <= 0 || alphaOf(col) <= 0) continue;
+        const p = this._quad(el, cs, -w / 2).pts, [x0, y0] = p[a], [x1, y1] = p[b];
+        c.lineWidth = w / this.hud.kx; c.strokeStyle = col; c.beginPath();
+        for (let k = 0; k <= 3; k++) { const t = k / 3, [u, v] = this._p(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t); if (k) c.lineTo(u, v); else c.moveTo(u, v); }
+        c.stroke();
       }
     }
     c.restore();
@@ -329,45 +353,84 @@ export class PageTV {
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalAlpha = 1;
     c.clearRect(0, 0, h.canvas.width, h.canvas.height);
-    if (which === 'pause' && this.shot) c.drawImage(this.shot, 0, 0);
+    if (this._inRun(which) && this.hasShot && this.shot) c.drawImage(this.shot, 0, 0);
     c.setTransform(h.s, 0, 0, h.s, 0, 0);
     c.imageSmoothingEnabled = true;
-    if (which === 'title') this._paintTitle(c); else this._paintPause(c);
+    if (which === 'title') this._paintTitle(c);
+    else if (which === 'pause') this._paintPause(c);
+    else this._paintPanel(c, which === 'results' ? this.results : which === 'records' ? this.records : this.settings, this._inRun(which));
   }
 
-  /** Every box and every text node under root, in page order (the special ones left to their own drawing). */
+  /**
+   * Every box and every text node under root, in page order (the special ones left to their own drawing): a box from
+   * its computed look, gradient type the logo's way, a menu button's cursor, a panel that scrolls inside its own box.
+   */
   _walk(c, root, skip, stop) {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => {
-        if (n.nodeType !== 1) return NodeFilter.FILTER_ACCEPT;
-        if (skip(n)) return NodeFilter.FILTER_REJECT;
-        const cs = getComputedStyle(n);
-        return cs.display === 'none' || cs.visibility === 'hidden' ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
-      },
-    });
     const focus = [];
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      if (n.nodeType === 1) {
-        const cs = getComputedStyle(n);
-        const hasBox = alphaOf(cs.backgroundColor) > 0 || /gradient/.test(cs.backgroundImage) || (num(cs.borderTopWidth) > 0 && alphaOf(cs.borderTopColor) > 0) || cs.boxShadow !== 'none';
-        if (hasBox) { const a = this._alpha(n, stop); if (a > 0) this._box(c, n, cs, a); }
-        if (n.tabIndex >= 0 || n.tagName === 'BUTTON') focus.push([n, cs]);
-      } else if (n.nodeType === 3 && /\S/.test(n.textContent)) {
-        const el = n.parentElement, cs = getComputedStyle(el), a = this._alpha(el, stop);
+    this._walkIn(c, root, skip, stop, focus);
+    for (const [n, cs] of focus) this._focus(c, n, cs);
+  }
+
+  _walkIn(c, el, skip, stop, focus) {
+    for (let n = el.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType === 3) {
+        if (!/\S/.test(n.textContent)) continue;
+        const pe = n.parentElement, cs = getComputedStyle(pe), a = this._alpha(pe, stop);
         if (a <= 0 || /text/.test(cs.backgroundClip || cs.webkitBackgroundClip || '')) continue;
         for (const [s, left, top] of this._lines(n, cs)) this._text(c, s, cs, left, top, a);
+        continue;
       }
+      if (n.nodeType !== 1 || skip(n)) continue;
+      const cs = getComputedStyle(n);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const border = ['Top', 'Right', 'Bottom', 'Left'].some((s) => num(cs['border' + s + 'Width']) > 0 && alphaOf(cs['border' + s + 'Color']) > 0);
+      const hasBox = alphaOf(cs.backgroundColor) > 0 || /gradient/.test(cs.backgroundImage) || border || cs.boxShadow !== 'none';
+      // (type filled with a gradient: the page clips the gradient to the letters, which the canvas draws the logo's way)
+      if (/text/.test(cs.backgroundClip || cs.webkitBackgroundClip || '') && /gradient/.test(cs.backgroundImage)) {
+        if (this._alpha(n, stop) > 0) this._logo(c, n);
+        continue;
+      }
+      let a = 1;
+      if (hasBox) { a = this._alpha(n, stop); if (a > 0) this._box(c, n, cs, a); }
+      this._before(c, n, stop);
+      if (n.tabIndex >= 0 || n.tagName === 'BUTTON') focus.push([n, cs]);
+      // (a box whose content scrolls, on a short screen: only what is inside it shows)
+      const scrolls = /auto|scroll/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 1;
+      if (scrolls) {
+        c.save();
+        const r = n.getBoundingClientRect(), [x0, y0] = this._p(r.left - 8, r.top), [x1, y1] = this._p(r.right + 8, r.bottom);
+        c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip();
+      }
+      this._walkIn(c, n, skip, stop, focus);
+      if (scrolls) c.restore();
     }
-    for (const [n, cs] of focus) this._focus(c, n, cs);
+  }
+
+  /**
+   * A menu button's cursor, the 90s menu's arrowhead the page draws as its ::before on hover and focus (index.html
+   * .pbtn): a triangle made of borders, drawn here as the triangle it is.
+   */
+  _before(c, el, stop) {
+    if (!el.matches || !el.matches('.pbtn:hover, .pbtn:focus-visible')) return;
+    const b = getComputedStyle(el, '::before');
+    if (!b || b.content === 'none' || b.content === 'normal') return;
+    const bl = num(b.borderLeftWidth), bt = num(b.borderTopWidth), bb = num(b.borderBottomWidth);
+    if (bl <= 0 || alphaOf(b.borderLeftColor) <= 0) return;
+    const r = el.getBoundingClientRect(), x = r.left + num(b.left), y = r.top + num(b.top) + num(b.marginTop);
+    const a = this._alpha(el, stop);
+    if (a <= 0) return;
+    c.save(); c.globalAlpha = a; c.fillStyle = b.borderLeftColor;
+    c.beginPath();
+    [[x, y], [x + bl, y + bt], [x, y + bt + bb]].forEach(([px, py], i) => { const [u, v] = this._p(px, py); if (i) c.lineTo(u, v); else c.moveTo(u, v); });
+    c.closePath(); c.fill(); c.restore();
   }
 
   // ---------------------------------------------------------------- the title
 
-  _paintTitle(c) {
-    const T = this.title, h = this.hud;
-    // the shade behind the menu, as the page draws it (under the glass now, with everything else)
+  /** The shade behind the title's menu, as the page draws it (under the glass now, with everything else). */
+  _shade(c) {
+    const h = this.hud, W = h.W, H = h.H;
     const portrait = matchMedia('(max-width: 720px) and (orientation: portrait)').matches;
-    const W = h.W, H = h.H;
     if (portrait) {
       const g = c.createLinearGradient(0, H, 0, 0);
       g.addColorStop(0, 'rgba(10,6,18,0.92)'); g.addColorStop(0.4, 'rgba(10,6,18,0.78)'); g.addColorStop(0.64, 'rgba(10,6,18,0.1)'); g.addColorStop(1, 'rgba(10,6,18,0)');
@@ -380,6 +443,11 @@ export class PageTV {
       g2.addColorStop(0, 'rgba(10,6,18,0.55)'); g2.addColorStop(0.3, 'rgba(10,6,18,0)');
       c.fillStyle = g2; c.fillRect(0, 0, W, H);
     }
+  }
+
+  _paintTitle(c) {
+    const T = this.title;
+    this._shade(c);
     const menu = T.querySelector('.menu');
     if (menu) {
       c.save();
@@ -506,5 +574,15 @@ export class PageTV {
     // the page's dimming over the run (its lines are the tube's own now)
     c.fillStyle = 'rgba(10,6,18,0.66)'; c.fillRect(0, 0, h.W, h.H);
     this._walk(c, P, () => false, P);
+  }
+
+  // ---------------------------------------------------------------- the results, the records, the settings
+
+  /** A panel: dimmed over the run (the HUD as it was left), or over the scene under the title's own shade. */
+  _paintPanel(c, root, inRun) {
+    const h = this.hud;
+    if (!inRun) this._shade(c);
+    c.fillStyle = inRun ? 'rgba(10,6,18,0.72)' : 'rgba(10,6,18,0.6)'; c.fillRect(0, 0, h.W, h.H);
+    if (root) this._walk(c, root, () => false, root);
   }
 }

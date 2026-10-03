@@ -14,6 +14,7 @@ for (const how of ['restart', 'quit']) {
   await ev('window.__AUTOPILOT__ = null');
   await tap('#pauseb'); await sleep(300);
   await tap(how === 'restart' ? '#restartb' : '#quitb'); await sleep(1500);
+  if (how !== 'restart') { await tap('#r-menu'); await sleep(600); }   // (MAIN MENU shows the run's results first)
   note(how, 'after', JSON.stringify(await ev(mag)), 'car at', await ev('Math.round(window.__DEBUG__.G.s)'), 'mode', await ev('window.__DEBUG__.G.mode'));
   // look at where the magnet was left, from the car
   await ev(`(() => { const D = window.__DEBUG__, M = D.magnet.g.position, c = D.car; window.__CAM__ = { pos: [c.x, D.G.carY + 4, c.z], look: [M.x, M.y, M.z], fov: 60 }; })()`);
