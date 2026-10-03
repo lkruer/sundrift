@@ -1997,7 +1997,10 @@ const pickIdx = new Int32Array(8), pickD = new Float64Array(8);
 function lampsFollow() {
   const k = lampLights.length, L = world.lamps;
   const tunnel = world.inTunnel(G.s);
-  if (G.night < 0.02 && !tunnel) { for (const pl of lampLights) pl.intensity = 0; return; }
+  // (the street lamps come on in the blue hour and are off by sunrise, as they are: at the sunrise's 30 percent of the
+  // night they lit pale pools and highlights on a road the sun was already on)
+  const lampsOn = smoothstep(0.32, 0.75, G.night);
+  if (lampsOn < 0.02 && !tunnel) { for (const pl of lampLights) pl.intensity = 0; return; }
   let n = 0;
   // (the lights go to the lamps round a point some way ahead of the car, where the lens is looking, so a lamp's
   // pool of light comes up well before the car reaches it rather than as it does)
@@ -2018,7 +2021,7 @@ function lampsFollow() {
     const col = l.color || 0xffa040;
     if (pl.userData.col !== col) { pl.color.setHex(col); pl.userData.col = col; }
     // (the lamps are dimmer than they were, and dimmer still in the rain, when the wet road throws every one back)
-    pl.intensity = (l.tunnel ? 110 : (l.power || 330) * 0.8 * Math.max(G.night, 0.12) * (1 - 0.3 * W.wet)) * fade;
+    pl.intensity = (l.tunnel ? 110 : (l.power || 330) * 0.8 * Math.max(G.night, 0.12) * lampsOn * (1 - 0.3 * W.wet)) * fade;
   }
 }
 

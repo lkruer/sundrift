@@ -640,13 +640,16 @@ if (uGrassy > 0.5) diffuseColor.rgb = groundDetail(diffuseColor.rgb, vGPos, vGUp
     // and fro across the gravel band (x: on, y: the band's inner edge in u) instead of clamped to its last column,
     // which smeared a column of grit and fallen petals into long streaks down the widened part; the city keeps the
     // clamp (x 0)
-    this.roadSpecU = { uSpecKnee: { value: 7 }, uFold: { value: new THREE.Vector2(0, 0.9) } };
+    // uDrySpec: a dry road's highlights are dim and broad (a lamp or the headlights on dry asphalt made a pale ghost of an
+    // ellipse on the road ahead once the cel pass banded it); in the wet they come up to full (setWet)
+    this.roadSpecU = { uSpecKnee: { value: 7 }, uFold: { value: new THREE.Vector2(0, 0.9) }, uDrySpec: { value: 0.35 } };
     this.roadMat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.roadSpecU);
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>
 uniform float uSpecKnee;
 uniform vec2 uFold;
+uniform float uDrySpec;
 vec2 roadUv(vec2 uv) {
   if (uFold.x < 0.5) return vec2(clamp(uv.x, 0.0, 1.0), uv.y);
   float e = max(uv.x - 1.0, -uv.x);
@@ -664,9 +667,9 @@ vec2 roadUv(vec2 uv) {
         // (and a lamp's highlight on the road within a few metres of the lens is let go: that close, on a wet road, it
         // spread into a great white pill beside the car that the cel pass inked round like a solid thing)
         // (and the sky's own reflection at grazing light, the bright streak of sky round a low sun, has a ceiling as well)
-        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee) * smoothstep(3.0, 10.0, length(vViewPosition));\n  reflectedLight.indirectSpecular = reflectedLight.indirectSpecular / (1.0 + reflectedLight.indirectSpecular * 1.6);');
+        .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n  reflectedLight.directSpecular *= uDrySpec;\n  reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * uSpecKnee) * smoothstep(3.0, 10.0, length(vViewPosition));\n  reflectedLight.indirectSpecular = reflectedLight.indirectSpecular / (1.0 + reflectedLight.indirectSpecular * 1.6);');
     };
-    this.roadMat.customProgramCacheKey = () => 'road-spec-knee-fold-near-sky';
+    this.roadMat.customProgramCacheKey = () => 'road-spec-knee-fold-near-sky-dry';
     this.railMat = new THREE.MeshStandardMaterial({ color: PAL.galvanised, roughness: 0.42, metalness: 0.65, side: THREE.DoubleSide });
     // the lining glows faintly sodium-orange: the whole bore is lit by its lamps, not just the stretch round the car
     { const tt = tunnelTexture(); this.tunnelMat = new THREE.MeshStandardMaterial({ map: tt, emissiveMap: tt, emissive: 0xff9448, emissiveIntensity: 0.62, roughness: 0.82, metalness: 0, side: THREE.DoubleSide }); }
@@ -1906,11 +1909,13 @@ vec2 roadUv(vec2 uv) {
       // (dry asphalt, and the road's soft ceiling on its highlights: at 0.62 with nothing to cap it, a low sun laid a
       // white mirror of glare across the car park, the whole lot one blown-out wedge toward the sun)
       this.lotMat.onBeforeCompile = (shader) => {
-        shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+        shader.uniforms.uDrySpec = this.roadSpecU.uDrySpec;
+        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDrySpec;').replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+  reflectedLight.directSpecular *= uDrySpec;
   reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * 7.0);
   reflectedLight.indirectSpecular = reflectedLight.indirectSpecular / (1.0 + reflectedLight.indirectSpecular * 1.6);`);
       };
-      this.lotMat.customProgramCacheKey = () => 'lot-spec-knee';
+      this.lotMat.customProgramCacheKey = () => 'lot-spec-knee-dry';
     }
     this.postboxMat = new THREE.MeshStandardMaterial({ color: 0xc8261e, roughness: 0.38, metalness: 0.1 });
     // a shrine's dressed stone: a shade lighter than the lanterns' and, like the portals' concrete, holding a little
@@ -2735,6 +2740,7 @@ vec2 roadUv(vec2 uv) {
     // (not quite a mirror: at 0.2 each street lamp burned a white blob into the wet asphalt; at 0.4 it is a soft
     // glow drawn out toward the lens)
     if (this.roadMat) this.roadMat.roughness = 1 - 0.6 * w;
+    if (this.roadSpecU) this.roadSpecU.uDrySpec.value = 0.35 + 0.65 * w;
     if (this.lotMat) this.lotMat.roughness = 0.9 - 0.45 * w;
     if (this.groundMat) this.groundMat.roughness = 1 - 0.4 * w;
     this.setNight(this._n ?? 1);
@@ -2744,10 +2750,12 @@ vec2 roadUv(vec2 uv) {
     this._n = n;
     if (this.city && this.City) this.City.cityWet(this, this._wet || 0, n);
     const w = this._wet || 0, pool = 1 + 0.12 * w;
-    if (this.glowMat) this.glowMat.opacity = 0.75 * n * pool;
+    // (the lamps' pools come on with the lamps, in the blue hour, and are gone by sunrise: see main.js lampsFollow)
+    const on = smoothstep(0.32, 0.75, n);
+    if (this.glowMat) this.glowMat.opacity = 0.75 * on * pool;
     // (the pass's shop and its roadside machines a little softer than they were: the lot read as a sheet of snow)
-    if (this.glowCoolMat) this.glowCoolMat.opacity = this.city ? Math.min(0.78, 0.62 * n * pool) : Math.min(0.6, 0.5 * n * pool);
-    if (this.glowLanternMat) this.glowLanternMat.opacity = 0.6 * n * pool;
+    if (this.glowCoolMat) this.glowCoolMat.opacity = this.city ? Math.min(0.78, 0.62 * n * pool) : Math.min(0.6, 0.5 * on * pool);
+    if (this.glowLanternMat) this.glowLanternMat.opacity = 0.6 * on * pool;
     if (this.glowCityMat) this.glowCityMat.opacity = 0.26 * n;
     if (this.town) this.town.material.opacity = 0.9 * n;
     // (by day the pools and the towns are drawn at nothing: seventy-odd draws of nothing, so not drawn at all)
