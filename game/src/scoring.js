@@ -22,7 +22,7 @@
  * paid), driftTime (seconds sliding in banked drifts), angle (the biggest angle held in a banked drift, degrees, a
  * spin's counted as 90) and topKmh; main.js keeps distance in it.
  */
-import { SCORE, clamp } from './config.js?v=202610032333';
+import { SCORE, clamp } from './config.js?v=202610040057';
 
 // the road and its gravel shoulder (0.88), not the verge or the pavement (0.6): where a slide scores (main.js hands
 // update() the surface as the ground has it, before the rain takes its 7% of grip, so a wet shoulder still counts)

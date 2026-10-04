@@ -4,8 +4,10 @@
  * The road is built in chunks of 60 samples (about 120 m), chosen by distance from the car, not by distance
  * along the road, so the leg of a switchback above you is there whether you drove it or not. A chunk has two
  * levels. Built (within FAR_R): the ribbon, the guardrail beams, the tunnel lining, the street lamps and their
- * light, the set pieces. Dressed (within NEAR_R): everything small besides, the posts, poles, studs, signs,
- * mirrors, boulders, power poles and wires, and the trees and shrubs along the verge.
+ * light, the set pieces, the wayside shrines, the dry-stone walls on the higher cuttings. Dressed (within NEAR_R):
+ * everything small besides, the posts, poles, studs, signs, mirrors, boulders, power poles and wires, the side
+ * gutters and kilometre posts, and the trees and shrubs along the verge. (The farmland out in the valley is the
+ * terrain's: farm.js lays it out, farmland.js draws it.)
  *
  * Draw-call discipline: every repeated prop of every chunk lives in one shared instanced Pool per prop, so
  * the prop draws do not grow with the number of chunks; a chunk's own meshes are its ribbon, its rail, and
@@ -15,12 +17,13 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202610032333';
-import { surface } from '../surfaces.js?v=202610032333';
-import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202610032333';
-import { Ground } from './ground.js?v=202610032333';
-import { Terrain, LODS } from './terrain.js?v=202610032333';
-import { partsOf, Pool, freezeStatic } from './instancing.js?v=202610032333';
+import { ASSET } from '../assetlib.js?v=202610040057';
+import { surface } from '../surfaces.js?v=202610040057';
+import { PAL, QUALITY, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202610040057';
+import { Ground } from './ground.js?v=202610040057';
+import { Terrain, LODS } from './terrain.js?v=202610040057';
+import { partsOf, Pool, freezeStatic } from './instancing.js?v=202610040057';
+import { Farmland, bakeParts } from './farmland.js?v=202610040057';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const ASSETS = {
@@ -33,6 +36,8 @@ const ASSETS = {
   conbini: './assets/conbini.js', busstop: './assets/bus_shelter.js', chochin: './assets/chochin.js', jizo: './assets/jizo.js',
   sakura: './assets/sakura_tree.js', weeping: './assets/weeping_cherry.js',
   grass: './assets/grass_tuft.js', flowers: './assets/wildflowers.js', pagoda: './assets/pagoda.js',
+  // the farmland's hamlets (farmland.js) and the wayside shrines
+  farmhouse: './assets/farmhouse.js', kura: './assets/kura.js', persimmon: './assets/persimmon_tree.js', hokora: './assets/hokora.js',
 };
 const SURFACED = new Set(['boulder', 'post', 'pole', 'lamp', 'mirror', 'chevron', 'torii', 'lantern', 'portal', 'hut', 'vending', 'upole', 'conbini', 'busstop', 'jizo', 'pagoda']);
 // pool capacities: what the whole visible road can hold at once
@@ -57,6 +62,7 @@ const COLL = {
   bare: { kind: 'solid', r: 0.28 }, cedar: { kind: 'solid', r: 0.4 }, bamboo: { kind: 'solid', r: 0.85 }, boulder: { kind: 'solid', r: 0.7 },
   upole: { kind: 'solid', r: 0.2 }, lantern: { kind: 'solid', r: 0.42 }, jizo: { kind: 'solid', r: 0.24 }, torii: { kind: 'solid', legs: true, r: 0.26 },
   hut: { kind: 'solid', box: true }, conbini: { kind: 'solid', box: true }, busstop: { kind: 'solid', box: true }, pagoda: { kind: 'solid', box: true },
+  hokora: { kind: 'solid', r: 0.55 }, kmpost: { kind: 'knock', r: 0.13, m: 18 },
 };
 const COL_CELL = 8;
 const colKey = (cx, cz) => (cx + 50000) * 100000 + (cz + 50000);
@@ -789,12 +795,141 @@ vec2 roadUv(vec2 uv) {
       for (const p of pool.parts) { p.im.material.depthWrite = false; p.im.renderOrder = 2; p.im.receiveShadow = false; }
     }
     for (const p of Object.values(this.pools)) this.root.add(p.group);
+    this._farmParts();
     // (the pools' groups and meshes sit at the origin for good: their instances carry the places)
     freezeStatic(this.root);
     this.buildSky();
     this.glyphs = drawsGlyphs;
     // (NEO TOKYO is not loaded here: see loadCity)
     this.City = null; this._cityMats = [];
+  }
+
+  /**
+   * What the woods and the farmland need besides the pools. Every tree of the forest has a colour of its own now, so the
+   * cedar's foliage (and the persimmon's) turns white and takes the instance's colour, as the broadleaf's does; the
+   * second ring's broadleaf is a few flattened clouds round a stub, all in its foliage (one draw a tile, as the cedar's
+   * middle model); and the farmland's own pools (farmland.js).
+   */
+  _farmParts() {
+    for (const name of ['cedar', 'persimmon']) for (const p of this.parts[name] || []) {
+      if (p.material.name !== 'foliage') continue;
+      const m = p.material.clone(); m.color.set(0xffffff); m.name = 'foliage_tinted'; p.material = m;
+    }
+    // (the cedar's middle model was made from its foliage before it was tinted: it takes the tinted one)
+    const ced = this.parts.cedar && this.parts.cedar.find((p) => p.material.name === 'foliage_tinted');
+    if (ced && this.parts.cedarMid) this.parts.cedarMid[0].material = ced.material;
+    const bl = this.parts.broadleaf && this.parts.broadleaf.find((p) => p.material.name === 'foliage_tinted');
+    const bark = this.parts.broadleaf && this.parts.broadleaf.find((p) => p.material.name !== 'foliage_tinted');
+    if (bl) {
+      const clouds = [[0, 4.3, 0, 2.05], [1.6, 3.7, 0.7, 1.65], [-1.5, 3.75, 0.6, 1.65], [0.1, 3.6, -1.7, 1.6]].map(([x, y, z, r]) => {
+        const g = new THREE.IcosahedronGeometry(r, 0); g.scale(1, 0.85, 1); g.translate(x, y, z); return g;
+      });
+      const trunk = new THREE.CylinderGeometry(0.13, 0.2, 3.4, 5, 1, true); trunk.translate(0, 1.7, 0);
+      this.parts.broadleafMid = [{ geometry: mergeGeos([...clouds, trunk.toNonIndexed()]), material: bl.material, local: new THREE.Matrix4() }];
+      // the woods' broadleaf in the nearest ring: the same crown as eight jittered twenty-sided clusters over a trunk that
+      // forks in three, about two hundred triangles for the template's seven hundred (some five hundred of them stand
+      // within 200 m of the car, in the woods past the verge, where the full tree's finer facets cannot be told apart;
+      // the verge's own trees keep the full model)
+      if (bark) {
+        const hsh = (n) => { let h = Math.imul(n ^ 0x5bd1e995, 0x27d4eb2f); h ^= h >>> 15; return ((h >>> 0) % 1000) / 1000; };
+        // (round and full, low on the trunk: squashed flat and high up they read from above as plates on sticks)
+        const blobs = [[0, 4.6, 0, 1.6], [1.6, 4.0, 0.3, 1.3], [0.55, 4.05, 1.55, 1.25], [-1.3, 4.1, 1.0, 1.3], [-1.35, 3.95, -1.05, 1.25], [0.5, 3.9, -1.55, 1.25], [1.1, 3.0, -0.5, 1.0], [-0.6, 2.95, 0.3, 1.0]];
+        const crown = blobs.map(([x, y, z, r], i) => {
+          const g = new THREE.IcosahedronGeometry(r, 0), p = g.attributes.position, ids = new Map();
+          for (let k = 0; k < p.count; k++) {
+            const key = Math.round(p.getX(k) * 100) + ',' + Math.round(p.getY(k) * 100) + ',' + Math.round(p.getZ(k) * 100);
+            if (!ids.has(key)) ids.set(key, ids.size);
+            const f = 0.88 + 0.24 * hsh(ids.get(key) * 31 + i * 7);
+            p.setXYZ(k, p.getX(k) * f, p.getY(k) * f * 0.88, p.getZ(k) * f);
+          }
+          g.rotateY(i * 1.3); g.translate(x, y, z); g.computeVertexNormals();
+          return g;
+        });
+        const wood = [new THREE.CylinderGeometry(0.11, 0.17, 2.9, 5, 1, true).translate(0, 1.45, 0)];
+        for (const [ax, az] of [[1.0, 0.25], [-0.7, 0.8], [-0.35, -0.95]]) {
+          const d = new THREE.Vector3(ax, 1.3, az), L = d.length(), limb = new THREE.CylinderGeometry(0.05, 0.09, L, 5, 1, true);
+          limb.translate(0, L / 2, 0);
+          limb.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+          limb.translate(0, 2.55, 0);
+          wood.push(limb);
+        }
+        // (crown and wood one part, in one vertex-coloured material the instance tints: a draw a tile, not two. The wood's
+        // vertex colour is picked so that under a broadleaf's usual green it comes out the bark's dark brown)
+        this.forestMat = bl.material.clone(); this.forestMat.vertexColors = true; this.forestMat.name = 'foliage_tinted';
+        this.parts.broadleafLite = [{ geometry: vcMerge([[crown, [1, 1, 1]], [wood.map((g) => g.toNonIndexed()), [0.2, 0.07, 0.24]]]), material: this.forestMat, local: new THREE.Matrix4() }];
+      }
+    }
+    // the cedar of the woods' nearest ring the same way: its tiers and its trunk one part (under the cedar's own dark
+    // green the trunk's colour has to be well over one in red to come out brown)
+    if (this.forestMat && this.parts.cedar && this.parts.cedar.length === 2) {
+      const fol = this.parts.cedar.find((p) => p.material.name === 'foliage_tinted'), trk = this.parts.cedar.find((p) => p.material.name !== 'foliage_tinted');
+      if (fol && trk) {
+        const geo = (p) => [(p.geometry.index ? p.geometry.toNonIndexed() : p.geometry.clone()).applyMatrix4(p.local)];
+        this.parts.cedarLite = [{ geometry: vcMerge([[geo(fol), [1, 1, 1]], [geo(trk), [1.5, 0.3, 0.4]]]), material: this.forestMat, local: new THREE.Matrix4() }];
+      }
+    }
+    this.farmland = new Farmland(this, { phone: this.q === QUALITY.phone });
+    // (the farmland draws the houses from copies of its own, baked to one material: their parts are not needed)
+    delete this.parts.farmhouse; delete this.parts.kura;
+    this._roadsideParts();
+  }
+
+  /**
+   * The pools of the roadside's smaller things: the concrete side gutter at the foot of a cutting (a U channel, in two
+   * metre lengths along the road) and its steel grates, the kilometre posts (the distance on a blue plate, one picture
+   * of an atlas per post, as the warning signs pick theirs), a bamboo fence's panel, and the wayside shrine (hokora),
+   * baked to one draw. The dry-stone walls on the cuttings are each chunk's own mesh (_walls).
+   */
+  _roadsideParts() {
+    const I4 = new THREE.Matrix4();
+    const add = (name, parts, cap, opts) => { this.parts[name] = parts; const p = this.pools[name] = new Pool(parts, cap, opts); this.root.add(p.group); return p; };
+    // (vertex-coloured, as the farmland's buildings: one material for all of it, one program)
+    const vc = this.farmland.houseMat;
+    if (this.parts.hokora) { add('hokora', bakeParts(this.parts.hokora, null, vc), 40); this.foot.hokora = this.foot.hokora || [0.6, 0.6, 1.9]; }
+    add('gutter', [{ geometry: gutterGeometry(), material: vc, local: I4 }], 1600);
+    add('grate', [{ geometry: new THREE.BoxGeometry(0.9, 0.035, 0.46).translate(0.45, 0.215, 0.29), material: this.fixMetalMat, local: I4 }], 260);
+    add('fence', [{ geometry: fenceGeometry(), material: vc, local: I4 }], 400);
+    this.foot.fence = [1, 0.1, 1.2];
+    // the kilometre posts: a white concrete post and a blue plate on its top with the distance in half kilometres
+    {
+      const tex = kmTexture();
+      const post = new THREE.BoxGeometry(0.13, 1.0, 0.13).translate(0, 0.5, 0);
+      const plate = new THREE.BoxGeometry(0.4, 0.3, 0.04).translate(0, 1.08, 0.075);
+      const face = (g, front) => {
+        const uv = g.attributes.uv, f = new Float32Array(uv.count);
+        for (let i = 0; i < uv.count; i++) {
+          // (the plate's front, +z, shows the first number's cell; every other face the white cell at the atlas's end)
+          if (front && i >= 16 && i < 20) { uv.setXY(i, uv.getX(i) / 8, 1 - (1 - uv.getY(i)) / 8); f[i] = 1; }
+          else uv.setXY(i, 7.5 / 8, 0.5 / 8);
+        }
+        g.setAttribute('aFace', new THREE.BufferAttribute(f, 1));
+        return g.toNonIndexed();
+      };
+      const geo = mergeGeometries([face(post, false), face(plate, true)]);
+      const mat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.18, roughness: 0.5, metalness: 0 });
+      mat.name = 'kmpost'; mat.userData.tinted = true;
+      mat.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nattribute float aFace;')
+          .replace('#include <color_vertex>', `#include <color_vertex>
+#ifdef USE_INSTANCING_COLOR
+  {
+    // the post's distance, from the instance colour (its cell in the atlas as (k + 0.5) / 64), on the plate's face only
+    float k = floor(instanceColor.r * 64.0);
+    vec2 cell = vec2(mod(k, 8.0), -floor(k / 8.0)) / 8.0;
+    vMapUv += cell * aFace; vEmissiveMapUv += cell * aFace;
+    vColor = vec3(1.0);
+  }
+#endif`);
+      };
+      mat.customProgramCacheKey = () => 'kmpost-atlas';
+      this.kmMat = mat;
+      add('kmpost', [{ geometry: geo, material: mat, local: I4 }], 40, { tint: true });
+      this.foot.kmpost = [0.2, 0.1, 1.25];
+    }
+    // the dry-stone walls on the cuttings: the stones mapped along the wall and up it, the cap a green of moss and grass
+    this.ishigakiMat = new THREE.MeshStandardMaterial({ color: 0xcfc9bc, map: this.farmland.stoneMat.map, vertexColors: true, roughness: 0.95, metalness: 0, flatShading: true });
+    this.ishigakiMat.name = 'ishigaki';
   }
 
   /**
@@ -806,9 +941,9 @@ vec2 roadUv(vec2 uv) {
   loadCity() {
     if (!this._cityLoad) this._cityLoad = (async () => {
       try {
-        const City = await import('./city.js?v=202610032333');
+        const City = await import('./city.js?v=202610040057');
         this._cityMats = City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
-        const L = await import('./landmarks.js?v=202610032333').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+        const L = await import('./landmarks.js?v=202610040057').catch((e) => { console.warn('landmarks', e && e.message); return null; });
         this.citySky = City.citySkyBuild(this, L);
         this.citySky.visible = false;
         this.scene.add(this.citySky);
@@ -841,17 +976,19 @@ vec2 roadUv(vec2 uv) {
     this.roadMat.map = rt.map; this.roadMat.roughnessMap = rt.roughnessMap; this.roadMat.needsUpdate = true;
     this.roadSpecU.uFold.value.set(this.city ? 0 : 1, (track.half + track.wall) / (2 * track.wall));
     this.texLen = rt.len;
-    const tp = { cedar: this.parts.cedar, cedarMid: this.parts.cedarMid || null, maple: this.parts.maple, broadleaf: this.parts.broadleaf, bare: this.parts.bare, sakura: this.parts.sakura || null, sakuraFar: this.parts.sakuraFar || null };
+    const tp = { cedar: this.parts.cedar, cedarMid: this.parts.cedarMid || null, maple: this.parts.maple, broadleaf: this.parts.broadleaf, bare: this.parts.bare, sakura: this.parts.sakura || null, sakuraFar: this.parts.sakuraFar || null,
+      broadleafMid: this.parts.broadleafMid || null, broadleafLite: this.parts.broadleafLite || null, cedarLite: this.parts.cedarLite || null, bamboo: this.parts.bamboo || null, shrub: this.parts.shrub || null, boulder: this.parts.boulder || null };
     const building = this.city ? { geometry: this.pools.bldg.parts[0].im.geometry, material: this.bldgMat } : null;
     const colliders = { add: (o, list) => this.addTrees(o, list), drop: (o) => this.dropTrees(o) };
-    if (!this.terrain) this.terrain = new Terrain({ scene: this.scene, ground: this.ground, mat: this.groundMat, farMat: this.farMat, parts: tp, density: this.q.trees, seed: track.seed, city: this.city, building, colliders });
+    if (!this.terrain) this.terrain = new Terrain({ scene: this.scene, ground: this.ground, mat: this.groundMat, farMat: this.farMat, parts: tp, density: this.q.trees, seed: track.seed, city: this.city, building, colliders, farmland: this.farmland || null });
     else { this.terrain.o.seed = track.seed; this.terrain.o.city = this.city; this.terrain.o.building = building; this.terrain.reset(this.ground); }
-    // new final road dirties the terrain beside it
+    // new final road dirties the terrain beside it (and as far again as a field it takes away can reach: farm.js keeps
+    // its fields clear of the road, so new road can take a field away whose far side is a hundred metres off)
     track.onAdd((i0, i1) => {
       if (this.track !== track) return;
       let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, tun = false;
       for (let i = i0; i <= i1; i++) { const p = track.pts[i]; if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; if (p.tunnel) tun = true; }
-      this.terrain.markDirty(x0, z0, x1, z1, tun ? 150 : undefined);
+      this.terrain.markDirty(x0, z0, x1, z1, tun ? 150 : this.city ? undefined : 104);
     });
   }
 
@@ -1096,6 +1233,8 @@ vec2 roadUv(vec2 uv) {
     this._signsFor(ch);
     this._roadside(ch);
     this._studs(ch);
+    yield;
+    const walls = this._walls(ch); if (walls) ch.group.add(walls);
     if (this.city) yield* this.City.cityChunk(this, ch);
     // (the chunk's own materials, a tunnel's name plate, a road text, get the rig's patches before its first draw:
     // drawn unpatched, each compiled a shader of its own on the spot, a 400-550 ms stall a minute into a run)
@@ -1521,6 +1660,7 @@ vec2 roadUv(vec2 uv) {
       const [x, z] = this._at(p, (w + (p.express ? 0.45 : 0.55)) * side);
       const y = p.express ? p.y - (w + 0.45) * side * Math.tan(p.bank || 0) + 0.95 : g.height(x, z);
       const ry = side > 0 ? p.h + Math.PI : p.h;               // the arm reaches local +X: point it at the road
+      (ch.lampS || (ch.lampS = [])).push([sl, side]);          // (the side gutter leaves its foot clear: _dress)
       const rec = this._putLod(ch, 'lamp', x, y, z, ry, 1, null);
       const hx = x + Math.cos(ry) * this.lampHead[0], hz = z - Math.sin(ry) * this.lampHead[0];
       const hy = y + this.lampHead[1];
@@ -2084,18 +2224,125 @@ vec2 roadUv(vec2 uv) {
       // (as far back as the verge's trees and boulders, clear of a car that runs wide, and only where the ground there is
       // near the road's level; each seated on the lowest ground under its footprint)
       const at = (ds, du, r) => { const q = t.sample(p.s + ds), [x, z] = this._at(q, (w + du) * side); return [x, this._low(x, z, r), z]; };
-      const spot = [[0, 2.5, 0.7], [-1.3, 3.2, 0.3], [1.3, 3.2, 0.18], [0, 3.8, 0.2]].map(([ds, du, r]) => at(ds, du, r));
+      // (the shrine itself, a little timber hokora on its stones, behind the torii; the jizo to one side, the lantern to the
+      // other, and a bamboo fence behind them all)
+      const spot = [[0, 2.3, 0.7], [-1.5, 3.0, 0.3], [1.4, 2.95, 0.18], [2.0, 2.7, 0.2], [0, 3.5, 0.6]].map(([ds, du, r]) => at(ds, du, r));
       if (spot.some(([, y]) => Math.abs(y - p.y) > 0.6)) continue;
       { const [x, y, z] = spot[0]; this._put('torii', own, x, y - 0.04, z, face, 0.3); }
       { const [x, y, z] = spot[1]; this._put('lantern', own, x, y - 0.05, z, face, 0.8); }
       { const [x, y, z] = spot[2]; this._put('jizo', own, x, y - 0.04, z, face + 0.1, 1.0); }
       { const [x, y, z] = spot[3]; this._put('jizo', own, x, y - 0.04, z, face - 0.08, 1.12); }
+      if (this.pools.hokora) { const [x, y, z] = spot[4]; this._put('hokora', own, x, y - 0.06, z, face, 1.2); }
+      // (the fence where the ground behind is level enough for it)
+      if (this.pools.fence) for (const k of [-2.1, 0.1]) {
+        const q = t.sample(p.s + k), [x, z] = this._at(q, (w + 4.6) * side), y = this._low(x, z, 0.3);
+        if (Math.abs(y - p.y) < 0.7) this._put('fence', own, x, y - 0.05, z, q.h - Math.PI / 2, 1, 1, null, false);
+      }
       const [lx2, ly2, lz2] = spot[1];
       this.lamps.push({ x: lx2, y: ly2 + 1.4, z: lz2, c: ch.c, color: 0xffb070, power: 45 });
       warm.push([lx2, lz2, 4.5]);
       keep.push([p.s - 4, p.s + 4, side]);
     }
     if (warm.length) { const gm = this._glows(warm, ch, this.glowLanternMat); if (gm) ch.group.add(gm); }
+    // and halfway between them a lone hokora by the verge, with one jizo for company
+    if (this.pools.hokora) for (let i = ch.i0; i < ch.i1; i++) {
+      const p = pts[i];
+      const ph = (((p.s - 460) % 830) + 830) % 830;
+      if (ph >= t.step || p.s < 120 || Math.abs(p.k) > 1 / 60 || t.nearTunnel(p.s, 30) || this.avenueAt(p.s)) continue;
+      const lx = Math.cos(p.h), lz = -Math.sin(p.h);
+      const side = g.height(p.x + lx * (p.wl + 6), p.z + lz * (p.wl + 6)) >= g.height(p.x - lx * (p.wr + 6), p.z - lz * (p.wr + 6)) ? 1 : -1;
+      const w = side > 0 ? p.wl : p.wr;
+      if (ch.rails[side][i - ch.i0] || w > t.wall + 0.3) continue;
+      let clear = true;
+      for (const ds of [-12, 0, 12]) if (t.markerAt(p.s + ds, side) || t.padAt(p.s + ds, side)) clear = false;
+      if (!clear) continue;
+      const face = p.h + (side > 0 ? -Math.PI / 2 : Math.PI / 2);
+      const at = (ds, du, r) => { const q = t.sample(p.s + ds), [x, z] = this._at(q, (w + du) * side); return [x, this._low(x, z, r), z]; };
+      const spot = [at(0, 2.5, 0.6), at(1.2, 2.3, 0.2)];
+      if (spot.some(([, y]) => Math.abs(y - p.y) > 0.6)) continue;
+      { const [x, y, z] = spot[0]; this._put('hokora', own, x, y - 0.06, z, face, 1.2); }
+      { const [x, y, z] = spot[1]; this._put('jizo', own, x, y - 0.04, z, face - 0.15, 1.05); }
+      keep.push([p.s - 3, p.s + 3, side]);
+    }
+  }
+
+  /**
+   * Dry-stone walls (ishigaki) at the foot of the higher cuttings, along a stretch here and there: a battered face of
+   * mossy field stones two metres high, set back behind the side gutter and the verge, its top a ledge of moss running
+   * back into the cut face. One mesh a chunk (the cut over it keeps its concrete lattice). The walled stretches are
+   * remembered (ch.walls) so the boulders at a cutting's foot are not set inside one.
+   */
+  _walls(ch) {
+    ch.walls = [];
+    // (not on a phone: a draw a chunk, and its budget is in draws)
+    if (this.city || !this.ishigakiMat || this.q === QUALITY.phone) return null;
+    const t = this.track, g = this.ground, pts = t.pts;
+    const H = 2.1, pos = [], uv = [], col = [], idx = [];
+    const moss = new THREE.Color(0x8aa35a), stone = new THREE.Color(0xffffff);
+    const hash = (n) => { let h = Math.imul((n | 0) ^ 0x6a09e667, 0x27d4eb2f); h ^= h >>> 15; h = Math.imul(h, 0x85ebca6b); return ((h ^ (h >>> 13)) >>> 0) / 4294967296; };
+    for (const side of [1, -1]) {
+      let run = [];
+      const flush = () => {
+        if (run.length >= 4) this._wallRun(run, side, H, pos, uv, col, idx, stone, moss, ch);
+        run = [];
+      };
+      for (let i = ch.i0; i <= ch.i1; i++) {
+        const p = pts[i], k = i - ch.i0, w = side > 0 ? p.wl : p.wr;
+        // (a third or so of the stretches of a hundred metres, where the cut is high and nothing else stands at its foot)
+        let ok = hash(Math.floor(p.s / 100) * 2 + (side > 0 ? 1 : 0) + this.seed * 7) < 0.36 && !ch.rails[side][k] && !p.tunnel && !t.nearTunnel(p.s, 12)
+          && w <= t.wall + 0.05 && !t.markerAt(p.s, side) && !t.padAt(p.s, side) && !this._kept(ch, p.s, side) && !this.avenueAt(p.s);
+        let reach = 0;
+        if (ok) {
+          // the cut must rise to the wall's height within a few metres of its foot: where it does, the ledge runs into it
+          const lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side;
+          for (let u = w + 2.4; u <= w + 7.5; u += 0.5) if (g.height(p.x + lx * u, p.z + lz * u) >= p.y + H + 0.05) { reach = u; break; }
+          ok = reach > 0;
+        }
+        if (ok) run.push([i, reach]); else flush();
+      }
+      flush();
+    }
+    if (!idx.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx); geo.computeVertexNormals(); geo.computeBoundingSphere();
+    ch.own.add(geo);
+    const m = new THREE.Mesh(geo, this.ishigakiMat); m.receiveShadow = true; m.name = 'ishigaki';
+    return m;
+  }
+
+  /** One run of wall along samples [i, reach]: its face, its ledge and its two ends; and the stones the car meets. */
+  _wallRun(run, side, H, pos, uv, col, idx, stone, moss, ch) {
+    const t = this.track, pts = t.pts, own = ch.c * 2;
+    const rows = run.map(([i, reach]) => {
+      const p = pts[i], w = side > 0 ? p.wl : p.wr, lx = Math.cos(p.h) * side, lz = -Math.sin(p.h) * side, yv = p.y - 0.06;
+      const at = (u, y) => [p.x + lx * u, y, p.z + lz * u];
+      const u0 = w + 1.9, u1 = u0 + 0.45, u2 = Math.max(u1 + 0.6, reach + 0.5);
+      this._reg(own, { name: 'wall', kind: 'solid', x: p.x + lx * (u0 + 0.3), y: p.y, z: p.z + lz * (u0 + 0.3), r: 0.5, alive: true });
+      return { s: p.s, foot: at(u0, yv - 0.35), top: at(u1, yv + H), back: at(u2, yv + H + 0.06), u: [u0, u1, u2], yv };
+    });
+    ch.walls.push([rows[0].s - 1, rows[rows.length - 1].s + 1, side]);
+    // a strip of quads between consecutive rows, from one point of the section to the next
+    const strip = (a, b, c, uvA, uvB) => {
+      const base = pos.length / 3;
+      rows.forEach((r) => { pos.push(...r[a], ...r[b]); col.push(c.r, c.g, c.b, c.r, c.g, c.b); uv.push(...uvA(r), ...uvB(r)); });
+      for (let k = 0; k < rows.length - 1; k++) {
+        const v = base + k * 2;
+        // (wound so the face looks back at the road and the ledge up, whichever side of the road the wall is on)
+        if (side > 0) idx.push(v, v + 2, v + 1, v + 1, v + 2, v + 3); else idx.push(v, v + 1, v + 2, v + 1, v + 3, v + 2);
+      }
+    };
+    strip('foot', 'top', stone, (r) => [r.s / 2.6, -0.3 / 2.6], (r) => [r.s / 2.6, (H + 0.2) / 2.6]);
+    strip('top', 'back', moss, (r) => [r.s / 2.6, 0], (r) => [r.s / 2.6, (r.u[2] - r.u[1]) / 2.6]);
+    // the ends: the section closed, a stone face across the wall's thickness down to its foot
+    for (const [r, end] of [[rows[0], 0], [rows[rows.length - 1], 1]]) {
+      const base = pos.length / 3, low = [r.back[0], r.yv - 0.35, r.back[2]];
+      for (const v of [r.foot, r.top, r.back, low]) { pos.push(...v); col.push(stone.r, stone.g, stone.b); }
+      uv.push(0, 0, 0.2, H / 2.6, (r.u[2] - r.u[0]) / 2.6, H / 2.6, (r.u[2] - r.u[0]) / 2.6, 0);
+      if ((end === 0) === (side > 0)) idx.push(base, base + 1, base + 2, base, base + 2, base + 3); else idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+    }
   }
 
   /**
@@ -2320,6 +2567,62 @@ vec2 roadUv(vec2 uv) {
     return false;
   }
 
+  /** Whether a dry-stone wall stands at s on a side (_walls). */
+  _walled(ch, s, side) {
+    for (const [a, b, sd] of ch.walls || []) if (sd === side && s > a && s < b) return true;
+    return false;
+  }
+
+  /** Whether a street lamp stands within d of s on a side (_lampsFor). */
+  _lampBy(ch, s, side, d) {
+    for (const [sl, sd] of ch.lampS || []) if (sd === side && Math.abs(sl - s) < d) return true;
+    return false;
+  }
+
+  /**
+   * The side gutter at the foot of a cutting, as every Japanese mountain road has it: a U channel of precast concrete
+   * along the verge just past the road's edge, in two-metre lengths that follow the road, with a steel grate laid over
+   * it every dozen metres. Only where the ground rises beside the road (where it falls away there is the rail), and not
+   * where a lay-by or a terrace opens, at a tunnel's mouth, or at a lamp's foot. And the kilometre posts: every half
+   * kilometre on the left, a white post with the distance on a blue plate, facing the car coming up the road.
+   */
+  _gutters(ch, own) {
+    const t = this.track, g = this.ground, pts = t.pts, pool = this.pools.gutter, grate = this.pools.grate;
+    if (!pool) return;
+    const m = new THREE.Matrix4();
+    for (const side of [1, -1]) {
+      for (let i = ch.i0; i < ch.i1; i++) {
+        const p = pts[i], q = pts[i + 1], k = i - ch.i0;
+        if (ch.rails[side][k] || ch.rails[side][k + 1] || p.tunnel || q.tunnel || t.nearTunnel(p.s, 6)) continue;
+        const w = side > 0 ? p.wl : p.wr, w2 = side > 0 ? q.wl : q.wr;
+        if (w > t.wall + 0.05 || w2 > t.wall + 0.05 || t.markerAt(p.s, side) || t.padAt(p.s, side) || this._kept(ch, p.s, side) || this._lampBy(ch, p.s + 1, side, 1.7)) continue;
+        const [cx, cz] = this._at(p, (w + 5) * side);
+        if (g.height(cx, cz) < p.y + 1.2) continue;               // not a cutting
+        let [ax, az] = this._at(p, (w + 0.05) * side), [bx, bz] = this._at(q, (w2 + 0.05) * side);
+        let ay = p.y - 0.06, by = q.y - 0.06;
+        // (laid so that along x up is outward: walked backward on the left)
+        if (side > 0) { [ax, bx] = [bx, ax]; [az, bz] = [bz, az]; [ay, by] = [by, ay]; }
+        const ux = bx - ax, uz = bz - az, L = Math.hypot(ux, uz) || 1, ox = -uz / L, oz = ux / L;
+        m.set(ux, 0, ox, ax, by - ay, 1, 0, ay, uz, 0, oz, az, 0, 0, 0, 1);
+        pool.add(own, m);
+        // a grate every dozen metres
+        if (grate && this.q !== QUALITY.phone && Math.floor(q.s / 12) !== Math.floor(p.s / 12)) { m.set(ux / L, 0, ox, ax, (by - ay) / L, 1, 0, ay, uz / L, 0, oz, az, 0, 0, 0, 1); grate.add(own, m); }
+      }
+    }
+    // the kilometre posts
+    if (!this.pools.kmpost) return;
+    const s0 = pts[ch.i0].s, s1 = pts[ch.i1].s;
+    for (let s = Math.ceil(s0 / 500) * 500; s < s1; s += 500) {
+      if (s < 100) continue;
+      const p = t.sample(s);
+      if (p.tunnel || t.nearTunnel(s, 15) || t.markerAt(s, 1) || t.padAt(s, 1) || this._kept(ch, s, 1)) continue;
+      const [x, z] = this._at(p, (p.wl + 0.85) * 1), y = g.height(x, z);
+      if (Math.abs(y - p.y) > 1.6) continue;
+      const cell = ((Math.round(s / 500) - 1) % 63 + 63) % 63;
+      this._put('kmpost', own, x, y, z, p.h + Math.PI, 1, 1, new THREE.Color((cell + 0.5) / 64, 1, 1));
+    }
+  }
+
   /**
    * The lowest ground under a footprint of radius r round (x, z): what a rock or a bush on a slope rests on. Given the
    * way across the road (lx, lz), only across it, which is the way a verge's bank rises (half the samples: this runs for
@@ -2406,6 +2709,8 @@ vec2 roadUv(vec2 uv) {
         }
       }
     }
+    // the side gutters at the foot of the cuttings, the kilometre posts
+    if (!this.city) this._gutters(ch, own);
     // (the old cat's-eye models: replaced by the road studs, points of light built with the chunk)
     if (false) for (let i = ch.i0; i < ch.i1; i++) {
       const p = pts[i];
@@ -2450,6 +2755,8 @@ vec2 roadUv(vec2 uv) {
     }
     // boulders at the foot of a cutting, bedded into the bank: seated on the lowest ground under them (set at the height
     // of their middle on the face, they hung on the slope with the verge showing under them, stuck to the lattice)
+    // (and a few smaller stones fallen round each, of every size: a second stream, so the boulders stay where they were)
+    const r2 = mulberry32((this.seed * 1931 + ch.c * 7393) >>> 0);
     if (!this.city) for (let i = ch.i0; i < ch.i1; i += 5) {
       const p = pts[i];
       if (p.tunnel || t.nearTunnel(p.s, 12)) continue;
@@ -2462,7 +2769,15 @@ vec2 roadUv(vec2 uv) {
         const u = Math.min(w + 2.3 + rng() * 1.2, w + 2.65);
         const [x, z] = this._at(p, u * side);
         const ry = rng() * 6.28, sc = 0.5 + rng() * 0.8;
+        // (not inside a stretch of dry-stone wall: _walls)
+        if (this._walled(ch, p.s, side)) continue;
         this._put('boulder', own, x, this._low(x, z, 0.55 * sc) - 0.12 * sc, z, ry, sc);
+        for (let k = Math.floor(r2() * 4); k > 0; k--) {
+          // (along the foot of the face, and never out toward the gutter and the road)
+          const al = (r2() - 0.5) * 3.2, out = 0.1 + r2() * 0.6, ss = 0.18 + r2() * 0.3;
+          const bx = x + Math.sin(p.h) * al + Math.cos(p.h) * side * out, bz = z + Math.cos(p.h) * al - Math.sin(p.h) * side * out;
+          this._put('boulder', own, bx, this._low(bx, bz, 0.55 * ss) - 0.12 * ss, bz, r2() * 6.28, ss, 1, null, false);
+        }
       }
     }
     if (!this.city && this.pools.warn) this._warnFor(ch, own);
@@ -2509,6 +2824,8 @@ vec2 roadUv(vec2 uv) {
     const dens = this.q.trees || 1;
     const probe = {};
     const verge = !this.city;
+    // (nothing of the verge's grows out into a field: farm.js lets a paddy come within a dozen metres of the road)
+    const farm = this.ground.farm, inField = (x, z) => !!(farm && farm.kindAt(x, z));
     // grass along the verges, thick near the edge and thinning out, with a clump of spring flowers now and then
     if (verge && this.pools.grass) {
       const GRASS = [PAL.youngLeaf, PAL.moss, PAL.leafDeep, PAL.dryGrass, PAL.youngLeaf];
@@ -2524,13 +2841,13 @@ vec2 roadUv(vec2 uv) {
             const u = w + 0.35 + (k ? 1.2 + rng() * 7 : rng() * 1.6);
             const [x, z] = this._at(p, u * side + (rng() - 0.5) * 1.6);
             g.sample(x, z, 2.2, probe);
-            if (probe.edge < 0.25 || probe.tunnel) continue;
+            if (probe.edge < 0.25 || probe.tunnel || inField(x, z)) continue;
             this._put('grass', own, x, probe.h - 0.03, z, rng() * 6.28, 0.95 + rng() * 0.8, 1, GRASS[Math.floor(rng() * GRASS.length)], false);
           }
           if (this.pools.flowers && rng() < 0.3 * dens) {
             const [x, z] = this._at(p, (w + 0.5 + rng() * 4.5) * side);
             g.sample(x, z, 2.2, probe);
-            if (probe.edge < 0.3 || probe.tunnel) continue;
+            if (probe.edge < 0.3 || probe.tunnel || inField(x, z)) continue;
             this._put('flowers', own, x, probe.h - 0.02, z, rng() * 6.28, 0.8 + rng() * 0.5, 1, FLOWER[Math.floor(rng() * FLOWER.length)], false);
           }
         }
@@ -2547,7 +2864,7 @@ vec2 roadUv(vec2 uv) {
           const u = w + 3.2 + rng() * 3.4;
           const [x, z] = this._at(p, u * side);
           g.sample(x, z, 2.2, probe);
-          if (probe.edge > 1.2 && !probe.tunnel) {
+          if (probe.edge > 1.2 && !probe.tunnel && !inField(x, z)) {
             const h = probe.h;
             const hx = g.height(x + 1.2, z) - g.height(x - 1.2, z), hz = g.height(x, z + 1.2) - g.height(x, z - 1.2);
             if (hx * hx + hz * hz < 4.0) {
@@ -2571,9 +2888,11 @@ vec2 roadUv(vec2 uv) {
         const u = w + 0.7 + rng() * 2.4;
         const [x, z] = this._at(p, u * side + (rng() - 0.5));
         g.sample(x, z, 2.2, probe);
-        if (probe.edge < 0.5 || probe.tunnel) continue;
+        if (probe.edge < 0.5 || probe.tunnel || inField(x, z)) continue;
         const pick = rng();
-        const colour = pick < 0.3 ? PAL.youngLeaf : pick < 0.52 ? PAL.moss : pick < 0.68 ? PAL.leafDeep : pick < 0.82 ? PAL.azalea : pick < 0.93 ? PAL.azaleaPink : PAL.sakuraWhite;
+        // (mostly green; a few azaleas in flower, a rose pink and a paler one, and white: the old azalea, a saturated
+        // magenta, burned neon through the grade)
+        const colour = pick < 0.3 ? PAL.youngLeaf : pick < 0.52 ? PAL.moss : pick < 0.72 ? PAL.leafDeep : pick < 0.84 ? 0xd77d9c : pick < 0.93 ? 0xeba6bd : PAL.sakuraWhite;
         const ry = rng(), sc = 0.7 + rng() * 0.7;
         // (on the lowest ground under it where the verge meets a bank: set by its middle, a bush at the top of one hung
         // out over the slope; on the level verge its middle is enough)
@@ -2695,7 +3014,7 @@ vec2 roadUv(vec2 uv) {
     const box = new THREE.BoxGeometry(1, 1, 1);
     for (const m of [this.tunnelMat, this.tunnelLampMat, this.glowMat, this.glowCoolMat, this.glowLanternMat, this.glowCityMat, this.postMat, this.toriiRedMat, this.toriiBlackMat, this._plaqueMat, this.signBackMat, ...this._signMats, this._roadTextMat('徐行'), this._roadTextMat('止まれ'), ...(this._cityMats || []), this.bulbMat, this.groundMat, this.farMat, this.roadMat, this.railMat,
       this.fixMetalMat, this.signGreenMat, this.signRedMat, this.reflectorMat, this.portalMat, this.copingMat, [...this._plates.values()][0],
-      this.postboxMat, this.pylonMat, this.lotMat, this.stoneMat]) {
+      this.postboxMat, this.pylonMat, this.lotMat, this.stoneMat, this.ishigakiMat].filter(Boolean)) {
       const x = new THREE.Mesh(box, m); x.position.y = -500; x.castShadow = true; stage.add(x);
     }
     { const l = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -500, 0), new THREE.Vector3(1, -500, 0)]), this.wireMat); stage.add(l); }
@@ -2774,7 +3093,10 @@ vec2 roadUv(vec2 uv) {
       this._tinted = [];
       const grab = (mat, k) => { if (mat && mat.color && !this._tinted.some((t) => t.mat === mat)) this._tinted.push({ mat, base: mat.color.clone(), k }); };
       grab(this.groundMat, [0.42, 0.55, 0.95]); grab(this.farMat, [0.34, 0.45, 0.85]); grab(this.roadMat, [0.62, 0.70, 0.95]); grab(this.lotMat, [0.62, 0.70, 0.95]);
-      for (const name of ['maple', 'shrub', 'broadleaf', 'cedar', 'bamboo']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.40, 0.52, 0.92]);
+      for (const name of ['maple', 'shrub', 'broadleaf', 'cedar', 'bamboo', 'persimmon', 'broadleafLite', 'cedarLite']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.40, 0.52, 0.92]);
+      // the farmland's water, bunds, walls, rows and houses (farmland.js), and the roadside's dry-stone walls
+      if (this.farmland) this.farmland.setNight(0, grab);
+      if (this.ishigakiMat) grab(this.ishigakiMat, [0.5, 0.58, 0.92]);
       // blossom keeps more of its pink by night: moonlight turns it pale lilac rather than blue
       for (const name of ['sakura', 'weeping']) for (const p of this.parts[name] || []) if (/foliage/.test(p.material.name)) grab(p.material, [0.80, 0.62, 0.74]);
       // (the far ridges take their colour from the haze: skylineTint)
@@ -2783,6 +3105,8 @@ vec2 roadUv(vec2 uv) {
       const wk = t.mat === this.roadMat || t.mat === this.lotMat ? 1 - 0.38 * w : t.mat === this.groundMat ? 1 - 0.22 * w : 1;
       t.mat.color.setRGB(t.base.r * (1 + (t.k[0] - 1) * n) * wk, t.base.g * (1 + (t.k[1] - 1) * n) * wk, t.base.b * (1 + (t.k[2] - 1) * n) * wk);
     }
+    // (the farmhouses' windows light up toward dusk, like the lanterns)
+    if (this.farmland) this.farmland.setNight(smoothstep(0, 0.4, n));
   }
 }
 
@@ -2798,6 +3122,100 @@ function mirrorX(geo, local) {
   }
   g.computeBoundingSphere();
   return g;
+}
+
+/** Geometries merged into one with a vertex colour per group: [[geometries (non-indexed), [r, g, b]], ...] (disposes them). */
+function vcMerge(groups) {
+  let nv = 0;
+  for (const [list] of groups) for (const g of list) nv += g.attributes.position.count;
+  const pos = new Float32Array(nv * 3), col = new Float32Array(nv * 3);
+  let o = 0;
+  for (const [list, [r, g2, b]] of groups) for (const g of list) {
+    const p = g.attributes.position, n = p.count;
+    pos.set(p.array.subarray(0, n * 3), o * 3);
+    for (let i = 0; i < n; i++) { col[(o + i) * 3] = r; col[(o + i) * 3 + 1] = g2; col[(o + i) * 3 + 2] = b; }
+    o += n;
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  out.computeVertexNormals(); out.computeBoundingSphere();
+  return out;
+}
+
+/** A flat-shaded, vertex-coloured geometry from quads: each [corner a, b, c, d (round it, outside facing you), colour]. */
+function quadGeometry(quads) {
+  const pos = [], col = [], c = new THREE.Color();
+  for (const [a, b, d, e, k] of quads) {
+    c.set(k);
+    for (const v of [a, b, d, a, d, e]) { pos.push(v[0], v[1], v[2]); col.push(c.r, c.g, c.b); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * The side gutter (U-gutter): a U channel of precast concrete, its walls standing 20 cm off the verge, a wet dark floor
+ * between them; one unit along x (a length is the instance's x scale), 0.58 m across z from its road side.
+ */
+function gutterGeometry() {
+  const P = [[0, 0], [0, 0.2], [0.1, 0.2], [0.1, 0.03], [0.48, 0.03], [0.48, 0.2], [0.58, 0.2], [0.58, 0]];
+  const K = [0xb4b0a6, 0xc6c2b8, 0x8f8b82, 0x55584e, 0x8f8b82, 0xc6c2b8, 0xa6a298];
+  const quads = [];
+  for (let i = 0; i < P.length - 1; i++) {
+    const [z0, y0] = P[i], [z1, y1] = P[i + 1];
+    quads.push([[0, y0, z0], [0, y1, z1], [1, y1, z1], [1, y0, z0], K[i]]);
+  }
+  return quadGeometry(quads);
+}
+
+/** A panel of bamboo fence (yotsume-gaki): posts at its ends, three rails, five canes; two metres along x. */
+function fenceGeometry() {
+  const geos = [];
+  const cane = (x0, y0, z0, x1, y1, z1, r, k) => {
+    const d = new THREE.Vector3(x1 - x0, y1 - y0, z1 - z0), L = d.length();
+    const g = new THREE.CylinderGeometry(r, r, L, 5, 1, true).toNonIndexed();
+    g.translate(0, L / 2, 0);
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+    g.translate(x0, y0, z0);
+    const c = new THREE.Color(k), n = g.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.deleteAttribute('uv');
+    geos.push(g);
+  };
+  for (const x of [0.05, 1.95]) cane(x, 0, 0, x, 1.18, 0, 0.045, 0x7f6f4a);
+  for (const y of [0.32, 0.66, 1.0]) cane(0, y, 0.05, 2, y, 0.05, 0.024, 0xb3a862);
+  for (let k = 0; k < 5; k++) cane(0.2 + k * 0.4, 0, -0.03, 0.2 + k * 0.4, 1.08, -0.03, 0.02, k % 2 ? 0xc4b872 : 0xa99d5e);
+  const g = mergeGeometries(geos);
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * The kilometre posts' atlas: 8 x 8 plates of 4:3, each the distance in white on blue enamel (0.5 km to 31.5 km, in
+ * half kilometres, cell k for (k + 1) / 2 km), and the last cell plain white for the post and the plate's edges.
+ */
+function kmTexture() {
+  const W = 128, H = 96, cv = document.createElement('canvas'); cv.width = 8 * W; cv.height = 8 * H;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#f2f0ea'; ctx.fillRect(0, 0, cv.width, cv.height);
+  for (let k = 0; k < 63; k++) {
+    const x = (k % 8) * W, y = Math.floor(k / 8) * H;
+    ctx.fillStyle = '#2156a8'; ctx.fillRect(x + 2, y + 2, W - 4, H - 4);
+    ctx.strokeStyle = '#f2f4f6'; ctx.lineWidth = 5; ctx.strokeRect(x + 9, y + 9, W - 18, H - 18);
+    ctx.fillStyle = '#f2f4f6'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '700 44px Rajdhani, "Share Tech Mono", sans-serif';
+    ctx.fillText(((k + 1) / 2).toFixed(1), x + W / 2, y + H / 2 - 6);
+    ctx.font = '700 18px Rajdhani, "Share Tech Mono", sans-serif';
+    ctx.fillText('km', x + W / 2, y + H - 22);
+  }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
 }
 
 /** Merge BufferGeometries with the same attributes (position, normal, uv) into one. */
