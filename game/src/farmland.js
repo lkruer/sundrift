@@ -31,6 +31,7 @@ const WATER = [0x3c4a4e, 0x42504f, 0x4a4a40, 0x3a4746, 0x4b5848];               
 const TEA = [0x3b6a2e, 0x416f31, 0x355f2b, 0x4c7a34, 0x5f8a3a];
 const CROP = [[0x6f9e3a, 0.36, 0.5], [0x8ab34a, 0.3, 0.45], [0x5d8a5a, 0.42, 0.5], [0x6a4c35, 0.2, 0.62], [0xe8eeec, 0.6, 0.95], [0x9cbf54, 0.26, 0.4]];
 const HEDGE = [0x2f5a32, 0x37643a, 0x2b5530];
+const TRACK = [0x9d947f, 0x948c78, 0xa39a84, 0x8f9070];                        // gravel, a little grass down its middle
 
 /**
  * A unit loaf: a rounded hedge, a crop row or a plastic tunnel, x -0.5..0.5 along, z -0.5..0.5 across, y 0..1. Five
@@ -59,10 +60,10 @@ function loafGeometry() {
 
 /**
  * A unit bund: a prism along x 0..1, its back face upright at z = 0 (the line between two plots) and its front face
- * battered down to z = 1, from y 0 (buried) to 1 (its top); the top a little over half as wide as the foot.
+ * battered down to z = 1, from y 0 (buried) to 1 (its top); the top a little over half as wide as the foot (T), or most
+ * of it for a farm track.
  */
-function bundGeometry() {
-  const T = 0.55;
+function bundGeometry(T = 0.55) {
   const sec = [[0, 0], [0, 1], [T, 1], [1, 0]];          // (z, y) round the section: back foot, back top, front top, front foot
   const pos = [];
   const P = (x, [z, y]) => pos.push(x, y, z);
@@ -262,6 +263,7 @@ export class Farmland {
     const parts = {
       paddy: [{ geometry: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), material: this.waterMat, local: new THREE.Matrix4() }],
       aze: [{ geometry: bundGeometry(), material: this.earthMat, local: new THREE.Matrix4() }],
+      track: [{ geometry: bundGeometry(0.88), material: this.earthMat, local: new THREE.Matrix4() }],
       ishi: [{ geometry: bundGeometry(), material: this.stoneMat, local: new THREE.Matrix4() }],
       rows: [{ geometry: loafGeometry(), material: this.rowMat, local: new THREE.Matrix4() }],
     };
@@ -272,7 +274,7 @@ export class Farmland {
     if (P.kura) { parts.kura = bakeParts(P.kura, /window/, this.houseMat); parts.kuraFar = [{ geometry: farHouse(this.foot.kura, false), material: this.houseMat, local: new THREE.Matrix4() }]; }
     if (P.persimmon) parts.kaki = P.persimmon;
     this.parts = parts;
-    const caps = { paddy: 3000, aze: 9000, ishi: 2500, rows: phone ? 9000 : 16000, house: 60, kura: 50, houseFar: 120, kuraFar: 90, kaki: 160 };
+    const caps = { paddy: 3000, aze: 9000, track: 1500, ishi: 2500, rows: phone ? 9000 : 16000, house: 60, kura: 50, houseFar: 120, kuraFar: 90, kaki: 160 };
     this.pools = {};
     for (const k of Object.keys(parts)) {
       // (nothing out in the fields casts a shadow: the cascades would draw every house in the valley twice more, and
@@ -361,19 +363,23 @@ export class Farmland {
     for (const [sx, sz, dx, dz, ox, oz] of sides) {
       const len = dx ? I.x1 - I.x0 : I.z1 - I.z0, steps = Math.round(len / 6);
       let run = null;
+      // a farm track (noudou) along the terrace edges that fall on a block's edge, here and there: gravel on top of the
+      // riser between two farmed plots, the way the farm's own little vans get round
+      const across = dx ? !I.tr : I.tr, coord = dx ? sz : sx;
+      const trackLine = across && coord % 72 === 0 && (Math.abs(Math.sin(coord * 0.1373 + Math.floor((dx ? sx : sz) / 72) * 7.31 + this.w.seed * 0.01) * 43758.5453) % 1) < 0.5;
       const flush = () => {
         if (!run) return;
-        const { a, b, out: sgn, top, bottom, stone } = run;
+        const { a, b, out: sgn, top, bottom, stone, track } = run;
         // walk the line so that (along) x up is the way the body goes (see the matrix below)
         const ax = sx + dx * a, az = sz + dz * a, bx = sx + dx * b, bz = sz + dz * b;
         const wx = ox * sgn, wz = oz * sgn;                    // the way to the lower side
         let px = ax, pz = az, ux = bx - ax, uz = bz - az;
         // (dir x up = out: dir = up x out = (wz, 0, -wx))
         if (ux * wz - uz * wx < 0) { px = bx; pz = bz; ux = -ux; uz = -uz; }
-        const L = Math.hypot(ux, uz), H = top - bottom, T = (stone ? 0.5 : 0.36) + 0.28 * Math.min(H, 4);
+        const L = Math.hypot(ux, uz), H = top - bottom, T = (track ? 2.5 : stone ? 0.5 : 0.36) + 0.28 * Math.min(H, 4);
         const m = new THREE.Matrix4().set(ux, 0, wx * T, px, 0, H, 0, bottom, uz, 0, wz * T, pz, 0, 0, 0, 1);
         const hsh = Math.abs(Math.floor(px * 7 + pz * 3));
-        out.list.push([stone ? 'ishi' : 'aze', m, stone ? null : H > 1.4 ? RISER[hsh % RISER.length] : BUND[hsh % BUND.length]]);
+        out.list.push([track ? 'track' : stone ? 'ishi' : 'aze', m, stone ? null : track ? TRACK[hsh % TRACK.length] : H > 1.4 ? RISER[hsh % RISER.length] : BUND[hsh % BUND.length]]);
         run = null;
       };
       for (let k = 0; k < steps; k++) {
@@ -391,10 +397,11 @@ export class Farmland {
           own = true; sgn = lo < I.level - 0.05 ? 1 : -1;
         }
         const stone = !this.phone && (I.kind === KIND.HOUSE || (J.flat && J.kind === KIND.HOUSE && J.level > I.level));
+        const track = trackLine && !stone && J.flat && I.kind !== KIND.HOUSE && J.kind !== KIND.HOUSE;
         if (!own) { flush(); continue; }
-        const t = top + (stone ? 0.32 : I.kind === KIND.VEG && (!J.flat || J.kind === KIND.VEG) ? 0.12 : 0.2), btm = lo - 0.5;
-        if (run && run.out === sgn && run.stone === stone && Math.abs(run.top - t) < 0.01 && run.b === a) { run.b = b; run.bottom = Math.min(run.bottom, btm); }
-        else { flush(); run = { a, b, out: sgn, top: t, bottom: btm, stone }; }
+        const t = top + (track ? 0.1 : stone ? 0.32 : I.kind === KIND.VEG && (!J.flat || J.kind === KIND.VEG) ? 0.12 : 0.2), btm = lo - 0.5;
+        if (run && run.out === sgn && run.stone === stone && run.track === track && Math.abs(run.top - t) < 0.01 && run.b === a) { run.b = b; run.bottom = Math.min(run.bottom, btm); }
+        else { flush(); run = { a, b, out: sgn, top: t, bottom: btm, stone, track }; }
       }
       flush();
     }

@@ -46,8 +46,8 @@ const T = {
   cedar: [0x2f5a3a, 0x335f3c, 0x2a5236, 0x37643f, 0x2c5639, 0x31583a],
   hinoki: [0x3d6a52, 0x44705a, 0x3a654c],
   broad: [0x8cbf4f, 0x9cc85a, 0x7ab04a, 0x6f9e45, 0x5f8f3e, 0x4f7a3a, 0xa9c35a, 0xc4bf62, 0x86b84c],
-  // (most maples in their fresh spring green; one in four in the red some keep their young leaves in: more read autumnal)
-  maple: [0x9cc85a, 0xb3c95c, 0x8fbf55, 0xa8473a],
+  // (most maples in their fresh spring green; one in five in the red some keep their young leaves in: more read autumnal)
+  maple: [0x9cc85a, 0xb3c95c, 0x8fbf55, 0xa3c45a, 0xa8473a],
   bamboo: [0x7da34a, 0x86ab4e, 0x739a44],
   cherry: [PAL.sakuraPale, PAL.sakuraPale, PAL.sakuraPink, PAL.sakuraWhite],
   // the low brush at the woods' edge and in the clearings: sasa, shrubs, ferns, and a few in flower (a soft azalea pink,
@@ -551,7 +551,7 @@ export class Terrain {
       // (and the broadleaf crowns a little wider than the model's, so a wood of them closes over instead of standing as a
       // park of separate trees)
       let kx = sxk, ky = syk;
-      if (kind === 'hinoki') { kx *= 1.08; ky *= 0.82; } else if (kind === 'maple') { kx *= 1.25; ky *= 0.88; } else if (kind === 'bamboo') { kx *= 0.85; ky *= 1.05; } else if (kind === 'broad') kx *= 1.18;
+      if (kind === 'hinoki') { kx *= 1.2; ky *= 0.82; } else if (kind === 'cedar') kx *= 1.12; else if (kind === 'maple') { kx *= 1.3; ky *= 0.92; } else if (kind === 'bamboo') { kx *= 0.85; ky *= 1.05; } else if (kind === 'broad') { kx *= 1.32; ky *= 1.0; }
       _q.setFromAxisAngle(_up, ry); _s.set(sc * kx, sc * ky, sc * kx);
       const m = _m4.compose(_v.set(x, y - 0.35, z), _q, _s).clone();
       const colour = kind === 'cedar' ? pick(T.cedar, tint) : kind === 'hinoki' ? pick(T.hinoki, tint) : kind === 'maple' ? pick(T.maple, tint)

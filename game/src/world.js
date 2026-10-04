@@ -647,8 +647,8 @@ vec2 roadUv(vec2 uv) {
     const bl = this.parts.broadleaf && this.parts.broadleaf.find((p) => p.material.name === 'foliage_tinted');
     const bark = this.parts.broadleaf && this.parts.broadleaf.find((p) => p.material.name !== 'foliage_tinted');
     if (bl) {
-      const clouds = [[0, 4.6, 0, 2.05], [1.6, 4.0, 0.7, 1.6], [-1.5, 4.05, 0.6, 1.6], [0.1, 3.9, -1.7, 1.55]].map(([x, y, z, r]) => {
-        const g = new THREE.IcosahedronGeometry(r, 0); g.scale(1, 0.72, 1); g.translate(x, y, z); return g;
+      const clouds = [[0, 4.3, 0, 2.05], [1.6, 3.7, 0.7, 1.65], [-1.5, 3.75, 0.6, 1.65], [0.1, 3.6, -1.7, 1.6]].map(([x, y, z, r]) => {
+        const g = new THREE.IcosahedronGeometry(r, 0); g.scale(1, 0.85, 1); g.translate(x, y, z); return g;
       });
       const trunk = new THREE.CylinderGeometry(0.13, 0.2, 3.4, 5, 1, true); trunk.translate(0, 1.7, 0);
       this.parts.broadleafMid = [{ geometry: mergeGeos([...clouds, trunk.toNonIndexed()]), material: bl.material, local: new THREE.Matrix4() }];
@@ -658,14 +658,15 @@ vec2 roadUv(vec2 uv) {
       // the verge's own trees keep the full model)
       if (bark) {
         const hsh = (n) => { let h = Math.imul(n ^ 0x5bd1e995, 0x27d4eb2f); h ^= h >>> 15; return ((h >>> 0) % 1000) / 1000; };
-        const blobs = [[0, 5.0, 0, 1.55], [1.65, 4.45, 0.3, 1.25], [0.55, 4.5, 1.6, 1.2], [-1.35, 4.55, 1.0, 1.25], [-1.4, 4.4, -1.05, 1.2], [0.5, 4.35, -1.6, 1.2], [1.2, 3.55, -0.5, 0.95], [-0.6, 3.5, 0.2, 0.95]];
+        // (round and full, low on the trunk: squashed flat and high up they read from above as plates on sticks)
+        const blobs = [[0, 4.6, 0, 1.6], [1.6, 4.0, 0.3, 1.3], [0.55, 4.05, 1.55, 1.25], [-1.3, 4.1, 1.0, 1.3], [-1.35, 3.95, -1.05, 1.25], [0.5, 3.9, -1.55, 1.25], [1.1, 3.0, -0.5, 1.0], [-0.6, 2.95, 0.3, 1.0]];
         const crown = blobs.map(([x, y, z, r], i) => {
           const g = new THREE.IcosahedronGeometry(r, 0), p = g.attributes.position, ids = new Map();
           for (let k = 0; k < p.count; k++) {
             const key = Math.round(p.getX(k) * 100) + ',' + Math.round(p.getY(k) * 100) + ',' + Math.round(p.getZ(k) * 100);
             if (!ids.has(key)) ids.set(key, ids.size);
             const f = 0.88 + 0.24 * hsh(ids.get(key) * 31 + i * 7);
-            p.setXYZ(k, p.getX(k) * f, p.getY(k) * f * 0.76, p.getZ(k) * f);
+            p.setXYZ(k, p.getX(k) * f, p.getY(k) * f * 0.88, p.getZ(k) * f);
           }
           g.rotateY(i * 1.3); g.translate(x, y, z); g.computeVertexNormals();
           return g;

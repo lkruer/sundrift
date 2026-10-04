@@ -31,6 +31,11 @@ if (PHONE) {
 page.on('pageerror', (e) => console.log('pageerror', e.message));
 await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'load' });
 await page.waitForFunction('window.__READY__ === true', { timeout: 60000 });
+// (--city: choose NEO TOKYO on the title first, as the gate does, and wait for it to build)
+if (process.argv.includes('--city')) {
+  await page.click('.map[data-m=city]'); await sleep(400);
+  await page.waitForFunction("!document.getElementById('building').classList.contains('on')", { timeout: 60000 }); await sleep(1500);
+}
 await page.evaluate("document.getElementById('startb').click()");
 await sleep(2500);
 await page.evaluate('window.__DEBUG__.rainNow(0)');
