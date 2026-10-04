@@ -17,13 +17,13 @@
  * floats and nothing is buried.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202610032044';
-import { surface } from '../surfaces.js?v=202610032044';
-import { PAL, QUALITY, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202610032044';
-import { Ground } from './ground.js?v=202610032044';
-import { Terrain, LODS } from './terrain.js?v=202610032044';
-import { partsOf, Pool, freezeStatic } from './instancing.js?v=202610032044';
-import { Farmland, bakeParts } from './farmland.js?v=202610032044';
+import { ASSET } from '../assetlib.js?v=202610040049';
+import { surface } from '../surfaces.js?v=202610040049';
+import { PAL, QUALITY, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202610040049';
+import { Ground } from './ground.js?v=202610040049';
+import { Terrain, LODS } from './terrain.js?v=202610040049';
+import { partsOf, Pool, freezeStatic } from './instancing.js?v=202610040049';
+import { Farmland, bakeParts } from './farmland.js?v=202610040049';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const ASSETS = {
@@ -767,9 +767,9 @@ vec2 roadUv(vec2 uv) {
   loadCity() {
     if (!this._cityLoad) this._cityLoad = (async () => {
       try {
-        const City = await import('./city.js?v=202610032044');
+        const City = await import('./city.js?v=202610040049');
         this._cityMats = City.cityLoad(this, Pool, '"M PLUS Rounded 1c", "Dela Gothic One", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif');
-        const L = await import('./landmarks.js?v=202610032044').catch((e) => { console.warn('landmarks', e && e.message); return null; });
+        const L = await import('./landmarks.js?v=202610040049').catch((e) => { console.warn('landmarks', e && e.message); return null; });
         this.citySky = City.citySkyBuild(this, L);
         this.citySky.visible = false;
         this.scene.add(this.citySky);

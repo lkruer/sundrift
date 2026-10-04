@@ -16,7 +16,7 @@
  *
  * Pure maths, no Three.js, like ground.js, which asks it.
  */
-import { clamp, smoothstep } from './config.js?v=202610032044';
+import { clamp, smoothstep } from './config.js?v=202610040049';
 
 export const KIND = { NONE: 0, PADDY: 1, VEG: 2, HOUSE: 3, TEA: 4 };
 const FLAT = [false, true, true, true, false];

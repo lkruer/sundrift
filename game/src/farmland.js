@@ -17,9 +17,9 @@
  * past it, earth for the house lots' walls, no persimmons (its budget is in draws).
  */
 import * as THREE from 'three';
-import { Pool } from './instancing.js?v=202610032044';
-import { KIND } from './farm.js?v=202610032044';
-import { mulberry32 } from './config.js?v=202610032044';
+import { Pool } from './instancing.js?v=202610040049';
+import { KIND } from './farm.js?v=202610040049';
+import { mulberry32 } from './config.js?v=202610040049';
 
 const _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 const OWN = 1000000;              // (the pools' and the colliders' owners for a tile: OWN + its farm id)
