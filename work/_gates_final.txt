@@ -1,0 +1,20 @@
+=== gate 
+ready           7.3 s
+drifts banked   8  at metres 277, 383, 421, 429, 443, 446, 448, 449
+peak draws      672   peak tris 1,145,273   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+=== gate --phone
+ready           6.5 s
+drifts banked   4  at metres 239, 522, 526, 551
+peak draws      424   peak tris 738,152   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+=== gate --city
+ready           8.0 s
+drifts banked   19  at metres 142, 143, 144, 144, 145, 145, 148, 153, 157, 237, 246, 247, 255, 262, 521, 522, 522, 532, 572
+peak draws      753   peak tris 983,112   median fps 60
+slow frames     0 over 34 ms, worst 17 ms (after the first second of the run)
+=== gate --city --phone
+ready           6.6 s
+drifts banked   18  at metres 145, 145, 146, 146, 147, 152, 241, 244, 245, 245, 246, 251, 252, 256, 296, 511, 536, 575
+peak draws      472   peak tris 686,645   median fps 60
+slow frames     1 over 34 ms, worst 50 ms (after the first second of the run)

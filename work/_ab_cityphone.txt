@@ -1,0 +1,8 @@
+=== before 1
+=== now 1
+peak draws      472   peak tris 686,029   median fps 60
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)
+=== before 2
+=== now 2
+peak draws      519   peak tris 681,553   median fps 60
+slow frames     0 over 34 ms, worst 33 ms (after the first second of the run)

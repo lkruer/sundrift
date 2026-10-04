@@ -1,0 +1,23 @@
+=== city phone rerun
+ready           7.0 s
+peak draws      482   peak tris 698,407   median fps 60
+slow frames     4 over 34 ms, worst 133 ms (after the first second of the run)
+                [t s, at m, frame ms, sim, world, render, js of the frame before] [[7.6,117,50,0.4,1.1,4.3,5.3],[12.2,168,133,0.7,1.3,18,137.9],[12.3,169,50,1.1,45.8,15.1,8.7],[12.3,170,50,0.6,0.3,13.5,56.6]]
+=== layout
+"no overlaps"
+=== work/scoring_check.mjs
+ok   with no ground given, the car's own surface decides
+
+the scoring as the QA round asked
+=== work/qa_clock.mjs
+a bank across DAWN : hour 4.81 said [[4.78,"dawn"]]
+a bank across BLUE HOUR : hour 18.41 said [[18.38,"blue"]]
+errors 0 []
+=== work/platform_flow.mjs
+errors 0 []
+
+every step as it should be
+=== work/platform_flow.mjs --phone
+errors 0 []
+
+every step as it should be

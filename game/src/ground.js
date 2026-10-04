@@ -12,9 +12,9 @@
  *
  * Pure maths, no Three.js: the terrain tiles, the props, the camera and the tests all ask this one function.
  */
-import { clamp, smoothstep } from './config.js?v=202610040057';
-import { CELL, ckey } from './track.js?v=202610040057';
-import { Farm } from './farm.js?v=202610040057';
+import { clamp, smoothstep } from './config.js?v=202610040117';
+import { CELL, ckey } from './track.js?v=202610040117';
+import { Farm } from './farm.js?v=202610040117';
 
 export const CUT = 1.25;          // steepest cut face: rise per metre (51 degrees)
 export const FILL = 0.8;          // steepest embankment (39 degrees)

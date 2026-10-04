@@ -23,9 +23,9 @@
  * S, the chunk's own: { at, clearAt, h01, inFoot, nearSolid, solids, clutter, D, paint, tris, paveOK, cornersOf }.
  */
 import * as THREE from 'three';
-import { guardRailGeometry, streetTreeGeometry, utilityBoxProps, treePitProps, roadManholes } from './cityprops.js?v=202610040057';
-import { overStreetAt } from './citydetail.js?v=202610040057';
-import { railSkip } from './citytrain.js?v=202610040057';
+import { guardRailGeometry, streetTreeGeometry, utilityBoxProps, treePitProps, roadManholes } from './cityprops.js?v=202610040117';
+import { overStreetAt } from './citydetail.js?v=202610040117';
+import { railSkip } from './citytrain.js?v=202610040117';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 const LEAVES = [0x8cbf4f, 0x7cb048, 0x98c65a, 0x6f9e3e, 0x86b850];

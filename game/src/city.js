@@ -13,16 +13,16 @@
  * Everything here runs at build level with the chunk and is owned by it (the world disposes what is in ch.own).
  */
 import * as THREE from 'three';
-import { clamp, lerp, mulberry32 } from './config.js?v=202610040057';
-import { buildingMaterial } from './buildings.js?v=202610040057';
-import { neonAtlas } from './neon.js?v=202610040057';
-import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202610040057';
-import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202610040057';
-import { railSkip } from './citytrain.js?v=202610040057';
-import { carsLoad, parkCar } from './citycars.js?v=202610040057';
-import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202610040057';
-import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202610040057';
-import { streetLoad, streetChunk, roadPaint, inRail } from './citystreet.js?v=202610040057';
+import { clamp, lerp, mulberry32 } from './config.js?v=202610040117';
+import { buildingMaterial } from './buildings.js?v=202610040117';
+import { neonAtlas } from './neon.js?v=202610040117';
+import { cityPropMaterials, lotProps, parkingProps, siteProps, streetProps, bollardGeometry, streetItems } from './cityprops.js?v=202610040117';
+import { detailLoad, detailBegin, detailLot, detailChunk, detailUpdate, detailWet, poleSpots, archPosts } from './citydetail.js?v=202610040117';
+import { railSkip } from './citytrain.js?v=202610040117';
+import { carsLoad, parkCar } from './citycars.js?v=202610040117';
+import { steamLoad, steamChunk, steamWeather } from './citysteam.js?v=202610040117';
+import { peopleLoad, peopleChunk, peopleWeather } from './citypeople.js?v=202610040117';
+import { streetLoad, streetChunk, roadPaint, inRail } from './citystreet.js?v=202610040117';
 
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 // the points of a lot's footprint tested against the roads: [along the front (-0.5..0.5 of its width), in (0..1 of its depth)]
