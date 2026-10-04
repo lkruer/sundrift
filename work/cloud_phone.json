@@ -1,0 +1,7 @@
+[
+ {"wait": 2500},
+ {"js": "document.getElementById('startb').click()"},
+ {"wait": 3500}, {"shot": "c_1723"},
+ {"js": "(() => { const D = window.__DEBUG__; D.G.dawnT = 0.01; D.G.hour = 18.2; D.G.hourShown = 18.2; D.G.lastApplied = -9; })()"}, {"wait": 2500}, {"shot": "c_1812"},
+ {"js": "(() => { const D = window.__DEBUG__; D.G.hour = 12; D.G.hourShown = 12; D.G.lastApplied = -9; })()"}, {"wait": 2500}, {"shot": "c_1200"}
+]

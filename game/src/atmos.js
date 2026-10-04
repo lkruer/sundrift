@@ -11,7 +11,7 @@
  * tiling noise texture made here once. Nothing in here writes depth, so none of it is inked by the cel pass.
  */
 import * as THREE from 'three';
-import { clamp, lerp, smoothstep, REDUCED_MOTION } from './config.js?v=202610040117';
+import { clamp, lerp, smoothstep, REDUCED_MOTION } from './config.js?v=202610040120';
 
 /** Tiling value noise, four octaves in the four channels (4, 8, 16 and 32 cells across). */
 function noiseTexture(size = 128) {
@@ -176,9 +176,12 @@ class CloudBank {
           // the light in the cloud's own frame: round the horizon, up, and toward the eye
           vec3 dh = normalize(vec3(d.x, 0.0, d.z) + 1e-5);
           vec3 L = normalize(vec3(dot(uSunDir, vec3(dh.z, 0.0, -dh.x)), uSunDir.y, -dot(uSunDir, dh)));
+          // (lit a little from above as well, as a painter lights a heap of cumulus: with a low sun to one side, each
+          // puff split down a straight vertical line into a lit half and a shaded one, a row of two-tone balls)
+          L = normalize(L + vec3(0.0, 0.45, 0.0));
           float ndl = dot(nrm, L);
-          // three flat tones, each edge a pixel soft
-          float tone = 0.45 * smoothstep(-0.12, -0.04, ndl) + 0.55 * smoothstep(0.36, 0.44, ndl);
+          // three flat tones, each edge a little soft
+          float tone = 0.45 * smoothstep(-0.16, -0.03, ndl) + 0.55 * smoothstep(0.33, 0.46, ndl);
           vec3 col = mix(uShade, uLit, tone);
           // the base in its own shadow
           col = mix(col, uShade * 0.9, (1.0 - smoothstep(baseV, baseV + 0.16, V)) * 0.55);
