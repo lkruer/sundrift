@@ -14,11 +14,12 @@
  */
 import { clamp, smoothstep } from './config.js?v=202610032044';
 import { CELL, ckey } from './track.js?v=202610032044';
+import { Farm } from './farm.js?v=202610032044';
 
 export const CUT = 1.25;          // steepest cut face: rise per metre (51 degrees)
 export const FILL = 0.8;          // steepest embankment (39 degrees)
 export const REACH = 46;          // metres: no road further away than this shapes the ground
-const SOFT = 1.8;                 // metres over which the clamps are rounded
+export const SOFT = 1.8;          // metres over which the clamps are rounded
 const UNDER = 0.15;               // how far below the road surface the ground sits under the ribbon
 const VERGE_DROP = 0.06;          // and on the verge beyond the wall
 
@@ -32,6 +33,8 @@ export class Ground {
     this.tubeHalf = track.tubeHalf;
     this.tubeTop = 2.4 + 4.05;                           // the lining's crown: walls 2.4 m, an arch 4.05 m high
     this.out = { h: 0, edge: 99, flat: false, tunnel: false, natural: 0 };
+    // the farmland out in the open land, its paddies and house lots levelled (farm.js); none in the city
+    this.farm = track.city ? null : new Farm(track, this, REACH);
   }
 
   /** Ground height at (x, z), with the default (finest) verge. */
@@ -137,11 +140,14 @@ export class Ground {
     } else if (exactD < Infinity) {
       h = exactY; out.flat = true;
     } else {
-      const Nd = N + f.detail(x, z) * smoothstep(1, 12, minE);
+      let Nd = N + f.detail(x, z) * smoothstep(1, 12, minE);
+      // (a field is levelled only where no road reaches, so these clamps never meet one: farm.js)
+      if (this.farm) Nd = this.farm.height(x, z, Nd);
       if (L <= U) h = smax(L, smin(Nd, U, SOFT), SOFT);
       else h = (U * eL + L * eU) / (eU + eL);           // two roads that cannot both be met: a straight face
     }
     out.h = h;
+    out.U = U; out.L = L;                                // (the clamps: farm.js keeps its fields clear of them)
     return out;
   }
 

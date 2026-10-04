@@ -1,6 +1,7 @@
 /**
  * The terrain: the ground (ground.js) meshed as square tiles in three levels of detail around the car, a coarse
- * far mesh under and beyond them out to the horizon, and the forest scattered per tile.
+ * far mesh under and beyond them out to the horizon, the woods scattered per tile with their brush and rocks, and
+ * the farmland's fields put in with each tile (farm.js lays them out, farmland.js draws them).
  *
  * Every tile samples the same ground function, so tiles agree with each other, with the road ribbon and with
  * every prop; where two levels of detail meet, a skirt hangs from each tile's edge so no crack shows. Coarser
@@ -12,6 +13,8 @@ import * as THREE from 'three';
 import { PAL, clamp, lerp, smoothstep, mulberry32 } from './config.js?v=202610032044';
 import { REACH } from './ground.js?v=202610032044';
 import { instanceGroup, Pool, freezeStatic, releaseGeometry } from './instancing.js?v=202610032044';
+import { KIND } from './farm.js?v=202610032044';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const TILE = 96;
 export const LODS = [
@@ -25,18 +28,40 @@ let farIndex = null;                                      // the far mesh's tria
 const tkey = (i, j) => (i + 50000) * 100000 + (j + 50000);
 
 const C = {
-  grass: new THREE.Color(PAL.springGrass), moss: new THREE.Color(PAL.moss), floor: new THREE.Color(0x3d5233), petal: new THREE.Color(0xe9bccb),
+  grass: new THREE.Color(PAL.springGrass), moss: new THREE.Color(PAL.moss), floor: new THREE.Color(0x3d5233), petal: new THREE.Color(0xf0b4c9),
   stone: new THREE.Color(PAL.stone), shot: new THREE.Color(0x9c978b), gravel: new THREE.Color(0x77716a),
   // the city: pavement by the road, dark lots and yards beyond, and the far ground a dull grey
   pave: new THREE.Color(0x8c8a85), lot: new THREE.Color(0x3b3c41), yard: new THREE.Color(0x4c4b48), cityFar: new THREE.Color(0x26272c),
   deep: new THREE.Color(0x2f4130), far: new THREE.Color(0x33463a),
+  // the fields (farm.js): a paddy's mud under its water, a vegetable plot's soil, a house lot's beaten yard, the ground
+  // between the tea rows (and a tea plot seen from too far for its rows: the rows' own green); far off, the fields as a
+  // patchwork of water, young green and soil
+  mud: new THREE.Color(0x4a4535), soil: new THREE.Color(0x6a4e36), yard2: new THREE.Color(0x9b8b6d), teaGround: new THREE.Color(0x4b4a31), tea: new THREE.Color(0x3f6a33),
+  farWater: new THREE.Color(0x7c8e8c), farGreen: new THREE.Color(0x7f9f4f), farSoil: new THREE.Color(0x7a6a50),
 };
+// the trees' own colours (the forest tints every instance): Japanese cedar (sugi) and cypress (hinoki) in the
+// plantations, the spring greens of the broadleaf woods (a few evergreen oaks darker, a chinquapin in its cream flower),
+// young maples in their red spring leaf or fresh green, bamboo
+const T = {
+  cedar: [0x2f5a3a, 0x335f3c, 0x2a5236, 0x37643f, 0x2c5639, 0x31583a],
+  hinoki: [0x3d6a52, 0x44705a, 0x3a654c],
+  broad: [0x8cbf4f, 0x9cc85a, 0x7ab04a, 0x6f9e45, 0x5f8f3e, 0x4f7a3a, 0xa9c35a, 0xc4bf62, 0x86b84c],
+  // (most maples in their fresh spring green; one in four in the red some keep their young leaves in: more read autumnal)
+  maple: [0x9cc85a, 0xb3c95c, 0x8fbf55, 0xa8473a],
+  bamboo: [0x7da34a, 0x86ab4e, 0x739a44],
+  cherry: [PAL.sakuraPale, PAL.sakuraPale, PAL.sakuraPink, PAL.sakuraWhite],
+  // the low brush at the woods' edge and in the clearings: sasa, shrubs, ferns, and a few in flower (a soft azalea pink,
+  // the yellow of yamabuki, white)
+  brush: [0x7cab45, 0x6e9e3e, 0x86b34c, 0x4f7a38, 0x5d8f3a, 0x6f9a40, 0x7cab45, 0xd88aa6, 0xe0c048, 0xeae6da],
+};
+const pick = (list, r) => list[Math.min(list.length - 1, Math.floor(r * list.length))];
 const FACADE = [0x55565c, 0x6b6a66, 0x7a746a, 0x3c3f47, 0x4a4e57, 0x8a8478, 0x5c5048, 0x2f3440, 0x6e6a74, 0x44474d];
 const _c = new THREE.Color(), _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _s = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 
 export class Terrain {
   /**
-   * @param opts { scene, ground, mat, farMat, parts: { cedar, maple, broadleaf, bare }, density, seed }
+   * @param opts { scene, ground, mat, farMat, parts: { cedar, maple, broadleaf, bare, ... }, density, seed, city, building,
+   *   colliders, farmland (farmland.js: a tile's fields, planned while it builds and put in with it) }
    */
   constructor(opts) {
     this.o = opts;
@@ -64,6 +89,7 @@ export class Terrain {
     const P = this.o.parts; if (!P || this.o.city) return;
     const foliageOf = (parts, re) => parts && parts.find((p) => re.test(p.material.name));
     const ced = foliageOf(P.cedar, /foliage/), chr = foliageOf(P.sakuraFar || P.maple || P.sakura, /foliage_tinted|foliage/);
+    const brd = foliageOf(P.broadleaf, /foliage_tinted|foliage/);
     if (!ced || !chr) return;
     const size = (parts) => { const b = new THREE.Box3(), t = new THREE.Box3(); for (const p of parts) { p.geometry.computeBoundingBox(); t.copy(p.geometry.boundingBox).applyMatrix4(p.local); b.union(t); } return b; };
     const cb = size(P.cedar), kb = size(P.sakuraFar || P.maple || P.sakura);
@@ -72,11 +98,40 @@ export class Terrain {
     const kW = Math.max(kb.max.x - kb.min.x, kb.max.z - kb.min.z), kH = kb.max.y - kb.min.y;
     const blob = new THREE.IcosahedronGeometry(0.5, 0); blob.scale(kW * 0.95, kH * 0.62, kW * 0.95); blob.translate(0, kb.min.y + kH * 0.62, 0);
     const I = new THREE.Matrix4();
+    // (every far tree its own colour, as the near ones: the cone and the broadleaf's blob are tinted; the cherry was)
     this.farTrees = {
-      cedar: new Pool([{ geometry: cone, material: ced.material, local: I }], 7000),
+      cedar: new Pool([{ geometry: cone, material: ced.material, local: I }], 7000, { tint: true }),
       cherry: new Pool([{ geometry: blob, material: chr.material, local: I }], 4000, { tint: true }),
     };
-    for (const p of Object.values(this.farTrees)) { this.root.add(p.group); freezeStatic(p.group); }
+    // (a phone draws the far broadleaf as the cedar's cones: a pool fewer)
+    if (brd && (this.o.density || 1) >= 0.9) {
+      const bb = size(P.broadleaf), bW = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z), bH = bb.max.y - bb.min.y;
+      const b2 = new THREE.IcosahedronGeometry(0.5, 0); b2.scale(bW * 0.9, bH * 0.6, bW * 0.9); b2.translate(0, bb.min.y + bH * 0.66, 0);
+      this.farTrees.broad = new Pool([{ geometry: b2, material: brd.material, local: I }], 4000, { tint: true });
+    }
+    // the shared pools of what every tile scatters besides its trees: the brush at the woods' edges (two lobes of
+    // forty triangles, tinted: sasa, shrubs, ferns, a few in flower) and rocks on the steep ground (the boulder near,
+    // a lumpy twenty-sided stone further off)
+    this.extra = {};
+    const shrubFol = foliageOf(P.shrub, /foliage_tinted|foliage/);
+    if (shrubFol) {
+      const a = new THREE.IcosahedronGeometry(1, 0); a.scale(1, 0.62, 0.85); a.translate(0, 0.3, 0);
+      const b = new THREE.IcosahedronGeometry(0.72, 0); b.scale(1, 0.7, 1); b.translate(0.55, 0.26, 0.28);
+      const geo = mergeGeometries([a.toNonIndexed(), b.toNonIndexed()]);
+      const p = geo.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < 0) p.setY(i, 0);
+      geo.computeVertexNormals();
+      this.extra.brush = new Pool([{ geometry: geo, material: shrubFol.material, local: I }], this.o.density < 0.9 ? 2200 : 3600, { tint: true });
+    }
+    if (P.boulder) {
+      this.extra.rockNear = new Pool(P.boulder, 900);
+      const stone = P.boulder.find((p) => p.material.name === 'stone') || P.boulder[0];
+      const g = new THREE.IcosahedronGeometry(0.75, 0).toNonIndexed();
+      const q = g.attributes.position;
+      for (let i = 0; i < q.count; i++) { const k = 1 + 0.18 * Math.sin(q.getX(i) * 7.1 + q.getZ(i) * 5.3); q.setXYZ(i, q.getX(i) * k, Math.max(0, q.getY(i) * k * 0.75 + 0.3), q.getZ(i) * k); }
+      g.computeVertexNormals();
+      this.extra.rockFar = new Pool([{ geometry: g, material: stone.material, local: I }], 2400);
+    }
+    for (const p of [...Object.values(this.farTrees), ...Object.values(this.extra)]) { this.root.add(p.group); freezeStatic(p.group); }
   }
 
   /** Forget every tile (a new course). */
@@ -84,9 +139,9 @@ export class Terrain {
     if (ground) { this.ground = ground; this.field = ground.field; }
     for (const t of this.tiles.values()) this._dispose(t);
     this.tiles.clear();
-    if (this.farTrees) for (const p of Object.values(this.farTrees)) p.clear();
+    if (this.farTrees) for (const p of [...Object.values(this.farTrees), ...Object.values(this.extra || {})]) p.clear();
     // (a map with no forest has no far forest; the pass builds it again if it had none)
-    if (this.o.city && this.farTrees) { for (const p of Object.values(this.farTrees)) this.root.remove(p.group); this.farTrees = null; }
+    if (this.o.city && this.farTrees) { for (const p of [...Object.values(this.farTrees), ...Object.values(this.extra || {})]) this.root.remove(p.group); this.farTrees = null; this.extra = null; }
     else if (!this.o.city && !this.farTrees) this._farForest();
     this.job = null; this.farJob = null; this.farAt = null;
     if (this.far) { this.root.remove(this.far); this.far.geometry.dispose(); this.far = null; }
@@ -138,7 +193,7 @@ export class Terrain {
       const r = this.job.it.next();
       if (r.done) this.job = null;
     }
-    if (this.farTrees) for (const p of Object.values(this.farTrees)) { p.flush(); for (const part of p.parts) part.im.visible = p.n > 0; }
+    if (this.farTrees) for (const p of [...Object.values(this.farTrees), ...Object.values(this.extra || {})]) { p.flush(); for (const part of p.parts) part.im.visible = p.n > 0; }
     // the far mesh follows the car in steps
     if (!this.farAt || Math.hypot(x - this.farAt[0], z - this.farAt[1]) > FAR_RECENTER) {
       if (!this.farJob) {
@@ -190,6 +245,8 @@ export class Terrain {
   _dispose(t) {
     if (t.mesh) { this.root.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh = null; }
     if (t.farId && this.farTrees) { for (const p of Object.values(this.farTrees)) p.removeOwner(t.farId); t.farId = 0; }
+    if (t.extraId && this.extra) { for (const p of Object.values(this.extra)) p.removeOwner(t.extraId); t.extraId = 0; }
+    if (this.o.farmland) this.o.farmland.drop(t);
     if (t.trunks && this.o.colliders) { this.o.colliders.drop('tile' + t.i + ',' + t.j); t.trunks = null; }
     // (a tile's forest draws with geometries of its own over the templates' buffers: releaseGeometry, not dispose)
     if (t.trees) { this.root.remove(t.trees); t.trees.traverse((o) => { if (o.isInstancedMesh) { o.dispose(); if (o.userData.sharedGeometry) releaseGeometry(o.geometry); } }); t.trees = null; }
@@ -203,6 +260,8 @@ export class Terrain {
     const x0 = tile.i * TILE - sp, z0 = tile.j * TILE - sp;
     const s = {};
     const g = this.ground;
+    // the farmland's plots round the tile worked out first, a few at a time (farm.js prepare)
+    if (!this.o.city && g.farm) yield* g.farm.prepare(tile.i * TILE - 40, tile.j * TILE - 40, (tile.i + 1) * TILE + 40, (tile.j + 1) * TILE + 40);
     const rowsPerStep = lod === 0 ? 9 : lod === 1 ? 18 : n;
     for (let j = 0; j < n; j++) {
       for (let i = 0; i < n; i++) {
@@ -212,12 +271,25 @@ export class Terrain {
       }
       if (j % rowsPerStep === rowsPerStep - 1) yield;
     }
-    const geo = this._geometry(tile, seg, H, E, F, S);
+    const geo = this._geometry(tile, seg, H, E, F, S, lod);
     yield;
-    const trees = this.o.city ? this._blocks(tile, lod, seg, H, E, F) : lod <= 1 ? this._forest(tile, lod, seg, H, E, F) : null;
+    // the fields of the plots whose middles are on this tile (farmland.js), worked out a few plots a step
+    const plan = !this.o.city && this.o.farmland ? yield* this.o.farmland.plan(tile, lod, this.ground.farm, this.ground, TILE) : null;
+    this._extraList = null; this._cherries = null;
+    // (the far ring's trees go into the shared pools, and so do the second ring's on a phone: see _forest)
+    const shared = !this.o.city && this.farTrees && (lod === 2 || (lod === 1 && (this.o.density || 1) < 0.9));
+    const trees = this.o.city ? this._blocks(tile, lod, seg, H, E, F) : lod <= 1 && !shared ? this._forest(tile, lod, seg, H, E, F) : null;
     // swap
     this._dispose(tile);
-    if (!this.o.city && lod === 2 && this.farTrees) this._forest(tile, lod, seg, H, E, F);
+    if (shared) this._forest(tile, lod, seg, H, E, F);
+    // petals under the cherries just placed (the near rings only)
+    if (!this.o.city && lod <= 1 && this._cherries) this._carpets(tile, seg, geo, this._cherries);
+    if (plan) this.o.farmland.commit(tile, plan);
+    if (this._extraList && this.extra) {
+      const id = tile.extraId = this.nextId++;
+      for (const [k, m, c] of this._extraList) { const pool = this.extra[k]; if (pool) pool.add(id, m, c); }
+      this._extraList = null;
+    }
     const mesh = new THREE.Mesh(geo, this.o.mat);
     mesh.receiveShadow = true; mesh.castShadow = false;
     mesh.name = 'tile';
@@ -253,10 +325,11 @@ export class Terrain {
       return out;
     }
     const nz = f.vnoise(x / 23, z / 23, 7) * 0.5 + 0.5;
-    const big = f.vnoise(x / 140, z / 140, 8);
+    const farm = this.ground.farm;
     out.copy(C.grass).lerp(C.moss, clamp(nz * 1.3 - 0.2, 0, 1));
-    // under the forest the ground is darker
-    out.lerp(C.floor, smoothstep(-0.35, 0.35, big) * 0.75 * smoothstep(3, 10, edge));
+    // under the woods the ground is darker (where the woods stand: farm.js, the forest's own density)
+    const woods = farm ? farm.woods(x, z) : smoothstep(-0.35, 0.35, f.vnoise(x / 140, z / 140, 8));
+    out.lerp(C.floor, woods * 0.75 * smoothstep(3, 10, edge));
     const steep = smoothstep(0.62, 0.8, 1 - ny * ny);       // sin^2 of the slope: faces steeper than about 40 degrees
     if (steep > 0) {
       // cut faces by the road are sprayed concrete, the ones further off are bare rock
@@ -267,16 +340,25 @@ export class Terrain {
     if (flags & 1) out.lerp(C.gravel, 0.55 + 0.25 * nz);    // the verge: gravel with grass coming through
     else if (edge < 5) out.lerp(C.gravel, 0.3 * (1 - edge / 5));
     if (flags & 2) out.lerp(C.floor, 0.4);
-    // fallen petals: a carpet under the cherry groves, and drifts blown against the verge
-    if (!(flags & 2) && steep < 0.5) {
-      const grove = smoothstep(0.3, 0.62, f.vnoise(x / 70, z / 70, 11));
-      const drift = smoothstep(0.1, 0.55, f.vnoise(x / 4.3, z / 4.3, 13)) * (flags & 1 ? 0.75 : edge < 8 ? 0.45 : 0.18);
-      out.lerp(C.petal, Math.min(0.62, grove * (0.28 + 0.3 * nz) + drift * (0.35 + 0.4 * grove)));
+    // the fields: a paddy's mud (under its water), a vegetable plot's soil, a house lot's beaten yard, the shaded ground
+    // between the tea rows, or, too far off for the rows, the tea's own green
+    if (farm && !(flags & 3)) {
+      const kind = farm.kindAt(x, z);
+      if (kind === KIND.PADDY) out.copy(C.mud);
+      else if (kind === KIND.VEG) out.copy(C.soil).multiplyScalar(0.92 + 0.16 * nz);
+      else if (kind === KIND.HOUSE) out.lerp(C.yard2, 0.75);
+      else if (kind === KIND.TEA) out.copy(lod <= 1 ? C.teaGround : C.tea).multiplyScalar(0.94 + 0.12 * nz);
+    }
+    // fallen petals blown into drifts against the verge (the carpets under the cherries are laid under the trees
+    // themselves, _carpets: a carpet laid by a noise of its own lay out on open ground too and read as tan smudges)
+    if (!(flags & 2) && steep < 0.5 && edge < 8) {
+      const drift = smoothstep(0.1, 0.55, f.vnoise(x / 4.3, z / 4.3, 13)) * (flags & 1 ? 0.75 : 0.45 * (1 - edge / 8));
+      out.lerp(C.petal, Math.min(0.45, drift * 0.42));
     }
     return out;
   }
 
-  _geometry(tile, seg, H, E, F, S) {
+  _geometry(tile, seg, H, E, F, S, lod = 0) {
     const n = seg + 3, sp = TILE / seg, row = seg + 1, V = row * row, per = 4 * seg;
     const total = V + per;
     const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3), col = new Float32Array(total * 3), uv = new Float32Array(total * 2);
@@ -289,7 +371,7 @@ export class Terrain {
       const il = 1 / Math.hypot(nx, ny, nz); nx *= il; ny *= il; nz *= il;
       pos[v * 3] = x; pos[v * 3 + 1] = y; pos[v * 3 + 2] = z;
       nor[v * 3] = nx; nor[v * 3 + 1] = ny; nor[v * 3 + 2] = nz;
-      this._colour(x, z, y, ny, E[k], F[k], 0, _c);
+      this._colour(x, z, y, ny, E[k], F[k], lod, _c);
       col[v * 3] = _c.r; col[v * 3 + 1] = _c.g; col[v * 3 + 2] = _c.b;
       uv[v * 2] = x / 7; uv[v * 2 + 1] = z / 7;
       // slope protection on a steep face near the road (a cutting, or the face between two legs); not on a face that
@@ -378,9 +460,16 @@ export class Terrain {
     return out;
   }
 
-  /** The forest on a tile: cedars, with groves of cherry in blossom and fresh broadleaf; clearings between. */
+  /**
+   * The forest on a tile. The woods stand in stands with ragged edges and clearings between (farm.js woods): cedar and
+   * cypress plantations where one slow noise says so, broadleaf woods of fresh spring greens and young maples in red
+   * leaf where it says the other, mixed between, groves of cherry in blossom, and bamboo thickets at the margins of the
+   * farm country. Near a stand's edge the trees are younger and smaller and the edge is crowded with low brush (sasa,
+   * shrubs, a few in flower); out in a clearing a lone tree stands now and then. No tree stands in a field. Every tree
+   * has its own colour and its own proportions. On the steep faces where no tree holds, rocks.
+   */
   _forest(tile, lod, seg, H, E, F) {
-    const f = this.field, P = this.o.parts;
+    const f = this.field, P = this.o.parts, farm = this.ground.farm;
     const n = seg + 3, sp = TILE / seg;
     const far = lod >= 2;
     const views = this._views(tile);
@@ -391,60 +480,148 @@ export class Terrain {
       }
       return false;
     };
-    const spacing = (lod === 0 ? 8.8 : 11.5) / (this.o.density || 1);
-    const cedars = [], sakura = [], broad = [], bare = [], trunks = (this._trunks = far ? null : []);
+    const dens0 = this.o.density || 1, phone = dens0 < 0.9;
+    // the far ring's trees, and on a phone the second ring's too, are single cones and blobs in pools shared by every
+    // tile: a draw or two in all, where a tile's own trees are a draw a kind a tile (a phone's budget is in draws)
+    const shared = far || (phone && lod === 1);
+    const spacing = (lod === 0 ? 8.8 : 11.5) / dens0;
+    const cedars = [], sakura = [], broad = [], bare = [], bamboo = [], trunks = (this._trunks = lod > 0 ? null : []);
+    const extra = this._extraList = [];
+    this._cherries = lod <= 1 ? [] : null;
     const cells = Math.floor(TILE / spacing);
     const step = TILE / cells;
     let farId = 0;
-    if (far) { farId = tile.farId = this.nextId++; }
+    if (shared) { farId = tile.farId = this.nextId++; }
     for (let gz = 0; gz < cells; gz++) for (let gx = 0; gx < cells; gx++) {
-      // (each cell its own random numbers, so a tree stands on the same spot at every level of detail)
-      const rng = mulberry32(((tile.i * 73856093) ^ (tile.j * 19349663) ^ (gx * 83492791) ^ (gz * 29765729) ^ (this.o.seed || 0) ^ (lod === 0 ? 0x5bd1e995 : 0)) >>> 0);
+      // (each cell its own random numbers, so a tree stands on the same spot at every level of detail; what only the
+      // nearest ring adds, the brush, draws on a second stream so it never moves a tree)
+      const seed = ((tile.i * 73856093) ^ (tile.j * 19349663) ^ (gx * 83492791) ^ (gz * 29765729) ^ (this.o.seed || 0)) >>> 0;
+      const rng = mulberry32((seed ^ (lod === 0 ? 0x5bd1e995 : 0)) >>> 0), r2 = mulberry32((seed ^ 0x27d4eb2f) >>> 0);
       const lx = (gx + 0.15 + rng() * 0.7) * step, lz = (gz + 0.15 + rng() * 0.7) * step;
       const x = tile.i * TILE + lx, z = tile.j * TILE + lz;
       const gi = Math.round(lx / sp) + 1, gj = Math.round(lz / sp) + 1;
       const k = gj * n + gi;
-      if (F[k] || E[k] < 4.5) { rng(); rng(); rng(); continue; }
-      // slope from the grid: no trees on cut faces
+      if (F[k] || E[k] < 4.5) continue;
+      if (views.length && inView(x, z)) continue;
+      const y = Terrain.surf(H, n, sp, lx, lz);
+      // slope from the grid: no trees on cut faces, but rocks, of every size
       const sx = (H[k + 1] - H[k - 1]) / (2 * sp), sz = (H[k + n] - H[k - n]) / (2 * sp);
-      if (sx * sx + sz * sz > 0.8) { rng(); rng(); rng(); continue; }
-      const big = f.vnoise(x / 140, z / 140, 8);
-      const dens = smoothstep(-0.55, 0.05, big);
-      if (rng() > dens || (views.length && inView(x, z))) { rng(); rng(); continue; }
-      const y = Terrain.surf(H, n, sp, lx, lz) - 0.35;
-      const ry = rng() * Math.PI * 2, sc = 0.72 + rng() * 0.6;
-      _q.setFromAxisAngle(_up, ry); _s.set(sc, sc, sc);
-      const m = far ? _m4.compose(_v.set(x, y, z), _q, _s) : _m4.compose(_v.set(x, y, z), _q, _s).clone();
-      const patch = f.vnoise(x / 70, z / 70, 11);
-      const pick = rng();
-      if (far) {
-        if (patch > 0.42 && pick < 0.62) this.farTrees.cherry.add(farId, m, pick < 0.3 ? PAL.sakuraPale : pick < 0.5 ? PAL.sakuraPink : PAL.sakuraWhite);
-        else this.farTrees.cedar.add(farId, m);
+      if (sx * sx + sz * sz > 0.8) {
+        // (past the cuttings' lattice: on it, a rock sat stuck to the concrete)
+        if (E[k] > 22 && rng() < 0.34) {
+          const rs = 0.45 + rng() * rng() * 2.4, ry = rng() * 6.28;
+          _q.setFromAxisAngle(_up, ry); _s.set(rs * (0.8 + r2() * 0.5), rs * (0.6 + r2() * 0.5), rs);
+          // (on a phone the plain stone everywhere: the boulder's two materials were two more draws)
+          extra.push([lod === 0 && !phone ? 'rockNear' : 'rockFar', _m4.compose(_v.set(x, y - 0.3 * rs, z), _q, _s).clone(), null]);
+          if (trunks) trunks.push([x, z, 0.62 * rs, y]);
+        }
         continue;
       }
-      trunks.push([x, z, 0.36 * sc, y]);
-      // a grove: mostly cherry in blossom with fresh broadleaf through it (the far ring keeps only the cherry,
-      // so a hillside reads pink in patches from across the valley)
-      if (patch > 0.42 && (lod === 0 || pick < 0.62)) {
-        if (lod === 0 && pick < 0.04) bare.push({ m });
-        else if (lod === 0 && pick < 0.3) broad.push({ m, colour: pick < 0.17 ? PAL.youngLeaf : PAL.leafDeep });
-        else sakura.push({ m, colour: pick < 0.62 ? PAL.sakuraPale : pick < 0.86 ? PAL.sakuraPink : PAL.sakuraWhite });
-      } else cedars.push({ m });
+      // no tree in a field (a paddy, a house lot, the tea rows...)
+      if (farm && farm.kindAt(x, z)) continue;
+      const wn = farm ? farm.wn(x, z) : 0;
+      const woods = farm ? farm.woodsOf(wn) : smoothstep(-0.55, 0.05, f.vnoise(x / 140, z / 140, 8));
+      // scrub: a clearing by the road that nobody farms (too steep, or the road's banks in the way) grows young trees
+      // and brush, not a lawn
+      const scrub = farm && woods < 0.6 ? (1 - woods) * smoothstep(48, 20, E[k]) : 0;
+      const lone = woods < 0.05 && rng() < 0.035;
+      if (!lone && rng() > Math.max(woods, 0.45 * scrub)) {
+        // a stand's edge and the clearings: brush, thick along the edge and in the scrub, scattered out in the open
+        // (the nearest ring)
+        if (lod === 0 && r2() < (woods > 0.04 || scrub > 0.3 ? 0.75 : 0.16) * (phone ? 0.55 : 1)) this._brush(extra, x, y, z, r2, Math.max(woods, scrub));
+        continue;
+      }
+      const ry = rng() * Math.PI * 2;
+      // a younger, smaller tree toward a stand's edge and in the scrub
+      const sc = (0.72 + rng() * 0.6) * (lone ? 1.12 : 0.6 + 0.4 * Math.min(1, woods * 1.5));
+      const syk = 0.86 + rng() * 0.3, sxk = 0.88 + rng() * 0.24, tint = rng();
+      const patch = f.vnoise(x / 70, z / 70, 11);
+      const spz = f.vnoise(x / 260, z / 260, 23) + 0.25 * f.vnoise(x / 90, z / 90, 24);
+      const zone = farm ? farm.zoneOf(wn) : 0;
+      const pk = rng();
+      let kind;
+      if (lone) kind = pk < 0.4 ? 'cherry' : pk < 0.55 ? 'maple' : 'broad';
+      else if (scrub > woods) kind = pk < 0.5 ? 'broad' : pk < 0.72 ? 'maple' : pk < 0.92 ? 'cherry' : 'cedar';
+      else if (zone > 0.15 && zone < 0.5 && f.vnoise(x / 60, z / 60, 25) > 0.3 && pk < 0.75) kind = 'bamboo';
+      else if (patch > 0.42 && pk < 0.7) kind = pk < 0.28 ? 'broad' : 'cherry';
+      else if (spz > 0.0) kind = pk < 0.2 ? 'hinoki' : 'cedar';                          // the plantations
+      else if (spz < -0.12) kind = pk < 0.6 ? 'broad' : pk < 0.8 ? 'maple' : pk < 0.9 ? 'cherry' : 'cedar';
+      else kind = pk < 0.55 ? 'cedar' : pk < 0.86 ? 'broad' : pk < 0.94 ? 'maple' : 'cherry';
+      // (a cypress squatter and rounder than a cedar; a maple wide and low; bamboo tall and narrow)
+      // (and the broadleaf crowns a little wider than the model's, so a wood of them closes over instead of standing as a
+      // park of separate trees)
+      let kx = sxk, ky = syk;
+      if (kind === 'hinoki') { kx *= 1.08; ky *= 0.82; } else if (kind === 'maple') { kx *= 1.25; ky *= 0.88; } else if (kind === 'bamboo') { kx *= 0.85; ky *= 1.05; } else if (kind === 'broad') kx *= 1.18;
+      _q.setFromAxisAngle(_up, ry); _s.set(sc * kx, sc * ky, sc * kx);
+      const m = _m4.compose(_v.set(x, y - 0.35, z), _q, _s).clone();
+      const colour = kind === 'cedar' ? pick(T.cedar, tint) : kind === 'hinoki' ? pick(T.hinoki, tint) : kind === 'maple' ? pick(T.maple, tint)
+        : kind === 'bamboo' ? pick(T.bamboo, tint) : kind === 'cherry' ? pick(T.cherry, tint) : pick(T.broad, tint);
+      if (shared) {
+        if (kind === 'cherry') this.farTrees.cherry.add(farId, m, colour);
+        else if (kind === 'cedar' || kind === 'hinoki' || !this.farTrees.broad) this.farTrees.cedar.add(farId, m, kind === 'cedar' || kind === 'hinoki' ? colour : pick(T.cedar, tint));
+        else if (kind !== 'bare') this.farTrees.broad.add(farId, m, colour);
+        continue;
+      }
+      if (trunks) trunks.push([x, z, (kind === 'bamboo' ? 0.8 : 0.36) * sc, y]);
+      if (kind === 'cherry') { sakura.push({ m, colour }); this._cherries.push([x, z, sc]); }
+      else if (kind === 'cedar' || kind === 'hinoki') cedars.push({ m, colour });
+      else if (kind === 'bare') { if (lod === 0) bare.push({ m }); }
+      else if (kind === 'bamboo' && lod === 0 && P.bamboo && !phone) bamboo.push({ m });
+      else broad.push({ m, colour });
+      // undergrowth among the trees along a stand's edge
+      if (lod === 0 && woods < 0.85 && r2() < (phone ? 0.25 : 0.45)) {
+        const a = r2() * 6.28, d = 2.2 + r2() * 1.8, bx = x + Math.cos(a) * d, bz = z + Math.sin(a) * d;
+        if (!farm || !farm.kindAt(bx, bz)) this._brush(extra, bx, Terrain.surf(H, n, sp, clamp(bx - tile.i * TILE, 0, TILE), clamp(bz - tile.j * TILE, 0, TILE)), bz, r2, woods);
+      }
     }
-    if (far) return null;
+    if (shared) return null;
     const g = new THREE.Group(); g.name = 'forest';
     // the forest casts no shadow: at night the moon's tree shadows barely read, and drawing a forest twice was a
     // quarter of the frame's triangles
     const cast = false;
     // (the second ring's cedars are the plain-coned middle model: nobody can see a drooping rim at 250 m)
-    if (cedars.length && P.cedar) g.add(instanceGroup(lod === 0 ? P.cedar : (P.cedarMid || P.cedar), cedars, { castShadow: cast }));
+    if (cedars.length && P.cedar) g.add(instanceGroup(lod === 0 ? (P.cedarLite || P.cedar) : (P.cedarMid || P.cedar), cedars, { castShadow: cast, tint: true }));
     // (the far ring draws its cherries with the lighter maple, tinted the same: at 200 m nobody can tell, and it
     // is a third fewer triangles across a whole hillside)
     const cherry = lod === 0 ? (P.sakura || P.maple) : (P.sakuraFar || P.maple || P.sakura);
     if (sakura.length && cherry) g.add(instanceGroup(cherry, sakura, { castShadow: cast, tint: true }));
-    if (broad.length && P.broadleaf) g.add(instanceGroup(P.broadleaf, broad, { castShadow: cast, tint: true }));
+    // (the second ring's broadleaf, maples and bamboo too: a few flattened clouds and a stub, one draw)
+    const bl = lod === 0 ? (P.broadleafLite || P.broadleaf) : (P.broadleafMid || P.broadleaf);
+    if (broad.length && bl) g.add(instanceGroup(bl, broad, { castShadow: cast, tint: true }));
     if (bare.length && P.bare) g.add(instanceGroup(P.bare, bare, { castShadow: cast }));
+    if (bamboo.length && P.bamboo) g.add(instanceGroup(P.bamboo, bamboo, { castShadow: cast }));
     return g;
+  }
+
+  /** A clump of brush: sasa spread wide and low, a shrub rounder, a few in flower; a little smaller out in the open. */
+  _brush(list, x, y, z, r, woods) {
+    const t = r(), sasa = t < 0.45, k = 0.75 + 0.25 * Math.min(1, woods * 3);
+    const w = (sasa ? 1.3 + r() * 1.1 : 0.7 + r() * 0.6) * k, h = (sasa ? 0.45 + r() * 0.3 : 0.75 + r() * 0.5) * k;
+    _q.setFromAxisAngle(_up, r() * 6.28); _s.set(w, h, w * (0.8 + r() * 0.4));
+    const c = sasa ? T.brush[Math.floor(r() * 3)] : pick(T.brush, r());
+    list.push(['brush', _m4.compose(_v.set(x, y - 0.08, z), _q, _s).clone(), c]);
+  }
+
+  /**
+   * Petals fallen under the cherries just placed: each tree lays a carpet on the vertices under its crown, thickest
+   * near the trunk and broken by a noise at its rim. (Only under real trees: see _colour.)
+   */
+  _carpets(tile, seg, geo, list) {
+    if (!list.length) return;
+    const f = this.field, sp = TILE / seg, row = seg + 1, ox = tile.i * TILE, oz = tile.j * TILE;
+    const col = geo.attributes.color.array;
+    for (const [cx, cz, sc] of list) {
+      const R = 3.6 * sc;
+      const i0 = Math.max(0, Math.floor((cx - R - ox) / sp)), i1 = Math.min(seg, Math.ceil((cx + R - ox) / sp));
+      const j0 = Math.max(0, Math.floor((cz - R - oz) / sp)), j1 = Math.min(seg, Math.ceil((cz + R - oz) / sp));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const x = ox + i * sp, z = oz + j * sp, d = Math.hypot(x - cx, z - cz);
+        if (d > R) continue;
+        const k = 0.55 * smoothstep(R, R * 0.35, d) * (0.6 + 0.4 * (f.vnoise(x / 2.6, z / 2.6, 13) * 0.5 + 0.5));
+        const v = (j * row + i) * 3;
+        col[v] += (C.petal.r - col[v]) * k; col[v + 1] += (C.petal.g - col[v + 1]) * k; col[v + 2] += (C.petal.b - col[v + 2]) * k;
+      }
+    }
   }
 
   /**
@@ -487,15 +664,29 @@ export class Terrain {
     const seg = FAR_SEG, sp = FAR_SPAN / seg, row = seg + 1, V = row * row;
     const pos = new Float32Array(V * 3), col = new Float32Array(V * 3);
     const x0 = cx - FAR_SPAN / 2, z0 = cz - FAR_SPAN / 2;
+    const farm = this.o.city ? null : this.ground.farm, q = {};
     for (let j = 0; j <= seg; j++) {
       for (let i = 0; i <= seg; i++) {
         const x = x0 + i * sp, z = z0 + j * sp, v = j * row + i;
         const r = Math.hypot(x - cx, z - cz);
         const sink = 3 + 32 * (1 - smoothstep(340, 560, r));
         pos[v * 3] = x; pos[v * 3 + 1] = f.base(x, z) - sink; pos[v * 3 + 2] = z;
-        const nz = f.vnoise(x / 140, z / 140, 8);
-        if (this.o.city) _c.copy(C.cityFar).multiplyScalar(0.85 + 0.3 * (nz * 0.5 + 0.5));
-        else _c.copy(C.far).lerp(C.deep, smoothstep(-0.3, 0.4, nz) * 0.8).lerp(C.grass, 0.12 * (1 - smoothstep(-0.6, 0, nz)));
+        if (this.o.city) _c.copy(C.cityFar).multiplyScalar(0.85 + 0.3 * (f.vnoise(x / 140, z / 140, 8) * 0.5 + 0.5));
+        else if (farm) {
+          // the woods dark where they stand (the forest's own density), the clearings lighter; the farm country's fields
+          // a patchwork of water, young green and soil, one plot to a vertex
+          const wn = farm.wn(x, z), w = farm.woodsOf(wn);
+          _c.copy(C.far).lerp(C.deep, w * 0.8).lerp(C.grass, 0.14 * (1 - w));
+          const zn = farm.zoneOf(wn);
+          if (zn > 0.5) {
+            farm.plotAt(x, z, q);
+            const h = ((Math.imul((q.key % 1048576) | 0, 2654435761) ^ Math.imul(Math.floor(q.key / 1048576) | 0, 40503)) >>> 0) / 4294967296;
+            _c.lerp(h < 0.5 ? C.farWater : h < 0.8 ? C.farGreen : C.farSoil, 0.55 * smoothstep(0.5, 0.65, zn));
+          }
+        } else {
+          const nz = f.vnoise(x / 140, z / 140, 8);
+          _c.copy(C.far).lerp(C.deep, smoothstep(-0.3, 0.4, nz) * 0.8).lerp(C.grass, 0.12 * (1 - smoothstep(-0.6, 0, nz)));
+        }
         col[v * 3] = _c.r; col[v * 3 + 1] = _c.g; col[v * 3 + 2] = _c.b;
       }
       if (j % 34 === 33) yield;
