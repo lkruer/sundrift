@@ -36,9 +36,10 @@ Most of that is fixed or improved this round. What is left is listed under **Sti
 | **The ground was one lime-green colour** with tan smudges on every hill. The smudges were the petal carpet's noise read as dirt. | critical | **improved**. The ground shader adds a lush and pale patchwork, straw drifts, earth bands on steep slopes, and drifts of small flowers up close. (The petal carpets went to the scenery round; see the merge notes.) |
 | **The slope lattice was one tile on a smooth hill**: a grid painted on, the same square repeated a thousand times. | major | **fixed**. A 2 x 2 block of different pockets (grass, a slumped scar, moss and a fern, flowering weeds). Drain holes and stains, grass over the beams. The beams stand proud in the lighting and the ink. |
 | **The road had never been driven on.** | major | **fixed**. Sealed cracks, an oil line in each lane, fresh and bleached patches with seams, worn paint, stones and grass at the shoulder edge. A weathered yellow centre line, the way Japanese mountain roads are marked. |
-| **Forests were identical cones** evenly scattered on bare grass. No undergrowth, no edges, one shade of green. | critical | see "The scenery round" |
-| **The valley floor was empty**: no farms, fields, paddies, houses or paths. Nothing gave scale. | critical | see "The scenery round" |
-| **One shrub was a jarring magenta blob.** | minor | see "The scenery round" |
+| **Forests were identical cones** evenly scattered on bare grass. No undergrowth, no edges, one shade of green. | critical | **fixed**. Clustered stands with gradual edges and undergrowth. A mix of cedar, hinoki, broadleaf, maple, bamboo and cherry, each tree its own colour and size. Rocks only on steep ground. |
+| **The valley floor was empty**: no farms, fields, paddies, houses or paths. Nothing gave scale. | critical | **fixed**. Satoyama farmland laid out from the seed and levelled into the ground: terraced paddies that mirror the sky with rice planted out in rows, tea rows on the contour, vegetable beds with plastic greenhouses, gravel farm tracks. Hamlets of tiled farmhouses and kura with persimmons, house shrines, hedges and stone walls, windows lit at night. |
+| **One shrub was a jarring magenta blob.** | minor | **fixed** (azalea pinks). The roadside also gained concrete gutters with grates in the cuttings, kilometre posts, wayside shrines with jizo, mossy dry-stone walls at the foot of cuttings, and boulders. |
+| **The grass came out as hard-edged camouflage blobs up close.** The cel pass cut its gentle colour noise into flat bands. | major | **fixed**. Each band edge is now a narrow ramp: steep light stays crisp and a lawn becomes a soft mottle. The ground's patchwork changes hue only. |
 | **On the title screen, a great torii leg stood through the middle of the hero shot**: a shrine just past the start puts a torii over the waiting car. | major | **fixed**. It is hidden while the title is up. |
 
 ## The car, the smoke, the effects
@@ -46,7 +47,16 @@ Most of that is fixed or improved this round. What is left is listed under **Sti
 | Problem | Severity | Status |
 |---|---|---|
 | **Tyre smoke**, the drift genre's signature, was a faint wisp in the sun's colour: an orange smear even at 34°. | critical | **fixed**. White, tinted by the light, billowing into a cloud that hangs behind a deep, fast slide. |
-| **The car** is a faceted box with small dark dots across the body that read as rivets or dirt. No panel lines, mirror detail or brake detail; the lamps are flat. | major | see "The city and the car round" |
+| **The car** is a faceted box with small dark dots across the body that read as rivets or dirt. No panel lines, mirror detail or brake detail; the lamps are flat. | major | **improved**. Twin gunmetal stripes with vermilion and silver pinstripes, on a material of their own so every paint keeps them (on purple and black only the pinstripes really show). Door shut lines, chrome handles, a racing fuel cap, reflector rings in the pop-ups, split bumper lamps, round tail reflectors, mud flaps, tyre lettering, slotted discs and bigger calipers. +11% triangles, one more draw. The dots are still there. |
+
+## NEO TOKYO
+
+| Problem | Severity | Status |
+|---|---|---|
+| **At night the buildings were black slabs with windows in them.** Their forms, setbacks and edges vanished against the sky. | critical | **fixed**. Skyglow on the walls (stronger up high, in rain, and on one side, so corners read). Warm street light rising up the lower floors. Pale edges on parapets and corners, glow round lit windows, red aviation lights on anything over 42 m. |
+| **By day the facades were flat window grids.** | major | **improved**. A third of the plain blocks re-clad in tile, cream, grey or brick. Sills, sashes, curtains and blinds, air conditioners, made-up tenant names on upper glass. Flats get plain windows, balconies with laundry and futons, or open corridors with lamps and a stair. |
+| **The pavement and the road were bare.** | major | **improved**. Pruned zelkovas in grated pits, guard rails at the crossings (knockable: RAIL!), utility boxes, rows of bicycles. On the road: lane arrows, speed limits, blue cycle lanes, Tokyo manhole covers. |
+| **No bus lanes (バス専用).** | | not done: the characters are not in the page's font subset. |
 
 ## Menus, HUD, first impression
 
@@ -58,7 +68,27 @@ Most of that is fixed or improved this round. What is left is listed under **Sti
 
 ## Still wrong (an honest list)
 
-(filled in at the end of the round)
+Ranked by how much each one costs the picture.
+
+1. **Foliage reads as rock up close.** Every tree is a cluster of faceted puffs. From the chase camera at speed it
+   reads as an anime tree. Stopped beside a cherry, its blossom is a pile of pink boulders. Fixing it means a
+   different canopy (card clusters, or a leaf shader on the puffs), and nothing this round attempted.
+2. **The car is still a faceted box.** The livery, fittings and brakes helped. The dots across the body are still
+   there, and the body has none of a real 80s coupe's curvature. A proper remodel is its own job.
+3. **Tunnel interiors are one tile texture repeated**, with lamps. No jet fans, no emergency boxes, no signage
+   variety. Long tunnels go monotonous.
+4. **Paddies at noon are a flat blue at a distance.** The rice rows only show near the road.
+5. **No streams, irrigation channels or paths across the fields.** The valley's water only sits in the paddies.
+6. **The hamlets' lit windows barely read from the road at night.** The valley goes dark, apart from the far
+   towns' points.
+7. **Phones get less.** Fewer and simpler hamlets, and no persimmons, stone walls or gutter grates.
+8. **NEO TOKYO has no bus lanes.** The characters バス専用 are not in the page's font subset.
+9. **Load time is longer.** Ready went up by about 0.3 to 0.9 s on the pass with the farmland (still about 7 s on a
+   desktop, 6.5 s on a phone).
+10. **City draw spikes.** On some runs the city's phone gate peaks over its 500-draw budget (624 once) when the
+    camera swings through a drift. It happened before this round too. The game held 60 fps with 0 slow frames.
+11. **The ambience is unheard.** The creatures of each hour were checked by spectrogram, never by ear.
+12. **The pass's open edges, the city's kerb and CLIP** stay as the QA round found them, on purpose.
 
 ## Tools
 

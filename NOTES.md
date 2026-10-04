@@ -655,6 +655,36 @@ detailed. do a harsh self critique of EVERYTHING". The critique is work/CRITIQUE
   - They are dark against the sky: near black on a gold one, the haze taking the far ones.
   - They go home one by one as the day goes, and keep off in the rain.
   - Over the city they are crows at dawn and dusk.
+- **The Milky Way** over the pass on a clear dark night.
+  - A soft band across the sky, warmer toward its heart in the south-west, torn along its middle by dust lanes.
+  - One draw: a dome round the camera, with the noise looked up three ways so the sphere has no seam.
+  - It sits under the cumulus and behind the mountains, faded into the haze near the horizon. The moon, the city's
+    light and cloud take it.
+- **A wet road at night** mirrors a third of the sky (uSkyRefl). Mirroring all of an overcast, light-polluted sky,
+  it was a pale grey sheet with the lamps' streaks drowned in it.
+- **The farmed valley** (the scenery round, merged; its tools are in work/: farm_map, census, forest_mix, step_probe,
+  boot_stages, program_probe, farm_tour, verge_tour, city_leftovers).
+  - farm.js decides from the seed which land is paddy, tea, vegetable plot or house lot, on a 6 m grid, levelled so
+    the car, the terrain and the props agree. Plots are clear of the cuttings, the tunnels and the verge; none in the
+    city.
+  - farmland.js draws it: terraced paddies whose water mirrors the rig's own sky (atmosSky), held under the bloom,
+    with earth bunds and gravel tracks along some terraces; tea rows on the contour; vegetable beds and plastic
+    greenhouses.
+  - Hamlets of farmhouses and kura, with persimmons, house shrines, hedges, bamboo fences and stone walls, windows lit
+    at night, and cheaper far versions.
+  - The woods grow in clustered stands with gradual edges and undergrowth: cedar, hinoki, broadleaf, maple, bamboo
+    and cherry, each tree its own colour and size. Rocks only on steep ground; a field patchwork on the far terrain.
+    The petal carpets only by the verge and under cherries.
+  - The roadside: concrete gutters with grates in the cuttings, kilometre posts, wayside shrines with jizo, mossy
+    dry-stone walls at the foot of some cuttings, boulders. The magenta shrub went azalea pink.
+  - New assets: farmhouse, kura, persimmon_tree, hokora, each passing verify.mjs.
+- **Rice planted out** in the paddies: rows of seedlings 55 cm apart, each a line of tufts, standing out of the water
+  and breaking its mirror. Further off they give way to a faint green haze, so they never shimmer. A first try as a
+  dot grid read as polka-dot cloth.
+- **The cel bands' edges** are a narrow ramp, a fifth of a band, not a cliff. Steep light, a facet or the side of a
+  tree, is as crisp as before. A field whose light wavered a little either side of an edge was cut into hard
+  camouflage blobs (the ground shader's own patchwork changes hue only now, for the same reason).
+- **A knocked guard rail bay** (the city round's) says RAIL! and rings like steel.
 
 ## 3 October, late: the rounds together, the hour by ear, the QA round's last items
 

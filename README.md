@@ -25,7 +25,17 @@ and its fastest dawn, and its last run, under RECORDS on the title, each shareab
   Grass and spring flowers tuft the verges, and a five-storey pagoda stands at every shrine, lanterns glowing
   under its eaves. At night and at dawn the nearer valleys below the road lie under a sea of cloud (unkai), silver
   under the moon and rose at dawn; by day it has burned off. Fireflies pulse over the verges, thin cloud drifts across the stars,
-  now and then a shooting star falls, and the moon (or a low sun) throws shafts of light through the trees.
+  now and then a shooting star falls, and the moon (or a low sun) throws shafts of light through the trees. On a
+  clear dark night the Milky Way spans the sky; by day flocks of birds wheel over the valley.
+- **The valley is farmed.**
+  - Terraced rice paddies mirror the sky, the rice planted out in rows.
+  - Tea grows in rows on the slopes, beside vegetable beds and plastic greenhouses.
+  - Hamlets of tiled farmhouses and storehouses (kura) stand among persimmon trees, house shrines, hedges and stone
+    walls, their windows lit at night.
+  - The woods are mixed stands of cedar, hinoki, broadleaf, maple, bamboo and cherry, with undergrowth at their edges.
+  - The road is lined with concrete gutters in the cuttings, kilometre posts, wayside shrines and mossy dry-stone
+    walls.
+  - The road itself has been driven on: sealed cracks, patches, worn paint and a yellow centre line.
 - **The city.** Grimy street fronts line the road, with rain streaks, roller shutters, air conditioners, fire
   escapes, laundry and roof tanks. Blocks of flats carry balconies across their faces with the washing out, or the
   open corridors to their doors, lit all night, with the stair at one end; a third of the fronts are clad in the pale
@@ -245,6 +255,9 @@ passing 90 degrees).
   share sheet, or copied and saved; `game/src/settings.js`: the settings and their panel; `game/src/platform.js`: the
   hooks a games platform can take (below).
 - `game/src/offroad.js`: the countdown's state and the magnet (its swoop, the flight, the drop, every beat of it).
+- `game/src/farm.js`: which land in the valley is paddy, tea, vegetable plot or house lot, from the seed, levelled into
+  the ground; `game/src/farmland.js`: the farmland drawn (the paddies' sky-mirror water and their rice, the bunds,
+  the rows, the hamlets).
 - `game/src/daylight.js`: the day on the clock: where the sun stands at each hour (a slow golden hour and blue hour,
   a dawn of its own) and the look of fourteen keyed hours (the sky's colours, written as they should come out on the
   screen and turned back through the tone curve, the sun, the night's lamps, the fill light and its colour, the haze,
