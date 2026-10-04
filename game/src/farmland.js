@@ -226,15 +226,37 @@ export class Farmland {
     this.waterMat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.mirrorU);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vPaddyW;')
+        .replace('#include <common>', '#include <common>\nvarying vec3 vPaddyW;\nvarying vec2 vPaddyL;')
         .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
 #ifdef USE_INSTANCING
   vPaddyW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+  // (the paddy's own metres, along its sides: the plane is a unit square the instance stretches)
+  vPaddyL = transformed.xz * vec2(length(instanceMatrix[0].xyz), length(instanceMatrix[2].xyz));
 #else
   vPaddyW = (modelMatrix * vec4(transformed, 1.0)).xyz;
+  vPaddyL = vPaddyW.xz;
 #endif`);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vPaddyW;\nuniform float uPaddyMirror;')
+        .replace('#include <common>', `#include <common>
+varying vec3 vPaddyW;
+varying vec2 vPaddyL;
+uniform float uPaddyMirror;
+// the rice planted out in spring: clumps of seedlings in straight rows along the paddy (60 cm apart, a clump every 35
+// cm), standing out of the water and breaking up its mirror; further off, where a row is under a few pixels, the rows
+// give way to their average, a faint green haze over the water, so they never shimmer
+float paddySeedlings(vec2 L) {
+  // rows across the paddy every 55 cm, each a line of tufts 22 cm apart (a dot grid read as polka-dot cloth)
+  float gx = L.y / 0.55, fx = fract(gx) - 0.5, wx = fwidth(gx);
+  float line = 1.0 - smoothstep(0.075 - wx, 0.075 + wx, abs(fx));
+  float ga = L.x / 0.22, fa = fract(ga) - 0.5, wa = fwidth(ga);
+  float tuft = 1.0 - smoothstep(0.32 - wa, 0.32 + wa, abs(fa));
+  float m = line * mix(1.0, tuft, 1.0 - smoothstep(0.2, 0.5, wa));
+  float near = 1.0 - smoothstep(0.12, 0.3, wx);
+  return mix(0.13, m, near) * 0.85;
+}`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+  float paddySd = paddySeedlings(vPaddyL);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.3, 0.5, 0.15), paddySd);`)
         .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
   // (the sun's highlight under a soft ceiling, as on the road: a sheen across the paddies, never a blaze for the bloom)
   reflectedLight.directSpecular = reflectedLight.directSpecular / (1.0 + reflectedLight.directSpecular * 4.0);
@@ -243,14 +265,14 @@ export class Farmland {
     vec3 rd = reflect(normalize(vPaddyW - cameraPosition), vec3(0.0, 1.0, 0.0));
     float fr = 0.04 + 0.96 * pow(1.0 - clamp(rd.y, 0.0, 1.0), 5.0);
     vec3 sky = min(atmosSky(normalize(vec3(rd.x, max(rd.y, 0.006), rd.z))), vec3(1.05));
-    float k = clamp(fr * uPaddyMirror + 0.06, 0.0, 0.88);
+    float k = clamp(fr * uPaddyMirror + 0.06, 0.0, 0.88) * (1.0 - paddySd);
     reflectedLight.indirectSpecular = sky * k;
     reflectedLight.directDiffuse *= 1.0 - k;
     reflectedLight.indirectDiffuse *= 1.0 - k;
   }
 #endif`);
     };
-    this.waterMat.customProgramCacheKey = () => 'paddy-water-sky';
+    this.waterMat.customProgramCacheKey = () => 'paddy-water-sky-rice';
     this.earthMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0, flatShading: true });
     this.earthMat.name = 'bund'; this.earthMat.userData.tinted = true;
     this.stoneMat = wallMaterial(stoneTexture());

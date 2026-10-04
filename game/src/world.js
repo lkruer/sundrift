@@ -596,10 +596,12 @@ vec3 groundDetail(vec3 c, vec3 P, float up, float wall) {
   if (green < 0.01) return c;
   float d = length(P - cameraPosition);
   float n1 = gNoise(P.xz / 57.0), n2 = gNoise(P.xz / 19.0 + 4.7), n3 = gNoise(P.xz / 6.1 + 9.1);
-  vec3 t = mix(vec3(0.78, 0.92, 0.8), vec3(1.14, 1.07, 0.82), smoothstep(-0.55, 0.55, n1 + 0.35 * n2));
+  // (in hue, at an even brightness: the cel pass cuts any change of brightness into flat bands, and a patchwork of
+  // light and dark grass came out as hard-edged camouflage blobs)
+  vec3 t = mix(vec3(0.84, 1.0, 0.86), vec3(1.12, 1.0, 0.76), smoothstep(-0.55, 0.55, n1 + 0.35 * n2));
   float dry = smoothstep(0.3, 0.8, n2 * 0.7 + n3 * 0.3) * smoothstep(-0.3, 0.3, n1);
-  t = mix(t, vec3(1.2, 1.0, 0.7), dry * 0.36);
-  t *= 1.0 - 0.09 * smoothstep(0.2, 0.8, n3) * (1.0 - smoothstep(60.0, 160.0, d));
+  t = mix(t, vec3(1.2, 1.0, 0.66), dry * 0.36);
+  t /= dot(t, vec3(0.2126, 0.7152, 0.0722));
   // earth in bands on the steeper slopes (the vertex colours turn the steepest to rock)
   float steep = (1.0 - smoothstep(0.7, 0.9, up)) * smoothstep(0.35, 0.6, up);
   float strata = 0.5 + 0.5 * sin(P.y * 1.9 + n2 * 2.4);

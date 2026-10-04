@@ -1,0 +1,164 @@
+[
+ {
+  "wait": 2500
+ },
+ {
+  "js": "document.getElementById('startb').click()"
+ },
+ {
+  "wait": 2500
+ },
+ {
+  "js": "window.__DEBUG__.rainNow(0)"
+ },
+ {
+  "js": "(() => { const D = window.__DEBUG__;\n    window.__FARM__ = (s, kind, h, dist, up) => {\n      D.G.dawnT = D.G.dawnT || 0.01; D.G.hour = h; D.G.hourShown = h; D.G.lastApplied = -9;\n      const p = D.teleport(s, 0), F = D.world.ground.farm;\n      let best = null, bd = Infinity;\n      for (const I of F.plots.values()) if (I.kind === kind) { const d = Math.hypot(I.cx - p.x, I.cz - p.z); if (d < bd) { bd = d; best = I; } }\n      if (!best) { window.__CAM__ = null; return 'none'; }\n      // the camera on the side of the plot toward the road, looking at its middle\n      const dx = p.x - best.cx, dz = p.z - best.cz, dl = Math.hypot(dx, dz) || 1;\n      const cx = best.cx + dx / dl * dist, cz = best.cz + dz / dl * dist, gy = D.world.ground.height(cx, cz);\n      window.__CAM__ = { pos: [cx, Math.max(gy, best.level) + up, cz], look: [best.cx, best.level, best.cz], fov: 55 };\n      return Math.round(bd) + ' m from the road point';\n    }; })()"
+ },
+ {
+  "js": "window.__FARM__(900, 1, 12, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1200_s900_paddy"
+ },
+ {
+  "js": "window.__FARM__(900, 2, 12, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1200_s900_veg"
+ },
+ {
+  "js": "window.__FARM__(900, 3, 12, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1200_s900_house"
+ },
+ {
+  "js": "window.__FARM__(900, 4, 12, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1200_s900_tea"
+ },
+ {
+  "js": "window.__FARM__(2700, 1, 12, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1200_s2700_paddy"
+ },
+ {
+  "js": "window.__FARM__(2700, 2, 12, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1200_s2700_veg"
+ },
+ {
+  "js": "window.__FARM__(2700, 3, 12, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1200_s2700_house"
+ },
+ {
+  "js": "window.__FARM__(2700, 4, 12, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1200_s2700_tea"
+ },
+ {
+  "js": "window.__FARM__(900, 1, 17.3, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1718_s900_paddy"
+ },
+ {
+  "js": "window.__FARM__(900, 2, 17.3, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1718_s900_veg"
+ },
+ {
+  "js": "window.__FARM__(900, 3, 17.3, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1718_s900_house"
+ },
+ {
+  "js": "window.__FARM__(900, 4, 17.3, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1718_s900_tea"
+ },
+ {
+  "js": "window.__FARM__(2700, 1, 17.3, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1718_s2700_paddy"
+ },
+ {
+  "js": "window.__FARM__(2700, 2, 17.3, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1718_s2700_veg"
+ },
+ {
+  "js": "window.__FARM__(2700, 3, 17.3, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1718_s2700_house"
+ },
+ {
+  "js": "window.__FARM__(2700, 4, 17.3, 22, 6)"
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "shot": "farm_1718_s2700_tea"
+ },
+ {
+  "js": "window.__CAM__ = null"
+ }
+]

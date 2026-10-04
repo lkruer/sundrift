@@ -107,7 +107,10 @@ const Cel = {
       vec3 tm = c / (c + 1.0);
       float l = luma(tm);
       float steps = 6.0;
-      float q = floor(l * steps + 0.5) / steps;
+      // (each band's edge a narrow ramp, not a cliff: where the light changes steeply, a facet or the side of a tree, it
+      // is as crisp as before, but a field whose light only wavers a little either side of an edge was cut into hard
+      // camouflage blobs; a ramp over a fifth of a band leaves it a soft mottle)
+      float lq = l * steps, q = (floor(lq) + smoothstep(0.4, 0.6, fract(lq))) / steps;
       // by day the darkest band is the first step up, not black: a face in shade keeps its colour (at night the dark is
       // the picture, and stays as it is)
       q = max(q, uLift * step(0.012, l) * 0.5 / steps);
