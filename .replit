@@ -1,0 +1,15 @@
+# SUNDRIFT on Replit: the game is plain static files in game/ (Three.js comes from a CDN),
+# so the Run button just serves that folder and Publish uses a Static deployment of it.
+modules = ["web", "python-3.11"]
+run = "python3 -m http.server 8080 --directory game"
+
+[nix]
+channel = "stable-24_05"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
+[deployment]
+deploymentTarget = "static"
+publicDir = "game"
